@@ -43,17 +43,17 @@ export default function Header() {
                     {/* Izquierda: hamburguesa + logo */}
                     <div style={{ display: "flex", alignItems: "center", gap: 12, minWidth: 0 }}>
                         <button
-                            onClick={() => setMenuOpen(true)} aria-label="Abrir menú"
-                            style={{ fontSize: 26, background: "none", border: "none", cursor: "pointer", lineHeight: 1 }}
+                            onClick={() => setMenuOpen(true)}
+                            aria-label="Abrir menú"
+                            style={{ position:"relative", left:"0px", fontSize:26, background:"none", border:"none", cursor:"pointer", lineHeight:1 }} //el left nme marca q tan alejado del borde esta
                         >☰</button>
 
                         <button
                             onClick={() => navigate("/")}
-                            style={{ background: "transparent", border: "none", cursor: "pointer",
-                                fontWeight: 800, fontSize: 20, color: "var(--accent)" }}
+                            style={{ background:"transparent", border:"none", cursor:"pointer", fontWeight:800, fontSize:20, color:"var(--accent)" }}
                             aria-label="Ir al inicio"
                         >
-                            LOGO
+                            KERANA
                         </button>
                     </div>
 

@@ -4,6 +4,7 @@ import Home from "./pages/Home";
 import Signup from "./pages/Signup";
 import SearchResults from "./pages/SearchResults";
 import ProfessorDetail from "./pages/ProfessorDetail";
+import Contact from "./pages/Contact";
 
 export default function App() {
     return (
@@ -14,6 +15,7 @@ export default function App() {
                 <Route path="/signup" element={<Signup />} />
                 <Route path="/search" element={<SearchResults />} />
                 <Route path="/profesores/:id" element={<ProfessorDetail />} />
+                <Route path="/contact" element={<Contact />} />
             </Routes>
         </BrowserRouter>
     );
