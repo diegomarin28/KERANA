@@ -1,8 +1,9 @@
 import { BrowserRouter, Routes, Route } from "react-router-dom";
-import Header from "./components/Header";
+import Header from "../src/components/Header.jsx";
 import Home from "./pages/Home";
 import Signup from "./pages/Signup";
-// ...tus otras pages
+import SearchResults from "./pages/SearchResults";
+import ProfessorDetail from "./pages/ProfessorDetail";
 
 export default function App() {
     return (
@@ -11,7 +12,8 @@ export default function App() {
             <Routes>
                 <Route path="/" element={<Home />} />
                 <Route path="/signup" element={<Signup />} />
-                {/* /upload, /review, /about, etc. */}
+                <Route path="/search" element={<SearchResults />} />
+                <Route path="/profesores/:id" element={<ProfessorDetail />} />
             </Routes>
         </BrowserRouter>
     );
