@@ -1,8 +1,9 @@
+
 import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import AuthModal_SignIn from "./AuthModal_SignIn.jsx";
-import AuthModal_HacerResenia from "./AuthModal_HacerResenia.jsx";
-import Sidebar from "./Sidebar.jsx";
+import AuthModal_SignIn from "../components/AuthModal_SignIn.jsx";
+import AuthModal_HacerResenia from "../components/AuthModal_HacerReseña.jsx";
+import Sidebar from "../components/Sidebar.jsx";
 
 export default function Header() {
     const [menuOpen, setMenuOpen] = useState(false);
@@ -43,17 +44,17 @@ export default function Header() {
                     {/* Izquierda: hamburguesa + logo */}
                     <div style={{ display: "flex", alignItems: "center", gap: 12, minWidth: 0 }}>
                         <button
-                            onClick={() => setMenuOpen(true)}
-                            aria-label="Abrir menú"
-                            style={{ position:"relative", left:"0px", fontSize:26, background:"none", border:"none", cursor:"pointer", lineHeight:1 }} //el left nme marca q tan alejado del borde esta
+                            onClick={() => setMenuOpen(true)} aria-label="Abrir menú"
+                            style={{ fontSize: 26, background: "none", border: "none", cursor: "pointer", lineHeight: 1 }}
                         >☰</button>
 
                         <button
                             onClick={() => navigate("/")}
-                            style={{ background:"transparent", border:"none", cursor:"pointer", fontWeight:800, fontSize:20, color:"var(--accent)" }}
+                            style={{ background: "transparent", border: "none", cursor: "pointer",
+                                fontWeight: 800, fontSize: 20, color: "var(--accent)" }}
                             aria-label="Ir al inicio"
                         >
-                            KERANA
+                            LOGO
                         </button>
                     </div>
 

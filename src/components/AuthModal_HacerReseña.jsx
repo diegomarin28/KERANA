@@ -130,7 +130,7 @@ const StarRating = ({ rating, onRatingChange }) => {
     );
 };
 
-export default function AuthModal_HacerResenia({ open, onClose, onSave }) {
+export default function AuthModal_HacerReseA({ open, onClose, onSave }) {
     const [form, setForm] = useState({
         rating: 5,
         titulo: "",
