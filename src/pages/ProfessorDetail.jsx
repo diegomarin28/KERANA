@@ -35,7 +35,7 @@ const mock = {
 
 function StarRow({ value=0 }) {
     return (
-        <div aria-label={`Rating ${value}`} style={{ color:"#f59e0b", fontWeight:700 }}>
+        <div aria-label={`Rating ${value}`} style={{ color:"#f8a415", fontWeight:700 }}>
             {"★".repeat(Math.round(value))}{"☆".repeat(5-Math.round(value))}
         </div>
     );

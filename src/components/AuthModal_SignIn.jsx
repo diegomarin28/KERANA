@@ -1,6 +1,6 @@
 import { useState } from "react";
 
-export default function AuthModal({ open, onClose, onSignedIn }) { //Sirve para en vez de abrir una ventana aparte es como que abre el cuadrado para lo de log in
+export default function AuthModal_SignIn({ open, onClose, onSignedIn }) { //Sirve para en vez de abrir una ventana aparte es como que abre el cuadrado para lo de log in
     const [email, setEmail] = useState("");
     const [pwd, setPwd] = useState("");
 
