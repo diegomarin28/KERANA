@@ -1,118 +1,129 @@
 import { useState } from "react";
+import { supabase } from "../supabase";
 
-// Componente EmailHistory para manejar el historial de emails
-function EmailHistory({ emails, onSelectEmail, onDeleteEmail, currentEmail, onClose }) {
-    if (emails.length === 0) return null;
-
-    return (
-        <div style={{
-            position: "absolute",
-            top: "100%",
-            left: 0,
-            right: 0,
-            backgroundColor: "#fff",
-            border: "1px solid #d1d5db",
-            borderTop: "none",
-            borderRadius: "0 0 8px 8px",
-            boxShadow: "0 4px 6px rgba(0,0,0,0.1)",
-            zIndex: 10,
-            maxHeight: "200px",
-            overflowY: "auto"
-        }}>
-            {emails.map((email, index) => (
-                <div key={index} style={{
-                    display: "flex",
-                    justifyContent: "space-between",
-                    alignItems: "center",
-                    padding: "8px 12px",
-                    borderBottom: index < emails.length - 1 ? "1px solid #f3f4f6" : "none",
-                    cursor: "pointer",
-                    backgroundColor: email === currentEmail ? "#f3f4f6" : "transparent"
-                }}
-                     onMouseEnter={(e) => e.currentTarget.style.backgroundColor = "#f9fafb"}
-                     onMouseLeave={(e) => e.currentTarget.style.backgroundColor = email === currentEmail ? "#f3f4f6" : "transparent"}
-                     onClick={() => {
-                         onSelectEmail(email);
-                         onClose();
-                     }}>
-                    <span style={{ fontSize: 14 }}>{email}</span>
-                    <button
-                        onClick={(e) => {
-                            e.stopPropagation();
-                            onDeleteEmail(email);
-                        }}
-                        style={{
-                            background: "none",
-                            border: "none",
-                            cursor: "pointer",
-                            color: "#6b7280",
-                            fontSize: 14,
-                            padding: "2px 4px"
-                        }}
-                        onMouseEnter={(e) => e.target.style.color = "#dc3545"}
-                        onMouseLeave={(e) => e.target.style.color = "#6b7280"}
-                    >
-                        ✖
-                    </button>
-                </div>
-            ))}
-        </div>
-    );
-}
-
-export default function AuthModal_SignIn({ open, onClose, onSignedIn, onSwitchToSignUp }) {
+export default function AuthModal_SignIn({ open, onClose, onSignedIn }) {
     const [email, setEmail] = useState("");
     const [pwd, setPwd] = useState("");
-    const [emailHistory, setEmailHistory] = useState(() => {
-        try {
-            const saved = localStorage.getItem("emailHistory");
-            return saved ? JSON.parse(saved) : [];
-        } catch {
-            return [];
-        }
-    });
-    const [showHistory, setShowHistory] = useState(false);
+    const [loading, setLoading] = useState(false);
+    const [error, setError] = useState("");
+    const [mode, setMode] = useState("login"); // "login", "signup", "reset"
 
     if (!open) return null;
 
-    const saveEmailToHistory = (email) => {
-        const trimmedEmail = email.trim();
-        if (!trimmedEmail || !trimmedEmail.includes("@")) return;
-
-        const newHistory = [trimmedEmail, ...emailHistory.filter(e => e !== trimmedEmail)].slice(0, 5);
-        setEmailHistory(newHistory);
-        try {
-            localStorage.setItem("emailHistory", JSON.stringify(newHistory));
-        } catch (error) {
-            console.warn("No se pudo guardar el historial de emails:", error);
-        }
-    };
-
-    const deleteEmailFromHistory = (emailToDelete) => {
-        const newHistory = emailHistory.filter(e => e !== emailToDelete);
-        setEmailHistory(newHistory);
-        try {
-            localStorage.setItem("emailHistory", JSON.stringify(newHistory));
-        } catch (error) {
-            console.warn("No se pudo actualizar el historial de emails:", error);
-        }
-    };
-
-    function handleSubmit(e) {
+    // LOGIN
+    async function handleLogin(e) {
         e.preventDefault();
-        // demo: si hay email, "loguea"
-        if (email.trim()) {
-            saveEmailToHistory(email);
-            onSignedIn(email.split("@")[0]); // nombre de usuario = antes del @
-            onClose();
+        setLoading(true);
+        setError("");
+
+        try {
+            const { data, error } = await supabase.auth.signInWithPassword({
+                email: email.trim(),
+                password: pwd,
+            });
+
+            if (error) {
+                setError(error.message);
+            } else {
+                // Éxito - usuario logueado
+                onSignedIn(data.user);
+                onClose();
+                setEmail("");
+                setPwd("");
+            }
+        } catch (err) {
+            setError("Error inesperado: " + err.message);
         }
+
+        setLoading(false);
     }
 
-    const handleSwitchToSignUp = () => {
-        if (onSwitchToSignUp) {
-            onSwitchToSignUp();
+    // REGISTRO
+    async function handleSignup(e) {
+        e.preventDefault();
+        setLoading(true);
+        setError("");
+
+        try {
+            const { data, error } = await supabase.auth.signUp({
+                email: email.trim(),
+                password: pwd,
+            });
+
+            if (error) {
+                setError(error.message);
+            } else {
+                setError("¡Cuenta creada! Revisa tu email para verificar tu cuenta.");
+                // Mantener el modal abierto para que vea el mensaje
+            }
+        } catch (err) {
+            setError("Error inesperado: " + err.message);
         }
-    };
+
+        setLoading(false);
+    }
+
+    // RESET PASSWORD
+    async function handleResetPassword(e) {
+        e.preventDefault();
+        if (!email.trim()) {
+            setError("Ingresa tu email para resetear contraseña");
+            return;
+        }
+
+        setLoading(true);
+        setError("");
+
+        try {
+            const { error } = await supabase.auth.resetPasswordForEmail(email.trim(), {
+                redirectTo: `${window.location.origin}/reset-password`
+            });
+
+            if (error) {
+                setError(error.message);
+            } else {
+                setError("Te enviamos un email para resetear tu contraseña.");
+            }
+        } catch (err) {
+            setError("Error inesperado: " + err.message);
+        }
+
+        setLoading(false);
+    }
+
+    // LOGIN CON GOOGLE
+    async function handleGoogleLogin() {
+        setLoading(true);
+        try {
+            const { error } = await supabase.auth.signInWithOAuth({
+                provider: 'google',
+                options: {
+                    redirectTo: window.location.origin
+                }
+            });
+            if (error) setError(error.message);
+        } catch (err) {
+            setError("Error con Google: " + err.message);
+        }
+        setLoading(false);
+    }
+
+    // LOGIN CON GITHUB
+    async function handleGitHubLogin() {
+        setLoading(true);
+        try {
+            const { error } = await supabase.auth.signInWithOAuth({
+                provider: 'github',
+                options: {
+                    redirectTo: window.location.origin
+                }
+            });
+            if (error) setError(error.message);
+        } catch (err) {
+            setError("Error con GitHub: " + err.message);
+        }
+        setLoading(false);
+    }
 
     return (
         <>
@@ -133,87 +144,144 @@ export default function AuthModal_SignIn({ open, onClose, onSignedIn, onSwitchTo
                     transform: "translate(-50%, -50%)",
                     width: "min(92vw, 520px)", background: "#fff",
                     borderRadius: 12, boxShadow: "0 12px 30px rgba(0,0,0,.25)",
-                    zIndex: 4010, overflow: "visible"
+                    zIndex: 4010, overflow: "hidden"
                 }}
             >
                 <div style={{ padding: "18px 22px", borderBottom: "1px solid #eee",
                     display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                    <h3 id="auth-title" style={{ margin: 0 }}>Iniciar sesión</h3>
+                    <h3 id="auth-title" style={{ margin: 0 }}>
+                        {mode === "login" ? "Iniciar sesión" :
+                            mode === "signup" ? "Crear cuenta" : "Resetear contraseña"}
+                    </h3>
                     <button onClick={onClose} aria-label="Cerrar"
                             style={{ border: "none", background: "transparent", fontSize: 20, cursor: "pointer" }}>✖</button>
                 </div>
 
                 <div style={{ padding: 22 }}>
-                    {/* Social (dummy) */}
-                    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginBottom: 14 }}>
-                        <button style={socBtn}>Google</button>
-                        <button style={socBtn}>GitHub</button>
-                    </div>
+                    {/* Social (funcional) */}
+                    {mode !== "reset" && (
+                        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginBottom: 14 }}>
+                            <button onClick={handleGoogleLogin} disabled={loading} style={socBtn}>
+                                {loading ? "..." : "Google"}
+                            </button>
+                            <button onClick={handleGitHubLogin} disabled={loading} style={socBtn}>
+                                {loading ? "..." : "GitHub"}
+                            </button>
+                        </div>
+                    )}
 
                     <div style={{ textAlign: "center", color: "#6b7280", fontSize: 12, margin: "8px 0 16px" }}>
-                        o con tu correo
+                        {mode === "reset" ? "Ingresa tu email" : "o con tu correo"}
                     </div>
 
-                    <form onSubmit={handleSubmit} style={{ display: "grid", gap: 12 }}>
-                        <label style={label}>
-                            Email
-                            <div style={{ position: "relative" }}>
-                                <input
-                                    type="email"
-                                    value={email}
-                                    onChange={e => setEmail(e.target.value)}
-                                    onFocus={() => setShowHistory(true)}
-                                    onBlur={() => setTimeout(() => setShowHistory(false), 200)}
-                                    required
-                                    style={input}
-                                />
-                                {showHistory && (
-                                    <EmailHistory
-                                        emails={emailHistory}
-                                        onSelectEmail={setEmail}
-                                        onDeleteEmail={deleteEmailFromHistory}
-                                        currentEmail={email}
-                                        onClose={() => setShowHistory(false)}
-                                    />
-                                )}
-                            </div>
-                        </label>
-                        <label style={label}>
-                            Contraseña
-                            <input type="password" value={pwd} onChange={e=>setPwd(e.target.value)} required style={input}/>
-                        </label>
-
-                        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", fontSize: 14 }}>
-                            <label style={{ display: "flex", gap: 8, alignItems: "center" }}>
-                                <input type="checkbox" /> Recordarme
+                    {/* FORMULARIO LOGIN */}
+                    {mode === "login" && (
+                        <form onSubmit={handleLogin} style={{ display: "grid", gap: 12 }}>
+                            <label style={label}>
+                                Email
+                                <input type="email" value={email} onChange={e=>setEmail(e.target.value)}
+                                       required style={input} disabled={loading}/>
                             </label>
-                            <a href="#" onClick={(e)=>e.preventDefault()}>¿Olvidaste tu contraseña?</a>
-                        </div>
+                            <label style={label}>
+                                Contraseña
+                                <input type="password" value={pwd} onChange={e=>setPwd(e.target.value)}
+                                       required style={input} disabled={loading}/>
+                            </label>
 
-                        <button type="submit" style={submitBtn}>Ingresar</button>
+                            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", fontSize: 14 }}>
+                                <label style={{ display: "flex", gap: 8, alignItems: "center" }}>
+                                    <input type="checkbox" /> Recordarme
+                                </label>
+                                <button type="button" onClick={()=>setMode("reset")}
+                                        style={{background:"none", border:"none", color:"#2563eb", cursor:"pointer"}}>
+                                    ¿Olvidaste tu contraseña?
+                                </button>
+                            </div>
 
-                        <p style={{ textAlign: "center", margin: 0 }}>
-                            ¿No tenés cuenta?{" "}
-                            {onSwitchToSignUp ? (
-                                <button
-                                    type="button"
-                                    onClick={handleSwitchToSignUp}
-                                    style={{
-                                        background: "none",
-                                        border: "none",
-                                        color: "#2563eb",
-                                        cursor: "pointer",
-                                        textDecoration: "underline",
-                                        fontSize: "inherit"
-                                    }}
-                                >
+                            <button type="submit" disabled={loading} style={{...submitBtn, opacity: loading ? 0.7 : 1}}>
+                                {loading ? "Ingresando..." : "Ingresar"}
+                            </button>
+
+                            <p style={{ textAlign: "center", margin: 0 }}>
+                                ¿No tenés cuenta?
+                                <button type="button" onClick={()=>setMode("signup")}
+                                        style={{background:"none", border:"none", color:"#2563eb", cursor:"pointer", marginLeft: 5}}>
                                     Crear cuenta
                                 </button>
-                            ) : (
-                                <a href="/signup">Crear cuenta</a>
-                            )}
-                        </p>
-                    </form>
+                            </p>
+                        </form>
+                    )}
+
+                    {/* FORMULARIO SIGNUP */}
+                    {mode === "signup" && (
+                        <form onSubmit={handleSignup} style={{ display: "grid", gap: 12 }}>
+                            <label style={label}>
+                                Email
+                                <input type="email" value={email} onChange={e=>setEmail(e.target.value)}
+                                       required style={input} disabled={loading}/>
+                            </label>
+                            <label style={label}>
+                                Contraseña (mínimo 6 caracteres)
+                                <input type="password" value={pwd} onChange={e=>setPwd(e.target.value)}
+                                       required minLength={6} style={input} disabled={loading}/>
+                            </label>
+
+                            <button type="submit" disabled={loading} style={{...submitBtn, opacity: loading ? 0.7 : 1}}>
+                                {loading ? "Creando cuenta..." : "Crear cuenta"}
+                            </button>
+
+                            <p style={{ textAlign: "center", margin: 0 }}>
+                                ¿Ya tenés cuenta?
+                                <button type="button" onClick={()=>setMode("login")}
+                                        style={{background:"none", border:"none", color:"#2563eb", cursor:"pointer", marginLeft: 5}}>
+                                    Iniciar sesión
+                                </button>
+                            </p>
+                        </form>
+                    )}
+
+                    {/* FORMULARIO RESET PASSWORD */}
+                    {mode === "reset" && (
+                        <form onSubmit={handleResetPassword} style={{ display: "grid", gap: 12 }}>
+                            <label style={label}>
+                                Email
+                                <input type="email" value={email} onChange={e=>setEmail(e.target.value)}
+                                       required style={input} disabled={loading}/>
+                            </label>
+
+                            <button type="submit" disabled={loading} style={{...submitBtn, opacity: loading ? 0.7 : 1}}>
+                                {loading ? "Enviando..." : "Enviar email de reset"}
+                            </button>
+
+                            <p style={{ textAlign: "center", margin: 0 }}>
+                                <button type="button" onClick={()=>setMode("login")}
+                                        style={{background:"none", border:"none", color:"#2563eb", cursor:"pointer"}}>
+                                    ← Volver al login
+                                </button>
+                            </p>
+                            <p style={{ marginTop: 10, fontSize: 14 }}>
+                                ¿No tenés cuenta?{" "}
+                                <button onClick={onSwitchToSignUp} style={{ color: "#2563eb", background: "none", border: "none", cursor: "pointer" }}>
+                                    Crear cuenta
+                                </button>
+                            </p>
+
+                        </form>
+                    )}
+
+                    {/* Mensajes de error/éxito */}
+                    {error && (
+                        <div style={{
+                            marginTop: 12,
+                            padding: 12,
+                            backgroundColor: error.includes("¡") || error.includes("Te enviamos") ? "#d4edda" : "#f8d7da",
+                            color: error.includes("¡") || error.includes("Te enviamos") ? "#155724" : "#721c24",
+                            borderRadius: 6,
+                            fontSize: 14
+                        }}>
+                            {error}
+                        </div>
+                    )}
                 </div>
             </div>
         </>

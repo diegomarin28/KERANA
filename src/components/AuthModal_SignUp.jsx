@@ -140,6 +140,13 @@ export default function AuthModal_SignUp({ open, onClose, onSignedIn, onSwitchTo
                                 <a href="/signin">Iniciar sesión</a>
                             )}
                         </p>
+                        <p style={{ marginTop: 10, fontSize: 14 }}>
+                            ¿Ya tenés cuenta?{" "}
+                            <button onClick={onSwitchToSignIn} style={{ color: "#2563eb", background: "none", border: "none", cursor: "pointer" }}>
+                                Iniciá sesión
+                            </button>
+                        </p>
+
                     </form>
                 </div>
             </div>

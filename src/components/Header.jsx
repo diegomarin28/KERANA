@@ -26,11 +26,11 @@ export default function Header() {
         // Aquí puedes implementar la lógica para guardar la reseña
     };
 
-    const handleSignedIn = (username) => {
-        setUser({ name: username });
+    function handleSignedIn(u) {
+        setUser(u || { email: "demo@kerana.app" });
         setAuthOpen(false);
         setSignUpOpen(false);
-    };
+    }
 
     const handleLogout = () => {
         setUser(null);
@@ -140,83 +140,31 @@ export default function Header() {
                     </nav>
 
                     {/* Derecha: Sign Up / Sign In o usuario logueado */}
-                    <div style={{ display: "flex", alignItems: "center", gap: 10, flexShrink: 0 }}>
+                    {/* Derecha del header */}
+                    <div>
                         {!user ? (
-                            <>
-                                <button
-                                    onClick={() => setSignUpOpen(true)}
-                                    style={{
-                                        padding: "10px 20px",
-                                        fontSize: 16,
-                                        backgroundColor: "#28a745",
-                                        borderColor: "#28a745",
-                                        color: "#fff",
-                                        borderRadius: 6,
-                                        cursor: "pointer"
-                                    }}
-                                >
-                                    Sign Up
-                                </button>
-                                <button
-                                    onClick={() => setAuthOpen(true)}
-                                    style={{
-                                        padding: "10px 20px",
-                                        fontSize: 16,
-                                        backgroundColor: "#2563eb",
-                                        color: "#fff",
-                                        border: "none",
-                                        borderRadius: 6,
-                                        cursor: "pointer"
-                                    }}
-                                >
-                                    Sign In
-                                </button>
-                            </>
+                            <button
+                                onClick={() => setAuthOpen(true)}
+                                className="btn-primary"
+                                style={{ height: 40, padding: "0 16px", borderRadius: 9999 }}
+                            >
+                                Sign in
+                            </button>
                         ) : (
                             <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                                <span
-                                    style={{
-                                        fontWeight: 600,
-                                        maxWidth: 120,
-                                        overflow: "hidden",
-                                        textOverflow: "ellipsis"
-                                    }}
-                                >
-                                    {user.name}
-                                </span>
+                                <span style={{ fontWeight: 700 }}>{user.email || "Usuario"}</span>
                                 <div
-                                    title={user.name}
                                     style={{
-                                        width: 36,
-                                        height: 36,
-                                        borderRadius: "50%",
-                                        background: "var(--accent)",
-                                        color: "#fff",
-                                        display: "flex",
-                                        alignItems: "center",
-                                        justifyContent: "center",
-                                        fontWeight: 800
+                                        width: 36, height: 36, borderRadius: "50%", background: "var(--accent)", color: "#fff",
+                                        display: "grid", placeItems: "center", fontWeight: 800
                                     }}
                                 >
-                                    {user.name[0].toUpperCase()}
+                                    {(user.email?.[0] || "U").toUpperCase()}
                                 </div>
-                                <button
-                                    onClick={handleLogout}
-                                    style={{
-                                        padding: "8px 12px",
-                                        fontSize: 12,
-                                        backgroundColor: "#dc3545",
-                                        color: "#fff",
-                                        border: "none",
-                                        borderRadius: 4,
-                                        cursor: "pointer"
-                                    }}
-                                >
-                                    Salir
-                                </button>
                             </div>
                         )}
                     </div>
+
                 </div>
             </header>
 
@@ -237,12 +185,14 @@ export default function Header() {
                 onSignedIn={handleSignedIn}
                 onSwitchToSignUp={switchToSignUp}
             />
+
             <AuthModal_SignUp
                 open={signUpOpen}
                 onClose={() => setSignUpOpen(false)}
                 onSignedIn={handleSignedIn}
                 onSwitchToSignIn={switchToSignIn}
             />
+
             <AuthModal_HacerResenia
                 open={reseniaOpen}
                 onClose={() => setReseniaOpen(false)}
