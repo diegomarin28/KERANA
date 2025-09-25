@@ -2,7 +2,7 @@ import { useLocation } from "react-router-dom";
 import { useMemo, useState } from "react";
 import ResultCard from "../components/ResultCard";
 import SearchBar from "../components/SearchBar";
-import { SUBJECTS } from "../data/subjects"; // Importar los cursos
+import { SUBJECTS } from "../data/subjects";
 
 // Función para normalizar texto (quitar acentos y convertir a minúsculas)
 const normalizeText = (text) => {
@@ -37,25 +37,30 @@ export default function SearchResults() {
     const res = useMemo(() => {
         const ql = normalizeText(q);
 
+        // PROFESORES - Solo buscar por NOMBRE
         const prof = demo.profesores.filter(p =>
-            [p.nombre, p.materia].some(t => normalizeText(t).includes(ql)) && p.rating >= minRating
+            normalizeText(p.nombre).includes(ql) && p.rating >= minRating
         );
 
+        // APUNTES - Solo buscar por TÍTULO (no por autor)
         const apunt = demo.apuntes.filter(a =>
-            [a.titulo, a.autor].some(t => normalizeText(t).includes(ql)) && a.rating >= minRating
+            normalizeText(a.titulo).includes(ql) && a.rating >= minRating
         );
 
+        // MENTORES - Solo buscar por NOMBRE
         const ment = demo.mentores.filter(m =>
-            [m.nombre, m.area].some(t => normalizeText(t).includes(ql)) && m.rating >= minRating
+            normalizeText(m.nombre).includes(ql) && m.rating >= minRating
         );
 
-        // Crear cursos dinámicamente
+        // CURSOS - Solo buscar por NOMBRE DEL CURSO
         const cursos = SUBJECTS
             .filter(c => normalizeText(c.name).includes(ql))
             .map(subject => ({
                 ...subject,
-                rating: 4.5, // Rating promedio del curso
-                profesores: demo.profesores.filter(p => normalizeText(p.materia).includes(normalizeText(subject.name.split(' ')[0])))
+                rating: 4.5,
+                profesores: demo.profesores.filter(p =>
+                    normalizeText(p.materia).includes(normalizeText(subject.name.split(' ')[0]))
+                )
             }))
             .filter(c => c.rating >= minRating);
 
@@ -102,7 +107,7 @@ export default function SearchResults() {
                 </div>
             ) : (
                 <>
-                    {/* NUEVA SECCIÓN DE CURSOS */}
+                    {/* CURSOS */}
                     {show("cursos") && res.cursos.length > 0 && (
                         <section className="section">
                             <div className="section-title">Cursos <span className="section-count">{res.cursos.length}</span></div>
@@ -121,6 +126,7 @@ export default function SearchResults() {
                         </section>
                     )}
 
+                    {/* MENTORES */}
                     {show("mentores") && res.ment.length > 0 && (
                         <section className="section">
                             <div className="section-title">Mentores <span className="section-count">{res.ment.length}</span></div>
@@ -138,6 +144,7 @@ export default function SearchResults() {
                         </section>
                     )}
 
+                    {/* APUNTES */}
                     {show("apuntes") && res.apunt.length > 0 && (
                         <section className="section">
                             <div className="section-title">Apuntes <span className="section-count">{res.apunt.length}</span></div>
@@ -155,6 +162,7 @@ export default function SearchResults() {
                         </section>
                     )}
 
+                    {/* PROFESORES */}
                     {show("profesores") && res.prof.length > 0 && (
                         <section className="section">
                             <div className="section-title">Profesores <span className="section-count">{res.prof.length}</span></div>
