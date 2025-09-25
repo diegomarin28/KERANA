@@ -2,6 +2,14 @@ import { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import useRecentSearches from "../hooks/useRecentSearches";
 
+// Función para normalizar texto (quitar acentos y convertir a minúsculas)
+const normalizeText = (text) => {
+    return text
+        .toLowerCase()
+        .normalize("NFD")
+        .replace(/[\u0300-\u036f]/g, "");
+};
+
 export default function SearchBar() {
     const navigate = useNavigate();
     const { items, add, remove, clear } = useRecentSearches();
@@ -27,8 +35,9 @@ export default function SearchBar() {
         navigate(`/search?q=${encodeURIComponent(query)}`);
     };
 
+    // Filtrar sugerencias con texto normalizado
     const suggestions = q
-        ? items.filter((s) => s.toLowerCase().includes(q.toLowerCase()))
+        ? items.filter((s) => normalizeText(s).includes(normalizeText(q)))
         : items;
 
     return (

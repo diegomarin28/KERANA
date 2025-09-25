@@ -3,6 +3,7 @@ import { supabase } from "../supabase";
 
 export default function AuthModal_SignIn({ open, onClose, onSignedIn }) {
     const [email, setEmail] = useState("");
+    const [name, setName] = useState("");
     const [pwd, setPwd] = useState("");
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState("");
@@ -28,6 +29,7 @@ export default function AuthModal_SignIn({ open, onClose, onSignedIn }) {
                 // Éxito - usuario logueado
                 onSignedIn(data.user);
                 onClose();
+                setName("");
                 setEmail("");
                 setPwd("");
             }
@@ -215,6 +217,11 @@ export default function AuthModal_SignIn({ open, onClose, onSignedIn }) {
                     {/* FORMULARIO SIGNUP */}
                     {mode === "signup" && (
                         <form onSubmit={handleSignup} style={{ display: "grid", gap: 12 }}>
+                            <label style={label}>
+                                Nombre
+                                <input type="name" value={name} onChange={e=>setName(e.target.value)}
+                                       required style={input} disabled={loading}/>
+                            </label>
                             <label style={label}>
                                 Email
                                 <input type="email" value={email} onChange={e=>setEmail(e.target.value)}

@@ -152,7 +152,7 @@ export default function Header() {
                             </button>
                         ) : (
                             <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                                <span style={{ fontWeight: 700 }}>{user.email || "Usuario"}</span>
+                                <span style={{ fontWeight: 700 }}>{user.name || "Usuario"}</span>
                                 <div
                                     style={{
                                         width: 36, height: 36, borderRadius: "50%", background: "var(--accent)", color: "#fff",

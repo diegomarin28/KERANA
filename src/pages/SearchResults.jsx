@@ -1,6 +1,16 @@
 import { useLocation } from "react-router-dom";
 import { useMemo, useState } from "react";
 import ResultCard from "../components/ResultCard";
+import SearchBar from "../components/SearchBar";
+import { SUBJECTS } from "../data/subjects"; // Importar los cursos
+
+// Función para normalizar texto (quitar acentos y convertir a minúsculas)
+const normalizeText = (text) => {
+    return text
+        .toLowerCase()
+        .normalize("NFD")
+        .replace(/[\u0300-\u036f]/g, "");
+};
 
 const demo = {
     profesores: [
@@ -22,33 +32,52 @@ export default function SearchResults() {
     const q = (new URLSearchParams(search).get("q") || "").trim();
     const [tab, setTab] = useState("todo");
     const [minRating, setMinRating] = useState(0);
-    const [loading] = useState(false); // cambialo a true si hacés fetch real
+    const [loading] = useState(false);
 
     const res = useMemo(() => {
-        const ql = q.toLowerCase();
+        const ql = normalizeText(q);
+
         const prof = demo.profesores.filter(p =>
-            [p.nombre, p.materia].some(t => t.toLowerCase().includes(ql)) && p.rating >= minRating
+            [p.nombre, p.materia].some(t => normalizeText(t).includes(ql)) && p.rating >= minRating
         );
+
         const apunt = demo.apuntes.filter(a =>
-            [a.titulo, a.autor].some(t => t.toLowerCase().includes(ql)) && a.rating >= minRating
+            [a.titulo, a.autor].some(t => normalizeText(t).includes(ql)) && a.rating >= minRating
         );
+
         const ment = demo.mentores.filter(m =>
-            [m.nombre, m.area].some(t => t.toLowerCase().includes(ql)) && m.rating >= minRating
+            [m.nombre, m.area].some(t => normalizeText(t).includes(ql)) && m.rating >= minRating
         );
-        return { prof, apunt, ment };
+
+        // Crear cursos dinámicamente
+        const cursos = SUBJECTS
+            .filter(c => normalizeText(c.name).includes(ql))
+            .map(subject => ({
+                ...subject,
+                rating: 4.5, // Rating promedio del curso
+                profesores: demo.profesores.filter(p => normalizeText(p.materia).includes(normalizeText(subject.name.split(' ')[0])))
+            }))
+            .filter(c => c.rating >= minRating);
+
+        return { prof, apunt, ment, cursos };
     }, [q, minRating]);
 
     const show = (k) => tab === "todo" || tab === k;
-    const total = res.prof.length + res.apunt.length + res.ment.length;
+    const total = res.prof.length + res.apunt.length + res.ment.length + res.cursos.length;
 
     return (
         <div className="container" style={{ padding: "18px 0 36px" }}>
+            {/* Buscador en resultados */}
+            <div style={{ marginBottom: "24px" }}>
+                <SearchBar />
+            </div>
+
             <div className="results-head">
-                <h2 style={{ margin: 0 }}>Resultados {q && <>para “<em>{q}</em>”</>}</h2>
+                <h2 style={{ margin: 0 }}>Resultados {q && <>para "<em>{q}</em>"</>}</h2>
                 <span className="badge-chip">{total} items</span>
 
                 <div className="tabs" style={{ marginLeft: "auto" }}>
-                    {["todo","mentores","apuntes","profesores"].map(t => (
+                    {["todo","cursos","mentores","apuntes","profesores"].map(t => (
                         <button key={t} className={`tab ${tab===t ? "active" : ""}`} onClick={()=>setTab(t)}>
                             {t[0].toUpperCase()+t.slice(1)}
                         </button>
@@ -73,6 +102,25 @@ export default function SearchResults() {
                 </div>
             ) : (
                 <>
+                    {/* NUEVA SECCIÓN DE CURSOS */}
+                    {show("cursos") && res.cursos.length > 0 && (
+                        <section className="section">
+                            <div className="section-title">Cursos <span className="section-count">{res.cursos.length}</span></div>
+                            <div className="grid">
+                                {res.cursos.map(c => (
+                                    <ResultCard
+                                        key={c.id}
+                                        title={c.name}
+                                        subtitle={`${c.profesores?.length || 0} profesores`}
+                                        rating={c.rating}
+                                        pill="Curso"
+                                        to={`/cursos/${c.id}`}
+                                    />
+                                ))}
+                            </div>
+                        </section>
+                    )}
+
                     {show("mentores") && res.ment.length > 0 && (
                         <section className="section">
                             <div className="section-title">Mentores <span className="section-count">{res.ment.length}</span></div>
