@@ -1,24 +1,94 @@
 import { useState } from "react";
+import { supabase } from "../supabase";
 
 export default function AuthModal_SignUp({ open, onClose, onSignedIn, onSwitchToSignIn }) {
     const [email, setEmail] = useState("");
     const [pwd, setPwd] = useState("");
     const [confirmPwd, setConfirmPwd] = useState("");
     const [name, setName] = useState("");
+    const [loading, setLoading] = useState(false);
+    const [error, setError] = useState("");
 
     if (!open) return null;
 
-    function handleSubmit(e) {
+    // REGISTRO CON SUPABASE
+    async function handleSubmit(e) {
         e.preventDefault();
+
+        // Validaciones
         if (pwd !== confirmPwd) {
-            alert("Las contraseñas no coinciden");
+            setError("Las contraseñas no coinciden");
             return;
         }
-        // demo: si hay email y nombre, "registra"
-        if (email.trim() && name.trim()) {
-            onSignedIn(name.trim()); // usar el nombre completo como username
-            onClose();
+
+        if (pwd.length < 6) {
+            setError("La contraseña debe tener al menos 6 caracteres");
+            return;
         }
+
+        setLoading(true);
+        setError("");
+
+        try {
+            const { data, error } = await supabase.auth.signUp({
+                email: email.trim(),
+                password: pwd,
+                options: {
+                    data: {
+                        name: name.trim(), // Guardar nombre en metadata
+                    }
+                }
+            });
+
+            if (error) {
+                setError(error.message);
+            } else {
+                setError("¡Cuenta creada! Revisa tu email para verificar tu cuenta.");
+                // Limpiar formulario
+                setName("");
+                setEmail("");
+                setPwd("");
+                setConfirmPwd("");
+            }
+        } catch (err) {
+            setError("Error inesperado: " + err.message);
+        }
+
+        setLoading(false);
+    }
+
+    // LOGIN CON GOOGLE
+    async function handleGoogleSignup() {
+        setLoading(true);
+        try {
+            const { error } = await supabase.auth.signInWithOAuth({
+                provider: 'google',
+                options: {
+                    redirectTo: window.location.origin
+                }
+            });
+            if (error) setError("Error con Google: " + error.message);
+        } catch (err) {
+            setError("Error con Google: " + err.message);
+        }
+        setLoading(false);
+    }
+
+    // LOGIN CON GITHUB
+    async function handleGitHubSignup() {
+        setLoading(true);
+        try {
+            const { error } = await supabase.auth.signInWithOAuth({
+                provider: 'github',
+                options: {
+                    redirectTo: window.location.origin
+                }
+            });
+            if (error) setError("Error con GitHub: " + error.message);
+        } catch (err) {
+            setError("Error con GitHub: " + err.message);
+        }
+        setLoading(false);
     }
 
     const handleSwitchToSignIn = () => {
@@ -57,10 +127,14 @@ export default function AuthModal_SignUp({ open, onClose, onSignedIn, onSwitchTo
                 </div>
 
                 <div style={{ padding: 22 }}>
-                    {/* Social (dummy) */}
+                    {/* Social (funcional) */}
                     <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginBottom: 14 }}>
-                        <button style={socBtn}>Google</button>
-                        <button style={socBtn}>GitHub</button>
+                        <button onClick={handleGoogleSignup} disabled={loading} style={socBtn}>
+                            {loading ? "..." : "Google"}
+                        </button>
+                        <button onClick={handleGitHubSignup} disabled={loading} style={socBtn}>
+                            {loading ? "..." : "GitHub"}
+                        </button>
                     </div>
 
                     <div style={{ textAlign: "center", color: "#6b7280", fontSize: 12, margin: "8px 0 16px" }}>
@@ -75,6 +149,8 @@ export default function AuthModal_SignUp({ open, onClose, onSignedIn, onSwitchTo
                                 value={name}
                                 onChange={e => setName(e.target.value)}
                                 required
+                                disabled={loading}
+                                placeholder="Tu nombre completo"
                                 style={input}
                             />
                         </label>
@@ -85,6 +161,8 @@ export default function AuthModal_SignUp({ open, onClose, onSignedIn, onSwitchTo
                                 value={email}
                                 onChange={e => setEmail(e.target.value)}
                                 required
+                                disabled={loading}
+                                placeholder="tu@email.com"
                                 style={input}
                             />
                         </label>
@@ -95,6 +173,9 @@ export default function AuthModal_SignUp({ open, onClose, onSignedIn, onSwitchTo
                                 value={pwd}
                                 onChange={e => setPwd(e.target.value)}
                                 required
+                                minLength={6}
+                                disabled={loading}
+                                placeholder="Mínimo 6 caracteres"
                                 style={input}
                             />
                         </label>
@@ -105,18 +186,34 @@ export default function AuthModal_SignUp({ open, onClose, onSignedIn, onSwitchTo
                                 value={confirmPwd}
                                 onChange={e => setConfirmPwd(e.target.value)}
                                 required
+                                minLength={6}
+                                disabled={loading}
+                                placeholder="Repite tu contraseña"
                                 style={input}
                             />
                         </label>
 
                         <div style={{ fontSize: 12, color: "#6b7280" }}>
                             Al crear una cuenta, aceptás nuestros{" "}
-                            <a href="#" onClick={e => e.preventDefault()}>términos y condiciones</a> y{" "}
-                            <a href="#" onClick={e => e.preventDefault()}>política de privacidad</a>.
+                            <a href="#" onClick={e => e.preventDefault()} style={{ color: "#2563eb" }}>
+                                términos y condiciones
+                            </a> y{" "}
+                            <a href="#" onClick={e => e.preventDefault()} style={{ color: "#2563eb" }}>
+                                política de privacidad
+                            </a>.
                         </div>
 
-                        <button type="submit" style={{...submitBtn, backgroundColor: "#28a745"}}>
-                            Crear cuenta
+                        <button
+                            type="submit"
+                            disabled={loading}
+                            style={{
+                                ...submitBtn,
+                                backgroundColor: "#28a745",
+                                opacity: loading ? 0.7 : 1,
+                                cursor: loading ? "not-allowed" : "pointer"
+                            }}
+                        >
+                            {loading ? "Creando cuenta..." : "Crear cuenta"}
                         </button>
 
                         <p style={{ textAlign: "center", margin: 0 }}>
@@ -125,6 +222,7 @@ export default function AuthModal_SignUp({ open, onClose, onSignedIn, onSwitchTo
                                 <button
                                     type="button"
                                     onClick={handleSwitchToSignIn}
+                                    disabled={loading}
                                     style={{
                                         background: "none",
                                         border: "none",
@@ -137,17 +235,24 @@ export default function AuthModal_SignUp({ open, onClose, onSignedIn, onSwitchTo
                                     Iniciar sesión
                                 </button>
                             ) : (
-                                <a href="/signin">Iniciar sesión</a>
+                                <a href="/signin" style={{ color: "#2563eb" }}>Iniciar sesión</a>
                             )}
                         </p>
-                        <p style={{ marginTop: 10, fontSize: 14 }}>
-                            ¿Ya tenés cuenta?{" "}
-                            <button onClick={onSwitchToSignIn} style={{ color: "#2563eb", background: "none", border: "none", cursor: "pointer" }}>
-                                Iniciá sesión
-                            </button>
-                        </p>
-
                     </form>
+
+                    {/* Mensajes de error/éxito */}
+                    {error && (
+                        <div style={{
+                            marginTop: 12,
+                            padding: 12,
+                            backgroundColor: error.includes("¡") || error.includes("creada") ? "#d4edda" : "#f8d7da",
+                            color: error.includes("¡") || error.includes("creada") ? "#155724" : "#721c24",
+                            borderRadius: 6,
+                            fontSize: 14
+                        }}>
+                            {error}
+                        </div>
+                    )}
                 </div>
             </div>
         </>

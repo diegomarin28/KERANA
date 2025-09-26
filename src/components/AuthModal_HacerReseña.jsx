@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { ratingsAPI } from "../api/Database";
 
 // Componente de estrellas interactivo
 const StarRating = ({ rating, onRatingChange }) => {
@@ -41,10 +42,8 @@ const StarRating = ({ rating, onRatingChange }) => {
                                 transition: "color 0.15s ease"
                             }}
                         >
-                            {/* Estrella base (gris) */}
                             <span>★</span>
 
-                            {/* Mitad izquierda clickeable */}
                             <div
                                 style={{
                                     position: "absolute",
@@ -58,7 +57,6 @@ const StarRating = ({ rating, onRatingChange }) => {
                                 onClick={() => handleStarClick(starIndex - 0.5)}
                             />
 
-                            {/* Mitad derecha clickeable */}
                             <div
                                 style={{
                                     position: "absolute",
@@ -72,7 +70,6 @@ const StarRating = ({ rating, onRatingChange }) => {
                                 onClick={() => handleStarClick(starIndex)}
                             />
 
-                            {/* Overlay para media estrella */}
                             {displayRating >= starIndex - 0.5 && displayRating < starIndex && (
                                 <div
                                     style={{
@@ -90,7 +87,6 @@ const StarRating = ({ rating, onRatingChange }) => {
                                 </div>
                             )}
 
-                            {/* Overlay para estrella completa */}
                             {displayRating >= starIndex && (
                                 <div
                                     style={{
@@ -130,15 +126,13 @@ const StarRating = ({ rating, onRatingChange }) => {
     );
 };
 
-export default function AuthModal_HacerReseA({ open, onClose, onSave }) {
+export default function AuthModal_HacerReseña({ open, onClose, onSave, courseId }) {
     const [form, setForm] = useState({
         rating: 5,
         titulo: "",
         texto: "",
         workload: "Medio",
-        metodologia: "Clases prácticas",
-        profesor: "",
-        materia: ""
+        metodologia: "Clases prácticas"
     });
     const [errors, setErrors] = useState({});
     const [isSubmitting, setIsSubmitting] = useState(false);
@@ -148,8 +142,6 @@ export default function AuthModal_HacerReseA({ open, onClose, onSave }) {
     const validateForm = () => {
         const newErrors = {};
 
-        if (!form.profesor.trim()) newErrors.profesor = "El nombre del profesor es obligatorio";
-        if (!form.materia.trim()) newErrors.materia = "El nombre de la materia es obligatorio";
         if (!form.titulo.trim()) newErrors.titulo = "El título es obligatorio";
         if (!form.texto.trim()) newErrors.texto = "El comentario es obligatorio";
         if (form.texto.trim().length < 20) newErrors.texto = "El comentario debe tener al menos 20 caracteres";
@@ -164,26 +156,47 @@ export default function AuthModal_HacerReseA({ open, onClose, onSave }) {
         setIsSubmitting(true);
 
         try {
-            await new Promise(resolve => setTimeout(resolve, 1000));
+            // Crear calificación con API real
+            const { data, error } = await ratingsAPI.createRating(
+                courseId,
+                form.rating,
+                form.texto,
+                {
+                    titulo: form.titulo,
+                    workload: form.workload,
+                    metodologia: form.metodologia
+                }
+            );
 
-            onSave?.(form);
+            if (error) {
+                alert('Error al enviar reseña: ' + error.message);
+            } else {
+                alert('¡Reseña enviada correctamente!');
 
-            setForm({
-                rating: 5,
-                titulo: "",
-                texto: "",
-                workload: "Medio",
-                metodologia: "Clases prácticas",
-                profesor: "",
-                materia: ""
-            });
-            setErrors({});
-            onClose();
+                // Callback al componente padre
+                if (onSave) {
+                    onSave({
+                        ...form,
+                        id: data?.id,
+                        fecha: new Date().toISOString()
+                    });
+                }
 
-            console.log("✅ Reseña enviada exitosamente!");
+                // Limpiar formulario
+                setForm({
+                    rating: 5,
+                    titulo: "",
+                    texto: "",
+                    workload: "Medio",
+                    metodologia: "Clases prácticas"
+                });
+                setErrors({});
+                onClose();
+            }
 
         } catch (error) {
             console.error("Error al enviar reseña:", error);
+            alert('Error inesperado al enviar la reseña');
         } finally {
             setIsSubmitting(false);
         }
@@ -232,7 +245,7 @@ export default function AuthModal_HacerReseA({ open, onClose, onSave }) {
                         justifyContent: "space-between",
                         alignItems: "center"
                     }}>
-                        <h3 style={{ margin: 0 }}>Hacer reseña de profesor</h3>
+                        <h3 style={{ margin: 0 }}>Hacer reseña de curso</h3>
                         <button
                             onClick={onClose}
                             style={{
@@ -244,69 +257,6 @@ export default function AuthModal_HacerReseA({ open, onClose, onSave }) {
                         >
                             ✖
                         </button>
-                    </div>
-
-                    {/* Información del profesor y materia */}
-                    <div style={{
-                        display: "grid",
-                        gridTemplateColumns: "1fr 1fr",
-                        gap: 12
-                    }}>
-                        <label style={{ display: "grid", gap: 6 }}>
-                            <span>
-                                Profesor <span style={{color: "#ef4444"}}>*</span>
-                            </span>
-                            <input
-                                type="text"
-                                value={form.profesor}
-                                onChange={(e) => {
-                                    setForm({...form, profesor: e.target.value});
-                                    if (errors.profesor) setErrors({...errors, profesor: ""});
-                                }}
-                                placeholder="Ej: Laura Pérez"
-                                style={{
-                                    height: 40,
-                                    border: errors.profesor ? "2px solid #ef4444" : "1px solid var(--border)",
-                                    borderRadius: 10,
-                                    padding: "0 12px",
-                                    outline: "none",
-                                    transition: "border-color 0.2s ease"
-                                }}
-                            />
-                            {errors.profesor && (
-                                <span style={{ color: "#ef4444", fontSize: 12, marginTop: -2 }}>
-                                    {errors.profesor}
-                                </span>
-                            )}
-                        </label>
-
-                        <label style={{ display: "grid", gap: 6 }}>
-                            <span>
-                                Materia <span style={{color: "#ef4444"}}>*</span>
-                            </span>
-                            <input
-                                type="text"
-                                value={form.materia}
-                                onChange={(e) => {
-                                    setForm({...form, materia: e.target.value});
-                                    if (errors.materia) setErrors({...errors, materia: ""});
-                                }}
-                                placeholder="Ej: Base de Datos I"
-                                style={{
-                                    height: 40,
-                                    border: errors.materia ? "2px solid #ef4444" : "1px solid var(--border)",
-                                    borderRadius: 10,
-                                    padding: "0 12px",
-                                    outline: "none",
-                                    transition: "border-color 0.2s ease"
-                                }}
-                            />
-                            {errors.materia && (
-                                <span style={{ color: "#ef4444", fontSize: 12, marginTop: -2 }}>
-                                    {errors.materia}
-                                </span>
-                            )}
-                        </label>
                     </div>
 
                     {/* Calificación con estrellas interactivas */}
@@ -328,7 +278,7 @@ export default function AuthModal_HacerReseA({ open, onClose, onSave }) {
                                 setForm({...form, titulo: e.target.value});
                                 if (errors.titulo) setErrors({...errors, titulo: ""});
                             }}
-                            placeholder="Ej: Clara y exigente"
+                            placeholder="Ej: Excelente curso, muy completo"
                             maxLength={100}
                             style={{
                                 height: 40,
@@ -369,7 +319,7 @@ export default function AuthModal_HacerReseA({ open, onClose, onSave }) {
                                 setForm({...form, texto: e.target.value});
                                 if (errors.texto) setErrors({...errors, texto: ""});
                             }}
-                            placeholder="Contanos sobre la metodología, parciales, si recomendas material, cómo fueron las clases..."
+                            placeholder="Contanos sobre el curso: contenido, metodología, dificultad, si lo recomendas..."
                             rows={5}
                             maxLength={500}
                             style={{
@@ -455,37 +405,13 @@ export default function AuthModal_HacerReseA({ open, onClose, onSave }) {
                         overflow: "hidden"
                     }}>
                         <div style={{
-                            position: "absolute",
-                            top: -10,
-                            right: -10,
-                            width: 40,
-                            height: 40,
-                            background: "rgba(59, 130, 246, 0.1)",
-                            borderRadius: "50%"
-                        }} />
-                        <div style={{
-                            position: "absolute",
-                            bottom: -5,
-                            left: -5,
-                            width: 30,
-                            height: 30,
-                            background: "rgba(16, 185, 129, 0.1)",
-                            borderRadius: "50%"
-                        }} />
-
-                        <div style={{
                             display: "flex",
                             alignItems: "flex-start",
                             gap: 12,
                             position: "relative",
                             zIndex: 1
                         }}>
-                            <div style={{
-                                fontSize: 20,
-                                filter: "drop-shadow(0 2px 4px rgba(0,0,0,0.1))"
-                            }}>
-                                💡
-                            </div>
+                            <div style={{ fontSize: 20 }}>💡</div>
                             <div>
                                 <strong style={{
                                     color: "#0c4a6e",
@@ -501,8 +427,8 @@ export default function AuthModal_HacerReseA({ open, onClose, onSave }) {
                                     color: "#0369a1",
                                     lineHeight: 1.5
                                 }}>
-                                    <li>Sé específico sobre la metodología y el estilo de enseñanza</li>
-                                    <li>Menciona la dificultad de los parciales y trabajos</li>
+                                    <li>Sé específico sobre el contenido y metodología</li>
+                                    <li>Menciona la dificultad y tiempo requerido</li>
                                     <li>Comenta si el material es útil y accesible</li>
                                     <li>Sé constructivo y honesto en tus comentarios</li>
                                 </ul>
@@ -554,8 +480,7 @@ export default function AuthModal_HacerReseA({ open, onClose, onSave }) {
                                 boxShadow: isSubmitting
                                     ? "none"
                                     : "0 4px 12px rgba(59, 130, 246, 0.4)",
-                                transition: "all 0.2s ease",
-                                position: "relative"
+                                transition: "all 0.2s ease"
                             }}
                         >
                             {isSubmitting && (

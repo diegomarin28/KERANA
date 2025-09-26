@@ -1,37 +1,7 @@
-
-import { useMemo, useState } from "react";
+import { useMemo, useState, useEffect } from "react";
 import { useParams } from "react-router-dom";
-
-/** MOCK – reemplazá con fetch/API */
-const mock = {
-    1: {
-        id: 1,
-        nombre: "Laura Pérez",
-        materia: "Base de Datos I",
-        depto: "Informática",
-        promedio: 4.6,
-        totalResenas: 18,
-        bio: "Enfoca en SQL práctico, proyectos por equipos y parciales con casos reales.",
-        tags: ["SQL", "Modelo relacional", "Trabajo práctico", "Feedback rápido"],
-        resenas: [
-            { id: 101, user: "Diego M.", rating: 5, titulo: "Clara y exigente", texto: "Da mucho material, corrige rápido.", fecha: "2025-08-11" },
-            { id: 102, user: "Ana R.",   rating: 4, titulo: "Parciales justos", texto: "Clases dinámicas, pide práctica.", fecha: "2025-06-02" },
-        ],
-    },
-    2: {
-        id: 2,
-        nombre: "Martín Silva",
-        materia: "Algoritmos",
-        depto: "Informática",
-        promedio: 4.2,
-        totalResenas: 11,
-        bio: "Fuerte en complejidad y estructuras. Parciales a mano.",
-        tags: ["C++", "Punteros", "Listas", "Complejidad"],
-        resenas: [
-            { id: 201, user: "Nico T.", rating: 4, titulo: "Teórico pero útil", texto: "Buen material, orales exigentes.", fecha: "2025-04-18" },
-        ],
-    },
-};
+import { courseAPI, ratingsAPI } from "../api/Database";
+import AuthModal_HacerReseña from "../components/AuthModal_HacerReseña";
 
 function StarRow({ value=0 }) {
     return (
@@ -52,14 +22,87 @@ function Chip({ children }) {
 
 export default function ProfessorDetail() {
     const { id } = useParams();
-    const data = mock[id] ?? mock[1]; // fallback
-    const [open, setOpen] = useState(false);
+    const [professorCourse, setProfessorCourse] = useState(null);
+    const [reviews, setReviews] = useState([]);
+    const [loading, setLoading] = useState(true);
+    const [error, setError] = useState("");
+    const [showReviewModal, setShowReviewModal] = useState(false);
 
-    const promedioTxt = useMemo(()=> (Math.round(data.promedio*10)/10).toFixed(1), [data.promedio]);
+    useEffect(() => {
+        loadProfessorData();
+    }, [id]);
+
+    const loadProfessorData = async () => {
+        setLoading(true);
+        setError("");
+
+        try {
+            // Cargar datos del curso/profesor
+            const { data: courseData, error: courseError } = await courseAPI.getCourseById(id);
+
+            if (courseError) {
+                setError("Error cargando datos del profesor: " + courseError.message);
+            } else if (courseData) {
+                setProfessorCourse(courseData);
+
+                // Cargar reseñas
+                const { data: reviewsData } = await ratingsAPI.getCourseRatings(id);
+                setReviews(reviewsData || []);
+            } else {
+                setError("Profesor no encontrado");
+            }
+        } catch (err) {
+            console.error("Error:", err);
+            setError("Error conectando con el servidor");
+        }
+
+        setLoading(false);
+    };
+
+    const handleNewReview = (newReview) => {
+        // Agregar nueva reseña a la lista
+        setReviews(prev => [newReview, ...prev]);
+
+        // Recargar datos para actualizar promedio
+        loadProfessorData();
+    };
+
+    const promedioRating = useMemo(() => {
+        if (!reviews || reviews.length === 0) return 0;
+        const sum = reviews.reduce((acc, review) => acc + review.puntuacion, 0);
+        return Math.round((sum / reviews.length) * 10) / 10;
+    }, [reviews]);
+
+    if (loading) {
+        return (
+            <div className="container" style={{ padding: "18px 0 36px", textAlign: "center" }}>
+                <p>Cargando información del profesor...</p>
+            </div>
+        );
+    }
+
+    if (error) {
+        return (
+            <div className="container" style={{ padding: "18px 0 36px", textAlign: "center" }}>
+                <div style={{ color: "#dc2626", padding: "20px" }}>
+                    <h3>Error</h3>
+                    <p>{error}</p>
+                </div>
+            </div>
+        );
+    }
+
+    if (!professorCourse) {
+        return (
+            <div className="container" style={{ padding: "18px 0 36px", textAlign: "center" }}>
+                <h3>Profesor no encontrado</h3>
+            </div>
+        );
+    }
 
     return (
         <div className="container" style={{ padding: "18px 0 36px" }}>
-            {/* Header del profe */}
+            {/* Header del profesor */}
             <section style={{
                 border:"1px solid var(--border)", borderRadius:12, padding:16, background:"#fff",
                 display:"grid", gap:12
@@ -69,155 +112,136 @@ export default function ProfessorDetail() {
                         width:56, height:56, borderRadius:"50%", background:"var(--accent)", color:"#fff",
                         display:"grid", placeItems:"center", fontWeight:800, fontSize:22
                     }}>
-                        {data.nombre[0]}
+                        {professorCourse.usuario?.nombre?.[0] || "P"}
                     </div>
                     <div style={{ display:"grid" }}>
-                        <h2 style={{ margin:0 }}>{data.nombre}</h2>
+                        <h2 style={{ margin:0 }}>{professorCourse.usuario?.nombre || "Profesor"}</h2>
                         <div style={{ color:"var(--muted)", fontSize:14 }}>
-                            {data.materia} · {data.depto}
+                            {professorCourse.materia?.nombre} • {professorCourse.titulo}
                         </div>
                     </div>
                     <div style={{ marginLeft:"auto", textAlign:"right" }}>
                         <div style={{ display:"flex", alignItems:"center", gap:8, justifyContent:"flex-end" }}>
-                            <StarRow value={data.promedio} />
-                            <strong>{promedioTxt}</strong>
+                            <StarRow value={promedioRating} />
+                            <strong>{promedioRating.toFixed(1)}</strong>
                         </div>
-                        <div style={{ color:"var(--muted)", fontSize:12 }}>{data.totalResenas} reseñas</div>
+                        <div style={{ color:"var(--muted)", fontSize:12 }}>
+                            {reviews.length} reseña{reviews.length !== 1 ? 's' : ''}
+                        </div>
                     </div>
                 </div>
 
-                <p style={{ margin:0, color:"var(--fg)" }}>{data.bio}</p>
+                <p style={{ margin:0, color:"var(--fg)" }}>
+                    {professorCourse.descripcion || "Información del curso no disponible."}
+                </p>
 
                 <div style={{ display:"flex", gap:8, flexWrap:"wrap" }}>
-                    {data.tags.map(t => <Chip key={t}>{t}</Chip>)}
+                    <Chip>💰 ${professorCourse.precio}</Chip>
+                    <Chip>📍 {professorCourse.modalidad}</Chip>
+                    {professorCourse.duracion && <Chip>⏰ {professorCourse.duracion}</Chip>}
+                    {professorCourse.nivel && <Chip>📊 {professorCourse.nivel}</Chip>}
                 </div>
 
                 <div style={{ display:"flex", gap:10, flexWrap:"wrap" }}>
-                    <button className="btn-primary" onClick={()=>setOpen(true)}>Hacer reseña</button>
-                    <button className="btn-primary" style={{ background:"var(--accent)" }}>Seguir profesor</button>
+                    <button
+                        className="btn-primary"
+                        onClick={() => setShowReviewModal(true)}
+                        style={{ background: "#059669" }}
+                    >
+                        Hacer reseña
+                    </button>
+                    <button
+                        className="btn-primary"
+                        style={{ background:"var(--accent)" }}
+                        onClick={() => alert('Funcionalidad próximamente')}
+                    >
+                        Contactar profesor
+                    </button>
+                    <button
+                        className="btn-primary"
+                        onClick={() => alert(`Comprando curso: ${professorCourse.titulo}`)}
+                    >
+                        Comprar curso - ${professorCourse.precio}
+                    </button>
                 </div>
             </section>
 
             {/* Reseñas */}
             <section style={{ marginTop:20 }}>
-                <h3 style={{ margin:"10px 0" }}>Reseñas</h3>
-                <div style={{ display:"grid", gap:12 }}>
-                    {data.resenas.map(r => (
-                        <article key={r.id} style={{
-                            border:"1px solid var(--border)", borderRadius:12, padding:14, background:"#fff"
-                        }}>
-                            <div style={{ display:"flex", justifyContent:"space-between", gap:12 }}>
-                                <div style={{ display:"flex", alignItems:"center", gap:10 }}>
-                                    <div style={{
-                                        width:34, height:34, borderRadius:"50%", background:"#e2e8f0", display:"grid",
-                                        placeItems:"center", fontWeight:800, color:"#334155"
-                                    }}>{r.user[0]}</div>
-                                    <div style={{ display:"grid" }}>
-                                        <strong style={{ margin:0 }}>{r.titulo}</strong>
-                                        <span style={{ fontSize:12, color:"var(--muted)" }}>{r.user} · {r.fecha}</span>
+                <h3 style={{ margin:"10px 0" }}>
+                    Reseñas ({reviews.length})
+                </h3>
+
+                {reviews.length === 0 ? (
+                    <div style={{
+                        textAlign: 'center',
+                        padding: '40px',
+                        color: '#6b7280',
+                        border: '1px solid var(--border)',
+                        borderRadius: 12,
+                        background: '#fff'
+                    }}>
+                        <div style={{ fontSize: '2rem', marginBottom: '15px' }}>💭</div>
+                        <h4>Aún no hay reseñas</h4>
+                        <p>Sé el primero en compartir tu experiencia con este profesor</p>
+                        <button
+                            onClick={() => setShowReviewModal(true)}
+                            style={{
+                                marginTop: '15px',
+                                padding: '8px 16px',
+                                backgroundColor: '#059669',
+                                color: 'white',
+                                border: 'none',
+                                borderRadius: '6px',
+                                cursor: 'pointer'
+                            }}
+                        >
+                            Escribir primera reseña
+                        </button>
+                    </div>
+                ) : (
+                    <div style={{ display:"grid", gap:12 }}>
+                        {reviews.map(r => (
+                            <article key={r.id} style={{
+                                border:"1px solid var(--border)", borderRadius:12, padding:14, background:"#fff"
+                            }}>
+                                <div style={{ display:"flex", justifyContent:"space-between", gap:12 }}>
+                                    <div style={{ display:"flex", alignItems:"center", gap:10 }}>
+                                        <div style={{
+                                            width:34, height:34, borderRadius:"50%", background:"#e2e8f0",
+                                            display:"grid", placeItems:"center", fontWeight:800, color:"#334155"
+                                        }}>
+                                            {r.usuario?.nombre?.[0] || "U"}
+                                        </div>
+                                        <div style={{ display:"grid" }}>
+                                            <strong style={{ margin:0 }}>
+                                                {r.titulo || "Reseña sin título"}
+                                            </strong>
+                                            <span style={{ fontSize:12, color:"var(--muted)" }}>
+                                                {r.usuario?.nombre || "Anónimo"} • {new Date(r.created_at).toLocaleDateString()}
+                                            </span>
+                                        </div>
                                     </div>
+                                    <StarRow value={r.puntuacion} />
                                 </div>
-                                <StarRow value={r.rating} />
-                            </div>
-                            <p style={{ margin:"10px 0 0 0" }}>{r.texto}</p>
-                        </article>
-                    ))}
-                </div>
+                                <p style={{ margin:"10px 0 0 0" }}>
+                                    {r.comentario || "Sin comentario"}
+                                </p>
+                            </article>
+                        ))}
+                    </div>
+                )}
             </section>
 
-            {open && <ReviewModal onClose={()=>setOpen(false)} onSave={(review)=>console.log("guardar", review)} />}
+            {/* Modal de reseña */}
+            {showReviewModal && (
+                <AuthModal_HacerReseña
+                    open={showReviewModal}
+                    onClose={() => setShowReviewModal(false)}
+                    onSave={handleNewReview}
+                    courseId={professorCourse.id}
+                />
+            )}
         </div>
-    );
-}
-
-function ReviewModal({ onClose, onSave }) {
-    const [form, setForm] = useState({ rating:5, titulo:"", texto:"", workload:"Medio", metodologia:"Clases prácticas" });
-
-    const save = () => {
-        if(!form.titulo.trim() || !form.texto.trim()) return;
-        onSave?.(form);
-        onClose();
-    };
-
-    return (
-        <>
-            <div onClick={onClose} style={{ position:"fixed", inset:0, background:"rgba(0,0,0,.35)", zIndex:3000 }} />
-            <div role="dialog" aria-modal="true" style={{
-                position:"fixed", inset:0, display:"grid", placeItems:"center", zIndex:3010
-            }}>
-                <div style={{
-                    width:"min(720px, 92vw)", background:"#fff", borderRadius:14, border:"1px solid var(--border)",
-                    boxShadow:"0 24px 60px rgba(0,0,0,.25)", padding:18, display:"grid", gap:12
-                }}>
-                    <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center" }}>
-                        <h3 style={{ margin:0 }}>Nueva reseña</h3>
-                        <button onClick={onClose} style={{ border:"none", background:"transparent", fontSize:20, cursor:"pointer" }}>✖</button>
-                    </div>
-
-                    <label style={{ display:"grid", gap:6 }}>
-                        <span>Calificación (1–5)</span>
-                        <input type="number" min={1} max={5}
-                               value={form.rating}
-                               onChange={(e)=>setForm({...form, rating:Number(e.target.value)})}
-                               style={{ height:40, border:"1px solid var(--border)", borderRadius:10, padding:"0 10px" }}
-                        />
-                    </label>
-
-                    <label style={{ display:"grid", gap:6 }}>
-                        <span>Título</span>
-                        <input type="text"
-                               value={form.titulo}
-                               onChange={(e)=>setForm({...form, titulo:e.target.value})}
-                               placeholder="Ej: Clara y exigente"
-                               style={{ height:40, border:"1px solid var(--border)", borderRadius:10, padding:"0 10px" }}
-                        />
-                    </label>
-
-                    <label style={{ display:"grid", gap:6 }}>
-                        <span>Comentario</span>
-                        <textarea
-                            value={form.texto}
-                            onChange={(e)=>setForm({...form, texto:e.target.value})}
-                            placeholder="Contanos metodología, parciales, si recomienda material…"
-                            rows={5}
-                            style={{ border:"1px solid var(--border)", borderRadius:10, padding:"10px" }}
-                        />
-                    </label>
-
-                    {/* Campos tipo “metodología”/“workload” que vos mencionaste */}
-                    <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:12 }}>
-                        <label style={{ display:"grid", gap:6 }}>
-                            <span>Carga de trabajo</span>
-                            <select
-                                value={form.workload}
-                                onChange={(e)=>setForm({...form, workload:e.target.value})}
-                                style={{ height:40, border:"1px solid var(--border)", borderRadius:10, padding:"0 10px" }}
-                            >
-                                {["Baja","Medio","Alta"].map(v => <option key={v}>{v}</option>)}
-                            </select>
-                        </label>
-                        <label style={{ display:"grid", gap:6 }}>
-                            <span>Metodología</span>
-                            <select
-                                value={form.metodologia}
-                                onChange={(e)=>setForm({...form, metodologia:e.target.value})}
-                                style={{ height:40, border:"1px solid var(--border)", borderRadius:10, padding:"0 10px" }}
-                            >
-                                {["Clases teóricas","Clases prácticas","Proyectos","Parciales frecuentes"].map(v => <option key={v}>{v}</option>)}
-                            </select>
-                        </label>
-                    </div>
-
-                    <div style={{ display:"flex", gap:10, justifyContent:"flex-end" }}>
-                        <button onClick={onClose} style={{ height:40, padding:"0 14px", borderRadius:10, border:"1px solid var(--border)", background:"#fff", cursor:"pointer" }}>
-                            Cancelar
-                        </button>
-                        <button onClick={save} className="btn-primary" style={{ height:40 }}>
-                            Publicar reseña
-                        </button>
-                    </div>
-                </div>
-            </div>
-        </>
     );
 }

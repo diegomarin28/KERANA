@@ -50,6 +50,11 @@ export default function AuthModal_SignIn({ open, onClose, onSignedIn }) {
             const { data, error } = await supabase.auth.signUp({
                 email: email.trim(),
                 password: pwd,
+                options: {
+                    data: {
+                        name: name.trim(), // Incluir el nombre en el metadata
+                    }
+                }
             });
 
             if (error) {
@@ -219,18 +224,18 @@ export default function AuthModal_SignIn({ open, onClose, onSignedIn }) {
                         <form onSubmit={handleSignup} style={{ display: "grid", gap: 12 }}>
                             <label style={label}>
                                 Nombre
-                                <input type="name" value={name} onChange={e=>setName(e.target.value)}
-                                       required style={input} disabled={loading}/>
+                                <input type="text" value={name} onChange={e=>setName(e.target.value)}
+                                       required style={input} disabled={loading} placeholder="Tu nombre completo"/>
                             </label>
                             <label style={label}>
                                 Email
                                 <input type="email" value={email} onChange={e=>setEmail(e.target.value)}
-                                       required style={input} disabled={loading}/>
+                                       required style={input} disabled={loading} placeholder="tu@email.com"/>
                             </label>
                             <label style={label}>
                                 Contraseña (mínimo 6 caracteres)
                                 <input type="password" value={pwd} onChange={e=>setPwd(e.target.value)}
-                                       required minLength={6} style={input} disabled={loading}/>
+                                       required minLength={6} style={input} disabled={loading} placeholder="Mínimo 6 caracteres"/>
                             </label>
 
                             <button type="submit" disabled={loading} style={{...submitBtn, opacity: loading ? 0.7 : 1}}>
@@ -253,7 +258,7 @@ export default function AuthModal_SignIn({ open, onClose, onSignedIn }) {
                             <label style={label}>
                                 Email
                                 <input type="email" value={email} onChange={e=>setEmail(e.target.value)}
-                                       required style={input} disabled={loading}/>
+                                       required style={input} disabled={loading} placeholder="tu@email.com"/>
                             </label>
 
                             <button type="submit" disabled={loading} style={{...submitBtn, opacity: loading ? 0.7 : 1}}>
@@ -266,13 +271,14 @@ export default function AuthModal_SignIn({ open, onClose, onSignedIn }) {
                                     ← Volver al login
                                 </button>
                             </p>
-                            <p style={{ marginTop: 10, fontSize: 14 }}>
+
+                            <p style={{ textAlign: "center", marginTop: 10, fontSize: 14 }}>
                                 ¿No tenés cuenta?{" "}
-                                <button onClick={onSwitchToSignUp} style={{ color: "#2563eb", background: "none", border: "none", cursor: "pointer" }}>
+                                <button type="button" onClick={()=>setMode("signup")}
+                                        style={{ color: "#2563eb", background: "none", border: "none", cursor: "pointer" }}>
                                     Crear cuenta
                                 </button>
                             </p>
-
                         </form>
                     )}
 

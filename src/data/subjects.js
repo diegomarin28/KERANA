@@ -4,4 +4,5 @@ export const SUBJECTS = [
   { id: "algebra", name: "Álgebra" },
   { id: "calculo", name: "Cálculo" },
   { id: "redes", name: "Redes" },
+
 ];
