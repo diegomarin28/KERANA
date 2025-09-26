@@ -72,84 +72,65 @@ export const userAPI = {
 }
 
 // ==========================================
-// 👨‍🏫 PROFESORES Y CURSOS
+// 👨‍🏫 PROFESORES Y “CURSOS” (profesor+materia)
 // ==========================================
 export const courseAPI = {
-    // Obtener todos los cursos
+    // Listado (con stats)
     async getAllCourses() {
         const { data, error } = await supabase
-            .from('profesor_curso')
-            .select(`
-        *,
-        usuario(*),
-        materia(*),
-        califica(
-          puntuacion,
-          comentario,
-          usuario(nombre)
-        )
-      `)
+            .from('cursos_con_stats')
+            .select('*')
+            .order('rating_promedio', { ascending: false })
 
         return { data, error }
     },
 
-    // Buscar cursos con filtros
+    // Búsqueda/filtrado
     async searchCourses(filters = {}) {
         let query = supabase
-            .from('profesor_curso')
-            .select(`
-        *,
-        usuario(*),
-        materia(*),
-        califica(puntuacion)
-      `)
+            .from('cursos_con_stats')
+            .select('*')
 
-        // Filtro por materia
         if (filters.materia) {
-            query = query.eq('materia_id', filters.materia)
+            query = query.eq('id_materia', filters.materia)      // 👈 ahora filtra por id_materia de la vista
+        }
+        if (filters.profesorNombre) {
+            query = query.ilike('profesor_nombre', `%${filters.profesorNombre}%`)
         }
 
-        // Filtro por precio máximo
-        if (filters.maxPrice) {
-            query = query.lte('precio', filters.maxPrice)
-        }
-
-        // Filtro por modalidad
-        if (filters.modalidad) {
-            query = query.eq('modalidad', filters.modalidad)
-        }
-
-        // Ordenar por rating o precio
-        if (filters.sortBy === 'price_asc') {
-            query = query.order('precio', { ascending: true })
-        } else if (filters.sortBy === 'price_desc') {
-            query = query.order('precio', { ascending: false })
+        // Orden por rating (default)
+        if (!filters.sortBy || filters.sortBy === 'rating_desc') {
+            query = query.order('rating_promedio', { ascending: false })
         }
 
         const { data, error } = await query
         return { data, error }
     },
 
-    // Obtener un curso específico
-    async getCourseById(courseId) {
+    // Detalle por par (id_profesor, id_materia)
+    async getCourseByIds(idProfesor, idMateria) {
         const { data, error } = await supabase
-            .from('profesor_curso')
-            .select(`
-        *,
-        usuario(*),
-        materia(*),
-        califica(
-          *,
-          usuario(nombre)
-        ),
-        apunte(*)
-      `)
-            .eq('id', courseId)
+            .from('cursos_con_stats')
+            .select('*')
+            .eq('id_profesor', idProfesor)
+            .eq('id_materia', idMateria)
+            .single()
+
+        return { data, error }
+    },
+
+    // O detalle por clave compuesta textual, si usás /cursos/:cursoKey
+    async getCourseByKey(cursoKey) {
+        const { data, error } = await supabase
+            .from('cursos_con_stats')
+            .select('*')
+            .eq('curso_key', cursoKey)
             .single()
 
         return { data, error }
     }
 }
+
 
 // ==========================================
 // ⭐ FAVORITOS
