@@ -1,3 +1,4 @@
+// src/components/AuthModal_SignUp.jsx
 import { useState } from "react";
 import { supabase } from "../supabase";
 
@@ -8,19 +9,30 @@ export default function AuthModal_SignUp({ open, onClose, onSignedIn, onSwitchTo
     const [name, setName] = useState("");
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState("");
+    const [success, setSuccess] = useState(""); // ✅ mensaje de éxito (“revisá tu email…”)
 
     if (!open) return null;
+
+    const SITE_URL = import.meta.env?.VITE_PUBLIC_SITE_URL || window.location.origin;
+    const emailRedirectTo = `${SITE_URL}/auth/confirm`; // ✅ Confirm page
 
     // REGISTRO CON SUPABASE
     async function handleSubmit(e) {
         e.preventDefault();
+        if (loading) return;
 
         // Validaciones
+        const trimmedEmail = email.trim();
+        const trimmedName = name.trim();
+
+        if (!trimmedName) {
+            setError("Ingresá tu nombre completo");
+            return;
+        }
         if (pwd !== confirmPwd) {
             setError("Las contraseñas no coinciden");
             return;
         }
-
         if (pwd.length < 6) {
             setError("La contraseña debe tener al menos 6 caracteres");
             return;
@@ -28,73 +40,64 @@ export default function AuthModal_SignUp({ open, onClose, onSignedIn, onSwitchTo
 
         setLoading(true);
         setError("");
+        setSuccess("");
 
         try {
-            const { data, error } = await supabase.auth.signUp({
-                email: email.trim(),
+            const { error: signErr } = await supabase.auth.signUp({
+                email: trimmedEmail,
                 password: pwd,
                 options: {
-                    data: {
-                        name: name.trim(), // Guardar nombre en metadata
-                    }
+                    emailRedirectTo,            // ✅ el link del mail llegará aquí
+                    data: { name: trimmedName } // guardamos nombre en user_metadata
                 }
             });
 
-            if (error) {
-                setError(error.message);
-            } else {
-                setError("¡Cuenta creada! Revisa tu email para verificar tu cuenta.");
-                // Limpiar formulario
-                setName("");
-                setEmail("");
-                setPwd("");
-                setConfirmPwd("");
+            if (signErr) {
+                // Mensaje amigable para duplicado
+                if (signErr.message?.toLowerCase().includes("already registered")) {
+                    setError("Ya existe una cuenta con este email.");
+                } else {
+                    setError(signErr.message || "No se pudo crear la cuenta.");
+                }
+                return;
             }
-        } catch (err) {
-            setError("Error inesperado: " + err.message);
-        }
 
-        setLoading(false);
+            // ✅ Mostrar estado “éxito” y dejar al usuario ir al mail
+            setSuccess("¡Cuenta creada! Revisá tu email para verificarla y finalizar el acceso.");
+            setName("");
+            setEmail("");
+            setPwd("");
+            setConfirmPwd("");
+        } catch (err) {
+            setError("Error inesperado: " + (err?.message || "Intentalo de nuevo"));
+        } finally {
+            setLoading(false);
+        }
     }
 
-    // LOGIN CON GOOGLE
-    async function handleGoogleSignup() {
+    // OAUTH (redirige también a /auth/confirm)
+    async function handleOAuth(provider) {
+        if (loading) return;
         setLoading(true);
+        setError("");
+        setSuccess("");
         try {
-            const { error } = await supabase.auth.signInWithOAuth({
-                provider: 'google',
+            const { error: oerr } = await supabase.auth.signInWithOAuth({
+                provider,
                 options: {
-                    redirectTo: window.location.origin
+                    redirectTo: emailRedirectTo // ✅ volvemos a /auth/confirm, que hace login y redirige al panel
                 }
             });
-            if (error) setError("Error con Google: " + error.message);
+            if (oerr) setError(`Error con ${provider}: ${oerr.message}`);
         } catch (err) {
-            setError("Error con Google: " + err.message);
+            setError(`Error con ${provider}: ${err?.message || "Intentalo de nuevo"}`);
+        } finally {
+            setLoading(false);
         }
-        setLoading(false);
-    }
-
-    // LOGIN CON GITHUB
-    async function handleGitHubSignup() {
-        setLoading(true);
-        try {
-            const { error } = await supabase.auth.signInWithOAuth({
-                provider: 'github',
-                options: {
-                    redirectTo: window.location.origin
-                }
-            });
-            if (error) setError("Error con GitHub: " + error.message);
-        } catch (err) {
-            setError("Error con GitHub: " + err.message);
-        }
-        setLoading(false);
     }
 
     const handleSwitchToSignIn = () => {
-        if (onSwitchToSignIn) {
-            onSwitchToSignIn();
-        }
+        if (onSwitchToSignIn) onSwitchToSignIn();
     };
 
     return (
@@ -102,37 +105,53 @@ export default function AuthModal_SignUp({ open, onClose, onSignedIn, onSwitchTo
             {/* Backdrop */}
             <div
                 onClick={onClose}
-                style={{
-                    position: "fixed", inset: 0, background: "rgba(0,0,0,0.45)",
-                    zIndex: 4000
-                }}
+                style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.45)", zIndex: 4000 }}
                 aria-hidden="true"
             />
             {/* Panel */}
             <div
-                role="dialog" aria-modal="true" aria-labelledby="signup-title"
+                role="dialog"
+                aria-modal="true"
+                aria-labelledby="signup-title"
                 style={{
-                    position: "fixed", top: "50%", left: "50%",
+                    position: "fixed",
+                    top: "50%",
+                    left: "50%",
                     transform: "translate(-50%, -50%)",
-                    width: "min(92vw, 520px)", background: "#fff",
-                    borderRadius: 12, boxShadow: "0 12px 30px rgba(0,0,0,.25)",
-                    zIndex: 4010, overflow: "hidden"
+                    width: "min(92vw, 520px)",
+                    background: "#fff",
+                    borderRadius: 12,
+                    boxShadow: "0 12px 30px rgba(0,0,0,.25)",
+                    zIndex: 4010,
+                    overflow: "hidden"
                 }}
             >
-                <div style={{ padding: "18px 22px", borderBottom: "1px solid #eee",
-                    display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                <div
+                    style={{
+                        padding: "18px 22px",
+                        borderBottom: "1px solid #eee",
+                        display: "flex",
+                        justifyContent: "space-between",
+                        alignItems: "center"
+                    }}
+                >
                     <h3 id="signup-title" style={{ margin: 0 }}>Crear cuenta</h3>
-                    <button onClick={onClose} aria-label="Cerrar"
-                            style={{ border: "none", background: "transparent", fontSize: 20, cursor: "pointer" }}>✖</button>
+                    <button
+                        onClick={onClose}
+                        aria-label="Cerrar"
+                        style={{ border: "none", background: "transparent", fontSize: 20, cursor: "pointer" }}
+                    >
+                        ✖
+                    </button>
                 </div>
 
                 <div style={{ padding: 22 }}>
-                    {/* Social (funcional) */}
+                    {/* Social */}
                     <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginBottom: 14 }}>
-                        <button onClick={handleGoogleSignup} disabled={loading} style={socBtn}>
+                        <button onClick={() => handleOAuth('google')} disabled={loading} style={socBtn}>
                             {loading ? "..." : "Google"}
                         </button>
-                        <button onClick={handleGitHubSignup} disabled={loading} style={socBtn}>
+                        <button onClick={() => handleOAuth('github')} disabled={loading} style={socBtn}>
                             {loading ? "..." : "GitHub"}
                         </button>
                     </div>
@@ -240,17 +259,19 @@ export default function AuthModal_SignUp({ open, onClose, onSignedIn, onSwitchTo
                         </p>
                     </form>
 
-                    {/* Mensajes de error/éxito */}
-                    {error && (
-                        <div style={{
-                            marginTop: 12,
-                            padding: 12,
-                            backgroundColor: error.includes("¡") || error.includes("creada") ? "#d4edda" : "#f8d7da",
-                            color: error.includes("¡") || error.includes("creada") ? "#155724" : "#721c24",
-                            borderRadius: 6,
-                            fontSize: 14
-                        }}>
-                            {error}
+                    {/* Mensajes */}
+                    {(error || success) && (
+                        <div
+                            style={{
+                                marginTop: 12,
+                                padding: 12,
+                                backgroundColor: success ? "#d4edda" : "#f8d7da",
+                                color: success ? "#155724" : "#721c24",
+                                borderRadius: 6,
+                                fontSize: 14
+                            }}
+                        >
+                            {success || error}
                         </div>
                     )}
                 </div>

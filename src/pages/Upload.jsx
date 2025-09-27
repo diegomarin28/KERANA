@@ -1,311 +1,120 @@
-import { useState, useEffect } from "react";
-import { useNavigate } from "react-router-dom";
-import { subjectsAPI } from "../api/Database";
-import TagInput from "../components/TagInput";
-import FileDrop from "../components/FileDrop";
+// src/pages/Upload.jsx
+import { useState, useEffect } from "react"
+import { supabase } from "../supabase"
 
-export default function Upload(){
-    const nav = useNavigate();
-    const [title, setTitle] = useState("");
-    const [subject, setSubject] = useState("");
-    const [subjects, setSubjects] = useState([]);
-    const [desc, setDesc] = useState("");
-    const [tags, setTags] = useState([]);
-    const [visibility, setVisibility] = useState("public");
-    const [file, setFile] = useState(null);
-    const [agree, setAgree] = useState(false);
-    const [saving, setSaving] = useState(false);
-    const [error, setError] = useState("");
-    const [loadingSubjects, setLoadingSubjects] = useState(true);
+export default function Upload() {
+    const [file, setFile] = useState(null)
+    const [titulo, setTitulo] = useState("")
+    const [descripcion, setDescripcion] = useState("")
+    const [materiaId, setMateriaId] = useState("")
+    const [materias, setMaterias] = useState([])
+    const [creditos, setCreditos] = useState(1)
+    const [loading, setLoading] = useState(false)
+    const [msg, setMsg] = useState("")
 
-    // Cargar materias reales de la BD
     useEffect(() => {
-        loadSubjects();
-    }, []);
-
-    const loadSubjects = async () => {
-        setLoadingSubjects(true);
-        try {
-            const { data, error } = await subjectsAPI.getAllSubjects();
-            if (error) {
-                console.error('Error cargando materias:', error.message);
-                setError('Error cargando las materias disponibles');
-            } else {
-                setSubjects(data || []);
-            }
-        } catch (err) {
-            console.error('Error:', err);
-            setError('Error conectando con la base de datos');
-        }
-        setLoadingSubjects(false);
-    };
-
-    const valid = title.trim() && subject && file && agree;
+        (async () => {
+            const { data } = await supabase.from("materia").select("id_materia, nombre_materia").order("nombre_materia")
+            setMaterias(data || [])
+        })()
+    }, [])
 
     const onSubmit = async (e) => {
-        e.preventDefault();
-        setError("");
-        if(!valid) {
-            setError("Completa los campos obligatorios y acepta los términos.");
-            return;
+        e.preventDefault()
+        if (!file || !titulo || !materiaId) {
+            setMsg("Falta título, materia o archivo.")
+            return
         }
-
+        setLoading(true); setMsg("")
         try {
-            setSaving(true);
+            const { data: { user } } = await supabase.auth.getUser()
+            if (!user) throw new Error("Debés iniciar sesión para subir.")
 
-            // TODO: Cuando tengamos API de apuntes, cambiar esto:
-            // const { data, error } = await notesAPI.createNote({
-            //     titulo: title,
-            //     descripcion: desc,
-            //     materia_id: subject,
-            //     tags: tags,
-            //     visibilidad: visibility,
-            //     archivo: file
-            // });
+            const ext = file.name.includes(".") ? file.name.split(".").pop() : "bin"
+            const key = `user_${user.id}/${crypto.randomUUID()}.${ext}`
 
-            // Por ahora, simulamos con localStorage
-            const id = crypto.randomUUID();
-            const meta = {
-                id,
-                titulo: title,
-                materia_id: subject,
-                descripcion: desc,
-                tags,
-                visibilidad: visibility,
-                fileName: file.name,
-                fileSize: file.size,
-                createdAt: new Date().toISOString(),
-                // Buscar nombre de materia para mostrar
-                materiaNombre: subjects.find(s => s.id === subject)?.nombre || 'Materia'
-            };
+            const { error: upErr } = await supabase
+                .storage
+                .from("apuntes")
+                .upload(key, file, {
+                    cacheControl: "3600",
+                    upsert: false,
+                    contentType: file.type || undefined
+                })
+            if (upErr) throw upErr
 
-            const prev = JSON.parse(localStorage.getItem("kerana_uploads") || "[]");
-            localStorage.setItem("kerana_uploads", JSON.stringify([meta, ...prev]));
+            const { error: insErr } = await supabase
+                .from("apunte")
+                .insert([{
+                    titulo,
+                    descripcion,
+                    id_materia: Number(materiaId),
+                    // ⚠️ Si tu apunte.id_usuario no es UUID de Auth, mapealo al esquema que uses.
+                    id_usuario: user.id,
+                    file_path: key,
+                    file_name: file.name,
+                    mime_type: file.type || null,
+                    file_size: file.size,
+                    creditos: Number(creditos) || 0,
+                    estrellas: 0
+                }])
+            if (insErr) throw insErr
 
-            alert("✅ Apunte cargado (simulado). Próximamente con API real.");
-            nav(`/search?q=${encodeURIComponent(title)}`);
-
+            setMsg("✅ Apunte subido con éxito.")
+            setFile(null); setTitulo(""); setDescripcion(""); setMateriaId(""); setCreditos(1)
         } catch (err) {
-            console.error(err);
-            setError("Ocurrió un error al guardar.");
+            console.error(err)
+            setMsg(`❌ ${err.message || "Error subiendo apunte"}`)
         } finally {
-            setSaving(false);
+            setLoading(false)
         }
-    };
-
-    if (loadingSubjects) {
-        return (
-            <div className="container" style={{ padding:"32px 16px 80px", textAlign: 'center' }}>
-                <p>Cargando materias disponibles...</p>
-            </div>
-        );
     }
 
     return (
-        <div className="container" style={{ padding:"32px 16px 80px" }}>
-            <h1 style={{ margin:"12px 0 4px", fontSize:"clamp(22px,3.4vw,32px)", color:"#0b2a7a" }}>
-                Subir apunte
-            </h1>
-            <p style={{ margin:"0 0 18px", color:"#64748b" }}>
-                Comparte tus apuntes con la comunidad. Completa los campos y sube el PDF.
-            </p>
+        <div style={{ maxWidth: 640, margin: "0 auto", padding: 16 }}>
+            <h1>Subir apunte</h1>
+            <form onSubmit={onSubmit} style={{ display: "grid", gap: 12 }}>
+                <input
+                    type="text"
+                    placeholder="Título"
+                    value={titulo}
+                    onChange={(e)=>setTitulo(e.target.value)}
+                    required
+                />
+                <textarea
+                    placeholder="Descripción (opcional)"
+                    value={descripcion}
+                    onChange={(e)=>setDescripcion(e.target.value)}
+                />
 
-            <form onSubmit={onSubmit} style={{ display:"grid", gap:18, maxWidth:800 }}>
-                {/* Título */}
-                <div>
-                    <label style={label}>Título *</label>
-                    <input
-                        value={title}
-                        onChange={e=>setTitle(e.target.value)}
-                        placeholder="Ej: Resumen Parcial 1 - Base de Datos I"
-                        style={input}
-                    />
-                </div>
+                <select value={materiaId} onChange={(e)=>setMateriaId(e.target.value)} required>
+                    <option value="">Seleccioná la materia</option>
+                    {materias.map(m => (
+                        <option key={m.id_materia} value={m.id_materia}>{m.nombre_materia}</option>
+                    ))}
+                </select>
 
-                {/* Materia - Con datos reales */}
-                <div>
-                    <label style={label}>Materia *</label>
-                    <select
-                        value={subject}
-                        onChange={e=>setSubject(e.target.value)}
-                        style={input}
-                    >
-                        <option value="">Selecciona una materia</option>
-                        {subjects.map(s => (
-                            <option key={s.id} value={s.id}>{s.nombre}</option>
-                        ))}
-                    </select>
-                    {subjects.length === 0 && (
-                        <p style={{ color: '#ef4444', fontSize: 12, marginTop: 4 }}>
-                            No se pudieron cargar las materias
-                        </p>
-                    )}
-                </div>
+                <input
+                    type="number"
+                    min={0}
+                    placeholder="Créditos (precio)"
+                    value={creditos}
+                    onChange={(e)=>setCreditos(e.target.value)}
+                />
 
-                {/* Descripción */}
-                <div>
-                    <label style={label}>Descripción</label>
-                    <textarea
-                        value={desc}
-                        onChange={e=>setDesc(e.target.value)}
-                        rows={4}
-                        placeholder="Breve descripción del contenido..."
-                        style={{ ...input, resize:"vertical" }}
-                    />
-                </div>
+                <input
+                    type="file"
+                    onChange={(e)=> setFile(e.target.files?.[0] || null)}
+                    accept=".pdf,.doc,.docx,.ppt,.pptx"
+                    required
+                />
 
-                {/* Etiquetas */}
-                <div>
-                    <label style={label}>Etiquetas</label>
-                    <TagInput
-                        value={tags}
-                        onChange={setTags}
-                        placeholder="Ej: parcial, normalización, SQL"
-                    />
-                    <p style={{ fontSize: 12, color: '#6b7280', marginTop: 4 }}>
-                        Agrega palabras clave para que otros encuentren tu apunte fácilmente
-                    </p>
-                </div>
-
-                {/* Archivo */}
-                <div>
-                    <label style={label}>Archivo PDF *</label>
-                    <FileDrop
-                        file={file}
-                        onFile={(f)=>{
-                            if(f && f.type !== "application/pdf"){
-                                alert("Solo se admite PDF");
-                                return;
-                            }
-                            setFile(f);
-                        }}
-                    />
-                </div>
-
-                {/* Visibilidad */}
-                <div>
-                    <label style={label}>Visibilidad</label>
-                    <div style={{ display:"flex", gap:12 }}>
-                        <label style={radio}>
-                            <input
-                                type="radio"
-                                name="vis"
-                                value="public"
-                                checked={visibility==="public"}
-                                onChange={()=>setVisibility("public")}
-                            />
-                            Público (todos pueden verlo)
-                        </label>
-                        <label style={radio}>
-                            <input
-                                type="radio"
-                                name="vis"
-                                value="private"
-                                checked={visibility==="private"}
-                                onChange={()=>setVisibility("private")}
-                            />
-                            Privado (solo yo)
-                        </label>
-                    </div>
-                </div>
-
-                {/* Términos */}
-                <label style={{ display:"flex", gap:10, alignItems:"center", color:"#334155" }}>
-                    <input
-                        type="checkbox"
-                        checked={agree}
-                        onChange={e=>setAgree(e.target.checked)}
-                    />
-                    Declaro que el contenido es mío o tengo permiso para compartirlo y cumple las reglas de la comunidad.
-                </label>
-
-                {/* Error */}
-                {error ? (
-                    <div style={{
-                        color:"#b91c1c",
-                        fontWeight:700,
-                        padding: '10px',
-                        backgroundColor: '#fef2f2',
-                        borderRadius: '8px',
-                        border: '1px solid #fecaca'
-                    }}>
-                        {error}
-                    </div>
-                ) : null}
-
-                {/* Acciones */}
-                <div style={{ display:"flex", gap:10 }}>
-                    <button
-                        className="btn-primary"
-                        type="submit"
-                        disabled={!valid || saving}
-                        style={{
-                            opacity: (!valid || saving) ? 0.7 : 1,
-                            cursor: (!valid || saving) ? 'not-allowed' : 'pointer'
-                        }}
-                    >
-                        {saving ? "Subiendo..." : "Publicar apunte"}
-                    </button>
-                    <button
-                        type="button"
-                        onClick={()=>nav(-1)}
-                        style={btnGhost}
-                        disabled={saving}
-                    >
-                        Cancelar
-                    </button>
-                </div>
-
-                {/* Info adicional */}
-                <div style={{
-                    backgroundColor: '#f0f9ff',
-                    padding: '15px',
-                    borderRadius: '8px',
-                    border: '1px solid #bae6fd',
-                    fontSize: '14px',
-                    color: '#0c4a6e'
-                }}>
-                    <strong>Próximamente:</strong> Subida real de archivos, sistema de moderación y notificaciones automáticas cuando publiques tu apunte.
-                </div>
+                <button disabled={loading} type="submit">
+                    {loading ? "Subiendo..." : "Subir"}
+                </button>
             </form>
+
+            {msg && <p style={{ marginTop: 10 }}>{msg}</p>}
         </div>
-    );
+    )
 }
-
-const label = {
-    display:"block",
-    fontSize:14,
-    color:"#475569",
-    marginBottom:6,
-    fontWeight:700
-};
-
-const input = {
-    width:"100%",
-    height:44,
-    border:"1px solid var(--border)",
-    borderRadius:12,
-    padding:"0 12px",
-    outline:"none",
-    background:"#fff"
-};
-
-const radio = {
-    display:"inline-flex",
-    gap:8,
-    alignItems:"center",
-    padding:"6px 10px",
-    border:"1px solid var(--border)",
-    borderRadius:9999,
-    cursor: "pointer"
-};
-
-const btnGhost = {
-    height:54,
-    padding:"0 22px",
-    borderRadius:9999,
-    border:"1px solid var(--border)",
-    background:"#fff",
-    fontWeight:700,
-    cursor:"pointer"
-};

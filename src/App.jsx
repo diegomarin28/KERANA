@@ -10,6 +10,7 @@ import Upload from "./pages/Upload";
 import MentorApply from "./pages/MentorApply";
 import UserDashboard from "./components/UserDashboard";
 import CourseSearch from "./components/CourseSearch";
+import AuthConfirm from './pages/AuthConfirm';
 
 export default function App() {
     return (
@@ -25,6 +26,7 @@ export default function App() {
                 <Route path="/mentores/postular" element={<MentorApply />} />
                 <Route path="/panel" element={<UserDashboard />} />
                 <Route path="/cursos/buscar" element={<CourseSearch />} />
+                <Route path="/auth/confirm" element={<AuthConfirm />} />
             </Routes>
         </BrowserRouter>
     );

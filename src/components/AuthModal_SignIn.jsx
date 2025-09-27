@@ -4,12 +4,45 @@ import { supabase } from "../supabase";
 export default function AuthModal_SignIn({ open, onClose, onSignedIn }) {
     const [email, setEmail] = useState("");
     const [name, setName] = useState("");
+    const [username, setUsername] = useState("");
     const [pwd, setPwd] = useState("");
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState("");
     const [mode, setMode] = useState("login"); // "login", "signup", "reset"
 
+    // Estados para validaciones
+    const [usernameAvailable, setUsernameAvailable] = useState(null);
+    const [checkingUsername, setCheckingUsername] = useState(false);
+
     if (!open) return null;
+
+    // Verificar disponibilidad de username
+    const checkUsernameAvailability = async (usernameToCheck) => {
+        if (!usernameToCheck || usernameToCheck.length < 3) {
+            setUsernameAvailable(null);
+            return;
+        }
+
+        setCheckingUsername(true);
+        try {
+            const { data, error } = await supabase.rpc('check_username_exists', {
+                username_to_check: usernameToCheck
+            });
+
+            if (error) {
+                console.error('Error verificando username:', error);
+                setUsernameAvailable(null);
+            } else {
+                setUsernameAvailable(!data); // true si NO existe (está disponible)
+            }
+        } catch (err) {
+            console.error('Error:', err);
+            setUsernameAvailable(null);
+        }
+        setCheckingUsername(false);
+    };
+
+
 
     // LOGIN
     async function handleLogin(e) {
@@ -24,14 +57,17 @@ export default function AuthModal_SignIn({ open, onClose, onSignedIn }) {
             });
 
             if (error) {
-                setError(error.message);
+                if (error.message.includes('Invalid login credentials')) {
+                    setError("Email o contraseña incorrectos");
+                } else if (error.message.includes('Email not confirmed')) {
+                    setError("Debes verificar tu email antes de iniciar sesión");
+                } else {
+                    setError(error.message);
+                }
             } else {
-                // Éxito - usuario logueado
                 onSignedIn(data.user);
                 onClose();
-                setName("");
-                setEmail("");
-                setPwd("");
+                clearForm();
             }
         } catch (err) {
             setError("Error inesperado: " + err.message);
@@ -43,25 +79,69 @@ export default function AuthModal_SignIn({ open, onClose, onSignedIn }) {
     // REGISTRO
     async function handleSignup(e) {
         e.preventDefault();
-        setLoading(true);
         setError("");
 
+        // Validaciones
+        if (!name.trim() || !email.trim() || !username.trim() || !pwd) {
+            setError("Todos los campos son obligatorios");
+            return;
+        }
+
+        if (username.length < 3) {
+            setError("El nombre de usuario debe tener al menos 3 caracteres");
+            return;
+        }
+
+        if (pwd.length < 6) {
+            setError("La contraseña debe tener al menos 6 caracteres");
+            return;
+        }
+
+        if (!usernameAvailable) {
+            setError("El nombre de usuario no está disponible");
+            return;
+        }
+
+        // Validar formato de username
+        const usernameRegex = /^[a-zA-Z0-9_]+$/;
+        if (!usernameRegex.test(username)) {
+            setError("El nombre de usuario solo puede contener letras, números y guiones bajos");
+            return;
+        }
+
+        setLoading(true);
+
         try {
+            // Verificar si el email ya existe
+            const emailExists = await checkEmailExists(email.trim());
+            if (emailExists) {
+                setError("Ya existe una cuenta con este email");
+                setLoading(false);
+                return;
+            }
+
             const { data, error } = await supabase.auth.signUp({
                 email: email.trim(),
                 password: pwd,
                 options: {
                     data: {
-                        name: name.trim(), // Incluir el nombre en el metadata
-                    }
+                        name: name.trim(),
+                        username: username.trim().toLowerCase(),
+                    },
+                    // Configurar URL de confirmación
+                    emailRedirectTo: `${window.location.origin}/auth/confirm`
                 }
             });
 
             if (error) {
-                setError(error.message);
+                if (error.message.includes('User already registered')) {
+                    setError("Ya existe una cuenta con este email");
+                } else {
+                    setError(error.message);
+                }
             } else {
-                setError("¡Cuenta creada! Revisa tu email para verificar tu cuenta.");
-                // Mantener el modal abierto para que vea el mensaje
+                setError("¡Cuenta creada! Revisa tu email para verificar tu cuenta. Una vez verificada podrás iniciar sesión automáticamente.");
+                clearForm();
             }
         } catch (err) {
             setError("Error inesperado: " + err.message);
@@ -83,7 +163,7 @@ export default function AuthModal_SignIn({ open, onClose, onSignedIn }) {
 
         try {
             const { error } = await supabase.auth.resetPasswordForEmail(email.trim(), {
-                redirectTo: `${window.location.origin}/reset-password`
+                redirectTo: `${window.location.origin}/auth/reset-password`
             });
 
             if (error) {
@@ -98,14 +178,22 @@ export default function AuthModal_SignIn({ open, onClose, onSignedIn }) {
         setLoading(false);
     }
 
-    // LOGIN CON GOOGLE
+    const clearForm = () => {
+        setName("");
+        setEmail("");
+        setUsername("");
+        setPwd("");
+        setUsernameAvailable(null);
+    };
+
+    // OAuth functions...
     async function handleGoogleLogin() {
         setLoading(true);
         try {
             const { error } = await supabase.auth.signInWithOAuth({
                 provider: 'google',
                 options: {
-                    redirectTo: window.location.origin
+                    redirectTo: `${window.location.origin}/auth/callback`
                 }
             });
             if (error) setError(error.message);
@@ -115,14 +203,13 @@ export default function AuthModal_SignIn({ open, onClose, onSignedIn }) {
         setLoading(false);
     }
 
-    // LOGIN CON GITHUB
     async function handleGitHubLogin() {
         setLoading(true);
         try {
             const { error } = await supabase.auth.signInWithOAuth({
                 provider: 'github',
                 options: {
-                    redirectTo: window.location.origin
+                    redirectTo: `${window.location.origin}/auth/callback`
                 }
             });
             if (error) setError(error.message);
@@ -143,6 +230,7 @@ export default function AuthModal_SignIn({ open, onClose, onSignedIn }) {
                 }}
                 aria-hidden="true"
             />
+
             {/* Panel */}
             <div
                 role="dialog" aria-modal="true" aria-labelledby="auth-title"
@@ -183,16 +271,16 @@ export default function AuthModal_SignIn({ open, onClose, onSignedIn }) {
 
                     {/* FORMULARIO LOGIN */}
                     {mode === "login" && (
-                        <form onSubmit={handleLogin} style={{ display: "grid", gap: 12 }}>
+                        <div style={{ display: "grid", gap: 12 }}>
                             <label style={label}>
-                                Email
-                                <input type="email" value={email} onChange={e=>setEmail(e.target.value)}
-                                       required style={input} disabled={loading}/>
+                                Email o nombre de usuario
+                                <input type="text" value={email} onChange={e=>setEmail(e.target.value)}
+                                       style={input} disabled={loading} placeholder="tu@email.com o tuusername"/>
                             </label>
                             <label style={label}>
                                 Contraseña
                                 <input type="password" value={pwd} onChange={e=>setPwd(e.target.value)}
-                                       required style={input} disabled={loading}/>
+                                       style={input} disabled={loading}/>
                             </label>
 
                             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", fontSize: 14 }}>
@@ -205,63 +293,108 @@ export default function AuthModal_SignIn({ open, onClose, onSignedIn }) {
                                 </button>
                             </div>
 
-                            <button type="submit" disabled={loading} style={{...submitBtn, opacity: loading ? 0.7 : 1}}>
+                            <button onClick={handleLogin} disabled={loading} style={{...submitBtn, opacity: loading ? 0.7 : 1}}>
                                 {loading ? "Ingresando..." : "Ingresar"}
                             </button>
 
                             <p style={{ textAlign: "center", margin: 0 }}>
-                                ¿No tenés cuenta?
+                                ¿No tienes cuenta?
                                 <button type="button" onClick={()=>setMode("signup")}
                                         style={{background:"none", border:"none", color:"#2563eb", cursor:"pointer", marginLeft: 5}}>
                                     Crear cuenta
                                 </button>
                             </p>
-                        </form>
+                        </div>
                     )}
 
                     {/* FORMULARIO SIGNUP */}
                     {mode === "signup" && (
-                        <form onSubmit={handleSignup} style={{ display: "grid", gap: 12 }}>
+                        <div style={{ display: "grid", gap: 12 }}>
                             <label style={label}>
-                                Nombre
+                                Nombre completo
                                 <input type="text" value={name} onChange={e=>setName(e.target.value)}
-                                       required style={input} disabled={loading} placeholder="Tu nombre completo"/>
+                                       style={input} disabled={loading} placeholder="Juan Pérez"/>
                             </label>
+
+                            <label style={label}>
+                                Nombre de usuario
+                                <div style={{ position: 'relative' }}>
+                                    <input
+                                        type="text"
+                                        value={username}
+                                        onChange={(e) => {
+                                            const value = e.target.value.toLowerCase().replace(/[^a-z0-9_]/g, '');
+                                            setUsername(value);
+                                            if (value.length >= 3) {
+                                                checkUsernameAvailability(value);
+                                            } else {
+                                                setUsernameAvailable(null);
+                                            }
+                                        }}
+                                        style={{
+                                            ...input,
+                                            paddingRight: 35,
+                                            border: usernameAvailable === false ? '2px solid #ef4444' :
+                                                usernameAvailable === true ? '2px solid #10b981' : input.border
+                                        }}
+                                        disabled={loading}
+                                        placeholder="juanperez"
+                                        minLength={3}
+                                    />
+                                    <div style={{
+                                        position: 'absolute',
+                                        right: '10px',
+                                        top: '50%',
+                                        transform: 'translateY(-50%)',
+                                        fontSize: '14px'
+                                    }}>
+                                        {checkingUsername ? "..." :
+                                            usernameAvailable === true ? "✓" :
+                                                usernameAvailable === false ? "✗" : ""}
+                                    </div>
+                                </div>
+                                <div style={{ fontSize: 12, color: '#6b7280', marginTop: 2 }}>
+                                    Solo letras, números y guiones bajos. Mínimo 3 caracteres.
+                                </div>
+                            </label>
+
                             <label style={label}>
                                 Email
                                 <input type="email" value={email} onChange={e=>setEmail(e.target.value)}
-                                       required style={input} disabled={loading} placeholder="tu@email.com"/>
-                            </label>
-                            <label style={label}>
-                                Contraseña (mínimo 6 caracteres)
-                                <input type="password" value={pwd} onChange={e=>setPwd(e.target.value)}
-                                       required minLength={6} style={input} disabled={loading} placeholder="Mínimo 6 caracteres"/>
+                                       style={input} disabled={loading} placeholder="tu@email.com"/>
                             </label>
 
-                            <button type="submit" disabled={loading} style={{...submitBtn, opacity: loading ? 0.7 : 1}}>
+                            <label style={label}>
+                                Contraseña
+                                <input type="password" value={pwd} onChange={e=>setPwd(e.target.value)}
+                                       style={input} disabled={loading} placeholder="Mínimo 6 caracteres" minLength={6}/>
+                            </label>
+
+                            <button onClick={handleSignup} disabled={loading || !usernameAvailable}
+                                    style={{...submitBtn, opacity: (loading || !usernameAvailable) ? 0.7 : 1}}>
                                 {loading ? "Creando cuenta..." : "Crear cuenta"}
                             </button>
 
                             <p style={{ textAlign: "center", margin: 0 }}>
-                                ¿Ya tenés cuenta?
+                                ¿Ya tienes cuenta?
                                 <button type="button" onClick={()=>setMode("login")}
                                         style={{background:"none", border:"none", color:"#2563eb", cursor:"pointer", marginLeft: 5}}>
                                     Iniciar sesión
                                 </button>
                             </p>
-                        </form>
+                        </div>
                     )}
 
                     {/* FORMULARIO RESET PASSWORD */}
                     {mode === "reset" && (
-                        <form onSubmit={handleResetPassword} style={{ display: "grid", gap: 12 }}>
+                        <div style={{ display: "grid", gap: 12 }}>
                             <label style={label}>
                                 Email
                                 <input type="email" value={email} onChange={e=>setEmail(e.target.value)}
-                                       required style={input} disabled={loading} placeholder="tu@email.com"/>
+                                       style={input} disabled={loading} placeholder="tu@email.com"/>
                             </label>
 
-                            <button type="submit" disabled={loading} style={{...submitBtn, opacity: loading ? 0.7 : 1}}>
+                            <button onClick={handleResetPassword} disabled={loading} style={{...submitBtn, opacity: loading ? 0.7 : 1}}>
                                 {loading ? "Enviando..." : "Enviar email de reset"}
                             </button>
 
@@ -271,15 +404,7 @@ export default function AuthModal_SignIn({ open, onClose, onSignedIn }) {
                                     ← Volver al login
                                 </button>
                             </p>
-
-                            <p style={{ textAlign: "center", marginTop: 10, fontSize: 14 }}>
-                                ¿No tenés cuenta?{" "}
-                                <button type="button" onClick={()=>setMode("signup")}
-                                        style={{ color: "#2563eb", background: "none", border: "none", cursor: "pointer" }}>
-                                    Crear cuenta
-                                </button>
-                            </p>
-                        </form>
+                        </div>
                     )}
 
                     {/* Mensajes de error/éxito */}
