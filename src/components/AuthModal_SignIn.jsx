@@ -112,13 +112,6 @@ export default function AuthModal_SignIn({ open, onClose, onSignedIn }) {
         setLoading(true);
 
         try {
-            // Verificar si el email ya existe
-            const emailExists = await checkEmailExists(email.trim());
-            if (emailExists) {
-                setError("Ya existe una cuenta con este email");
-                setLoading(false);
-                return;
-            }
 
             const { data, error } = await supabase.auth.signUp({
                 email: email.trim(),

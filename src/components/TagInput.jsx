@@ -1,41 +1,30 @@
-import { useState } from "react"
+import { useState } from "react";
 
-export default function TagInput({ tags = [], setTags }) {
-    const [input, setInput] = useState("")
+export default function TagInput({ value = [], onChange, placeholder="Agregar etiqueta y Enter" }) {
+    const [draft, setDraft] = useState("");
 
-    const addTag = () => {
-        if (input && !tags.includes(input)) {
-            setTags([...tags, input])
-        }
-        setInput("")
-    }
-
-    const removeTag = (tag) => {
-        setTags(tags.filter(t => t !== tag))
-    }
+    const add = () => {
+        const t = draft.trim();
+        if (!t) return;
+        if (!value.includes(t)) onChange([...(value||[]), t]);
+        setDraft("");
+    };
+    const remove = (t) => onChange(value.filter(v => v !== t));
 
     return (
-        <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-            <div style={{ display: "flex", gap: 8 }}>
-                <input
-                    value={input}
-                    onChange={(e) => setInput(e.target.value)}
-                    onKeyDown={(e) => e.key === "Enter" && (e.preventDefault(), addTag())}
-                    placeholder="Agregar tag y presionar Enter"
-                    style={{ flex: 1, padding: "8px 12px", borderRadius: 8, border: "1px solid #e5e7eb" }}
-                />
-                <button type="button" onClick={addTag} style={{ padding: "8px 12px", borderRadius: 8, background: "#2563eb", color: "white", border: "none", cursor: "pointer" }}>
-                    +
-                </button>
-            </div>
-            <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
-                {tags.map(tag => (
-                    <span key={tag} style={{ background: "#f1f5f9", padding: "4px 8px", borderRadius: 12, fontSize: 12 }}>
-            {tag}
-                        <button onClick={() => removeTag(tag)} style={{ marginLeft: 6, background: "none", border: "none", cursor: "pointer" }}>x</button>
-          </span>
-                ))}
-            </div>
+        <div style={{ border:"1px solid var(--border)", borderRadius:12, padding:8, display:"flex", flexWrap:"wrap", gap:8 }}>
+            {value.map(t => (
+                <span key={t} style={{ padding:"6px 10px", borderRadius:9999, background:"rgba(37,99,235,.10)", color:"var(--accent)", fontWeight:700, border:"1px solid rgba(37,99,235,.25)" }}>
+          {t} <button onClick={()=>remove(t)} style={{ marginLeft:6, border:"none", background:"transparent", cursor:"pointer", color:"#64748b" }}>×</button>
+        </span>
+            ))}
+            <input
+                value={draft}
+                onChange={e=>setDraft(e.target.value)}
+                onKeyDown={e=>{ if(e.key === "Enter"){ e.preventDefault(); add(); } }}
+                placeholder={placeholder}
+                style={{ flex:1, minWidth:140, border:"none", outline:"none" }}
+            />
         </div>
-    )
+    );
 }

@@ -91,8 +91,8 @@ export default function Header() {
         fontWeight: 600,
         textDecoration: "none",
         whiteSpace: "nowrap",
-        minWidth: 120, // esto le cambia el ancho a las burbujas (lo mantengo)
-        height: 22,    // esto le sube la "altura" de las burbujas (lo mantengo)
+        minWidth: 125, // esto le cambia el ancho a las burbujas (lo mantengo)
+        height: 23,    // esto le sube la "altura" de las burbujas (lo mantengo)
         cursor: "pointer",
         appearance: "none",
         WebkitAppearance: "none",
