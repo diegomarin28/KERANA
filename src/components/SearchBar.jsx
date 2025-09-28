@@ -115,7 +115,53 @@ export default function SearchBar() {
                     {/* Items */}
                     <ul style={{ listStyle: "none", margin: 0, padding: 0 }}>
                         {recent.map((r) => (
-                            <li key={r} style={{ borderBottom: "1px solid #f3f4f6" }}>
+                            <li
+                                key={r}
+                                style={{
+                                    borderBottom: "1px solid #f3f4f6",
+                                    transition: "all 0.2s ease",
+                                    position: "relative",
+                                    cursor: "pointer"
+                                }}
+                                onMouseEnter={(e) => {
+                                    e.currentTarget.style.background = "linear-gradient(90deg, rgba(37, 99, 235, 0.06) 0%, rgba(37, 99, 235, 0.04) 50%, rgba(37, 99, 235, 0.06) 100%)";
+                                    e.currentTarget.style.borderLeft = "3px solid #2563eb";
+                                    e.currentTarget.style.paddingLeft = "11px";
+                                    e.currentTarget.style.transform = "translateX(2px)";
+
+                                    // Cambiar el color del texto del botón
+                                    const button = e.currentTarget.querySelector('button[title="' + r + '"]');
+                                    if (button) {
+                                        button.style.color = "#2563eb";
+                                        button.style.fontWeight = "600";
+                                    }
+
+                                    // Cambiar el color del icono
+                                    const svg = e.currentTarget.querySelector('svg');
+                                    if (svg) {
+                                        svg.style.color = "#2563eb";
+                                    }
+                                }}
+                                onMouseLeave={(e) => {
+                                    e.currentTarget.style.background = "transparent";
+                                    e.currentTarget.style.borderLeft = "none";
+                                    e.currentTarget.style.paddingLeft = "0";
+                                    e.currentTarget.style.transform = "translateX(0px)";
+
+                                    // Restaurar el color del texto del botón
+                                    const button = e.currentTarget.querySelector('button[title="' + r + '"]');
+                                    if (button) {
+                                        button.style.color = "#111827";
+                                        button.style.fontWeight = "normal";
+                                    }
+
+                                    // Restaurar el color del icono
+                                    const svg = e.currentTarget.querySelector('svg');
+                                    if (svg) {
+                                        svg.style.color = "#9ca3af";
+                                    }
+                                }}
+                            >
                                 <div
                                     style={{
                                         display: "flex",
@@ -143,6 +189,7 @@ export default function SearchBar() {
                                             padding: 0,
                                             color: "#111827",
                                             fontSize: 15,
+                                            transition: "all 0.2s ease",
                                         }}
                                         title={r}
                                     >
@@ -153,7 +200,12 @@ export default function SearchBar() {
                                             viewBox="0 0 24 24"
                                             strokeWidth={1.5}
                                             stroke="currentColor"
-                                            style={{ width: 18, height: 18, color: "#9ca3af" }}
+                                            style={{
+                                                width: 18,
+                                                height: 18,
+                                                color: "#9ca3af",
+                                                transition: "all 0.2s ease"
+                                            }}
                                         >
                                             <path
                                                 strokeLinecap="round"
@@ -164,7 +216,7 @@ export default function SearchBar() {
                                         {r}
                                     </button>
 
-                                    {/* “x” gris */}
+                                    {/* "x" gris */}
                                     <button
                                         aria-label="Eliminar búsqueda"
                                         onClick={() => removeRecent(r)}
@@ -179,8 +231,19 @@ export default function SearchBar() {
                                             textAlign: "center",
                                             cursor: "pointer",
                                             fontSize: 16,
+                                            transition: "all 0.2s ease",
                                         }}
                                         title="Eliminar"
+                                        onMouseEnter={(e) => {
+                                            e.target.style.color = "#ef4444";
+                                            e.target.style.transform = "scale(1.1)";
+                                            e.target.style.borderColor = "#ef4444";
+                                        }}
+                                        onMouseLeave={(e) => {
+                                            e.target.style.color = "#9ca3af";
+                                            e.target.style.transform = "scale(1)";
+                                            e.target.style.borderColor = "#e5e7eb";
+                                        }}
                                     >
                                         ×
                                     </button>
