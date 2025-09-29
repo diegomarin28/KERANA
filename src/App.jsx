@@ -1,4 +1,4 @@
-// App.jsx
+
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import Header from "../src/components/Header.jsx";
 import Home from "./pages/Home.jsx";
@@ -11,6 +11,7 @@ import MentorApply from "./pages/MentorApply";
 import UserDashboard from "./components/UserDashboard";
 import CourseSearch from "./components/CourseSearch";
 import AuthConfirm from './pages/AuthConfirm';
+import Subjects from './pages/Subjects'
 
 export default function App() {
     return (
@@ -27,6 +28,7 @@ export default function App() {
                 <Route path="/panel" element={<UserDashboard />} />
                 <Route path="/cursos/buscar" element={<CourseSearch />} />
                 <Route path="/auth/confirm" element={<AuthConfirm />} />
+                <Route path="/subjects" element={<Subjects />} />
             </Routes>
         </BrowserRouter>
     );
