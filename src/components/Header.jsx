@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import AuthModal_SignIn from "../components/AuthModal_SignIn.jsx";
 import AuthModal_SignUp from "../components/AuthModal_SignUp.jsx";
@@ -11,25 +11,33 @@ export default function Header() {
     const [signUpOpen, setSignUpOpen] = useState(false);
     const [reseniaOpen, setReseniaOpen] = useState(false);
     const [user, setUser] = useState(null);
-    const [inHero, setInHero] = useState(true);     // ← estado: arriba del hero vs scroll
+    const [inHero, setInHero] = useState(true);
     const navigate = useNavigate();
+    const headerRef = useRef(null);
 
-    // Detectamos si todavía estamos en el hero
+    // === Trigger: cambia cuando pasás ~1 pantalla (independiente del Home) ===
     useEffect(() => {
-        const el = document.getElementById("hero-sentinel");
-        if (!el) {
-            const onScroll = () => setInHero(window.scrollY < 200);
-            onScroll();
-            window.addEventListener("scroll", onScroll, { passive: true });
-            return () => window.removeEventListener("scroll", onScroll);
-        }
-        const io = new IntersectionObserver(
-            (entries) => setInHero(entries[0].isIntersecting),
-            { root: null, threshold: 0, rootMargin: "-64px 0px 0px 0px" }
-        );
-        io.observe(el);
-        return () => io.disconnect();
+        const update = () => {
+            const headerH = headerRef.current?.offsetHeight ?? 64;
+            const sentinel = document.getElementById("after-hero"); // ← BUSCAR EN CADA TICK
+            const top = sentinel ? sentinel.getBoundingClientRect().top : Infinity;
+
+            const offset = 0; // px antes de que la sección toque el header (ajustá a gusto)
+            // Mientras la próxima sección aún no “entra” en el área del header + offset → seguimos en modo inHero
+            setInHero(top > headerH + offset);
+        };
+
+        update();
+        window.addEventListener("scroll", update, { passive: true });
+        window.addEventListener("resize", update);
+        window.addEventListener("load", update);
+        return () => {
+            window.removeEventListener("scroll", update);
+            window.removeEventListener("resize", update);
+            window.removeEventListener("load", update);
+        };
     }, []);
+
 
     const handleReseniaClick = () => {
         if (!user) setAuthOpen(true);
@@ -49,34 +57,31 @@ export default function Header() {
     const switchToSignUp = () => { setAuthOpen(false); setSignUpOpen(true); };
     const switchToSignIn = () => { setSignUpOpen(false); setAuthOpen(true); };
 
-    // Tokens de color para ambos modos (solo colores; tamaños intactos)
+    // Colores
     const TOKENS = inHero
         ? {
-            headerBg: "transparent",
-            headerText: "#111827",     // texto oscuro sobre hero
-            border: "rgba(255,255,255,.15)",
-            pillBg: "#ffffff",         // pills blancas arriba
+            headerBg: "#1b2e3a",  // azul claro (tu elección)
+            headerText: "#ffffff",
+            border: "transparent", // sin borde para evitar corte
+            pillBg: "#ffffff",     // burbujas blancas
             pillText: "#2563eb",
             pillBorder: "#e5e7eb",
             signBg: "#ffffff",
             signText: "#2563eb",
-            signBorder: "#e5e7eb", // ← Agregar esta línea
-
+            signBorder: "#e5e7eb",
         }
         : {
-            headerBg: "#ffffff",       // al scrollear: header blanco
-            headerText: "#0b1e3a",
-            border: "#e5e7eb",
-            pillBg: "#2563eb",         // pills azules abajo
+            headerBg: "#2563eb",  // azul oscuro
+            headerText: "#ffffff",
+            border: "transparent", // sin borde
+            pillBg: "#2563eb",     // burbujas azules
             pillText: "#ffffff",
             pillBorder: "#1e40af",
             signBg: "#2563eb",
             signText: "#ffffff",
-            signBorder: "#1e40af", // ← Agregar esta línea
-
+            signBorder: "#1e40af",
         };
 
-    // ——— estilos tal cual los tuyos, solo con colores dinámicos ———
     const pillReset = {
         all: "unset",
         display: "inline-block",
@@ -89,32 +94,28 @@ export default function Header() {
         justifyContent: "center",
         padding: "10px 18px",
         borderRadius: 9999,
-        background: TOKENS.pillBg,            // ← dinámico
+        background: TOKENS.pillBg,
         border: `1px solid ${TOKENS.pillBorder}`,
         color: TOKENS.pillText,
         fontWeight: 600,
         textDecoration: "none",
         whiteSpace: "nowrap",
-        minWidth: 125, // esto le cambia el ancho a las burbujas (lo mantengo)
-        height: 23,    // esto le sube la "altura" de las burbujas (lo mantengo)
+        minWidth: 125,
+        height: 23,
         cursor: "pointer",
         appearance: "none",
         WebkitAppearance: "none",
         lineHeight: 1,
-        transition: "all 0.3s ease", // Agregamos transición para el efecto suave
-        transform: "translateY(0px)",   // Agregamos transform para el efecto de elevación
-
-
+        transition: "all 0.3s ease",
+        transform: "translateY(0px)",
     };
-    // También necesitas agregar estas funciones para manejar el hover:
+
     const handleMouseEnter = (e) => {
         if (inHero) {
-            // Si estamos en hero: de blanco a azul
             e.target.style.background = "#2563eb";
             e.target.style.color = "#ffffff";
             e.target.style.borderColor = "#1e40af";
         } else {
-            // Si estamos scrolleados: de azul a blanco
             e.target.style.background = "#ffffff";
             e.target.style.color = "#2563eb";
             e.target.style.borderColor = "#e5e7eb";
@@ -124,7 +125,6 @@ export default function Header() {
     };
 
     const handleMouseLeave = (e) => {
-        // Restauramos los colores originales según el estado
         e.target.style.background = TOKENS.pillBg;
         e.target.style.color = TOKENS.pillText;
         e.target.style.borderColor = TOKENS.pillBorder;
@@ -132,17 +132,16 @@ export default function Header() {
         e.target.style.boxShadow = "none";
     };
 
-// Y modifica tus componentes PillLink y PillButton así:
     function PillLink({ to, children }) {
         return (
             <Link to={to} style={pillReset}>
-            <span
-                style={pillBox}
-                onMouseEnter={handleMouseEnter}
-                onMouseLeave={handleMouseLeave}
-            >
-                {children}
-            </span>
+        <span
+            style={pillBox}
+            onMouseEnter={handleMouseEnter}
+            onMouseLeave={handleMouseLeave}
+        >
+          {children}
+        </span>
             </Link>
         );
     }
@@ -150,13 +149,13 @@ export default function Header() {
     function PillButton({ onClick, children }) {
         return (
             <button type="button" onClick={onClick} style={pillReset}>
-            <span
-                style={pillBox}
-                onMouseEnter={handleMouseEnter}
-                onMouseLeave={handleMouseLeave}
-            >
-                {children}
-            </span>
+        <span
+            style={pillBox}
+            onMouseEnter={handleMouseEnter}
+            onMouseLeave={handleMouseLeave}
+        >
+          {children}
+        </span>
             </button>
         );
     }
@@ -165,23 +164,21 @@ export default function Header() {
         height: 40,
         padding: "0 16px",
         borderRadius: 9999,
-        background: TOKENS.signBg,           // ← dinámico
+        background: TOKENS.signBg,
         color: TOKENS.signText,
-        border: `1px solid ${TOKENS.signBorder}`, // ← Cambiar esta línea
+        border: `1px solid ${TOKENS.signBorder}`,
         fontWeight: 700,
         cursor: "pointer",
-         transition: "all 0.3s ease", // Agregamos transición para el efecto suave
-        transform: "translateY(0px)", // Agregamos transform para el efecto de elevación
+        transition: "all 0.3s ease",
+        transform: "translateY(0px)",
     };
 
     const handleSignInMouseEnter = (e) => {
         if (inHero) {
-            // Si estamos en hero: de blanco a azul
             e.target.style.background = "#2563eb";
             e.target.style.color = "#ffffff";
             e.target.style.borderColor = "#1e40af";
         } else {
-            // Si estamos scrolleados: de azul a blanco
             e.target.style.background = "#ffffff";
             e.target.style.color = "#2563eb";
             e.target.style.borderColor = "#e5e7eb";
@@ -191,10 +188,9 @@ export default function Header() {
     };
 
     const handleSignInMouseLeave = (e) => {
-        // Restauramos los colores originales según el estado
         e.target.style.background = TOKENS.signBg;
         e.target.style.color = TOKENS.signText;
-        e.target.style.borderColor = TOKENS.signBorder; // ← Cambiar esta línea
+        e.target.style.borderColor = TOKENS.signBorder;
         e.target.style.transform = "translateY(0px)";
         e.target.style.boxShadow = "none";
     };
@@ -202,13 +198,14 @@ export default function Header() {
     return (
         <>
             <header
+                ref={headerRef}
                 style={{
                     width: "100%",
                     position: "fixed",
                     top: 0,
                     left: 0,
                     zIndex: 1000,
-                    background: TOKENS.headerBg,    // ← dinámico
+                    background: TOKENS.headerBg,
                     color: TOKENS.headerText,
                     borderBottom: `1px solid ${TOKENS.border}`,
                     transition: "background .25s ease, color .25s ease, border-color .25s ease",
@@ -249,7 +246,7 @@ export default function Header() {
                                 cursor: "pointer",
                                 fontWeight: 800,
                                 fontSize: 20,
-                                color: TOKENS.headerText, // ← hereda modo
+                                color: TOKENS.headerText,
                             }}
                             aria-label="Ir al inicio"
                         >
@@ -257,7 +254,7 @@ export default function Header() {
                         </button>
                     </div>
 
-                    {/* Centro: 3 botones (idénticos) */}
+                    {/* Centro: acciones */}
                     <nav style={{ display: "flex", alignItems: "center", gap: 10, justifyContent: "center" }}>
                         <PillLink to="/upload">Subir Apuntes</PillLink>
                         <PillLink to="/about">¡Quiero ser mentor!</PillLink>
@@ -298,15 +295,14 @@ export default function Header() {
                 </div>
             </header>
 
-            {/* Spacer para que el contenido no quede tapado por el header fijo */}
+            {/* Spacer */}
             <div style={{ height: 64 }} />
 
-            {/* Sidebar + Modales (sin cambios) */}
+            {/* Sidebar + Modales */}
             <Sidebar open={menuOpen} onClose={() => setMenuOpen(false)} user={user} onLogout={handleLogout} />
             <AuthModal_SignIn open={authOpen} onClose={() => setAuthOpen(false)} onSignedIn={handleSignedIn} onSwitchToSignUp={switchToSignUp} />
             <AuthModal_SignUp open={signUpOpen} onClose={() => setSignUpOpen(false)} onSignedIn={handleSignedIn} onSwitchToSignIn={switchToSignIn} />
             <AuthModal_HacerResenia open={reseniaOpen} onClose={() => setReseniaOpen(false)} onSave={handleReseniaSubmit} />
         </>
     );
-
 }
