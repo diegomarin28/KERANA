@@ -1,0 +1,11 @@
+:root{
+    --bg:#f7fafc; --surface:#fff; --text:#0b1220; --muted:#5b6573; --border:#e5e7eb; --ring:rgba(14,165,163,.25);
+    --primary:#0ea5a3; --primary-700:#0b7a78; --secondary:#f59e0b; --blue:#2563eb; --card-shadow:0 6px 20px rgba(0,0,0,.04);
+}
+[data-theme="dark"]{
+    --bg:#0b1220; --surface:#111827; --text:#e5e7eb; --muted:#9aa4b2; --border:#273245; --ring:rgba(45,212,191,.25);
+    --primary:#2dd4bf; --primary-700:#14b8a6; --secondary:#fbbf24; --blue:#3b82f6;
+}
+html,body,#root{height:100%}
+body{margin:0;background:var(--bg);color:var(--text)}
+:where(button,a,input,select,textarea):focus-visible{outline:3px solid var(--ring);outline-offset:2px}

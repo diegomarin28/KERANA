@@ -1,6 +1,9 @@
 import { useParams } from 'react-router-dom'
 import { useEffect, useState } from 'react'
-import {  notesAPI } from '../api/database'
+import { notesAPI } from '../api/database'
+import { Card } from '../components/ui/Card'
+import { Button } from '../components/ui/Button'
+import { Chip } from '../components/ui/Chip'
 
 export default function CourseDetail() {
     const { id } = useParams()
@@ -46,61 +49,58 @@ export default function CourseDetail() {
     return (
         <div className="container" style={{ padding: '36px 0' }}>
             {/* Header */}
-            <div style={{ marginBottom: 32, padding: 24, background: 'var(--bg-secondary, #f8f9fa)', borderRadius: 12, border: '1px solid var(--border, #e1e5e9)' }}>
-                <h1 style={{ margin: '0 0 8px 0', fontSize: '2rem' }}>{materia}</h1>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 16, marginBottom: 16 }}>
-                    <span>👨‍🏫 {docente}</span>
-                    <span>⭐ {avg}</span>
-                    <span>{modalidad}</span>
-                    <span>${precio}</span>
+            <Card style={{ marginBottom: 32 }}>
+                <h1>{materia}</h1>
+                <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', marginBottom: 12 }}>
+                    <Chip tone="blue">👨‍🏫 {docente}</Chip>
+                    <Chip tone="amber">⭐ {avg}</Chip>
+                    <Chip>{modalidad}</Chip>
+                    <Chip tone="primary">${precio}</Chip>
                 </div>
-                <p style={{ margin: 0, color: 'var(--text-secondary)' }}>
+                <p style={{ margin: 0, color: 'var(--muted)' }}>
                     Encontrá reseñas y apuntes de este curso
                 </p>
-            </div>
+            </Card>
 
             {/* Apuntes */}
-            <section className="section" style={{ marginBottom: 24 }}>
-                <div className="section-title">Apuntes <span className="section-count">{notes.length}</span></div>
+            <section style={{ marginBottom: 24 }}>
+                <h2>Apuntes <Chip tone="blue">{notes.length}</Chip></h2>
                 {notes.length === 0 ? (
-                    <div className="empty">Aún no hay apuntes publicados.</div>
+                    <Card>Aún no hay apuntes publicados.</Card>
                 ) : (
-                    <div className="grid" style={{ display: 'grid', gap: 12 }}>
+                    <div style={{ display: 'grid', gap: 12 }}>
                         {notes.map(n => (
-                            <div key={n.id} style={{ border: '1px solid #e5e7eb', borderRadius: 12, padding: 16 }}>
+                            <Card key={n.id}>
                                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                                     <div>
                                         <h3 style={{ margin: 0 }}>{n.titulo || n.file_name}</h3>
-                                        {n.descripcion && <p style={{ margin: '6px 0', color: '#6b7280' }}>{n.descripcion}</p>}
+                                        {n.descripcion && <p style={{ margin: '6px 0', color: 'var(--muted)' }}>{n.descripcion}</p>}
                                     </div>
-                                    <button
-                                        onClick={() => window.open(n.file_url, '_blank')}
-                                        style={{ padding: '8px 12px', borderRadius: 6, background: '#2563eb', color: 'white', border: 'none', cursor: 'pointer' }}
-                                    >
+                                    <Button variant="secondary" onClick={() => window.open(n.file_url, '_blank')}>
                                         ⬇️ Descargar
-                                    </button>
+                                    </Button>
                                 </div>
-                            </div>
+                            </Card>
                         ))}
                     </div>
                 )}
             </section>
 
             {/* Reseñas */}
-            <section className="section">
-                <div className="section-title">Reseñas <span className="section-count">{ratings.length}</span></div>
+            <section>
+                <h2>Reseñas <Chip tone="amber">{ratings.length}</Chip></h2>
                 {ratings.length === 0 ? (
-                    <div className="empty">Sé el primero en calificar este curso.</div>
+                    <Card>Sé el primero en calificar este curso.</Card>
                 ) : (
-                    <div className="grid" style={{ display: 'grid', gap: 12 }}>
+                    <div style={{ display: 'grid', gap: 12 }}>
                         {ratings.map(r => (
-                            <div key={r.id} style={{ border: '1px solid #e5e7eb', borderRadius: 12, padding: 16 }}>
+                            <Card key={r.id}>
                                 <div style={{ display: 'flex', justifyContent: 'space-between' }}>
                                     <strong>{r.usuario?.nombre || 'Anónimo'}</strong>
                                     <span>⭐ {r.puntuacion}</span>
                                 </div>
                                 {r.comentario && <p style={{ marginTop: 8 }}>{r.comentario}</p>}
-                            </div>
+                            </Card>
                         ))}
                     </div>
                 )}

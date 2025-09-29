@@ -2,6 +2,8 @@
 import { useEffect, useState } from 'react'
 import { subjectsAPI, searchAPI, favoritesAPI } from '../api/Database'
 import CourseCard from '../components/CourseCard'
+import { Button } from '../components/ui/Button'
+import { Chip } from '../components/ui/Chip'
 
 export default function SearchCourses() {
     const [selectedSubject, setSelectedSubject] = useState(null)
@@ -10,7 +12,7 @@ export default function SearchCourses() {
     const [subjects, setSubjects] = useState([])
     const [loading, setLoading] = useState(false)
     const [errorMsg, setErrorMsg] = useState('')
-    const [activeTab, setActiveTab] = useState('todo') // 'todo', 'materias', 'apuntes', 'profesores', 'mentores'
+    const [activeTab, setActiveTab] = useState('todo') // 'todo', 'materia', 'apunte', 'profesor', 'mentor'
 
     useEffect(() => {
         loadSubjects()
@@ -117,13 +119,15 @@ export default function SearchCourses() {
     // Filtrar resultados por tipo
     const filteredResults = results.filter(item => {
         if (activeTab === 'todo') return true
-        return item.tipo === activeTab ||
-            (activeTab === 'materias' && item.tipo === 'materia')
+        return item.tipo === activeTab || (activeTab === 'materias' && item.tipo === 'materia')
     })
 
     return (
         <div className="container" style={{ maxWidth: 960, margin: '0 auto', padding: 16 }}>
-            <h1>Buscar en Kerana</h1>
+            <h1 style={{ marginBottom: 8 }}>Buscar en Kerana</h1>
+            <div style={{ marginBottom: 6, color: 'var(--muted)', fontSize: 14 }}>
+                <Chip tone="blue">{results.length} resultados</Chip>
+            </div>
 
             {/* Controles de búsqueda */}
             <div style={{ marginBottom: 20 }}>
@@ -133,28 +137,19 @@ export default function SearchCourses() {
                         placeholder="Buscar materias, apuntes, profesores..."
                         value={searchTerm}
                         onChange={(e) => setSearchTerm(e.target.value)}
-                        onKeyPress={(e) => e.key === 'Enter' && handleSearch()}
+                        onKeyDown={(e) => e.key === 'Enter' && handleSearch()}
                         style={{
                             flex: 1,
                             padding: '10px',
                             borderRadius: '8px',
-                            border: '1px solid #d1d5db'
+                            border: '1px solid var(--border)',
+                            background: 'var(--surface)',
+                            color: 'var(--text)',
                         }}
                     />
-                    <button
-                        onClick={handleSearch}
-                        disabled={loading}
-                        style={{
-                            padding: '10px 20px',
-                            backgroundColor: '#2563eb',
-                            color: 'white',
-                            border: 'none',
-                            borderRadius: '8px',
-                            cursor: 'pointer'
-                        }}
-                    >
+                    <Button onClick={handleSearch} disabled={loading} variant="secondary">
                         {loading ? 'Buscando...' : 'Buscar'}
-                    </button>
+                    </Button>
                 </div>
 
                 <div style={{ display: 'flex', gap: 8 }}>
@@ -164,7 +159,9 @@ export default function SearchCourses() {
                         style={{
                             padding: '8px',
                             borderRadius: '6px',
-                            border: '1px solid #d1d5db'
+                            border: '1px solid var(--border)',
+                            background: 'var(--surface)',
+                            color: 'var(--text)',
                         }}
                     >
                         <option value="">Todas las materias</option>
@@ -175,34 +172,30 @@ export default function SearchCourses() {
                         ))}
                     </select>
 
-                    <button
+                    <Button
                         onClick={() => {
                             setSearchTerm('')
                             setSelectedSubject(null)
                             loadInitialContent()
                         }}
-                        style={{
-                            padding: '8px 12px',
-                            backgroundColor: '#6b7280',
-                            color: 'white',
-                            border: 'none',
-                            borderRadius: '6px',
-                            cursor: 'pointer'
-                        }}
+                        variant="ghost"
                     >
                         Limpiar
-                    </button>
+                    </Button>
                 </div>
             </div>
 
             {/* Tabs de filtro */}
-            <div style={{
-                display: 'flex',
-                gap: 8,
-                marginBottom: 16,
-                borderBottom: '1px solid #e5e7eb',
-                paddingBottom: 8
-            }}>
+            <div
+                style={{
+                    display: 'flex',
+                    gap: 8,
+                    marginBottom: 16,
+                    borderBottom: '1px solid var(--border)',
+                    paddingBottom: 8,
+                    flexWrap: 'wrap',
+                }}
+            >
                 {[
                     { key: 'todo', label: 'Todo', count: results.length },
                     { key: 'materia', label: 'Materias', count: results.filter(r => r.tipo === 'materia').length },
@@ -210,21 +203,13 @@ export default function SearchCourses() {
                     { key: 'profesor', label: 'Profesores', count: results.filter(r => r.tipo === 'profesor').length },
                     { key: 'mentor', label: 'Mentores', count: results.filter(r => r.tipo === 'mentor').length }
                 ].map(tab => (
-                    <button
+                    <Button
                         key={tab.key}
+                        variant={activeTab === tab.key ? 'secondary' : 'ghost'}
                         onClick={() => setActiveTab(tab.key)}
-                        style={{
-                            padding: '8px 12px',
-                            border: 'none',
-                            backgroundColor: activeTab === tab.key ? '#2563eb' : 'transparent',
-                            color: activeTab === tab.key ? 'white' : '#6b7280',
-                            borderRadius: '6px',
-                            cursor: 'pointer',
-                            fontSize: '0.9rem'
-                        }}
                     >
                         {tab.label} ({tab.count})
-                    </button>
+                    </Button>
                 ))}
             </div>
 

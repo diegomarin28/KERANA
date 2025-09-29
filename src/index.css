@@ -247,3 +247,9 @@ body { background: var(--bg); color: var(--fg); /* esta en rojo pq intelij no la
 .empty {
     border: 1px dashed var(--border); border-radius: 12px; padding: 18px; text-align: center; color: var(--muted);
 }
+
+:where(button, a, input, select, textarea):focus-visible {
+    outline: 3px solid var(--ring);
+    outline-offset: 2px;
+}
+

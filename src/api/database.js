@@ -414,18 +414,6 @@ export const ratingsAPI = {
         return { data: { count, avg: count ? +(sum / count).toFixed(2) : 0 }, error: null };
     }
 };
-(async () => {
-    console.log("— PRUEBA buscar_cursos —");
-    const { data: profs, error: e1 } = await supabase.rpc("buscar_cursos", { termino: "analisis" });
-    console.log("profesores:", profs, e1);
-
-    console.log("— PRUEBA vistas —");
-    const { data: aps } = await supabase.from("apuntes_completos").select("*").limit(1);
-    console.log("apuntes 1:", aps);
-
-    const { data: mens } = await supabase.from("mentores_con_stats").select("*").limit(1);
-    console.log("mentores 1:", mens);
-})();
 
 
 

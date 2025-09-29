@@ -16,17 +16,21 @@ export default function FileDrop({ onFileSelected }) {
             onDragLeave={() => setDragOver(false)}
             onDrop={handleDrop}
             style={{
-                border: `2px dashed ${dragOver ? "#2563eb" : "#cbd5e1"}`,
+                border: `2px dashed ${dragOver ? "var(--blue)" : "#cbd5e1"}`,
                 borderRadius: 12,
                 padding: 30,
                 textAlign: "center",
-                background: dragOver ? "#f0f9ff" : "#fff"
+                background: dragOver ? "#f0f9ff" : "var(--surface)",
+                transition: "all .2s ease"
             }}
         >
-            <p>{dragOver ? "Soltá el archivo aquí" : "Arrastrá un archivo o hacé clic"}</p>
+            <p style={{ color: dragOver ? "var(--blue)" : "var(--muted)" }}>
+                {dragOver ? "Soltá el archivo aquí" : "Arrastrá un archivo o hacé clic"}
+            </p>
             <input
                 type="file"
                 onChange={(e) => e.target.files[0] && onFileSelected(e.target.files[0])}
+                style={{ marginTop: 10 }}
             />
         </div>
     )

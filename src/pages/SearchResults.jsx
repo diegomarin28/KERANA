@@ -2,7 +2,10 @@ import { useLocation } from "react-router-dom";
 import { useMemo, useState, useEffect } from "react";
 import ResultCard from "../components/ResultCard";
 import SearchBar from "../components/SearchBar";
-import { searchAPI } from "../api/Database"; // 👈 usar el buscador real
+import { searchAPI } from "../api/Database";
+import SearchHeader from "../components/SearchHeader";
+import { Chip } from "../components/ui/Chip";
+import { Button } from "../components/ui/Button";
 
 export default function SearchResults() {
     const { search } = useLocation();
@@ -13,10 +16,10 @@ export default function SearchResults() {
     const [loading, setLoading] = useState(false);
 
     // Estados por categoría que sí existen en Database.js → searchAPI.searchAll
-    const [subjects, setSubjects] = useState([]);    // materias
+    const [subjects, setSubjects] = useState([]); // materias
     const [professors, setProfessors] = useState([]); // profesores
-    const [mentors, setMentors] = useState([]);      // mentores
-    const [notes, setNotes] = useState([]);          // apuntes
+    const [mentors, setMentors] = useState([]); // mentores
+    const [notes, setNotes] = useState([]); // apuntes
 
     useEffect(() => {
         if (q) fetchAll(q);
@@ -35,7 +38,10 @@ export default function SearchResults() {
             setMentors(data?.mentores ?? []);
         } catch (e) {
             console.error("Error buscando:", e);
-            setSubjects([]); setNotes([]); setProfessors([]); setMentors([]);
+            setSubjects([]);
+            setNotes([]);
+            setProfessors([]);
+            setMentors([]);
         } finally {
             setLoading(false);
         }
@@ -43,8 +49,7 @@ export default function SearchResults() {
 
     // Filtro por rating (★) donde tiene sentido
     const filtered = useMemo(() => {
-        const byRating = (items, get) =>
-            items.filter((it) => (get(it) ?? 0) >= minRating);
+        const byRating = (items, get) => items.filter((it) => (get(it) ?? 0) >= minRating);
 
         return {
             subjects, // Materias no tienen rating
@@ -65,23 +70,24 @@ export default function SearchResults() {
         <div className="container" style={{ padding: "18px 0 36px" }}>
             <div style={{ marginBottom: 24 }}>
                 <SearchBar />
+                <SearchHeader title={q ? `Resultados para “${q}”` : "Explorar"} subtitle="Búsqueda" />
             </div>
 
-            <div className="results-head">
+            <div className="results-head" style={{ display: "flex", alignItems: "center", gap: 12 }}>
                 <h2 style={{ margin: 0 }}>
                     Resultados {q && <>para "<em>{q}</em>"</>}
                 </h2>
-                <span className="badge-chip">{total} items</span>
+                <Chip tone="blue">{total} items</Chip>
 
-                <div className="tabs" style={{ marginLeft: "auto" }}>
+                <div className="tabs" style={{ marginLeft: "auto", display: "flex", gap: 8, alignItems: "center" }}>
                     {["todo", "materias", "profesores", "mentores", "apuntes"].map((t) => (
-                        <button
+                        <Button
                             key={t}
-                            className={`tab ${tab === t ? "active" : ""}`}
+                            variant={tab === t ? "secondary" : "ghost"}
                             onClick={() => setTab(t)}
                         >
                             {t[0].toUpperCase() + t.slice(1)}
-                        </button>
+                        </Button>
                     ))}
                     <select
                         value={minRating}
@@ -92,7 +98,10 @@ export default function SearchResults() {
                             border: "1px solid var(--border)",
                             padding: "0 10px",
                             marginLeft: 8,
+                            background: "var(--surface)",
+                            color: "var(--text)",
                         }}
+                        title="Filtrar por ★ mínima"
                     >
                         {[0, 3, 3.5, 4, 4.5].map((v) => (
                             <option key={v} value={v}>
@@ -132,8 +141,9 @@ export default function SearchResults() {
                     {/* MATERIAS */}
                     {show("materias") && filtered.subjects.length > 0 && (
                         <section className="section">
-                            <div className="section-title">
-                                Materias <span className="section-count">{filtered.subjects.length}</span>
+                            <div className="section-title" style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                                <div>Materias</div>
+                                <Chip tone="blue">{filtered.subjects.length}</Chip>
                             </div>
                             <div className="grid">
                                 {filtered.subjects.map((m) => (
@@ -153,8 +163,9 @@ export default function SearchResults() {
                     {/* PROFESORES */}
                     {show("profesores") && filtered.professors.length > 0 && (
                         <section className="section">
-                            <div className="section-title">
-                                Profesores <span className="section-count">{filtered.professors.length}</span>
+                            <div className="section-title" style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                                <div>Profesores</div>
+                                <Chip tone="amber">{filtered.professors.length}</Chip>
                             </div>
                             <div className="grid">
                                 {filtered.professors.map((p) => (
@@ -174,8 +185,9 @@ export default function SearchResults() {
                     {/* MENTORES */}
                     {show("mentores") && filtered.mentors.length > 0 && (
                         <section className="section">
-                            <div className="section-title">
-                                Mentores <span className="section-count">{filtered.mentors.length}</span>
+                            <div className="section-title" style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                                <div>Mentores</div>
+                                <Chip tone="primary">{filtered.mentors.length}</Chip>
                             </div>
                             <div className="grid">
                                 {filtered.mentors.map((m) => (
@@ -195,20 +207,20 @@ export default function SearchResults() {
                     {/* APUNTES */}
                     {show("apuntes") && filtered.notes.length > 0 && (
                         <section className="section">
-                            <div className="section-title">
-                                Apuntes <span className="section-count">{filtered.notes.length}</span>
+                            <div className="section-title" style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                                <div>Apuntes</div>
+                                <Chip tone="gray">{filtered.notes.length}</Chip>
                             </div>
                             <div className="grid">
                                 {filtered.notes.map((a) => (
                                     <ResultCard
-                                        key={`${p.id_profesor}-${p.id_materia}`}
-                                        title={`Prof. ${p.profesor_nombre}`}
-                                        subtitle={p.materia_nombre}
-                                        rating={Number(p.rating_promedio) || 0}
-                                        pill="Profesor"
-                                        to={`/profesores/${p.id_profesor}?materia=${p.id_materia}`}
+                                        key={a.id_apunte ?? a.id}
+                                        title={a.titulo ?? "Apunte"}
+                                        subtitle={a.materia_nombre ?? a.profesor_nombre ?? ""}
+                                        rating={4.0} // placeholder como tenías
+                                        pill="PDF"
+                                        to={`/apuntes/${a.id_apunte ?? a.id}`}
                                     />
-
                                 ))}
                             </div>
                         </section>
