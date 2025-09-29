@@ -1,6 +1,5 @@
 import { useMemo, useState, useEffect } from "react";
 import { useParams } from "react-router-dom";
-import { courseAPI, ratingsAPI } from "../api/Database";
 import AuthModal_HacerReseña from "../components/AuthModal_HacerReseña";
 
 function StarRow({ value=0 }) {

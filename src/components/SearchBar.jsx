@@ -129,12 +129,7 @@ export default function SearchBar() {
                                     e.currentTarget.style.paddingLeft = "11px";
                                     e.currentTarget.style.transform = "translateX(2px)";
 
-                                    // Cambiar el color del texto del botón
-                                    const button = e.currentTarget.querySelector('button[title="' + r + '"]');
-                                    if (button) {
-                                        button.style.color = "#2563eb";
-                                        button.style.fontWeight = "600";
-                                    }
+
 
                                     // Cambiar el color del icono
                                     const svg = e.currentTarget.querySelector('svg');
@@ -148,12 +143,7 @@ export default function SearchBar() {
                                     e.currentTarget.style.paddingLeft = "0";
                                     e.currentTarget.style.transform = "translateX(0px)";
 
-                                    // Restaurar el color del texto del botón
-                                    const button = e.currentTarget.querySelector('button[title="' + r + '"]');
-                                    if (button) {
-                                        button.style.color = "#111827";
-                                        button.style.fontWeight = "normal";
-                                    }
+
 
                                     // Restaurar el color del icono
                                     const svg = e.currentTarget.querySelector('svg');

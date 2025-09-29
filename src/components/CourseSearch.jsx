@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react"
-import { courseAPI, favoritesAPI, subjectsAPI } from "../api/database"
+import {  favoritesAPI, subjectsAPI } from "../api/database"
 import CourseCard from "../components/CourseCard"
 
 export default function CourseSearch() {

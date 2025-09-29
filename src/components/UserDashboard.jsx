@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react"
 import { supabase } from "../supabase"
-import { userAPI, purchaseAPI } from "../api/database"
+import { userAPI} from "../api/database"
 import { Link } from "react-router-dom"
 
 function TabButton({ active, onClick, children }) {

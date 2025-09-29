@@ -1,5 +1,6 @@
 import { useState } from "react";
-import { ratingsAPI } from "../api/Database";
+import { ratingsAPI } from "../api/database";
+
 
 // Componente de estrellas interactivo
 const StarRating = ({ rating, onRatingChange }) => {

@@ -1,6 +1,6 @@
 import { useParams } from 'react-router-dom'
 import { useEffect, useState } from 'react'
-import { courseAPI, ratingsAPI, notesAPI } from '../api/database'
+import {  notesAPI } from '../api/database'
 
 export default function CourseDetail() {
     const { id } = useParams()

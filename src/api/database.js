@@ -1,11 +1,11 @@
-// src/api/database.js
+// src/api/Database.js
 import { supabase } from '../supabase'
+
 
 // ==========================================
 // 🧑‍🎓 USUARIOS
 // ==========================================
 export const userAPI = {
-    // Obtener perfil del usuario actual
     async getCurrentProfile() {
         const { data: { user } } = await supabase.auth.getUser()
         if (!user) return { data: null, error: 'No hay usuario logueado' }
@@ -19,7 +19,6 @@ export const userAPI = {
         return { data, error }
     },
 
-    // Crear perfil de usuario (después del registro)
     async createProfile(profileData) {
         const { data: { user } } = await supabase.auth.getUser()
         if (!user) return { data: null, error: 'No hay usuario logueado' }
@@ -36,7 +35,6 @@ export const userAPI = {
         return { data, error }
     },
 
-    // Actualizar perfil
     async updateProfile(profileData) {
         const { data: { user } } = await supabase.auth.getUser()
         if (!user) return { data: null, error: 'No hay usuario logueado' }
@@ -48,412 +46,388 @@ export const userAPI = {
             .select()
 
         return { data, error }
-    },
-
-    // Obtener favoritos del usuario
-    async getUserFavorites() {
-        const { data: { user } } = await supabase.auth.getUser()
-        if (!user) return { data: null, error: 'No hay usuario logueado' }
-
-        const { data, error } = await supabase
-            .from('usuario_fav')
-            .select(`
-        *,
-        profesor_curso(
-          *,
-          usuario(*),
-          materia(*)
-        )
-      `)
-            .eq('usuario_id', user.id)
-
-        return { data, error }
     }
 }
 
 // ==========================================
-// 👨‍🏫 PROFESORES Y “CURSOS” (profesor+materia)
+// 🎓 MATERIAS Y CONTENIDO
 // ==========================================
-export const courseAPI = {
-    // Listado (con stats)
-    async getAllCourses() {
+export const subjectsAPI = {
+    // Obtener todas las materias con conteos
+    async getAllSubjects() {
         const { data, error } = await supabase
-            .from('cursos_con_stats')
+            .from('materias_con_contenido')
             .select('*')
-            .order('rating_promedio', { ascending: false })
+            .order('nombre_materia')
 
         return { data, error }
     },
 
-    // Búsqueda/filtrado
-    async searchCourses(filters = {}) {
-        let query = supabase
-            .from('cursos_con_stats')
-            .select('*')
-
-        if (filters.materia) {
-            query = query.eq('id_materia', filters.materia)      // 👈 ahora filtra por id_materia de la vista
-        }
-        if (filters.profesorNombre) {
-            query = query.ilike('profesor_nombre', `%${filters.profesorNombre}%`)
-        }
-
-        // Orden por rating (default)
-        if (!filters.sortBy || filters.sortBy === 'rating_desc') {
-            query = query.order('rating_promedio', { ascending: false })
-        }
-
-        const { data, error } = await query
-        return { data, error }
-    },
-
-    // Detalle por par (id_profesor, id_materia)
-    async getCourseByIds(idProfesor, idMateria) {
+    // Obtener materias simples (para selects)
+    async getAllSubjectsSimple() {
         const { data, error } = await supabase
-            .from('cursos_con_stats')
-            .select('*')
-            .eq('id_profesor', idProfesor)
-            .eq('id_materia', idMateria)
-            .single()
+            .from('materia')
+            .select('id_materia, nombre_materia, semestre')
+            .order('nombre_materia')
 
         return { data, error }
     },
 
-    // O detalle por clave compuesta textual, si usás /cursos/:cursoKey
-    async getCourseByKey(cursoKey) {
-        const { data, error } = await supabase
-            .from('cursos_con_stats')
-            .select('*')
-            .eq('curso_key', cursoKey)
-            .single()
+    // Obtener contenido de una materia específica
+    async getSubjectContent(materiaId) {
+        const [apuntes, profesores, mentores] = await Promise.all([
+            supabase.from('apunte').select('*').eq('id_materia', materiaId),
 
-        return { data, error }
+            // Trae profesor a través de imparte
+            supabase
+                .from('imparte')
+                .select(`id_profesor,profesor_curso!inner(*, usuario(*))`)
+                .eq('id_materia', materiaId),
+
+            supabase
+                .from('mentor_materia')
+                .select('mentor(*, usuario(*))')
+                .eq('id_materia', materiaId)
+        ]);
+
+// Normalizá a una lista de profesores
+        const profesoresList = (profesores.data || []).map(row => row.profesor_curso);
+
+
+        return {
+            apuntes: apuntes.data || [],
+            profesores: profesores.data || [],
+            mentores: mentores.data || [],
+            errors: {
+                apuntes: apuntes.error,
+                profesores: profesores.error,
+                mentores: mentores.error
+            }
+        }
     }
 }
 
+// ==========================================
+// 📚 BÚSQUEDA GENERAL
+// ==========================================
+
+// — Profesores (par profesor–materia) via RPC
+async function searchProfessors(term) {
+    const q = (term || "").trim();
+    if (!q) return { data: [], error: null };
+    const { data, error } = await supabase.rpc("buscar_cursos", { termino: q });
+    return { data, error };
+}
+
+// — Materias (tabla)
+async function searchSubjects(term) {
+    const q = (term || "").trim();
+    if (!q) return { data: [], error: null };
+
+    const { data, error } = await supabase.rpc("buscar_materias_fuzzy", { termino: q });
+    return { data, error };
+}
+
+
+
+// — Apuntes (vista)
+async function searchNotes(term) {
+    const q = (term || "").trim();
+    let base = supabase
+        .from("apuntes_completos")
+        .select("id_apunte,autor_nombre,materia_nombre,estrellas,creditos")
+        .limit(50);
+    const { data, error } = q
+        ? await base.or(`autor_nombre.ilike.*${q}*,materia_nombre.ilike.*${q}*`)
+        : await base;
+    return { data, error };
+}
+
+// — Mentores (vista)
+async function searchMentors(term) {
+    const q = (term || "").trim();
+    let base = supabase
+        .from("mentores_con_stats")
+        .select("id_mentor,mentor_nombre,mentor_correo,rating_promedio,estrellas_mentor,contacto,total_calificaciones")
+        .limit(50);
+    const { data, error } = q ? await base.ilike("mentor_nombre", `*${q}*`) : await base;
+    return { data, error };
+}
+
+export const searchAPI = {
+    searchProfessors,
+    searchSubjects,
+    searchNotes,
+    searchMentors,
+    async searchAll(term) {
+        const [prof, mat, ap, men] = await Promise.all([
+            searchProfessors(term),
+            searchSubjects(term),
+            searchNotes(term),
+            searchMentors(term),
+        ]);
+        return {
+            data: {
+                profesores: prof.data ?? [],
+                materias: mat.data ?? [],
+                apuntes: ap.data ?? [],
+                mentores: men.data ?? [],
+            },
+            error: prof.error || mat.error || ap.error || men.error || null,
+        };
+    },
+};
+
 
 // ==========================================
-// ⭐ FAVORITOS
+// 🎯 MENTORES Y POSTULACIONES
 // ==========================================
-export const favoritesAPI = {
-    // Agregar curso a favoritos
-    async addToFavorites(courseId) {
+export const mentorAPI = {
+    // Crear postulación para ser mentor
+    async applyMentor(applicationData) {
         const { data: { user } } = await supabase.auth.getUser()
         if (!user) return { data: null, error: 'No hay usuario logueado' }
 
         const { data, error } = await supabase
-            .from('usuario_fav')
+            .from('mentor_aplicacion')
             .insert([{
-                usuario_id: user.id,
-                profesor_curso_id: courseId
+                id_usuario: user.id,
+                id_materia: applicationData.materiaId,
+                motivo: applicationData.motivo,
+                calificacion_materia: applicationData.calificacion,
+                comprobante_archivo: applicationData.comprobante, // archivo binario
+                estado: 'pendiente'
             }])
             .select()
 
         return { data, error }
     },
 
-    // Quitar de favoritos
-    async removeFromFavorites(courseId) {
-        const { data: { user } } = await supabase.auth.getUser()
-        if (!user) return { data: null, error: 'No hay usuario logueado' }
-
+    // Obtener aplicaciones pendientes (para admin)
+    async getPendingApplications() {
         const { data, error } = await supabase
-            .from('usuario_fav')
-            .delete()
-            .eq('usuario_id', user.id)
-            .eq('profesor_curso_id', courseId)
+            .from('mentor_aplicacion')
+            .select(`
+                *,
+                usuario(nombre, email),
+                materia(nombre_materia)
+            `)
+            .eq('estado', 'pendiente')
+            .order('created_at', { ascending: false })
 
         return { data, error }
     },
 
-    // Verificar si está en favoritos
-    async isFavorite(courseId) {
+    // Aprobar postulación de mentor
+    async approveApplication(applicationId) {
         const { data: { user } } = await supabase.auth.getUser()
-        if (!user) return { data: false, error: null }
+        if (!user) return { data: null, error: 'No autorizado' }
 
+        try {
+            // Obtener datos de la aplicación
+            const { data: app } = await supabase
+                .from('mentor_aplicacion')
+                .select('*')
+                .eq('id', applicationId)
+                .single()
+
+            if (!app) return { data: null, error: 'Aplicación no encontrada' }
+
+            // Crear mentor si no existe
+            const { data: existingMentor } = await supabase
+                .from('mentor')
+                .select('id_mentor')
+                .eq('id_usuario', app.id_usuario)
+                .single()
+
+            let mentorId = existingMentor?.id_mentor
+
+            if (!mentorId) {
+                const { data: newMentor, error: mentorError } = await supabase
+                    .from('mentor')
+                    .insert([{
+                        id_usuario: app.id_usuario,
+                        estrellas: 5, // rating inicial
+                        contacto: '' // se puede completar después
+                    }])
+                    .select('id_mentor')
+                    .single()
+
+                if (mentorError) return { data: null, error: mentorError.message }
+                mentorId = newMentor.id_mentor
+            }
+
+            // Agregar materia al mentor
+            await supabase
+                .from('mentor_materia')
+                .insert([{
+                    id_mentor: mentorId,
+                    id_materia: app.id_materia
+                }])
+
+            // Actualizar estado de aplicación
+            const { data, error } = await supabase
+                .from('mentor_aplicacion')
+                .update({ estado: 'aprobado' })
+                .eq('id', applicationId)
+                .select()
+
+            return { data, error }
+
+        } catch (error) {
+            return { data: null, error: error.message }
+        }
+    },
+
+    // Obtener mentores por materia
+    async getMentorsBySubject(materiaId) {
         const { data, error } = await supabase
-            .from('usuario_fav')
-            .select('id')
-            .eq('usuario_id', user.id)
-            .eq('profesor_curso_id', courseId)
-            .single()
+            .from('mentor_materia')
+            .select(`
+                mentor(*, usuario(nombre, email))
+            `)
+            .eq('id_materia', materiaId)
 
-        return { data: !!data, error }
+        return { data, error }
     }
 }
 
 // ==========================================
-// 📚 APUNTES
+// 📄 APUNTES
 // ==========================================
 export const notesAPI = {
-    // Obtener apuntes de un curso
-    async getCourseNotes(courseId) {
-        const { data, error } = await supabase
-            .from('apunte')
-            .select(`
-        *,
-        apunte_fav(count)
-      `)
-            .eq('profesor_curso_id', courseId)
-
-        return { data, error }
-    },
-
     // Buscar apuntes
     async searchNotes(searchTerm) {
         const { data, error } = await supabase
             .from('apunte')
-            .select(`
-        *,
-        profesor_curso(
-          *,
-          usuario(nombre),
-          materia(nombre)
-        )
-      `)
+            .select('*, materia(nombre_materia)')
             .ilike('titulo', `%${searchTerm}%`)
 
         return { data, error }
     },
 
-    // Marcar apunte como favorito
-    async addNoteToFavorites(noteId) {
-        const { data: { user } } = await supabase.auth.getUser()
-        if (!user) return { data: null, error: 'No hay usuario logueado' }
-
+    // Obtener apuntes por materia
+    async getNotesBySubject(materiaId) {
         const { data, error } = await supabase
-            .from('apunte_fav')
-            .insert([{
-                usuario_id: user.id,
-                apunte_id: noteId
-            }])
-            .select()
+            .from('apunte')
+            .select('*')
+            .eq('id_materia', materiaId)
 
         return { data, error }
     }
 }
 
 // ==========================================
-// ⭐ CALIFICACIONES
+// ⭐ FAVORITOS
 // ==========================================
+export const favoritesAPI = {
+    async addToFavorites(itemId, itemType) {
+        const { data: { user } } = await supabase.auth.getUser()
+        if (!user) return { data: null, error: 'No hay usuario logueado' }
+
+        const tableName = itemType === 'apunte' ? 'apunte_fav' : 'usuario_fav'
+        const columnName = itemType === 'apunte' ? 'apunte_id' : 'profesor_curso_id'
+
+        const { data, error } = await supabase
+            .from(tableName)
+            .insert([{
+                usuario_id: user.id,
+                [columnName]: itemId
+            }])
+            .select()
+
+        return { data, error }
+    },
+
+    async removeFromFavorites(itemId, itemType) {
+        const { data: { user } } = await supabase.auth.getUser()
+        if (!user) return { data: null, error: 'No hay usuario logueado' }
+
+        const tableName = itemType === 'apunte' ? 'apunte_fav' : 'usuario_fav'
+        const columnName = itemType === 'apunte' ? 'apunte_id' : 'profesor_curso_id'
+
+        const { data, error } = await supabase
+            .from(tableName)
+            .delete()
+            .eq('usuario_id', user.id)
+            .eq(columnName, itemId)
+
+        return { data, error }
+    }
+
+}
+
 export const ratingsAPI = {
-    // Crear calificación
-    async createRating(courseId, rating, comment) {
-        const { data: { user } } = await supabase.auth.getUser()
-        if (!user) return { data: null, error: 'No hay usuario logueado' }
-
-        const { data, error } = await supabase
-            .from('califica')
-            .insert([{
-                usuario_id: user.id,
-                profesor_curso_id: courseId,
-                puntuacion: rating,
-                comentario: comment
-            }])
-            .select()
-
-        return { data, error }
-    },
-
-    // Obtener calificaciones de un curso
-    async getCourseRatings(courseId) {
-        const { data, error } = await supabase
-            .from('califica')
-            .select(`
-        *,
-        usuario(nombre)
-      `)
-            .eq('profesor_curso_id', courseId)
-            .order('created_at', { ascending: false })
-
-        return { data, error }
-    },
-
-    // Obtener promedio de calificaciones
-    async getCourseAverageRating(courseId) {
-        const { data, error } = await supabase
-            .rpc('get_course_average_rating', { course_id: courseId })
-
-        return { data, error }
-    }
-}
-
-// ==========================================
-// 🎓 MATERIAS
-// ==========================================
-export const subjectsAPI = {
-    // Obtener todas las materias
-    async getAllSubjects() {
-        const { data, error } = await supabase
-            .from('materia')
-            .select('*')
-            .order('nombre')
-
-        return { data, error }
-    },
-
-    // Obtener cursos por materia
-    async getCoursesBySubject(subjectId) {
-        const { data, error } = await supabase
-            .from('profesor_curso')
-            .select(`
-        *,
-        usuario(*),
-        materia(*),
-        califica(puntuacion)
-      `)
-            .eq('materia_id', subjectId)
-
-        return { data, error }
-    }
-}
-
-// ==========================================
-// 🧑‍🏫 MENTORES
-// ==========================================
-export const mentorAPI = {
-    // Obtener todos los mentores
-    async getAllMentors() {
-        const { data, error } = await supabase
-            .from('mentor')
-            .select(`
-        *,
-        usuario(*),
-        evalua(
-          puntuacion,
-          comentario,
-          usuario(nombre)
-        )
-      `)
-
-        return { data, error }
-    },
-
-    // Buscar mentores
-    async searchMentors(filters = {}) {
-        let query = supabase
-            .from('mentor')
-            .select(`
-        *,
-        usuario(*),
-        evalua(puntuacion)
-      `)
-
-        if (filters.especialidad) {
-            query = query.ilike('especialidad', `%${filters.especialidad}%`)
+    /**
+     * Crea una reseña real en Supabase.
+     * Firma compatible con tu modal:
+     *   createRating(courseId, rating, texto, { titulo, workload, metodologia })
+     */
+    async createRating(courseId, estrellas, comentario, extra = {}) {
+        // Necesita usuario logueado (RLS)
+        const { data: authData, error: authErr } = await supabase.auth.getUser();
+        const user = authData?.user;
+        if (authErr || !user) {
+            return { data: null, error: { message: "Debes iniciar sesión para reseñar." } };
         }
 
-        if (filters.maxPrice) {
-            query = query.lte('precio_hora', filters.maxPrice)
-        }
-
-        const { data, error } = await query
-        return { data, error }
-    }
-}
-
-// ==========================================
-// 💰 COMPRAS
-// ==========================================
-export const purchaseAPI = {
-    // Crear compra
-    async createPurchase(courseId, paymentData) {
-        const { data: { user } } = await supabase.auth.getUser()
-        if (!user) return { data: null, error: 'No hay usuario logueado' }
+        const payload = {
+            tipo: 'materia',        // ← reseña de materia/curso
+            ref_id: courseId,       // ← el id que te llega como prop `courseId`
+            estrellas,
+            comentario: comentario?.trim() || null,
+            titulo: extra.titulo?.trim() || null,
+            workload: extra.workload || null,
+            metodologia: extra.metodologia || null,
+            user_id: user.id
+        };
 
         const { data, error } = await supabase
-            .from('comprar')
-            .insert([{
-                usuario_id: user.id,
-                profesor_curso_id: courseId,
-                monto: paymentData.amount,
-                metodo_pago: paymentData.paymentMethod,
-                estado: 'completado'
-            }])
+            .from('rating')
+            .insert(payload)
             .select()
+            .single();
 
-        return { data, error }
+        return { data, error };
     },
 
-    // Obtener compras del usuario
-    async getUserPurchases() {
-        const { data: { user } } = await supabase.auth.getUser()
-        if (!user) return { data: null, error: 'No hay usuario logueado' }
-
-        const { data, error } = await supabase
-            .from('comprar')
-            .select(`
-        *,
-        profesor_curso(
-          *,
-          usuario(nombre),
-          materia(nombre)
-        )
-      `)
-            .eq('usuario_id', user.id)
-            .order('created_at', { ascending: false })
-
-        return { data, error }
+    // (opcionales) helpers para leer y promediar
+    async listByMateria(materiaId) {
+        return await supabase
+            .from('rating')
+            .select('id, estrellas, comentario, titulo, workload, metodologia, user_id, created_at')
+            .eq('tipo','materia')
+            .eq('ref_id', materiaId)
+            .order('created_at', { ascending: false });
     },
 
-    // Verificar si el usuario compró un curso
-    async hasPurchased(courseId) {
-        const { data: { user } } = await supabase.auth.getUser()
-        if (!user) return { data: false, error: null }
-
+    async getAverageForMateria(materiaId) {
         const { data, error } = await supabase
-            .from('comprar')
-            .select('id')
-            .eq('usuario_id', user.id)
-            .eq('profesor_curso_id', courseId)
-            .eq('estado', 'completado')
-            .single()
+            .from('rating')
+            .select('estrellas', { count: 'exact' })
+            .eq('tipo','materia')
+            .eq('ref_id', materiaId);
 
-        return { data: !!data, error }
+        if (error) return { data: null, error };
+        const count = data?.length || 0;
+        const sum = (data || []).reduce((a, r) => a + (r.estrellas || 0), 0);
+        return { data: { count, avg: count ? +(sum / count).toFixed(2) : 0 }, error: null };
     }
-}
+};
+(async () => {
+    console.log("— PRUEBA buscar_cursos —");
+    const { data: profs, error: e1 } = await supabase.rpc("buscar_cursos", { termino: "analisis" });
+    console.log("profesores:", profs, e1);
 
-// ==========================================
-// 📊 ADMIN (solo para ti)
-// ==========================================
-export const adminAPI = {
-    // Obtener estadísticas generales
-    async getStats() {
-        const [users, courses, mentors, purchases] = await Promise.all([
-            supabase.from('usuario').select('id', { count: 'exact' }),
-            supabase.from('profesor_curso').select('id', { count: 'exact' }),
-            supabase.from('mentor').select('id', { count: 'exact' }),
-            supabase.from('comprar').select('monto')
-        ])
+    console.log("— PRUEBA vistas —");
+    const { data: aps } = await supabase.from("apuntes_completos").select("*").limit(1);
+    console.log("apuntes 1:", aps);
 
-        const totalRevenue = purchases.data?.reduce((sum, purchase) => sum + purchase.monto, 0) || 0
+    const { data: mens } = await supabase.from("mentores_con_stats").select("*").limit(1);
+    console.log("mentores 1:", mens);
+})();
 
-        return {
-            totalUsers: users.count,
-            totalCourses: courses.count,
-            totalMentors: mentors.count,
-            totalRevenue
-        }
-    },
 
-    // Obtener todos los usuarios
-    async getAllUsers() {
-        const { data, error } = await supabase
-            .from('usuario')
-            .select('*')
-            .order('created_at', { ascending: false })
 
-        return { data, error }
-    },
 
-    // Bannear/desbanear usuario
-    async toggleUserBan(userId, banned = true) {
-        const { data, error } = await supabase
-            .from('usuario')
-            .update({ banned })
-            .eq('id', userId)
-            .select()
 
-        return { data, error }
-    }
-}
