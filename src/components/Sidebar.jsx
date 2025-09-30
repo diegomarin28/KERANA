@@ -1,24 +1,21 @@
-// src/components/SidebarPro.jsx
+// Sidebar.jsx
 import { useEffect, useRef } from "react";
 
-export default function SidebarPro({
-                                       open,
-                                       onClose,
-                                       user,
-                                       onLogout,
-                                       onGo, // (path)=>void  -> usás navigate en el Header
-                                   }) {
+export default function Sidebar({
+                                    open,
+                                    onClose,
+                                    user,
+                                    onLogout,
+                                    onGo,
+                                }) {
     const panelRef = useRef(null);
-    const startX = useRef(0);
 
-    // ——— Scroll-lock del body
     useEffect(() => {
         const prev = document.body.style.overflow;
         if (open) document.body.style.overflow = "hidden";
         return () => { document.body.style.overflow = prev; };
     }, [open]);
 
-    // ——— Cerrar con ESC y click fuera
     useEffect(() => {
         if (!open) return;
         const onKey = (e) => { if (e.key === "Escape") onClose?.(); };
@@ -34,45 +31,19 @@ export default function SidebarPro({
         };
     }, [open, onClose]);
 
-    // ——— Focus trap simple
-    useEffect(() => {
-        if (!open) return;
-        const panel = panelRef.current;
-        if (!panel) return;
-        const focusables = panel.querySelectorAll(
-            'button, a[href], input, select, textarea, [tabindex]:not([tabindex="-1"])'
-        );
-        const first = focusables[0], last = focusables[focusables.length - 1];
-        first?.focus();
-        const trap = (e) => {
-            if (e.key !== "Tab") return;
-            if (e.shiftKey && document.activeElement === first) {
-                e.preventDefault(); last?.focus(); return;
-            }
-            if (!e.shiftKey && document.activeElement === last) {
-                e.preventDefault(); first?.focus(); return;
-            }
-        };
-        panel.addEventListener("keydown", trap);
-        return () => panel.removeEventListener("keydown", trap);
-    }, [open]);
-
-    // ——— Swipe para cerrar (mobile)
-    const onTouchStart = (e) => { startX.current = e.touches[0].clientX; };
-    const onTouchMove = (e) => {
-        const dx = e.touches[0].clientX - startX.current;
-        if (dx < -60) onClose?.();
-    };
-
-    const username = user?.name || "Invitado";
+    const username = user?.name || user?.username || "Invitado";
     const letter = (username[0] || "U").toUpperCase();
     const credits = user?.credits ?? 0;
     const followers = user?.followers ?? 0;
     const following = user?.following ?? 0;
 
+    const go = (path) => {
+        onGo?.(path);
+        onClose?.();
+    };
+
     return (
         <>
-            {/* Backdrop */}
             <div
                 aria-hidden
                 style={{
@@ -85,14 +56,12 @@ export default function SidebarPro({
                     zIndex: 999,
                 }}
             />
-            {/* Panel */}
+
             <aside
                 ref={panelRef}
                 role="dialog"
                 aria-modal="true"
                 aria-label="Menú principal"
-                onTouchStart={onTouchStart}
-                onTouchMove={onTouchMove}
                 style={{
                     position: "fixed",
                     top: 0,
@@ -109,8 +78,7 @@ export default function SidebarPro({
                     gridTemplateRows: "auto auto 1fr auto",
                 }}
             >
-                {/* Header del panel */}
-                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: 16, borderBottom: "1px solid rgba(255,255,255,.12)" }}>
+                <div style={headerStyle}>
                     <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
                         <div style={{ fontWeight: 800, letterSpacing: .5 }}>KERANA</div>
                         <span style={{ fontSize: 12, opacity: .75 }}>beta</span>
@@ -118,78 +86,58 @@ export default function SidebarPro({
                     <button
                         onClick={onClose}
                         aria-label="Cerrar menú"
-                        style={{
-                            all: "unset",
-                            padding: "8px 10px",
-                            cursor: "pointer",
-                            borderRadius: 8,
-                            background: "rgba(255,255,255,.08)",
-                        }}
+                        style={closeButtonStyle}
                     >
                         ✕
                     </button>
                 </div>
 
-                {/* Perfil compacto */}
-                <div style={{ padding: 14, borderBottom: "1px solid rgba(255,255,255,.08)" }}>
-                    <button
-                        type="button"
+                <div style={profileSectionStyle}>
+                    <div
                         onClick={() => go("/profile")}
-                        style={{
-                            all: "unset",
-                            width: "100%",
-                            display: "grid",
-                            gridTemplateColumns: "48px 1fr",
-                            gap: 10,
-                            alignItems: "center",
-                            cursor: "pointer",
-                        }}
+                        style={profileContainerStyle}
+                        role="button"
+                        tabIndex={0}
+                        onKeyDown={(e) => e.key === 'Enter' && go("/profile")}
                     >
-                        {/* Avatar */}
                         {user?.avatarUrl ? (
                             <img
                                 src={user.avatarUrl}
                                 alt={username}
-                                style={{ width: 48, height: 48, borderRadius: "50%", objectFit: "cover", background: "#fff" }}
+                                style={avatarImageStyle}
                             />
                         ) : (
-                            <div
-                                style={{
-                                    width: 48, height: 48, borderRadius: "50%",
-                                    background: "#fff", color: "#0b1e3a",
-                                    display: "grid", placeItems: "center", fontWeight: 800, fontSize: 18
-                                }}
-                            >
+                            <div style={avatarFallbackStyle}>
                                 {letter}
                             </div>
                         )}
 
-                        {/* Nombre y stats */}
                         <div style={{ overflow: "hidden" }}>
-                            <div style={{ fontWeight: 800, fontSize: 16, whiteSpace: "nowrap", textOverflow: "ellipsis", overflow: "hidden" }}>
+                            <div style={usernameStyle}>
                                 {username}
                             </div>
-                            <div style={{ display: "flex", gap: 10, marginTop: 6, fontSize: 12, opacity: .9 }}>
+                            <div style={statsContainerStyle}>
                                 <StatLink onClick={() => go("/profile/credits")} label="Créditos" value={credits} />
                                 <StatLink onClick={() => go("/profile/followers")} label="Seguidores" value={followers} />
                                 <StatLink onClick={() => go("/profile/following")} label="Seguidos" value={following} />
                             </div>
                         </div>
-                    </button>
+                    </div>
                 </div>
 
-                {/* Navegación (sin buscador, sin subir/mentor/reseñas) */}
-                <nav style={{ padding: 12, overflowY: "auto", display: "grid", gap: 14 }}>
+                <nav style={navStyle}>
                     <Group title="Explorar" />
                     <MenuLink label="Asignaturas" onClick={() => go("/subjects")} />
-
-                    {/* Si querés, podés sumar otras secciones públicas acá (ranking, novedades, etc.) */}
+                    <MenuLink label="Profesores" onClick={() => go("/professors")} />
+                    <MenuLink label="Mentores" onClick={() => go("/mentors")} />
+                    <MenuLink label="Apuntes" onClick={() => go("/notes")} />
 
                     <Group title="Cuenta" />
                     {user ? (
                         <>
-                            <MenuLink label="Perfil" onClick={() => go("/profile")} />
+                            <MenuLink label="Mi Perfil" onClick={() => go("/profile")} />
                             <MenuLink label="Ajustes" onClick={() => go("/settings")} />
+                            <MenuLink label="Favoritos" onClick={() => go("/favorites")} />
                             <DangerButton label="Cerrar sesión" onClick={() => { onLogout?.(); onClose?.(); }} />
                         </>
                     ) : (
@@ -200,27 +148,106 @@ export default function SidebarPro({
                     )}
                 </nav>
 
-                {/* Footer */}
-                <div style={{ padding: 12, borderTop: "1px solid rgba(255,255,255,.08)", display: "flex", gap: 8, flexWrap: "wrap" }}>
+                <div style={footerStyle}>
                     <Badge>ES</Badge>
                     <span style={{ marginLeft: "auto", opacity: .6, fontSize: 12 }}>v0.1</span>
                 </div>
             </aside>
         </>
     );
-
-    // helpers
-    function go(path) {
-        onGo?.(path);
-        onClose?.();
-    }
 }
 
-/* ——— Subcomponentes ——— */
+const headerStyle = {
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "space-between",
+    padding: 16,
+    borderBottom: "1px solid rgba(255,255,255,.12)"
+};
+
+const closeButtonStyle = {
+    all: "unset",
+    padding: "8px 10px",
+    cursor: "pointer",
+    borderRadius: 8,
+    background: "rgba(255,255,255,.08)",
+};
+
+const profileSectionStyle = {
+    padding: 14,
+    borderBottom: "1px solid rgba(255,255,255,.08)"
+};
+
+const profileContainerStyle = {
+    all: "unset",
+    width: "100%",
+    display: "grid",
+    gridTemplateColumns: "48px 1fr",
+    gap: 10,
+    alignItems: "center",
+    cursor: "pointer",
+};
+
+const avatarImageStyle = {
+    width: 48,
+    height: 48,
+    borderRadius: "50%",
+    objectFit: "cover",
+    background: "#fff"
+};
+
+const avatarFallbackStyle = {
+    width: 48,
+    height: 48,
+    borderRadius: "50%",
+    background: "#fff",
+    color: "#0b1e3a",
+    display: "grid",
+    placeItems: "center",
+    fontWeight: 800,
+    fontSize: 18
+};
+
+const usernameStyle = {
+    fontWeight: 800,
+    fontSize: 16,
+    whiteSpace: "nowrap",
+    textOverflow: "ellipsis",
+    overflow: "hidden"
+};
+
+const statsContainerStyle = {
+    display: "flex",
+    gap: 10,
+    marginTop: 6,
+    fontSize: 12,
+    opacity: .9
+};
+
+const navStyle = {
+    padding: 12,
+    overflowY: "auto",
+    display: "grid",
+    gap: 14
+};
+
+const footerStyle = {
+    padding: 12,
+    borderTop: "1px solid rgba(255,255,255,.08)",
+    display: "flex",
+    gap: 8,
+    flexWrap: "wrap"
+};
 
 function Group({ title }) {
     return (
-        <div style={{ margin: "6px 6px 0", fontSize: 12, letterSpacing: .3, textTransform: "uppercase", opacity: .65 }}>
+        <div style={{
+            margin: "6px 6px 0",
+            fontSize: 12,
+            letterSpacing: .3,
+            textTransform: "uppercase",
+            opacity: .65
+        }}>
             {title}
         </div>
     );
@@ -231,129 +258,159 @@ function MenuLink({ label, onClick }) {
         <button
             type="button"
             onClick={onClick}
-            style={{
-                all: "unset",
-                display: "flex",
-                alignItems: "center",
-                gap: 10,
-                padding: "10px 12px",
-                borderRadius: 10,
-                cursor: "pointer",
-                color: "#fff",
-                width: "100%",
-            }}
+            style={menuLinkStyle}
             onMouseEnter={(e) => e.currentTarget.style.background = "rgba(255,255,255,.08)"}
             onMouseLeave={(e) => e.currentTarget.style.background = "transparent"}
         >
-            <span style={{ width: 8, height: 8, borderRadius: 9999, background: "rgba(255,255,255,.45)" }} />
+            <span style={{
+                width: 8,
+                height: 8,
+                borderRadius: 9999,
+                background: "rgba(255,255,255,.45)"
+            }} />
             <span style={{ fontWeight: 600 }}>{label}</span>
         </button>
     );
 }
+
+const menuLinkStyle = {
+    all: "unset",
+    display: "flex",
+    alignItems: "center",
+    gap: 10,
+    padding: "10px 12px",
+    borderRadius: 10,
+    cursor: "pointer",
+    color: "#fff",
+    width: "100%",
+    transition: "background 0.2s ease",
+};
 
 function PrimaryButton({ label, onClick }) {
     return (
         <button
             type="button"
             onClick={onClick}
-            style={{
-                width: "100%",
-                height: 42,
-                borderRadius: 9999,
-                border: "1px solid rgba(255,255,255,.2)",
-                background: "#2563eb",
-                color: "#fff",
-                fontWeight: 700,
-                margin: "6px 0",
-                cursor: "pointer",
-            }}
+            style={primaryButtonStyle}
+            onMouseEnter={(e) => e.currentTarget.style.background = "#1d4ed8"}
+            onMouseLeave={(e) => e.currentTarget.style.background = "#2563eb"}
         >
             {label}
         </button>
     );
 }
+
+const primaryButtonStyle = {
+    width: "100%",
+    height: 42,
+    borderRadius: 9999,
+    border: "1px solid rgba(255,255,255,.2)",
+    background: "#2563eb",
+    color: "#fff",
+    fontWeight: 700,
+    margin: "6px 0",
+    cursor: "pointer",
+    transition: "all 0.2s ease",
+};
 
 function SecondaryButton({ label, onClick }) {
     return (
         <button
             type="button"
             onClick={onClick}
-            style={{
-                width: "100%",
-                height: 42,
-                borderRadius: 9999,
-                border: "1px solid rgba(255,255,255,.25)",
-                background: "rgba(255,255,255,.08)",
-                color: "#fff",
-                fontWeight: 700,
-                margin: "6px 0",
-                cursor: "pointer",
-            }}
+            style={secondaryButtonStyle}
+            onMouseEnter={(e) => e.currentTarget.style.background = "rgba(255,255,255,.12)"}
+            onMouseLeave={(e) => e.currentTarget.style.background = "rgba(255,255,255,.08)"}
         >
             {label}
         </button>
     );
 }
+
+const secondaryButtonStyle = {
+    width: "100%",
+    height: 42,
+    borderRadius: 9999,
+    border: "1px solid rgba(255,255,255,.25)",
+    background: "rgba(255,255,255,.08)",
+    color: "#fff",
+    fontWeight: 700,
+    margin: "6px 0",
+    cursor: "pointer",
+    transition: "all 0.2s ease",
+};
 
 function DangerButton({ label, onClick }) {
     return (
         <button
             type="button"
             onClick={onClick}
-            style={{
-                width: "100%",
-                height: 42,
-                borderRadius: 9999,
-                border: "1px solid rgba(255,255,255,.25)",
-                background: "rgba(255,255,255,.02)",
-                color: "#fecaca",
-                fontWeight: 700,
-                margin: "6px 0",
-                cursor: "pointer",
-            }}
+            style={dangerButtonStyle}
+            onMouseEnter={(e) => e.currentTarget.style.background = "rgba(239,68,68,.15)"}
+            onMouseLeave={(e) => e.currentTarget.style.background = "rgba(239,68,68,.1)"}
         >
             {label}
         </button>
     );
 }
 
+const dangerButtonStyle = {
+    width: "100%",
+    height: 42,
+    borderRadius: 9999,
+    border: "1px solid rgba(239,68,68,.3)",
+    background: "rgba(239,68,68,.1)",
+    color: "#fecaca",
+    fontWeight: 700,
+    margin: "6px 0",
+    cursor: "pointer",
+    transition: "all 0.2s ease",
+};
+
 function StatLink({ label, value, onClick }) {
     return (
-        <button
-            type="button"
+        <div
             onClick={onClick}
-            style={{
-                all: "unset",
-                display: "inline-flex",
-                alignItems: "center",
-                gap: 6,
-                cursor: "pointer",
-                padding: "4px 6px",
-                borderRadius: 8,
-            }}
+            style={statLinkStyle}
+            role="button"
+            tabIndex={0}
+            onKeyDown={(e) => e.key === 'Enter' && onClick?.()}
             onMouseEnter={(e) => e.currentTarget.style.background = "rgba(255,255,255,.08)"}
             onMouseLeave={(e) => e.currentTarget.style.background = "transparent"}
         >
             <strong style={{ fontWeight: 800 }}>{value}</strong>
             <span style={{ opacity: .85 }}>{label}</span>
-        </button>
+        </div>
     );
 }
 
+const statLinkStyle = {
+    all: "unset",
+    display: "inline-flex",
+    alignItems: "center",
+    gap: 6,
+    cursor: "pointer",
+    padding: "4px 6px",
+    borderRadius: 8,
+    transition: "background 0.2s ease",
+};
+
 function Badge({ children }) {
     return (
-        <span style={{
-            display: "inline-flex",
-            alignItems: "center",
-            height: 28,
-            padding: "0 10px",
-            borderRadius: 9999,
-            background: "rgba(255,255,255,.08)",
-            border: "1px solid rgba(255,255,255,.18)",
-            fontSize: 12,
-            color: "#fff",
-        }}>
-      {children}
-    </span>
+        <span style={badgeStyle}>
+            {children}
+        </span>
     );
 }
+
+const badgeStyle = {
+    display: "inline-flex",
+    alignItems: "center",
+    height: 28,
+    padding: "0 10px",
+    borderRadius: 9999,
+    background: "rgba(255,255,255,.08)",
+    border: "1px solid rgba(255,255,255,.18)",
+    fontSize: 12,
+    color: "#fff",
+};

@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import { supabase } from '../supabase';
 
 export default function SearchBar() {
     const [q, setQ] = useState("");
@@ -17,6 +18,7 @@ export default function SearchBar() {
         document.addEventListener("pointerdown", onDocDown);
         return () => document.removeEventListener("pointerdown", onDocDown);
     }, []);
+
 
     const saveRecent = (term) => {
         const t = term.trim();

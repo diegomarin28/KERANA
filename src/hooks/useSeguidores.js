@@ -1,9 +1,16 @@
-import { useState, useEffect } from 'react';
-import { supabase } from '../lib/supabase';
+import { useState } from 'react';
+import { supabase } from '../supabase'; // Cambié la ruta
 
 export const useSeguidores = () => {
     const [seguidores, setSeguidores] = useState([]);
     const [siguiendo, setSiguiendo] = useState([]);
+
+    // Función auxiliar para obtener ID del usuario actual
+    const obtenerMiUsuarioId = async () => {
+        const { data, error } = await supabase.rpc('obtener_usuario_actual_id');
+        if (error) throw error;
+        return data;
+    };
 
     // Seguir a un usuario
     const seguirUsuario = async (usuarioId) => {
@@ -11,15 +18,22 @@ export const useSeguidores = () => {
             .rpc('seguir_usuario', { usuario_a_seguir_id: usuarioId });
 
         if (error) throw error;
+
+        // Si la función retorna un error en el JSON
+        if (data && data.error) {
+            throw new Error(data.error);
+        }
+
         return data;
     };
 
     // Dejar de seguir
     const dejarSeguir = async (usuarioId) => {
+        const miId = await obtenerMiUsuarioId();
         const { error } = await supabase
             .from('seguidores')
             .delete()
-            .eq('seguidor_id', (await supabase.auth.getUser()).data.user.id)
+            .eq('seguidor_id', miId)
             .eq('seguido_id', usuarioId);
 
         if (error) throw error;
@@ -27,9 +41,13 @@ export const useSeguidores = () => {
 
     // Bloquear usuario
     const bloquearUsuario = async (usuarioId) => {
+        const miId = await obtenerMiUsuarioId();
         const { error } = await supabase
             .from('bloqueos')
-            .insert({ bloqueador_id: (await supabase.auth.getUser()).data.user.id, bloqueado_id: usuarioId });
+            .insert({
+                bloqueador_id: miId,
+                bloqueado_id: usuarioId
+            });
 
         if (error) throw error;
     };
@@ -39,10 +57,27 @@ export const useSeguidores = () => {
         const { data, error } = await supabase
             .from('seguidores')
             .select(`
-        seguidor_id,
-        usuario:seguidor_id(*)
-      `)
+                id,
+                creado_en,
+                seguidor:seguidor_id(*)
+            `)
             .eq('seguido_id', usuarioId)
+            .eq('estado', 'activo');
+
+        if (error) throw error;
+        return data;
+    };
+
+    // Obtener a quién sigue un usuario
+    const obtenerSiguiendo = async (usuarioId) => {
+        const { data, error } = await supabase
+            .from('seguidores')
+            .select(`
+                id,
+                creado_en,
+                seguido:seguido_id(*)
+            `)
+            .eq('seguidor_id', usuarioId)
             .eq('estado', 'activo');
 
         if (error) throw error;
@@ -55,6 +90,8 @@ export const useSeguidores = () => {
         seguirUsuario,
         dejarSeguir,
         bloquearUsuario,
-        obtenerSeguidores
+        obtenerSeguidores,
+        obtenerSiguiendo,
+        obtenerMiUsuarioId
     };
 };

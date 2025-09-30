@@ -21,6 +21,7 @@ export default function SearchResults() {
     const [mentors, setMentors] = useState([]); // mentores
     const [notes, setNotes] = useState([]); // apuntes
 
+
     useEffect(() => {
         if (q) fetchAll(q);
         // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -30,7 +31,7 @@ export default function SearchResults() {
         setLoading(true);
         try {
             const { data, error } = await searchAPI.searchAll(query);
-            if (error) throw new Error(error);
+            if (error) throw new Error(error.message || JSON.stringify(error));
 
             setSubjects(data?.materias ?? []);
             setNotes(data?.apuntes ?? []);
@@ -47,17 +48,32 @@ export default function SearchResults() {
         }
     };
 
-    // Filtro por rating (★) donde tiene sentido
+// Filtro por rating (★) donde tiene sentido Y eliminar duplicados
     const filtered = useMemo(() => {
         const byRating = (items, get) => items.filter((it) => (get(it) ?? 0) >= minRating);
 
+        // Función para eliminar duplicados por ID
+        const removeDuplicates = (items, getId) => {
+            const seen = new Set();
+            return items.filter(item => {
+                const id = getId(item);
+                if (seen.has(id)) return false;
+                seen.add(id);
+                return true;
+            });
+        };
+
         return {
-            subjects, // Materias no tienen rating
-            professors: byRating(professors, (p) => p.estrellas ?? 0),
-            mentors: byRating(mentors, (m) => m.estrellas ?? 0),
-            notes: byRating(notes, () => 4.0), // Por ahora fijo como tenías
+            subjects: removeDuplicates(subjects, (s) => s.id_materia ?? s.id),
+            professors: removeDuplicates(byRating(professors, (p) => p.estrellas ?? 0), (p) => p.id_profesor ?? p.id),
+            mentors: removeDuplicates(byRating(mentors, (m) => m.estrellas ?? 0), (m) => m.id_mentor ?? m.id),
+            notes: removeDuplicates(byRating(notes, () => 4.0), (n) => n.id_apunte ?? n.id),
         };
     }, [subjects, professors, mentors, notes, minRating]);
+
+    // ... después del useMemo de filtered
+
+
 
     const show = (k) => tab === "todo" || tab === k;
     const total =
@@ -139,92 +155,53 @@ export default function SearchResults() {
             ) : (
                 <>
                     {/* MATERIAS */}
-                    {show("materias") && filtered.subjects.length > 0 && (
-                        <section className="section">
-                            <div className="section-title" style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                                <div>Materias</div>
-                                <Chip tone="blue">{filtered.subjects.length}</Chip>
-                            </div>
-                            <div className="grid">
-                                {filtered.subjects.map((m) => (
-                                    <ResultCard
-                                        key={m.id_materia ?? m.id}
-                                        title={m.nombre_materia}
-                                        subtitle={`Semestre ${m.semestre ?? "-"}`}
-                                        rating={0}
-                                        pill="Materia"
-                                        to={`/materias/${m.id_materia ?? m.id}`}
-                                    />
-                                ))}
-                            </div>
-                        </section>
-                    )}
+                    {show("materias") && filtered.subjects.map((m) => (
+                        <ResultCard
+                            key={`materia-${m.id_materia ?? m.id}`}
+                            title={m.nombre_materia}
+                            subtitle={`Semestre ${m.semestre ?? "-"}`}
+                            rating={0}
+                            pill="Materia"
+                            to={`/materias/${m.id_materia ?? m.id}`}
+                        />
+                    ))}
 
                     {/* PROFESORES */}
-                    {show("profesores") && filtered.professors.length > 0 && (
-                        <section className="section">
-                            <div className="section-title" style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                                <div>Profesores</div>
-                                <Chip tone="amber">{filtered.professors.length}</Chip>
-                            </div>
-                            <div className="grid">
-                                {filtered.professors.map((p) => (
-                                    <ResultCard
-                                        key={p.id_profesor ?? p.id}
-                                        title={`Prof. ${p.usuario?.nombre ?? "—"}`}
-                                        subtitle={p.materia?.nombre_materia ?? ""}
-                                        rating={p.estrellas ?? 0}
-                                        pill="Profesor"
-                                        to={`/profesores/${p.id_profesor ?? p.id}`}
-                                    />
-                                ))}
-                            </div>
-                        </section>
-                    )}
+                    {show("profesores") && filtered.professors.map((p, index) => (
+                        <ResultCard
+                            key={`profesor-${p.id_profesor}-${index}`}
+                            title={`Prof. ${p.profesor_nombre}`} //* ← Usar profesor_nombre que SÍ existe */
+                            subtitle={p.materia_nombre} //* ← Usar materia_nombre que SÍ existe */}
+                            rating={p.rating_promedio ?? 0} //* ← Usar rating_promedio que SÍ existe */
+                            pill="Profesor"
+                            to={`/profesores/${p.id_profesor}`}
+                        />
+                    ))}
+
 
                     {/* MENTORES */}
-                    {show("mentores") && filtered.mentors.length > 0 && (
-                        <section className="section">
-                            <div className="section-title" style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                                <div>Mentores</div>
-                                <Chip tone="primary">{filtered.mentors.length}</Chip>
-                            </div>
-                            <div className="grid">
-                                {filtered.mentors.map((m) => (
-                                    <ResultCard
-                                        key={m.id_mentor ?? m.id}
-                                        title={`Mentor ${m.usuario?.nombre ?? "—"}`}
-                                        subtitle={m.especialidad || "Mentor académico"}
-                                        rating={m.estrellas ?? 0}
-                                        pill="Mentor"
-                                        to={`/mentores/${m.id_mentor ?? m.id}`}
-                                    />
-                                ))}
-                            </div>
-                        </section>
-                    )}
+                    {show("mentores") && filtered.mentors.map((m, index) => (
+                        <ResultCard
+                            key={`mentor-${m.id_mentor}-${index}`}
+                            title={`Mentor ${m.mentor_nombre ?? "—"}`} //* ← Cambiar aquí */
+                            subtitle={m.especialidad || "Mentor académico"}
+                            rating={m.rating_promedio ?? m.estrellas_mentor ?? 0} //* ← Y aquí */
+                            pill="Mentor"
+                            to={`/mentores/${m.id_mentor}`}
+                        />
+                    ))}
 
                     {/* APUNTES */}
-                    {show("apuntes") && filtered.notes.length > 0 && (
-                        <section className="section">
-                            <div className="section-title" style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                                <div>Apuntes</div>
-                                <Chip tone="gray">{filtered.notes.length}</Chip>
-                            </div>
-                            <div className="grid">
-                                {filtered.notes.map((a) => (
-                                    <ResultCard
-                                        key={a.id_apunte ?? a.id}
-                                        title={a.titulo ?? "Apunte"}
-                                        subtitle={a.materia_nombre ?? a.profesor_nombre ?? ""}
-                                        rating={4.0} // placeholder como tenías
-                                        pill="PDF"
-                                        to={`/apuntes/${a.id_apunte ?? a.id}`}
-                                    />
-                                ))}
-                            </div>
-                        </section>
-                    )}
+                    {show("apuntes") && filtered.notes.map((a, index) => (
+                        <ResultCard
+                            key={`apunte-${a.id_apunte}-${index}`}
+                            title={a.titulo ?? "Apunte"}
+                            subtitle={a.materia_nombre ?? a.autor_nombre ?? ""} //* ← Y aquí */
+                            rating={a.estrellas ?? 4.0}
+                            pill="PDF"
+                            to={`/apuntes/${a.id_apunte}`}
+                        />
+                    ))}
                 </>
             )}
         </div>

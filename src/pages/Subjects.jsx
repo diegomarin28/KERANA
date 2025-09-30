@@ -1,117 +1,138 @@
-import { useEffect, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
-import { subjectsAPI } from '../api/Database'
-import { Chip } from '../components/ui/Chip'
-import { Button } from '../components/ui/Button'
-import { Card } from '../components/ui/Card'
+// src/pages/Subjects.jsx
+import { useEffect, useState } from "react";
+import { subjectsAPI } from "../api/Database";
 
 export default function Subjects() {
-    const navigate = useNavigate()
-    const [subjects, setSubjects] = useState([])
-    const [loading, setLoading] = useState(true)
-    const [error, setError] = useState('')
-    const [selectedSemester, setSelectedSemester] = useState('all')
-    const [searchTerm, setSearchTerm] = useState('')
+    const [subjects, setSubjects] = useState([]);
+    const [loading, setLoading] = useState(true);
+    const [err, setErr] = useState(null);
 
     useEffect(() => {
-        loadSubjects()
-    }, [])
+        let alive = true;
 
-    const loadSubjects = async () => {
-        setLoading(true)
-        setError('')
-        try {
-            const { data, error } = await subjectsAPI.getAllSubjects()
-            if (error) setError('Error cargando asignaturas: ' + error.message)
-            else setSubjects(data || [])
-        } catch {
-            setError('Error conectando con la base de datos')
-        }
-        setLoading(false)
+        (async () => {
+            setLoading(true);
+            setErr(null);
+            try {
+                // 1) intento con la vista "completa"
+                const { data, error } = await subjectsAPI.getAllSubjects();
+                if (error) throw new Error(error.message || "Error cargando materias");
+
+                if (Array.isArray(data) && data.length) {
+                    if (!alive) return;
+                    setSubjects(normalize(data));
+                } else {
+                    // 2) fallback a la tabla simple
+                    const { data: simple, error: e2 } = await subjectsAPI.getAllSubjectsSimple();
+                    if (e2) throw new Error(e2.message || "Error cargando materias (simple)");
+                    if (!alive) return;
+                    setSubjects(normalizeSimple(simple));
+                }
+            } catch (e) {
+                // 3) si todo falla, mostramos error pero no bloqueamos UI
+                if (!alive) return;
+                setErr(e?.message || "No se pudo cargar Asignaturas");
+                setSubjects([]);
+            } finally {
+                if (alive) setLoading(false);
+            }
+        })();
+
+        return () => { alive = false; };
+    }, []);
+
+    if (loading) {
+        return (
+            <div style={{ minHeight: "50vh", display: "grid", placeItems: "center" }}>
+                <div>Cargando asignaturas…</div>
+            </div>
+        );
     }
 
-    const subjectsBySemester = subjects.reduce((acc, subject) => {
-        const sem = subject.semestre || 'Sin semestre'
-        if (!acc[sem]) acc[sem] = []
-        acc[sem].push(subject)
-        return acc
-    }, {})
-
-    const filteredSubjects = subjects.filter(subject => {
-        const matchesSemester = selectedSemester === 'all' || subject.semestre == selectedSemester
-        const matchesSearch = subject.nombre_materia.toLowerCase().includes(searchTerm.toLowerCase())
-        return matchesSemester && matchesSearch
-    })
-
-    const semesters = [...new Set(subjects.map(s => s.semestre))].sort((a, b) => a - b)
-    const handleSubjectClick = (id) => navigate(`/search?subject=${id}`)
-
-    if (loading) return <p style={{ textAlign: 'center' }}>Cargando asignaturas...</p>
-
     return (
-        <div style={{ maxWidth: '1200px', margin: '0 auto', padding: 20 }}>
-            <div style={{ marginBottom: 30, textAlign: 'center' }}>
-                <h1>Asignaturas</h1>
-                <p style={{ color: 'var(--muted)' }}>
-                    Explora todas las materias disponibles – <Chip tone="blue">{subjects.length}</Chip>
-                </p>
-            </div>
+        <div style={{ width: "min(1080px, 92vw)", margin: "0 auto", padding: "24px 0" }}>
+            <h1 style={{ margin: "0 0 12px" }}>Asignaturas</h1>
+            {err && (
+                <div style={{
+                    background: "#fef2f2",
+                    color: "#991b1b",
+                    border: "1px solid #fecaca",
+                    borderRadius: 8,
+                    padding: "10px 12px",
+                    marginBottom: 12
+                }}>
+                    {err} — mostrando vista simple si hay datos.
+                </div>
+            )}
 
-            {error && <div style={{ color: 'crimson', marginBottom: 20 }}>{error}</div>}
-
-            <div style={{ display: 'flex', gap: 10, marginBottom: 30, flexWrap: 'wrap' }}>
-                <input
-                    type="text"
-                    placeholder="Buscar materia..."
-                    value={searchTerm}
-                    onChange={(e) => setSearchTerm(e.target.value)}
-                    style={{ flex: 1, minWidth: 250, padding: 10, borderRadius: 8, border: '1px solid var(--border)' }}
-                />
-                <select value={selectedSemester} onChange={(e) => setSelectedSemester(e.target.value)} style={{ padding: 10, borderRadius: 8 }}>
-                    <option value="all">Todos los semestres</option>
-                    {semesters.map(sem => <option key={sem} value={sem}>Semestre {sem}</option>)}
-                </select>
-                {(searchTerm || selectedSemester !== 'all') && (
-                    <Button variant="ghost" onClick={() => { setSearchTerm(''); setSelectedSemester('all') }}>
-                        Limpiar filtros
-                    </Button>
-                )}
-            </div>
-
-            {selectedSemester === 'all' && !searchTerm ? (
-                semesters.map(sem => (
-                    <div key={sem} style={{ marginBottom: 40 }}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 20 }}>
-                            <Chip tone="secondary">Semestre {sem}</Chip>
-                            <span style={{ color: 'var(--muted)' }}>{subjectsBySemester[sem]?.length || 0} materias</span>
-                        </div>
-                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(300px,1fr))', gap: 15 }}>
-                            {subjectsBySemester[sem]?.map(s => (
-                                <Card key={s.id_materia} onClick={() => handleSubjectClick(s.id_materia)} style={{ cursor: 'pointer' }}>
-                                    <h3 style={{ margin: 0 }}>{s.nombre_materia}</h3>
-                                    <p style={{ color: 'var(--muted)', margin: '4px 0 0' }}>{s.total_apuntes} apuntes • {s.total_profesores} profes • {s.total_mentores} mentores</p>
-                                </Card>
-                            ))}
-                        </div>
-                    </div>
-                ))
+            {subjects.length === 0 ? (
+                <div style={{ color: "#6b7280" }}>No hay asignaturas disponibles.</div>
             ) : (
-                <>
-                    <p style={{ color: 'var(--muted)' }}>Mostrando {filteredSubjects.length} materias</p>
-                    {filteredSubjects.length === 0 ? (
-                        <p style={{ textAlign: 'center', padding: 40 }}>No se encontraron materias</p>
-                    ) : (
-                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(300px,1fr))', gap: 15 }}>
-                            {filteredSubjects.map(s => (
-                                <Card key={s.id_materia} onClick={() => handleSubjectClick(s.id_materia)} style={{ cursor: 'pointer' }}>
-                                    <h3>{s.nombre_materia}</h3>
-                                    <p style={{ color: 'var(--muted)', margin: 0 }}>{s.total_apuntes} apuntes • {s.total_profesores} profes • {s.total_mentores} mentores</p>
-                                </Card>
-                            ))}
-                        </div>
-                    )}
-                </>
+                <div style={{
+                    display: "grid",
+                    gridTemplateColumns: "repeat(auto-fill, minmax(220px, 1fr))",
+                    gap: 12
+                }}>
+                    {subjects.map(s => (
+                        <button
+                            key={s.id}
+                            type="button"
+                            onClick={() => {
+                                // navegá a la materia; ajustá la ruta a tu detalle si corresponde
+                                window.location.assign(`/cursos/${s.id}`);
+                            }}
+                            style={{
+                                all: "unset",
+                                display: "block",
+                                background: "#ffffff",
+                                border: "1px solid #e5e7eb",
+                                borderRadius: 10,
+                                padding: 12,
+                                cursor: "pointer"
+                            }}
+                            onMouseEnter={(e) => e.currentTarget.style.boxShadow = "0 8px 20px rgba(0,0,0,.06)"}
+                            onMouseLeave={(e) => e.currentTarget.style.boxShadow = "none"}
+                        >
+                            <div style={{ fontWeight: 700 }}>{s.nombre}</div>
+                            {typeof s.semestre !== "undefined" && (
+                                <div style={{ color: "#6b7280", fontSize: 12, marginTop: 4 }}>
+                                    Semestre: {s.semestre}
+                                </div>
+                            )}
+                            {"conteo" in s && (
+                                <div style={{ display: "flex", gap: 8, marginTop: 8, fontSize: 12, color: "#374151" }}>
+                                    <span>Apuntes: <b>{s.conteo.apuntes}</b></span>
+                                    <span>Profes: <b>{s.conteo.profesores}</b></span>
+                                    <span>Mentores: <b>{s.conteo.mentores}</b></span>
+                                </div>
+                            )}
+                        </button>
+                    ))}
+                </div>
             )}
         </div>
-    )
+    );
+}
+
+// Normaliza la vista "materias_con_contenido"
+function normalize(rows) {
+    return rows.map(r => ({
+        id: r.id_materia ?? r.id ?? r.materia_id,
+        nombre: r.nombre_materia ?? r.nombre ?? r.materia_nombre,
+        semestre: r.semestre ?? undefined,
+        conteo: {
+            apuntes: r.total_apuntes ?? r.apuntes ?? 0,
+            profesores: r.total_profesores ?? r.profesores ?? 0,
+            mentores: r.total_mentores ?? r.mentores ?? 0,
+        }
+    }));
+}
+
+// Normaliza la tabla "materia"
+function normalizeSimple(rows) {
+    return rows.map(r => ({
+        id: r.id_materia ?? r.id,
+        nombre: r.nombre_materia ?? r.nombre,
+        semestre: r.semestre ?? undefined,
+    }));
 }

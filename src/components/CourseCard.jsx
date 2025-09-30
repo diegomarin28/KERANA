@@ -39,7 +39,7 @@ export default function CourseCard({ course, onFav }) {
                 </div>
 
                 <h3 style={{ margin: "0 0 4px 0", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                    {course.titulo}
+                    {getTitulo()}
                 </h3>
                 <p style={{ margin: 0, color: "var(--muted)", fontSize: "0.9rem" }}>
                     {course.subtitulo}

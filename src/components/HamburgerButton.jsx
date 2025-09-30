@@ -17,6 +17,7 @@ export default function HamburgerButton({
     background: color,
     borderRadius: 2,
     transition: "transform .3s ease, opacity .2s ease, background .2s ease",
+
   };
 
   return (

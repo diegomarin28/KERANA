@@ -1,7 +1,6 @@
 // src/api/Database.js
 import { supabase } from '../supabase'
 
-
 // ==========================================
 // 🧑‍🎓 USUARIOS
 // ==========================================
@@ -52,8 +51,8 @@ export const userAPI = {
 // ==========================================
 // 🎓 MATERIAS Y CONTENIDO
 // ==========================================
+
 export const subjectsAPI = {
-    // Obtener todas las materias con conteos
     async getAllSubjects() {
         const { data, error } = await supabase
             .from('materias_con_contenido')
@@ -63,7 +62,6 @@ export const subjectsAPI = {
         return { data, error }
     },
 
-    // Obtener materias simples (para selects)
     async getAllSubjectsSimple() {
         const { data, error } = await supabase
             .from('materia')
@@ -73,26 +71,20 @@ export const subjectsAPI = {
         return { data, error }
     },
 
-    // Obtener contenido de una materia específica
     async getSubjectContent(materiaId) {
         const [apuntes, profesores, mentores] = await Promise.all([
             supabase.from('apunte').select('*').eq('id_materia', materiaId),
-
-            // Trae profesor a través de imparte
             supabase
                 .from('imparte')
                 .select(`id_profesor,profesor_curso!inner(*, usuario(*))`)
                 .eq('id_materia', materiaId),
-
             supabase
                 .from('mentor_materia')
                 .select('mentor(*, usuario(*))')
                 .eq('id_materia', materiaId)
         ]);
 
-// Normalizá a una lista de profesores
         const profesoresList = (profesores.data || []).map(row => row.profesor_curso);
-
 
         return {
             apuntes: apuntes.data || [],
@@ -111,7 +103,6 @@ export const subjectsAPI = {
 // 📚 BÚSQUEDA GENERAL
 // ==========================================
 
-// — Profesores (par profesor–materia) via RPC
 async function searchProfessors(term) {
     const q = (term || "").trim();
     if (!q) return { data: [], error: null };
@@ -119,7 +110,6 @@ async function searchProfessors(term) {
     return { data, error };
 }
 
-// — Materias (tabla)
 async function searchSubjects(term) {
     const q = (term || "").trim();
     if (!q) return { data: [], error: null };
@@ -128,9 +118,6 @@ async function searchSubjects(term) {
     return { data, error };
 }
 
-
-
-// — Apuntes (vista)
 async function searchNotes(term) {
     const q = (term || "").trim();
     let base = supabase
@@ -143,7 +130,6 @@ async function searchNotes(term) {
     return { data, error };
 }
 
-// — Mentores (vista)
 async function searchMentors(term) {
     const q = (term || "").trim();
     let base = supabase
@@ -178,12 +164,10 @@ export const searchAPI = {
     },
 };
 
-
 // ==========================================
 // 🎯 MENTORES Y POSTULACIONES
 // ==========================================
 export const mentorAPI = {
-    // Crear postulación para ser mentor
     async applyMentor(applicationData) {
         const { data: { user } } = await supabase.auth.getUser()
         if (!user) return { data: null, error: 'No hay usuario logueado' }
@@ -195,7 +179,7 @@ export const mentorAPI = {
                 id_materia: applicationData.materiaId,
                 motivo: applicationData.motivo,
                 calificacion_materia: applicationData.calificacion,
-                comprobante_archivo: applicationData.comprobante, // archivo binario
+                comprobante_archivo: applicationData.comprobante,
                 estado: 'pendiente'
             }])
             .select()
@@ -203,7 +187,6 @@ export const mentorAPI = {
         return { data, error }
     },
 
-    // Obtener aplicaciones pendientes (para admin)
     async getPendingApplications() {
         const { data, error } = await supabase
             .from('mentor_aplicacion')
@@ -218,13 +201,11 @@ export const mentorAPI = {
         return { data, error }
     },
 
-    // Aprobar postulación de mentor
     async approveApplication(applicationId) {
         const { data: { user } } = await supabase.auth.getUser()
         if (!user) return { data: null, error: 'No autorizado' }
 
         try {
-            // Obtener datos de la aplicación
             const { data: app } = await supabase
                 .from('mentor_aplicacion')
                 .select('*')
@@ -233,7 +214,6 @@ export const mentorAPI = {
 
             if (!app) return { data: null, error: 'Aplicación no encontrada' }
 
-            // Crear mentor si no existe
             const { data: existingMentor } = await supabase
                 .from('mentor')
                 .select('id_mentor')
@@ -247,8 +227,8 @@ export const mentorAPI = {
                     .from('mentor')
                     .insert([{
                         id_usuario: app.id_usuario,
-                        estrellas: 5, // rating inicial
-                        contacto: '' // se puede completar después
+                        estrellas: 5,
+                        contacto: ''
                     }])
                     .select('id_mentor')
                     .single()
@@ -257,7 +237,6 @@ export const mentorAPI = {
                 mentorId = newMentor.id_mentor
             }
 
-            // Agregar materia al mentor
             await supabase
                 .from('mentor_materia')
                 .insert([{
@@ -265,7 +244,6 @@ export const mentorAPI = {
                     id_materia: app.id_materia
                 }])
 
-            // Actualizar estado de aplicación
             const { data, error } = await supabase
                 .from('mentor_aplicacion')
                 .update({ estado: 'aprobado' })
@@ -279,7 +257,6 @@ export const mentorAPI = {
         }
     },
 
-    // Obtener mentores por materia
     async getMentorsBySubject(materiaId) {
         const { data, error } = await supabase
             .from('mentor_materia')
@@ -296,7 +273,6 @@ export const mentorAPI = {
 // 📄 APUNTES
 // ==========================================
 export const notesAPI = {
-    // Buscar apuntes
     async searchNotes(searchTerm) {
         const { data, error } = await supabase
             .from('apunte')
@@ -306,7 +282,6 @@ export const notesAPI = {
         return { data, error }
     },
 
-    // Obtener apuntes por materia
     async getNotesBySubject(materiaId) {
         const { data, error } = await supabase
             .from('apunte')
@@ -354,17 +329,10 @@ export const favoritesAPI = {
 
         return { data, error }
     }
-
 }
 
 export const ratingsAPI = {
-    /**
-     * Crea una reseña real en Supabase.
-     * Firma compatible con tu modal:
-     *   createRating(courseId, rating, texto, { titulo, workload, metodologia })
-     */
     async createRating(courseId, estrellas, comentario, extra = {}) {
-        // Necesita usuario logueado (RLS)
         const { data: authData, error: authErr } = await supabase.auth.getUser();
         const user = authData?.user;
         if (authErr || !user) {
@@ -372,8 +340,8 @@ export const ratingsAPI = {
         }
 
         const payload = {
-            tipo: 'materia',        // ← reseña de materia/curso
-            ref_id: courseId,       // ← el id que te llega como prop `courseId`
+            tipo: 'materia',
+            ref_id: courseId,
             estrellas,
             comentario: comentario?.trim() || null,
             titulo: extra.titulo?.trim() || null,
@@ -391,7 +359,6 @@ export const ratingsAPI = {
         return { data, error };
     },
 
-    // (opcionales) helpers para leer y promediar
     async listByMateria(materiaId) {
         return await supabase
             .from('rating')
@@ -441,6 +408,3 @@ export const professorAPI = {
         return { data, error }
     }
 }
-
-
-

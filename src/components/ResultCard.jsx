@@ -2,7 +2,7 @@ import { Link } from "react-router-dom"
 import { Card } from "../components/ui/Card"
 import { Chip } from "../components/ui/Chip"
 
-export default function ResultCard({ title, subtitle, description, link, pill }) {
+export default function ResultCard({ title, subtitle, description, link, pill, rating }) {
     return (
         <Link to={link} style={{ textDecoration: "none", color: "inherit" }}>
             <Card>
@@ -13,7 +13,14 @@ export default function ResultCard({ title, subtitle, description, link, pill })
                         {description.length > 120 ? description.substring(0, 120) + "…" : description}
                     </p>
                 )}
-                {pill && <div style={{ marginTop: 8 }}><Chip tone="blue">{pill}</Chip></div>}
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: 8 }}>
+                    {pill && <Chip tone="blue">{pill}</Chip>}
+                    {rating > 0 && (
+                        <div style={{ color: "#f8a415", fontSize: "0.9rem" }}>
+                            {"★".repeat(Math.round(rating))}{"☆".repeat(5 - Math.round(rating))} {rating}
+                        </div>
+                    )}
+                </div>
             </Card>
         </Link>
     )
