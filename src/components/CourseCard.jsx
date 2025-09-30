@@ -23,6 +23,13 @@ export default function CourseCard({ course, onFav }) {
         }
     };
 
+    const getTitulo = () => { //para profesor
+        if (course.tipo === 'profesor') {
+            return `Prof. ${course.nombre_profesor || course.titulo || 'Sin nombre'}`
+        }
+        return course.titulo
+    }
+
     return (
         <Card style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12 }}>
             <div style={{ flex: 1, minWidth: 0 }}>

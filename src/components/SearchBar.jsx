@@ -10,12 +10,12 @@ export default function SearchBar() {
     const wrapRef = useRef(null);
 
     useEffect(() => {
-        const onDocClick = (e) => {
+        const onDocDown = (e) => {
             if (!wrapRef.current) return;
             if (!wrapRef.current.contains(e.target)) setOpen(false);
         };
-        document.addEventListener("click", onDocClick);
-        return () => document.removeEventListener("click", onDocClick);
+        document.addEventListener("pointerdown", onDocDown);
+        return () => document.removeEventListener("pointerdown", onDocDown);
     }, []);
 
     const saveRecent = (term) => {
@@ -208,8 +208,10 @@ export default function SearchBar() {
 
                                     {/* "x" gris */}
                                     <button
+                                        type="button"
                                         aria-label="Eliminar búsqueda"
                                         onClick={() => removeRecent(r)}
+                                        onMouseDown={(e) => e.stopPropagation()}
                                         style={{
                                             border: "1px solid #e5e7eb",
                                             background: "#fff",

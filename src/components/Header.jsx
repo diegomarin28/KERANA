@@ -4,6 +4,7 @@ import AuthModal_SignIn from "../components/AuthModal_SignIn.jsx";
 import AuthModal_SignUp from "../components/AuthModal_SignUp.jsx";
 import AuthModal_HacerResenia from "../components/AuthModal_HacerReseña.jsx";
 import Sidebar from "../components/Sidebar.jsx";
+import HamburgerButton from "../components/HamburgerButton.jsx";
 
 export default function Header() {
     const [menuOpen, setMenuOpen] = useState(false);
@@ -235,7 +236,7 @@ export default function Header() {
                                 color: "inherit",
                             }}
                         >
-                            ☰
+                            <HamburgerButton open={menuOpen} onToggle={() => setMenuOpen(o => !o)} />
                         </button>
 
                         <button
@@ -299,7 +300,7 @@ export default function Header() {
             <div style={{ height: 64 }} />
 
             {/* Sidebar + Modales */}
-            <Sidebar open={menuOpen} onClose={() => setMenuOpen(false)} user={user} onLogout={handleLogout} />
+            <Sidebar open={menuOpen} onClose={() => setMenuOpen(false)} user={user} onLogout={handleLogout} onGo={(path) => { navigate(path); }}/>
             <AuthModal_SignIn open={authOpen} onClose={() => setAuthOpen(false)} onSignedIn={handleSignedIn} onSwitchToSignUp={switchToSignUp} />
             <AuthModal_SignUp open={signUpOpen} onClose={() => setSignUpOpen(false)} onSignedIn={handleSignedIn} onSwitchToSignIn={switchToSignIn} />
             <AuthModal_HacerResenia open={reseniaOpen} onClose={() => setReseniaOpen(false)} onSave={handleReseniaSubmit} />

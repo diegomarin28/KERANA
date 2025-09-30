@@ -6,11 +6,11 @@ export default function ScrollDownHint({
                                            label = "Ver más",
                                            showLabel = false,   // como lo puse en flase no se ve el Ver más
                                            chevrons = 1,          // ← cantidad de flechitas
-                                           size = 17,             // ← tamaño (px) de cada flecha
+                                           size = 18,             // ← tamaño (px) de cada flecha
                                            stroke = 3,            // ← grosor del “trazo” (px)
-                                           speed = 1.8,           // ← segundos de la animación
-                                           distance = 6,          // ← cuánto “baja” cada flecha (px)
-                                           bottom = 20,           // ← distancia al borde inferior del hero (px)
+                                           speed = 2,           // ← segundos de la animación
+                                           distance = 7,          // ← cuánto “baja” cada flecha (px)
+                                           bottom = 18,           // ← distancia al borde inferior del hero (px)
                                            color = "#ffffff",     // ← color (usa “currentColor” si querés heredarlo)
                                            gap = 4,               // ← separación vertical entre flechas (px)
                                            delayStep = 0.15       // ← desfase entre flechas (seg)

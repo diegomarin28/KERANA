@@ -415,7 +415,32 @@ export const ratingsAPI = {
     }
 };
 
+// ==========================================
+// 👨‍🏫 PROFESORES
+// ==========================================
+export const professorAPI = {
+    async getAllProfessors() {
+        const { data, error } = await supabase
+            .from('profesor_curso')
+            .select(`
+                *,
+                imparte(materia(id_materia, nombre_materia))
+            `)
+        return { data, error }
+    },
 
+    async getProfessorsBySubject(materiaId) {
+        const { data, error } = await supabase
+            .from('imparte')
+            .select(`
+                *,
+                profesor_curso(id_profesor, nombre_profesor, foto)
+            `)
+            .eq('id_materia', materiaId)
+
+        return { data, error }
+    }
+}
 
 
 
