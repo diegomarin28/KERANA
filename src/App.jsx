@@ -3,6 +3,9 @@ import { BrowserRouter, Routes, Route, useLocation } from "react-router-dom";
 import { lazy, Suspense, useEffect } from "react";
 import Header from "../src/components/Header.jsx";
 import Home from "./pages/Home.jsx";
+import Equipo from "./pages/Equipo";
+
+
 
 const SearchResults = lazy(() => import("./pages/SearchResults"));
 const ProfessorDetail = lazy(() => import("./pages/ProfessorDetail"));
@@ -66,6 +69,8 @@ export default function App() {
                     <Route path="/cursos/buscar" element={<CourseSearch />} />
                     <Route path="/auth/confirm" element={<AuthConfirm />} />
                     <Route path="/subjects" element={<Subjects />} />
+                    <Route path="/equipo" element={<Equipo />} />
+
                 </Routes>
             </Suspense>
         </BrowserRouter>

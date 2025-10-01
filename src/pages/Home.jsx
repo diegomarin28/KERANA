@@ -2,6 +2,7 @@ import SearchBar from "../components/SearchBar";
 import { useEffect, useState } from "react";
 import { Card } from "../components/ui/Card";
 import ScrollDownHint from "../components/ScrollDownHint.jsx";
+import { Link } from "react-router-dom";
 
 const HERO_BG = "gradient"; // podés cambiar: "solid" | "gradient" | "radial"
 
@@ -199,9 +200,12 @@ function FooterCol({ title, items }) {
             >
                 {items.map((t) => (
                     <li key={t}>
-                        <a href="#" style={{ color: "rgba(255,255,255,.9)" }}>
+                        <Link
+                            to={t === "Equipo" ? "/equipo" : "#"}
+                            style={{ color: "rgba(255,255,255,.9)" }}
+                        >
                             {t}
-                        </a>
+                        </Link>
                     </li>
                 ))}
             </ul>
