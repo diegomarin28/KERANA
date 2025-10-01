@@ -19,8 +19,11 @@ const MentorApply = lazy(() => import("./pages/MentorApply"));
 const UserDashboard = lazy(() => import("./components/UserDashboard"));
 const CourseSearch = lazy(() => import("./components/CourseSearch"));
 const MisionVision = lazy(() => import("./pages/MisionVision"));
-const MyMentorships = lazy(() => import("./pages/MyMentorships")); 
-// Componentes directos (sin lazy para evitar problemas)
+const MyMentorships = lazy(() => import("./pages/MyMentorships"));
+const MyCalendar = lazy(() => import('./pages/mentor/MyCalendar'));
+const IAmMentor = lazy(() => import('./pages/mentor/IAmMentor'));
+const MyStudents = lazy(() => import('./pages/mentor/MyStudents'));
+
 import AuthConfirm from './pages/AuthConfirm';
 import Purchased from './pages/Purchased';
 import Profile from './pages/Profile';
@@ -75,6 +78,10 @@ export default function App() {
                     <Route path="/search" element={<SearchResults />} />
                     <Route path="/cursos/buscar" element={<CourseSearch />} />
 
+                    <Route path="/mentor/calendar" element={<MyCalendar />} />
+                    <Route path="/mentor/courses" element={<IAmMentor />} />
+                    <Route path="/mentor/students" element={<MyStudents />} />
+
                     {/* Rutas de Detalles */}
                     <Route path="/profesores/:id" element={<ProfessorDetail />} />
                     <Route path="/cursos/:id" element={<CourseDetail />} />
@@ -113,7 +120,7 @@ export default function App() {
                             <MyPapers />
                         </AuthGuard>
                     } />
-                    <Route path="/my_mentorships" element={
+                    <Route path="/mentor/courses" element={
                         <AuthGuard requireAuth={true}>
                             <MyMentorships />
                         </AuthGuard>

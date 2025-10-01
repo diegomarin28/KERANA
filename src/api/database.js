@@ -1,5 +1,6 @@
 // src/api/Database.js
 import { supabase } from '../supabase'
+import emailjs from '@emailjs/browser';
 
 // ==========================================
 // 🧑‍🎓 USUARIOS
@@ -172,6 +173,7 @@ export const mentorAPI = {
         const { data: { user } } = await supabase.auth.getUser()
         if (!user) return { data: null, error: 'No hay usuario logueado' }
 
+
         const { data, error } = await supabase
             .from('mentor_aplicacion')
             .insert([{
@@ -183,6 +185,60 @@ export const mentorAPI = {
                 estado: 'pendiente'
             }])
             .select()
+        if (data && !error) {
+            await this.notifyNewApplication(data[0].id)
+        }
+
+        return { data, error }
+    },
+
+    async notifyNewApplication(applicationId, userEmail, materiaNombre) {
+        try {
+            // Usar EmailJS igual que en Contact.jsx
+            await emailjs.send(
+                "service_dan74a5",
+                "template_e9obnfd",
+                {
+                    application_id: applicationId,
+                    user_email: userEmail,
+                    materia_nombre: materiaNombre,
+                    message: `Nueva aplicación de mentor recibida de ${userEmail} para la materia ${materiaNombre}`,
+                    to_name: "Administrador Kerana",
+                    subject: "📚 Nueva aplicación de mentor - Kerana"
+                },
+                "DMO310micvFWXx-j4"
+            );
+
+            console.log('✅ Notificación de aplicación enviada por email');
+        } catch (error) {
+            console.log('❌ Notificación falló, pero aplicación se guardó:', error);
+        }
+    },
+
+    async getMyMentorStatus() {
+        const { data: { user } } = await supabase.auth.getUser()
+        if (!user) return { data: null, error: 'No hay usuario logueado' }
+
+        const { data: usuarioData } = await supabase
+            .from('usuario')
+            .select('id_usuario')
+            .eq('auth_id', user.id)
+            .single()
+
+        if (!usuarioData) return { data: null, error: 'Usuario no encontrado' }
+
+        const { data, error } = await supabase
+            .from('mentor')
+            .select(`
+                id_mentor,
+                estrellas,
+                contacto,
+                mentor_materia(
+                    materia(id_materia, nombre_materia, semestre)
+                )
+            `)
+            .eq('id_usuario', usuarioData.id_usuario)
+            .single()
 
         return { data, error }
     },
@@ -387,17 +443,17 @@ export const ratingsAPI = {
 // ==========================================
 export const professorAPI = {
     async getAllProfessors() {
-        const { data, error } = await supabase
+        const {data, error} = await supabase
             .from('profesor_curso')
             .select(`
                 *,
                 imparte(materia(id_materia, nombre_materia))
             `)
-        return { data, error }
+        return {data, error}
     },
 
     async getProfessorsBySubject(materiaId) {
-        const { data, error } = await supabase
+        const {data, error} = await supabase
             .from('imparte')
             .select(`
                 *,
@@ -405,6 +461,157 @@ export const professorAPI = {
             `)
             .eq('id_materia', materiaId)
 
-        return { data, error }
+        return {data, error}
     }
 }
+
+
+// ==========================================
+// 📅 MENTORÍAS Y CALENDARIO
+// ==========================================
+    export const mentorshipAPI = {
+        // Disponibilidad del mentor
+        async getMyDisponibilidad() {
+            const { data: { user } } = await supabase.auth.getUser()
+            if (!user) return { data: null, error: 'No hay usuario logueado' }
+
+            const { data: usuarioData } = await supabase
+                .from('usuario')
+                .select('id_usuario')
+                .eq('auth_id', user.id)
+                .single()
+
+            if (!usuarioData) return { data: null, error: 'Usuario no encontrado' }
+
+            const { data: mentorData } = await supabase
+                .from('mentor')
+                .select('id_mentor')
+                .eq('id_usuario', usuarioData.id_usuario)
+                .single()
+
+            if (!mentorData) return { data: null, error: 'No eres mentor' }
+
+            const { data, error } = await supabase
+                .from('mentor_disponibilidad')
+                .select('*')
+                .eq('id_mentor', mentorData.id_mentor)
+                .order('dia_semana, hora_inicio')
+
+            return { data, error }
+        },
+
+        async addDisponibilidad(diaSemana, horaInicio, horaFin) {
+            const { data: { user } } = await supabase.auth.getUser()
+            if (!user) return { data: null, error: 'No hay usuario logueado' }
+
+            const { data: usuarioData } = await supabase
+                .from('usuario')
+                .select('id_usuario')
+                .eq('auth_id', user.id)
+                .single()
+
+            const { data: mentorData } = await supabase
+                .from('mentor')
+                .select('id_mentor')
+                .eq('id_usuario', usuarioData.id_usuario)
+                .single()
+
+            const { data, error } = await supabase
+                .from('mentor_disponibilidad')
+                .insert([{
+                    id_mentor: mentorData.id_mentor,
+                    dia_semana: diaSemana,
+                    hora_inicio: horaInicio,
+                    hora_fin: horaFin,
+                    activo: true
+                }])
+                .select()
+
+            return { data, error }
+        },
+
+        async deleteDisponibilidad(idDisponibilidad) {
+            const { data, error } = await supabase
+                .from('mentor_disponibilidad')
+                .delete()
+                .eq('id_disponibilidad', idDisponibilidad)
+
+            return { data, error }
+        },
+
+        async toggleDisponibilidad(idDisponibilidad, activo) {
+            const { data, error } = await supabase
+                .from('mentor_disponibilidad')
+                .update({ activo })
+                .eq('id_disponibilidad', idDisponibilidad)
+                .select()
+
+            return { data, error }
+        },
+
+        // Sesiones
+        async getMySesiones() {
+            const { data: { user } } = await supabase.auth.getUser()
+            if (!user) return { data: null, error: 'No hay usuario logueado' }
+
+            const { data: usuarioData } = await supabase
+                .from('usuario')
+                .select('id_usuario')
+                .eq('auth_id', user.id)
+                .single()
+
+            const { data: mentorData } = await supabase
+                .from('mentor')
+                .select('id_mentor')
+                .eq('id_usuario', usuarioData.id_usuario)
+                .maybeSingle()
+
+            if (mentorData) {
+                // Es mentor, ver sus sesiones como mentor
+                const { data, error } = await supabase
+                    .from('mentor_sesion')
+                    .select(`
+                    *,
+                    alumno:usuario!mentor_sesion_id_alumno_fkey(nombre, correo),
+                    materia(nombre_materia)
+                `)
+                    .eq('id_mentor', mentorData.id_mentor)
+                    .order('fecha_hora', { ascending: false })
+
+                return { data, error }
+            } else {
+                // Es alumno, ver sus sesiones como alumno
+                const { data, error } = await supabase
+                    .from('mentor_sesion')
+                    .select(`
+                    *,
+                    mentor!inner(*, usuario(nombre, correo)),
+                    materia(nombre_materia)
+                `)
+                    .eq('id_alumno', usuarioData.id_usuario)
+                    .order('fecha_hora', { ascending: false })
+
+                return { data, error }
+            }
+        },
+
+        async confirmarSesion(idSesion) {
+            const { data, error } = await supabase
+                .from('mentor_sesion')
+                .update({ estado: 'confirmada' })
+                .eq('id_sesion', idSesion)
+                .select()
+
+            return { data, error }
+        },
+
+        async cancelarSesion(idSesion) {
+            const { data, error } = await supabase
+                .from('mentor_sesion')
+                .update({ estado: 'cancelada' })
+                .eq('id_sesion', idSesion)
+                .select()
+
+            return { data, error }
+        }
+    }

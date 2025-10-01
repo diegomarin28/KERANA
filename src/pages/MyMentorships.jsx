@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '../supabase';
+import { mentorAPI } from '../api/database'; // ← Importar la API que ya tienes
 import { Card } from '../components/ui/Card';
 import { Button } from '../components/ui/Button';
 
@@ -15,40 +16,24 @@ export default function MyMentorships() {
     const fetchMyMentorships = async () => {
         try {
             setLoading(true);
-            const { data: { user } } = await supabase.auth.getUser();
-            if (!user) {
-                setError('Debes iniciar sesión');
-                return;
-            }
 
-            const { data: usuarioData } = await supabase
-                .from('usuario')
-                .select('id_usuario')
-                .eq('auth_id', user.id)
-                .single();
+            // ✅ USAR EL HOOK O LA FUNCIÓN QUE YA TIENES PARA VERIFICAR MENTOR
+            const { data: mentorData, error: mentorError } = await mentorAPI.getMyMentorStatus();
 
-            if (!usuarioData) {
-                setError('No se encontró tu perfil');
-                return;
-            }
-
-            const { data: mentorData } = await supabase
-                .from('mentor')
-                .select('id_mentor')
-                .eq('contacto', usuarioData.id_usuario)
-                .single();
-
-            if (!mentorData) {
+            if (mentorError || !mentorData) {
+                // No es mentor o hay error
                 setMentorships([]);
+                setLoading(false);
                 return;
             }
 
+            // ✅ Obtener las materias del mentor
             const { data, error: fetchError } = await supabase
                 .from('mentor_materia')
                 .select(`
                     id,
                     id_materia,
-                    materia(nombre_materia, semestre)
+                    materia(id_materia, nombre_materia, semestre)
                 `)
                 .eq('id_mentor', mentorData.id_mentor);
 
@@ -130,7 +115,7 @@ export default function MyMentorships() {
                                         {mentorship.materia.nombre_materia}
                                     </h3>
                                     <p style={{ color: '#6b7280', margin: 0, fontSize: 14 }}>
-                                        {mentorship.materia.semestre}
+                                        Semestre: {mentorship.materia.semestre}
                                     </p>
                                 </div>
                                 <Button

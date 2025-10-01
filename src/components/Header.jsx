@@ -94,6 +94,13 @@ export default function Header() {
             }
 
             if (data) setUserProfile(data);
+            const { data: mentorData } = await supabase
+                .from('mentor')
+                .select('id_mentor, estrellas, contacto')
+                .eq('id_usuario', data.id_usuario)
+                .maybeSingle();
+
+            setUserProfile({ ...data, isMentor: !!mentorData, mentorInfo: mentorData });
         } catch (e) {
             console.warn("[perfil] fetchUserProfile error:", e);
         }
@@ -344,7 +351,8 @@ export default function Header() {
                     {/* Centro: acciones */}
                     <nav style={{ display: "flex", alignItems: "center", gap: 10, justifyContent: "center" }}>
                         <PillLink to="/upload">Subir Apuntes</PillLink>
-                        <PillLink to="/mentores/postular">¡Quiero ser mentor!</PillLink>
+                        <PillLink onClick={() => navigate("/apply-mentor")}>
+                            ¡Quiero ser Mentor!</PillLink>
                         <PillButton onClick={handleReseniaClick}>¡Hacé tu reseña!</PillButton>
                     </nav>
 

@@ -149,7 +149,7 @@ export default function MentorApply() {
 
             const comprobanteUrl = await uploadComprobante(formData.comprobante);
 
-            const { error: insertError } = await supabase
+            const { data: applicationData, error: insertError } = await supabase
                 .from('mentor_aplicacion')
                 .insert([{
                     id_usuario: usuarioData.id_usuario,
@@ -158,9 +158,18 @@ export default function MentorApply() {
                     calificacion_materia: parseFloat(formData.calificacion),
                     comprobante_archivo: comprobanteUrl,
                     estado: 'pendiente'
-                }]);
+                }])
+                .select()
+                .single();
 
             if (insertError) throw insertError;
+
+            // ✅ ENVIAR NOTIFICACIÓN POR EMAIL
+            await mentorAPI.notifyNewApplication(
+                applicationData.id,
+                user.email,
+                selectedMateria.nombre_materia
+            );
 
             alert('¡Postulación enviada con éxito! Te notificaremos cuando sea revisada.');
             navigate('/');
@@ -173,7 +182,6 @@ export default function MentorApply() {
             setUploading(false);
         }
     };
-
     return (
         <div style={{ maxWidth: 700, margin: '0 auto', padding: 20 }}>
             <h1 style={{ marginBottom: 12 }}>Postulate como Mentor</h1>

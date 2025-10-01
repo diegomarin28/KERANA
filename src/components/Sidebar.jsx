@@ -1,20 +1,20 @@
 // Sidebar.jsx
 import { useEffect, useRef } from "react";
+import { supabase } from "../supabase";
+import { useMentorStatus } from '../hooks/useMentorStatus'
 
-export default function Sidebar({
-                                    open,
-                                    onClose,
-                                    user,
-                                    onLogout,
-                                    onGo,
-                                }) {
+
+export default function Sidebar({ open, onClose, user, onLogout, onGo }) {
     const panelRef = useRef(null);
 
+    // autoCheck: false → No verificar automáticamente al montar
+    const { isMentor, loading: checkingMentor, refetch } = useMentorStatus(false);
+
     useEffect(() => {
-        const prev = document.body.style.overflow;
-        if (open) document.body.style.overflow = "hidden";
-        return () => { document.body.style.overflow = prev; };
-    }, [open]);
+        if (open) {
+            refetch();  // ← Solo verificar cuando se abre el sidebar
+        }
+    }, [open, refetch]);
 
     useEffect(() => {
         if (!open) return;
@@ -30,6 +30,8 @@ export default function Sidebar({
             document.removeEventListener("mousedown", onClickOutside);
         };
     }, [open, onClose]);
+
+
 
     const username = user?.name || user?.username || "Invitado";
     const letter = (username[0] || "U").toUpperCase();
@@ -92,7 +94,7 @@ export default function Sidebar({
                     </button>
                 </div>
 
-                {/* Sección de Perfil arriba del todo */}
+                {/* Sección de Perfil */}
                 <div style={profileSectionStyle}>
                     <div
                         onClick={() => go("/profile")}
@@ -117,6 +119,21 @@ export default function Sidebar({
                             <div style={usernameStyle}>
                                 {username}
                             </div>
+                            {isMentor && ( // ← Usar isMentor del hook
+                                <div style={{
+                                    display: 'inline-block',
+                                    padding: '2px 8px',
+                                    background: 'rgba(16, 185, 129, 0.2)',
+                                    border: '1px solid rgba(16, 185, 129, 0.4)',
+                                    borderRadius: 4,
+                                    fontSize: 10,
+                                    fontWeight: 600,
+                                    color: '#6ee7b7',
+                                    marginBottom: 4
+                                }}>
+                                    ✓ MENTOR
+                                </div>
+                            )}
                             <div style={statsContainerStyle}>
                                 <StatLink onClick={() => go("/profile/credits")} label="Créditos" value={credits} />
                                 <StatLink onClick={() => go("/profile/followers")} label="Seguidores" value={followers} />
@@ -131,6 +148,16 @@ export default function Sidebar({
                     <MenuLink icon="📚" label="Comprados" onClick={() => go("/purchased")} />
                     <MenuLink icon="⭐" label="Favoritos" onClick={() => go("/favorites")} />
                     <MenuLink icon="📝" label="Mis Apuntes" onClick={() => go("/my_papers")} />
+
+                    {/* SECCIÓN DE MENTOR - Usar isMentor del hook */}
+                    {isMentor && !checkingMentor && (
+                        <>
+                            <Group title="Panel de Mentor" />
+                            <MenuLink icon="📚" label="I Am Mentor" onClick={() => go("/mentor/courses")} />
+                            <MenuLink icon="👥" label="Mis Alumnos" onClick={() => go("/mentor/students")} />
+                            <MenuLink icon="📅" label="Mi Calendario" onClick={() => go("/mentor/calendar")} />
+                        </>
+                    )}
 
                     <Group title="Explorar" />
                     <MenuLink icon="📖" label="Asignaturas" onClick={() => go("/subjects")} />
@@ -157,7 +184,6 @@ export default function Sidebar({
                     <MenuLink icon="📄" label="Términos y condiciones" onClick={() => go("/terms")} />
                     <MenuLink icon="🔒" label="Política de privacidad" onClick={() => go("/privacy")} />
 
-                    {/* Cerrar sesión al final - MÁS ANGOSTO Y SIN EMOJI */}
                     {user && (
                         <>
                             <div style={{ marginTop: 20 }} />
@@ -174,6 +200,8 @@ export default function Sidebar({
         </>
     );
 }
+
+// ... resto de los estilos y componentes igual que antes
 
 const headerStyle = {
     display: "flex",
@@ -357,7 +385,6 @@ const secondaryButtonStyle = {
     fontSize: 14,
 };
 
-// BOTÓN DE CERRAR SESIÓN MÁS ANGOSTO Y SIN EMOJI
 function SmallDangerButton({ label, onClick }) {
     return (
         <button
@@ -376,9 +403,9 @@ const smallDangerButtonStyle = {
     all: "unset",
     display: "flex",
     alignItems: "center",
-    justifyContent: "",
+    justifyContent: "center",
     width: "100%",
-    height: 30, // Más angosto
+    height: 30,
     borderRadius: 6,
     border: "1px solid rgba(239,68,68,.3)",
     background: "rgba(239,68,68,.1)",
