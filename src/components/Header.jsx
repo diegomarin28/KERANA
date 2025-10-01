@@ -209,7 +209,7 @@ export default function Header() {
     // Colores
     const TOKENS = inHero
         ? {
-            headerBg: "#1b2e3a",
+            headerBg: "#13346b",
             headerText: "#ffffff",
             border: "transparent",
             pillBg: "#ffffff",
@@ -220,14 +220,14 @@ export default function Header() {
             signBorder: "#e5e7eb",
         }
         : {
-            headerBg: "#2563eb",
+            headerBg: "#1b2e3a",
             headerText: "#ffffff",
             border: "transparent",
-            pillBg: "#2563eb",
-            pillText: "#ffffff",
+            pillBg: "#ffffff",
+            pillText: "#1e40af",
             pillBorder: "#1e40af",
-            signBg: "#2563eb",
-            signText: "#ffffff",
+            signBg: "#ffffff",
+            signText: "#1e40af",
             signBorder: "#1e40af",
         };
 

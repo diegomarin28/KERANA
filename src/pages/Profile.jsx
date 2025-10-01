@@ -1,116 +1,199 @@
-import { useState, useEffect } from 'react'
-import { userAPI, purchaseAPI } from '../api/Database'
-import { Button } from '../components/ui/Button'
-import { Card } from '../components/ui/Card'
-import { Chip } from '../components/ui/Chip'
+// src/pages/Profile.jsx
+import { useEffect, useState } from 'react';
+import { supabase } from '../supabase';
+import { Card } from '../components/ui/Card';
+import { Button } from '../components/ui/Button';
+import { Chip } from '../components/ui/Chip';
 
 export default function Profile() {
-    const [user, setUser] = useState(null)
-    const [profile, setProfile] = useState({ nombre: '', telefono: '', bio: '' })
-    const [purchases, setPurchases] = useState([])
-    const [loading, setLoading] = useState(true)
-    const [saving, setSaving] = useState(false)
-    const [message, setMessage] = useState('')
-    const [activeTab, setActiveTab] = useState('info')
+    const [profile, setProfile] = useState(null);
+    const [loading, setLoading] = useState(true);
+    const [error, setError] = useState('');
+    const [isCreating, setIsCreating] = useState(false);
 
-    useEffect(() => { loadUserData() }, [])
+    useEffect(() => {
+        fetchProfile();
+    }, []);
 
-    const loadUserData = async () => {
-        setLoading(true)
+    const fetchProfile = async () => {
         try {
-            const { data: profileData } = await userAPI.getCurrentProfile()
-            if (profileData) {
+            setLoading(true);
+            setError('');
+
+            const { data: { user } } = await supabase.auth.getUser();
+            if (!user) {
+                setError('Debes iniciar sesión');
+                return;
+            }
+
+            // Usar maybeSingle en lugar de single para evitar error PGRST116
+            const { data, error: profileError } = await supabase
+                .from('usuario')
+                .select('*')
+                .eq('correo', user.email)
+                .maybeSingle();
+
+            if (profileError) {
+                console.warn('Error cargando perfil:', profileError);
+                // No es crítico - el usuario puede no tener perfil aún
+            }
+
+            if (data) {
+                setProfile(data);
+            } else {
+                // Usuario no tiene perfil en la base de datos
                 setProfile({
-                    nombre: profileData.nombre || '',
-                    telefono: profileData.telefono || '',
-                    bio: profileData.bio || ''
-                })
-                setUser(profileData)
+                    correo: user.email,
+                    nombre: user.user_metadata?.full_name || user.user_metadata?.name || 'Usuario',
+                    username: '',
+                    creditos: 0,
+                    fecha_creado: new Date().toISOString()
+                });
             }
-            const { data: purchasesData } = await purchaseAPI.getUserPurchases()
-            setPurchases(purchasesData || [])
-        } catch (e) { console.error(e) }
-        setLoading(false)
-    }
 
-    const handleUpdateProfile = async (e) => {
-        e.preventDefault()
-        setSaving(true)
-        setMessage('')
-        try {
-            const { error } = await userAPI.updateProfile(profile)
-            if (error) setMessage('Error: ' + error.message)
-            else {
-                setMessage('¡Perfil actualizado!')
-                setTimeout(() => setMessage(''), 3000)
-            }
-        } catch (e) {
-            setMessage('Error inesperado: ' + e.message)
+        } catch (err) {
+            console.error('Error en fetchProfile:', err);
+            setError('Error cargando perfil');
+        } finally {
+            setLoading(false);
         }
-        setSaving(false)
-    }
+    };
 
-    if (loading) return <p style={{ textAlign: 'center', padding: 20 }}>Cargando perfil…</p>
+    const createProfile = async () => {
+        try {
+            setIsCreating(true);
+            setError('');
+
+            const { data: { user } } = await supabase.auth.getUser();
+            if (!user) {
+                setError('Debes iniciar sesión');
+                return;
+            }
+
+            const profileData = {
+                correo: user.email,
+                nombre: user.user_metadata?.full_name || user.user_metadata?.name || 'Usuario',
+                username: generateUsername(user.email),
+                fecha_creado: new Date().toISOString(),
+                creditos: 10
+            };
+
+            const { data, error: insertError } = await supabase
+                .from('usuario')
+                .insert([profileData])
+                .select()
+                .single();
+
+            if (insertError) {
+                console.error('Error creando perfil:', insertError);
+                setError('No se pudo crear el perfil. Verifica los permisos de la base de datos.');
+                return;
+            }
+
+            setProfile(data);
+
+        } catch (err) {
+            console.error('Error en createProfile:', err);
+            setError('Error creando perfil');
+        } finally {
+            setIsCreating(false);
+        }
+    };
+
+    const generateUsername = (email) => {
+        const base = email.split('@')[0];
+        const random = Math.floor(Math.random() * 10000);
+        return `${base}${random}`;
+    };
+
+    if (loading) {
+        return (
+            <div style={{
+                minHeight: '60vh',
+                display: 'flex',
+                justifyContent: 'center',
+                alignItems: 'center'
+            }}>
+                <Card style={{ padding: 40, textAlign: 'center' }}>
+                    <div style={{
+                        width: 40,
+                        height: 40,
+                        border: '3px solid #f3f4f6',
+                        borderTop: '3px solid #2563eb',
+                        borderRadius: '50%',
+                        animation: 'spin 1s linear infinite',
+                        margin: '0 auto 16px'
+                    }} />
+                    <p>Cargando perfil...</p>
+                </Card>
+            </div>
+        );
+    }
 
     return (
-        <div style={{ padding: 20, maxWidth: 800, margin: '0 auto' }}>
-            {/* Header */}
-            <Card style={{ textAlign: 'center', background: 'var(--primary)', color: '#fff' }}>
-                <div style={{ fontSize: '3rem' }}>👤</div>
-                <h1>{profile.nombre || user?.email?.split('@')[0] || 'Usuario'}</h1>
-                <p style={{ opacity: 0.9 }}>{user?.email}</p>
-            </Card>
+        <div style={{ maxWidth: 600, margin: '0 auto', padding: 20 }}>
+            <h1 style={{ marginBottom: 24 }}>Mi Perfil</h1>
 
-            {/* Tabs */}
-            <div style={{ display: 'flex', borderBottom: '2px solid var(--border)', margin: '30px 0' }}>
-                {[
-                    { key: 'info', label: 'Información Personal' },
-                    { key: 'purchases', label: `Compras (${purchases.length})` }
-                ].map(tab => (
-                    <Button
-                        key={tab.key}
-                        variant={activeTab === tab.key ? 'secondary' : 'ghost'}
-                        onClick={() => setActiveTab(tab.key)}
-                    >
-                        {tab.label}
-                    </Button>
-                ))}
-            </div>
-
-            {activeTab === 'info' && (
-                <Card>
-                    <h2>Información Personal</h2>
-                    <form onSubmit={handleUpdateProfile} style={{ display: 'grid', gap: 20 }}>
-                        <input value={profile.nombre} onChange={e => setProfile({ ...profile, nombre: e.target.value })} placeholder="Nombre completo" />
-                        <input value={profile.telefono} onChange={e => setProfile({ ...profile, telefono: e.target.value })} placeholder="+598 99 123 456" />
-                        <textarea rows={4} value={profile.bio} onChange={e => setProfile({ ...profile, bio: e.target.value })} placeholder="Contanos sobre ti…" />
-                        <Button type="submit" disabled={saving} variant="primary">
-                            {saving ? 'Guardando…' : 'Actualizar Perfil'}
-                        </Button>
-                    </form>
-                    {message && <p style={{ marginTop: 10, color: message.includes('Error') ? 'crimson' : 'green' }}>{message}</p>}
+            {error && (
+                <Card style={{
+                    background: '#fef2f2',
+                    border: '1px solid #fecaca',
+                    color: '#dc2626',
+                    padding: 16,
+                    marginBottom: 20
+                }}>
+                    {error}
                 </Card>
             )}
 
-            {activeTab === 'purchases' && (
-                <Card>
-                    <h2>Mis Compras</h2>
-                    {purchases.length === 0 ? (
-                        <p style={{ textAlign: 'center', color: 'var(--muted)' }}>Aún no has comprado cursos</p>
-                    ) : (
-                        purchases.map(p => (
-                            <Card key={p.id} style={{ display: 'flex', justifyContent: 'space-between' }}>
-                                <div>
-                                    <h3>{p.profesor_curso?.titulo || 'Curso'}</h3>
-                                    <p>👨‍🏫 {p.profesor_curso?.usuario?.nombre} • 📚 {p.profesor_curso?.materia?.nombre}</p>
-                                    <Chip tone="primary">${p.monto}</Chip>
-                                </div>
-                                <Button variant="secondary">Ver Curso</Button>
-                            </Card>
-                        ))
-                    )}
+            {profile ? (
+                <Card style={{ padding: 24 }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 20 }}>
+                        <div>
+                            <h2 style={{ margin: '0 0 8px 0' }}>{profile.nombre}</h2>
+                            <p style={{ color: '#6b7280', margin: '0 0 8px 0' }}>{profile.correo}</p>
+                            {profile.username && (
+                                <p style={{ color: '#6b7280', margin: 0 }}>@{profile.username}</p>
+                            )}
+                        </div>
+                        <Chip tone="green">{profile.creditos || 0} créditos</Chip>
+                    </div>
+
+                    <div style={{ display: 'grid', gap: 12 }}>
+                        <div>
+                            <strong>Email:</strong> {profile.correo}
+                        </div>
+                        <div>
+                            <strong>Nombre:</strong> {profile.nombre}
+                        </div>
+                        {profile.username && (
+                            <div>
+                                <strong>Username:</strong> @{profile.username}
+                            </div>
+                        )}
+                        {profile.fecha_creado && (
+                            <div>
+                                <strong>Miembro desde:</strong> {new Date(profile.fecha_creado).toLocaleDateString()}
+                            </div>
+                        )}
+                    </div>
+                </Card>
+            ) : (
+                <Card style={{ padding: 40, textAlign: 'center' }}>
+                    <div style={{ fontSize: 48, marginBottom: 16 }}>👤</div>
+                    <h3 style={{ margin: '0 0 12px 0' }}>Perfil no encontrado</h3>
+                    <p style={{ color: '#6b7280', margin: '0 0 24px 0' }}>
+                        Tu cuenta de autenticación existe, pero no tienes un perfil en la base de datos.
+                    </p>
+                    <Button
+                        variant="primary"
+                        onClick={createProfile}
+                        disabled={isCreating}
+                    >
+                        {isCreating ? 'Creando perfil...' : 'Crear mi perfil'}
+                    </Button>
                 </Card>
             )}
         </div>
-    )
+    );
 }

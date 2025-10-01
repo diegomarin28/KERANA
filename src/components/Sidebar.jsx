@@ -68,7 +68,7 @@ export default function Sidebar({
                     left: 0,
                     height: "100dvh",
                     width: "min(88vw, 360px)",
-                    background: "#0b1e3a",
+                    background: "#13346b",
                     color: "#fff",
                     boxShadow: "0 10px 30px rgba(0,0,0,.35)",
                     transform: open ? "translateX(0)" : "translateX(-110%)",
@@ -92,6 +92,7 @@ export default function Sidebar({
                     </button>
                 </div>
 
+                {/* Sección de Perfil arriba del todo */}
                 <div style={profileSectionStyle}>
                     <div
                         onClick={() => go("/profile")}
@@ -126,24 +127,41 @@ export default function Sidebar({
                 </div>
 
                 <nav style={navStyle}>
+                    <Group title="Mis Recursos" />
+                    <MenuLink icon="📚" label="Comprados" onClick={() => go("/purchased")} />
+                    <MenuLink icon="⭐" label="Favoritos" onClick={() => go("/favorites")} />
+                    <MenuLink icon="📝" label="Mis Apuntes" onClick={() => go("/my_papers")} />
+
                     <Group title="Explorar" />
-                    <MenuLink label="Asignaturas" onClick={() => go("/subjects")} />
-                    <MenuLink label="Profesores" onClick={() => go("/professors")} />
-                    <MenuLink label="Mentores" onClick={() => go("/mentors")} />
-                    <MenuLink label="Apuntes" onClick={() => go("/notes")} />
+                    <MenuLink icon="📖" label="Asignaturas" onClick={() => go("/subjects")} />
+                    <MenuLink icon="👨‍🏫" label="Profesores" onClick={() => go("/professors")} />
+                    <MenuLink icon="💡" label="Mentores" onClick={() => go("/mentors")} />
+                    <MenuLink icon="📄" label="Apuntes" onClick={() => go("/notes")} />
 
                     <Group title="Cuenta" />
                     {user ? (
                         <>
-                            <MenuLink label="Mi Perfil" onClick={() => go("/profile")} />
-                            <MenuLink label="Ajustes" onClick={() => go("/settings")} />
-                            <MenuLink label="Favoritos" onClick={() => go("/favorites")} />
-                            <DangerButton label="Cerrar sesión" onClick={() => { onLogout?.(); onClose?.(); }} />
+                            <MenuLink icon="👤" label="Mi Perfil" onClick={() => go("/profile")} />
+                            <MenuLink icon="⚙️" label="Ajustes" onClick={() => go("/settings")} />
                         </>
                     ) : (
                         <>
                             <PrimaryButton label="Iniciar sesión" onClick={() => go("/signin")} />
                             <SecondaryButton label="Crear cuenta" onClick={() => go("/signup")} />
+                        </>
+                    )}
+
+                    <Group title="Ayuda" />
+                    <MenuLink icon="📞" label="Contacto" onClick={() => go("/contact")} />
+                    <MenuLink icon="❓" label="Centro de ayuda" onClick={() => go("/help")} />
+                    <MenuLink icon="📄" label="Términos y condiciones" onClick={() => go("/terms")} />
+                    <MenuLink icon="🔒" label="Política de privacidad" onClick={() => go("/privacy")} />
+
+                    {/* Cerrar sesión al final - MÁS ANGOSTO Y SIN EMOJI */}
+                    {user && (
+                        <>
+                            <div style={{ marginTop: 20 }} />
+                            <SmallDangerButton label="Cerrar sesión" onClick={() => { onLogout?.(); onClose?.(); }} />
                         </>
                     )}
                 </nav>
@@ -174,8 +192,9 @@ const closeButtonStyle = {
 };
 
 const profileSectionStyle = {
-    padding: 14,
-    borderBottom: "1px solid rgba(255,255,255,.08)"
+    padding: "16px",
+    borderBottom: "1px solid rgba(255,255,255,.12)",
+    background: "rgba(255,255,255,.03)"
 };
 
 const profileContainerStyle = {
@@ -183,7 +202,7 @@ const profileContainerStyle = {
     width: "100%",
     display: "grid",
     gridTemplateColumns: "48px 1fr",
-    gap: 10,
+    gap: 12,
     alignItems: "center",
     cursor: "pointer",
 };
@@ -213,26 +232,26 @@ const usernameStyle = {
     fontSize: 16,
     whiteSpace: "nowrap",
     textOverflow: "ellipsis",
-    overflow: "hidden"
+    overflow: "hidden",
+    marginBottom: 4
 };
 
 const statsContainerStyle = {
     display: "flex",
-    gap: 10,
-    marginTop: 6,
+    gap: 12,
     fontSize: 12,
     opacity: .9
 };
 
 const navStyle = {
-    padding: 12,
+    padding: 16,
     overflowY: "auto",
     display: "grid",
-    gap: 14
+    gap: 4
 };
 
 const footerStyle = {
-    padding: 12,
+    padding: 16,
     borderTop: "1px solid rgba(255,255,255,.08)",
     display: "flex",
     gap: 8,
@@ -242,18 +261,19 @@ const footerStyle = {
 function Group({ title }) {
     return (
         <div style={{
-            margin: "6px 6px 0",
-            fontSize: 12,
-            letterSpacing: .3,
+            margin: "16px 0 8px 0",
+            fontSize: 11,
+            letterSpacing: .5,
             textTransform: "uppercase",
-            opacity: .65
+            opacity: .6,
+            fontWeight: 600
         }}>
             {title}
         </div>
     );
 }
 
-function MenuLink({ label, onClick }) {
+function MenuLink({ icon, label, onClick }) {
     return (
         <button
             type="button"
@@ -262,13 +282,8 @@ function MenuLink({ label, onClick }) {
             onMouseEnter={(e) => e.currentTarget.style.background = "rgba(255,255,255,.08)"}
             onMouseLeave={(e) => e.currentTarget.style.background = "transparent"}
         >
-            <span style={{
-                width: 8,
-                height: 8,
-                borderRadius: 9999,
-                background: "rgba(255,255,255,.45)"
-            }} />
-            <span style={{ fontWeight: 600 }}>{label}</span>
+            <span style={{ fontSize: 16, width: 20, textAlign: 'center' }}>{icon}</span>
+            <span style={{ fontWeight: 500, fontSize: 14, flex: 1, textAlign: 'left' }}>{label}</span>
         </button>
     );
 }
@@ -277,9 +292,9 @@ const menuLinkStyle = {
     all: "unset",
     display: "flex",
     alignItems: "center",
-    gap: 10,
-    padding: "10px 12px",
-    borderRadius: 10,
+    gap: 12,
+    padding: "12px 8px",
+    borderRadius: 8,
     cursor: "pointer",
     color: "#fff",
     width: "100%",
@@ -303,14 +318,15 @@ function PrimaryButton({ label, onClick }) {
 const primaryButtonStyle = {
     width: "100%",
     height: 42,
-    borderRadius: 9999,
-    border: "1px solid rgba(255,255,255,.2)",
+    borderRadius: 8,
+    border: "none",
     background: "#2563eb",
     color: "#fff",
-    fontWeight: 700,
-    margin: "6px 0",
+    fontWeight: 600,
+    margin: "8px 0",
     cursor: "pointer",
     transition: "all 0.2s ease",
+    fontSize: 14,
 };
 
 function SecondaryButton({ label, onClick }) {
@@ -330,41 +346,47 @@ function SecondaryButton({ label, onClick }) {
 const secondaryButtonStyle = {
     width: "100%",
     height: 42,
-    borderRadius: 9999,
+    borderRadius: 8,
     border: "1px solid rgba(255,255,255,.25)",
     background: "rgba(255,255,255,.08)",
     color: "#fff",
-    fontWeight: 700,
-    margin: "6px 0",
+    fontWeight: 600,
+    margin: "8px 0",
     cursor: "pointer",
     transition: "all 0.2s ease",
+    fontSize: 14,
 };
 
-function DangerButton({ label, onClick }) {
+// BOTÓN DE CERRAR SESIÓN MÁS ANGOSTO Y SIN EMOJI
+function SmallDangerButton({ label, onClick }) {
     return (
         <button
             type="button"
             onClick={onClick}
-            style={dangerButtonStyle}
+            style={smallDangerButtonStyle}
             onMouseEnter={(e) => e.currentTarget.style.background = "rgba(239,68,68,.15)"}
             onMouseLeave={(e) => e.currentTarget.style.background = "rgba(239,68,68,.1)"}
         >
-            {label}
+            <span style={{ fontWeight: 500, fontSize: 13, textAlign: 'center', width: '100%' }}>{label}</span>
         </button>
     );
 }
 
-const dangerButtonStyle = {
+const smallDangerButtonStyle = {
+    all: "unset",
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "",
     width: "100%",
-    height: 42,
-    borderRadius: 9999,
+    height: 30, // Más angosto
+    borderRadius: 6,
     border: "1px solid rgba(239,68,68,.3)",
     background: "rgba(239,68,68,.1)",
     color: "#fecaca",
-    fontWeight: 700,
-    margin: "6px 0",
+    fontWeight: 500,
     cursor: "pointer",
     transition: "all 0.2s ease",
+    fontSize: 13,
 };
 
 function StatLink({ label, value, onClick }) {
@@ -378,8 +400,8 @@ function StatLink({ label, value, onClick }) {
             onMouseEnter={(e) => e.currentTarget.style.background = "rgba(255,255,255,.08)"}
             onMouseLeave={(e) => e.currentTarget.style.background = "transparent"}
         >
-            <strong style={{ fontWeight: 800 }}>{value}</strong>
-            <span style={{ opacity: .85 }}>{label}</span>
+            <strong style={{ fontWeight: 800, fontSize: 12 }}>{value}</strong>
+            <span style={{ opacity: .85, fontSize: 11 }}>{label}</span>
         </div>
     );
 }
@@ -387,12 +409,14 @@ function StatLink({ label, value, onClick }) {
 const statLinkStyle = {
     all: "unset",
     display: "inline-flex",
+    flexDirection: "column",
     alignItems: "center",
-    gap: 6,
+    gap: 2,
     cursor: "pointer",
-    padding: "4px 6px",
-    borderRadius: 8,
+    padding: "6px 8px",
+    borderRadius: 6,
     transition: "background 0.2s ease",
+    minWidth: 50,
 };
 
 function Badge({ children }) {
@@ -406,11 +430,11 @@ function Badge({ children }) {
 const badgeStyle = {
     display: "inline-flex",
     alignItems: "center",
-    height: 28,
+    height: 26,
     padding: "0 10px",
-    borderRadius: 9999,
+    borderRadius: 6,
     background: "rgba(255,255,255,.08)",
     border: "1px solid rgba(255,255,255,.18)",
-    fontSize: 12,
+    fontSize: 11,
     color: "#fff",
 };
