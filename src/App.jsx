@@ -4,6 +4,7 @@ import { lazy, Suspense, useEffect } from "react";
 import Header from "./components/Header.jsx";
 import Home from "./pages/Home.jsx";
 import AuthGuard from "./components/AuthGuard";
+import Equipo from "./pages/Equipo";
 
 // Componentes lazy
 const HelpCenter = lazy(() => import("./pages/HelpCenter"));
@@ -110,6 +111,7 @@ export default function App() {
                             <MyPapers />
                         </AuthGuard>
                     } />
+                    <Route path="/equipo" element={<Equipo />} />
 
                     {/* Rutas de Exploración */}
                     <Route path="/subjects" element={<Subjects />} />
