@@ -162,7 +162,7 @@ export default function Home() {
                     >
                         <FooterCol
                             title="Sobre nosotros"
-                            items={["Misión", "Equipo", "Cómo funciona Kerana"]}
+                            items={["Misión Visión", "Equipo", "Cómo funciona Kerana"]}
                         />
                         <FooterCol title="Contacto" items={["hola@kerana.app", "Soporte", "Prensa"]} />
                         <FooterCol
@@ -201,7 +201,13 @@ function FooterCol({ title, items }) {
                 {items.map((t) => (
                     <li key={t}>
                         <Link
-                            to={t === "Equipo" ? "/equipo" : "#"}
+                            to={
+                                t === "Equipo"
+                                    ? "/equipo"
+                                    : t === "Misión Visión"
+                                        ? "/mision-vision"
+                                        : "#"
+                            }
                             style={{ color: "rgba(255,255,255,.9)" }}
                         >
                             {t}

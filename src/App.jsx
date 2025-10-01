@@ -18,6 +18,7 @@ const Upload = lazy(() => import("./pages/Upload"));
 const MentorApply = lazy(() => import("./pages/MentorApply"));
 const UserDashboard = lazy(() => import("./components/UserDashboard"));
 const CourseSearch = lazy(() => import("./components/CourseSearch"));
+const MisionVision = lazy(() => import("./pages/MisionVision"));
 
 // Componentes directos (sin lazy para evitar problemas)
 import AuthConfirm from './pages/AuthConfirm';
@@ -94,6 +95,7 @@ export default function App() {
                             <UserDashboard />
                         </AuthGuard>
                     } />
+                    <Route path="/mision-vision" element={<MisionVision />} />
 
                     {/* Rutas de Recursos del Usuario - PROTEGIDAS */}
                     <Route path="/purchased" element={
