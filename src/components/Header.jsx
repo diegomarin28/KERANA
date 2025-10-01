@@ -177,7 +177,6 @@ export default function Header() {
 
             keysToRemove.forEach(key => {
                 localStorage.removeItem(key);
-                console.log('🗑️ Removed:', key);
             });
 
             // 2. Sign out de Supabase
@@ -190,16 +189,19 @@ export default function Header() {
             setAuthOpen(false);
             setReseniaOpen(false);
 
-            // 4. Redirigir y forzar recarga limpia
-            window.location.href = "/";
+            // 4. Navegar a home usando React Router (NO window.location)
+            navigate('/');
 
         } catch (error) {
             console.warn("[auth] signOut error:", error);
-            // Fallback: recarga forzada
-            window.location.href = "/";
+
+            // Fallback: limpiar estado y navegar
+            setUser(null);
+            setUserProfile(null);
+            setMenuOpen(false);
+            navigate('/');
         }
     };
-
     const displayName =
         userProfile?.nombre ||
         userProfile?.username ||
@@ -342,7 +344,7 @@ export default function Header() {
                     {/* Centro: acciones */}
                     <nav style={{ display: "flex", alignItems: "center", gap: 10, justifyContent: "center" }}>
                         <PillLink to="/upload">Subir Apuntes</PillLink>
-                        <PillLink to="/about">¡Quiero ser mentor!</PillLink>
+                        <PillLink to="/mentores/postular">¡Quiero ser mentor!</PillLink>
                         <PillButton onClick={handleReseniaClick}>¡Hacé tu reseña!</PillButton>
                     </nav>
 

@@ -1,4 +1,3 @@
-
 import { useEffect, useState } from 'react';
 import { supabase } from '../supabase';
 import AuthModal from './AuthModal';
@@ -56,18 +55,23 @@ export default function AuthGuard({ children, requireAuth = false }) {
         return () => subscription.unsubscribe();
     }, []);
 
-    // Mostrar loading mientras verifica
+    // Mostrar loading mínimo durante verificación
     if (loading) {
         return (
             <div style={{
                 display: 'flex',
                 justifyContent: 'center',
                 alignItems: 'center',
-                height: '50vh',
-                fontSize: '18px',
-                color: '#64748b'
+                minHeight: '200px'
             }}>
-                Cargando...
+                <div style={{
+                    width: 24,
+                    height: 24,
+                    border: "2px solid #f3f4f6",
+                    borderTop: "2px solid #2563eb",
+                    borderRadius: "50%",
+                    animation: "spin 0.8s linear infinite"
+                }} />
             </div>
         );
     }

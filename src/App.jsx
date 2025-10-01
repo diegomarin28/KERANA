@@ -19,7 +19,7 @@ const MentorApply = lazy(() => import("./pages/MentorApply"));
 const UserDashboard = lazy(() => import("./components/UserDashboard"));
 const CourseSearch = lazy(() => import("./components/CourseSearch"));
 const MisionVision = lazy(() => import("./pages/MisionVision"));
-
+const MyMentorships = lazy(() => import("./pages/MyMentorships")); 
 // Componentes directos (sin lazy para evitar problemas)
 import AuthConfirm from './pages/AuthConfirm';
 import Purchased from './pages/Purchased';
@@ -111,6 +111,11 @@ export default function App() {
                     <Route path="/my_papers" element={ // Cambié la ruta
                         <AuthGuard requireAuth={true}>
                             <MyPapers />
+                        </AuthGuard>
+                    } />
+                    <Route path="/my_mentorships" element={
+                        <AuthGuard requireAuth={true}>
+                            <MyMentorships />
                         </AuthGuard>
                     } />
                     <Route path="/equipo" element={<Equipo />} />
