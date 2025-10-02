@@ -93,14 +93,19 @@ export default function Header() {
                 return;
             }
 
-            if (data) setUserProfile(data);
-            const { data: mentorData } = await supabase
-                .from('mentor')
-                .select('id_mentor, estrellas, contacto')
-                .eq('id_usuario', data.id_usuario)
-                .maybeSingle();
 
-            setUserProfile({ ...data, isMentor: !!mentorData, mentorInfo: mentorData });
+            if (data) {
+                setUserProfile(data);
+
+                // ✅ SOLO buscar datos de mentor si tenemos data.id_usuario
+                const { data: mentorData } = await supabase
+                    .from('mentor')
+                    .select('id_mentor, estrellas, contacto')
+                    .eq('id_usuario', data.id_usuario)  // ← Ahora data existe
+                    .maybeSingle();
+
+                setUserProfile({ ...data, isMentor: !!mentorData, mentorInfo: mentorData });
+            }
         } catch (e) {
             console.warn("[perfil] fetchUserProfile error:", e);
         }
@@ -351,8 +356,9 @@ export default function Header() {
                     {/* Centro: acciones */}
                     <nav style={{ display: "flex", alignItems: "center", gap: 10, justifyContent: "center" }}>
                         <PillLink to="/upload">Subir Apuntes</PillLink>
-                        <PillLink onClick={() => navigate("/apply-mentor")}>
-                            ¡Quiero ser Mentor!</PillLink>
+                        <PillLink to="/mentores/postular">
+                            ¡Quiero ser Mentor!
+                        </PillLink>
                         <PillButton onClick={handleReseniaClick}>¡Hacé tu reseña!</PillButton>
                     </nav>
 

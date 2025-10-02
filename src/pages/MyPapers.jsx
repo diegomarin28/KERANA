@@ -20,7 +20,6 @@ export default function MyPapers() {
             setLoading(true);
             setError(null);
 
-            // Obtener el usuario actual
             const { data: { user }, error: userError } = await supabase.auth.getUser();
             if (userError) throw userError;
 
@@ -29,77 +28,37 @@ export default function MyPapers() {
                 return;
             }
 
-            console.log("Usuario ID:", user.id);
-
-            // Primero intentemos obtener el ID de usuario numérico
+            // Obtener el ID de usuario numérico
             const { data: usuarioData, error: usuarioError } = await supabase
                 .from('usuario')
                 .select('id_usuario')
                 .eq('correo', user.email)
                 .maybeSingle();
 
-            let userId = user.id;
-
-            // Si tenemos el ID numérico, usarlo
-            if (usuarioData?.id_usuario) {
-                userId = usuarioData.id_usuario;
+            if (!usuarioData) {
+                setError("No se encontró tu perfil de usuario");
+                return;
             }
 
-            console.log("Buscando apuntes para usuario:", userId);
+            console.log("Buscando apuntes para usuario ID:", usuarioData.id_usuario);
 
-            // Intentar diferentes consultas
-            let data = [];
-            let notesError = null;
-
-            // Intento 1: Con usuario_id numérico
-            const result1 = await supabase
+            // CONSULTA CORREGIDA - usar 'materia' (singular)
+            const { data, error: notesError } = await supabase
                 .from('apunte')
                 .select(`
-                    *,
-                    materias (nombre)
-                `)
-                .eq('usuario_id', userId)
+                *,
+                materia(id_materia, nombre_materia)  // ← CAMBIADO: 'materia' no 'materias'
+            `)
+                .eq('id_usuario', usuarioData.id_usuario)  // ← CORREGIDO: 'id_usuario' no 'usuario_id'
                 .order('created_at', { ascending: false });
 
-            if (result1.error) {
-                console.log("Error con usuario_id:", result1.error);
-
-                // Intento 2: Con id_usuario (numérico)
-                const result2 = await supabase
-                    .from('apunte')
-                    .select(`
-                        *,
-                        materias (nombre)
-                    `)
-                    .eq('id_usuario', usuarioData?.id_usuario)
-                    .order('created_at', { ascending: false });
-
-                if (result2.error) {
-                    console.log("Error con id_usuario:", result2.error);
-
-                    // Intento 3: Buscar todos los apuntes (para debug)
-                    const result3 = await supabase
-                        .from('apunte')
-                        .select('*')
-                        .limit(5);
-
-                    if (result3.error) {
-                        notesError = result3.error;
-                    } else {
-                        data = result3.data || [];
-                        console.log("Apuntes encontrados (todos):", data);
-                    }
-                } else {
-                    data = result2.data || [];
-                }
-            } else {
-                data = result1.data || [];
+            if (notesError) {
+                console.error("Error cargando apuntes:", notesError);
+                throw notesError;
             }
 
-            if (notesError) throw notesError;
-
             console.log("Apuntes cargados:", data);
-            setNotes(data);
+            setNotes(data || []);
 
         } catch (err) {
             console.error("Error loading notes:", err);
@@ -270,8 +229,8 @@ export default function MyPapers() {
                                         marginBottom: 12,
                                         flexWrap: "wrap"
                                     }}>
-                                        {note.materias?.nombre && (
-                                            <Chip tone="blue">{note.materias.nombre}</Chip>
+                                        {note.materia?.nombre_materia && (
+                                            <Chip tone="blue">{note.materia.nombre_materia}</Chip>
                                         )}
                                         <Chip tone="green">{note.creditos || 0} créditos</Chip>
                                         {note.tipo_archivo && (

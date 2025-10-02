@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { supabase } from '../supabase';
 import { Card } from '../components/ui/Card';
 import { Button } from '../components/ui/Button';
+import emailjs from '@emailjs/browser';
 
 export default function MentorApply() {
     const navigate = useNavigate();
@@ -164,12 +165,32 @@ export default function MentorApply() {
 
             if (insertError) throw insertError;
 
-            // ✅ ENVIAR NOTIFICACIÓN POR EMAIL
-            await mentorAPI.notifyNewApplication(
-                applicationData.id,
-                user.email,
-                selectedMateria.nombre_materia
-            );
+// ✅ ENVIAR EMAIL DE NOTIFICACIÓN
+            try {
+                await emailjs.send(
+                    "service_dan74a5",
+                    "template_e9obnfd",
+                    {
+                        application_id: applicationData.id,
+                        user_email: user.email,
+                        user_name: usuarioData.nombre || user.email,
+                        materia_nombre: selectedMateria.nombre_materia,
+                        calificacion: formData.calificacion,
+                        message: `Nueva aplicación de mentor:\n\n` +
+                            `Usuario: ${user.email}\n` +
+                            `Materia: ${selectedMateria.nombre_materia}\n` +
+                            `Calificación: ${formData.calificacion}\n\n` +
+                            `Revisa en Supabase: https://supabase.com/dashboard/project/cfmcvslstfryhapvsztu/editor`,
+                        to_email: "tu-email-admin@gmail.com", // 👈 TU EMAIL
+                        subject: "📚 Nueva aplicación de mentor - Kerana"
+                    },
+                    "DMO310micvFWXx-j4"
+                );
+                console.log('✅ Notificación enviada por email');
+            } catch (emailError) {
+                console.log('❌ Email falló pero aplicación se guardó:', emailError);
+                // No bloqueamos si el email falla
+            }
 
             alert('¡Postulación enviada con éxito! Te notificaremos cuando sea revisada.');
             navigate('/');
