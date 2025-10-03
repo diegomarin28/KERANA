@@ -21,15 +21,6 @@ export default function SearchBar() {
         return () => document.removeEventListener("pointerdown", onDocDown);
     }, []);
 
-    // Función para normalizar texto (quita tildes)
-    const normalizeText = (text) => {
-        return text
-            .toLowerCase()
-            .normalize('NFD')
-            .replace(/[\u0300-\u036f]/g, '');
-    };
-
-    // Búsqueda en tiempo real
     useEffect(() => {
         if (!q.trim()) {
             setSuggestions([]);
@@ -38,59 +29,64 @@ export default function SearchBar() {
 
         const searchSuggestions = async () => {
             setLoading(true);
-            const term = normalizeText(q.trim());
+            const term = q.trim();
 
             try {
-                const [materias, profesores, apuntes] = await Promise.all([
-                    // Materias
-                    supabase.rpc('buscar_materias_sin_tildes', { termino: q.trim() }),
-
-                    // Profesores - buscar normalizado
-                    supabase.rpc('buscar_profesores_sin_tildes', { termino: q.trim() }),
-
-                    // Apuntes
-                    supabase.rpc('buscar_apuntes_sin_tildes', { termino: q.trim() })
-                ]);
-
                 const results = [];
 
-                // Agregar materias
-                materias.data?.forEach(m => {
-                    results.push({
-                        type: 'materia',
-                        id: m.id_materia,
-                        text: m.nombre_materia,
-                        icon: '📖'
-                    });
-                });
+                const { data: materias, error: materiasError } = await supabase
+                    .rpc('buscar_materias_sin_tildes', { termino: term });
 
-                // Agregar profesores únicos
-                const seenProfs = new Set();
-                profesores.data?.forEach(p => {
-                    if (!seenProfs.has(p.id_profesor)) {
-                        seenProfs.add(p.id_profesor);
+                if (materiasError) {
+                    console.error('Error buscando materias:', materiasError);
+                } else if (materias) {
+                    materias.forEach(m => {
+                        results.push({
+                            type: 'materia',
+                            id: m.id_materia,
+                            text: m.nombre_materia,
+                            icon: '📖'
+                        });
+                    });
+                }
+
+                const { data: profesores, error: profesoresError } = await supabase
+                    .rpc('buscar_profesores_sin_tildes', { termino: term });
+
+                if (profesoresError) {
+                    console.error('Error buscando profesores:', profesoresError);
+                } else if (profesores) {
+                    profesores.forEach(p => {
                         results.push({
                             type: 'profesor',
                             id: p.id_profesor,
                             text: p.profesor_nombre,
                             icon: '👨‍🏫'
                         });
-                    }
-                });
-
-                // Agregar apuntes
-                apuntes.data?.forEach(a => {
-                    results.push({
-                        type: 'apunte',
-                        id: a.id_apunte,
-                        text: a.titulo,
-                        icon: '📝'
                     });
-                });
+                }
+
+                const { data: apuntes, error: apuntesError } = await supabase
+                    .rpc('buscar_apuntes_sin_tildes', { termino: term });
+
+                if (apuntesError) {
+                    console.error('Error buscando apuntes:', apuntesError);
+                } else if (apuntes) {
+                    apuntes.forEach(a => {
+                        results.push({
+                            type: 'apunte',
+                            id: a.id_apunte,
+                            text: a.titulo,
+                            icon: '📄'
+                        });
+                    });
+                }
 
                 setSuggestions(results);
+
             } catch (err) {
-                console.error('Error buscando sugerencias:', err);
+                console.error('Error general en búsqueda:', err);
+                setSuggestions([]);
             } finally {
                 setLoading(false);
             }
@@ -127,10 +123,10 @@ export default function SearchBar() {
 
     const goToSuggestion = (suggestion) => {
         saveRecent(suggestion.text);
+        setOpen(false);
 
-        // Navegar según el tipo
         if (suggestion.type === 'materia') {
-            window.location.href = `/subjects#${suggestion.id}`;
+            window.location.href = `/subjects/${suggestion.id}`;
         } else if (suggestion.type === 'profesor') {
             window.location.href = `/profesores/${suggestion.id}`;
         } else if (suggestion.type === 'apunte') {
@@ -140,6 +136,7 @@ export default function SearchBar() {
 
     const showRecent = !q.trim() && recent.length > 0;
     const showSuggestions = q.trim() && suggestions.length > 0;
+    const showNoResults = q.trim() && !loading && suggestions.length === 0;
 
     return (
         <div
@@ -150,7 +147,6 @@ export default function SearchBar() {
                 margin: "0 auto",
             }}
         >
-            {/* INPUT */}
             <form
                 onSubmit={onSearch}
                 style={{
@@ -162,7 +158,6 @@ export default function SearchBar() {
                     padding: 6,
                     boxShadow: "0 10px 24px rgba(0,0,0,.10)",
                     border: "1px solid #e5e7eb",
-                    borderBottom: open ? "1px solid #e5e7eb" : "1px solid #e5e7eb",
                 }}
             >
                 <input
@@ -195,8 +190,7 @@ export default function SearchBar() {
                 </button>
             </form>
 
-            {/* DROPDOWN */}
-            {open && (showRecent || showSuggestions) && (
+            {open && (showRecent || showSuggestions || showNoResults || loading) && (
                 <div
                     style={{
                         position: "absolute",
@@ -209,17 +203,17 @@ export default function SearchBar() {
                         borderRadius: "0 0 16px 16px",
                         boxShadow: "0 16px 32px rgba(0,0,0,.12)",
                         overflow: "hidden",
+                        maxHeight: "400px",
+                        overflowY: "auto"
                     }}
                 >
                     <ul style={{ listStyle: "none", margin: 0, padding: 0 }}>
-                        {/* SUGERENCIAS */}
                         {showSuggestions && suggestions.map((s, idx) => (
                             <li
                                 key={`${s.type}-${s.id}`}
                                 style={{
                                     borderBottom: idx < suggestions.length - 1 ? "1px solid #f3f4f6" : "none",
                                     transition: "all 0.2s ease",
-                                    position: "relative",
                                     cursor: "pointer"
                                 }}
                                 onMouseEnter={(e) => {
@@ -239,7 +233,7 @@ export default function SearchBar() {
                                     alignItems: "center",
                                     gap: 10,
                                     padding: "12px 14px",
-                                    textAlign: "left"
+                                    textAlign: "left",
                                 }}>
                                     <span style={{ fontSize: 18 }}>{s.icon}</span>
                                     <span style={{ flex: 1, fontSize: 15, color: "#111827" }}>
@@ -257,15 +251,12 @@ export default function SearchBar() {
                             </li>
                         ))}
 
-                        {/* RECIENTES */}
                         {showRecent && recent.map((r) => (
                             <li
                                 key={r}
                                 style={{
                                     borderBottom: "1px solid #f3f4f6",
                                     transition: "all 0.2s ease",
-                                    position: "relative",
-                                    cursor: "pointer"
                                 }}
                                 onMouseEnter={(e) => {
                                     e.currentTarget.style.background = "linear-gradient(90deg, rgba(37, 99, 235, 0.06) 0%, rgba(37, 99, 235, 0.04) 50%, rgba(37, 99, 235, 0.06) 100%)";
@@ -287,7 +278,6 @@ export default function SearchBar() {
                                     alignItems: "center",
                                     justifyContent: "space-between",
                                     gap: 10,
-                                    textAlign: "left",
                                     padding: "12px 14px",
                                 }}>
                                     <button
@@ -301,7 +291,6 @@ export default function SearchBar() {
                                             alignItems: "center",
                                             gap: 8,
                                             flex: "1 1 auto",
-                                            textAlign: "left",
                                             border: "none",
                                             background: "transparent",
                                             cursor: "pointer",
@@ -321,7 +310,6 @@ export default function SearchBar() {
                                                 height: 18,
                                                 color: "#9ca3af",
                                                 transition: "all 0.2s ease",
-                                                textAlign: "left"
                                             }}
                                         >
                                             <path
@@ -335,8 +323,10 @@ export default function SearchBar() {
 
                                     <button
                                         type="button"
-                                        onClick={() => removeRecent(r)}
-                                        onMouseDown={(e) => e.stopPropagation()}
+                                        onClick={(e) => {
+                                            e.stopPropagation();
+                                            removeRecent(r);
+                                        }}
                                         style={{
                                             border: "1px solid #e5e7eb",
                                             background: "#fff",
@@ -346,7 +336,6 @@ export default function SearchBar() {
                                             height: 28,
                                             cursor: "pointer",
                                             fontSize: 16,
-                                            textAlign: "left",
                                             transition: "all 0.2s ease",
                                         }}
                                         onMouseEnter={(e) => {
@@ -367,12 +356,23 @@ export default function SearchBar() {
 
                     {loading && (
                         <div style={{
-                            padding: 12,
-                            textAlign: "left",
+                            padding: 16,
+                            textAlign: "center",
                             color: '#9ca3af',
                             fontSize: 14
                         }}>
                             Buscando...
+                        </div>
+                    )}
+
+                    {showNoResults && (
+                        <div style={{
+                            padding: 16,
+                            textAlign: "center",
+                            color: '#9ca3af',
+                            fontSize: 14
+                        }}>
+                            No se encontraron resultados para "{q}"
                         </div>
                     )}
                 </div>

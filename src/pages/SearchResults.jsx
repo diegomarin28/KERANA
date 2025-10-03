@@ -37,6 +37,12 @@ export default function SearchResults() {
             setNotes(data?.apuntes ?? []);
             setProfessors(data?.profesores ?? []);
             setMentors(data?.mentores ?? []);
+            console.log('Resultados de búsqueda:', {
+                materias: data?.materias,
+                profesores: data?.profesores,
+                apuntes: data?.apuntes,
+                mentores: data?.mentores
+            });
         } catch (e) {
             console.error("Error buscando:", e);
             setSubjects([]);
@@ -46,6 +52,7 @@ export default function SearchResults() {
         } finally {
             setLoading(false);
         }
+
     };
 
 // Filtro por rating (★) donde tiene sentido Y eliminar duplicados

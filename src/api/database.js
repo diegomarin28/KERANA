@@ -100,45 +100,120 @@ export const subjectsAPI = {
     }
 }
 
+// En database.js - REEMPLAZA la sección de BÚSQUEDA GENERAL
+
 // ==========================================
-// 📚 BÚSQUEDA GENERAL
+// 🔍 BÚSQUEDA GENERAL
 // ==========================================
 
 async function searchProfessors(term) {
     const q = (term || "").trim();
     if (!q) return { data: [], error: null };
-    const { data, error } = await supabase.rpc("buscar_cursos", { termino: q });
-    return { data, error };
+
+    try {
+        console.log(`🔍 Buscando profesores para: "${q}"`);
+
+        // Usar la misma RPC que funciona en el SearchBar
+        const { data: profesores, error } = await supabase
+            .rpc('buscar_profesores_sin_tildes', { termino: q });
+
+        if (error) {
+            console.error('Error buscando profesores:', error);
+            return { data: [], error };
+        }
+
+        // Transformar los datos al formato que espera SearchResults
+        const transformed = (profesores || []).map(prof => ({
+            id: prof.id_profesor,
+            id_profesor: prof.id_profesor,
+            profesor_nombre: prof.profesor_nombre,
+            materia_nombre: '', // No tenemos esta info en la RPC
+            label: prof.profesor_nombre,
+            source: 'profesor',
+            rating_promedio: 0
+        }));
+
+        console.log(`✅ Profesores encontrados: ${transformed.length}`, transformed);
+        return { data: transformed, error: null };
+
+    } catch (error) {
+        console.error('Error crítico en searchProfessors:', error);
+        return { data: [], error };
+    }
 }
+
 
 async function searchSubjects(term) {
     const q = (term || "").trim();
     if (!q) return { data: [], error: null };
 
-    const { data, error } = await supabase.rpc("buscar_materias_fuzzy", { termino: q });
-    return { data, error };
+    const { data, error } = await supabase
+        .from('materia')
+        .select('id_materia, nombre_materia, semestre')
+        .ilike('nombre_materia', `%${q}%`)
+        .limit(50);
+
+    // Transformar al formato esperado
+    const transformed = (data || []).map(m => ({
+        id: m.id_materia,
+        id_materia: m.id_materia,
+        nombre_materia: m.nombre_materia,
+        semestre: m.semestre,
+        label: m.nombre_materia,
+        source: 'materia'
+    }));
+
+    return { data: transformed, error };
 }
 
 async function searchNotes(term) {
     const q = (term || "").trim();
-    let base = supabase
-        .from("apuntes_completos")
-        .select("id_apunte,autor_nombre,materia_nombre,estrellas,creditos")
+    if (!q) return { data: [], error: null };
+
+    const { data, error } = await supabase
+        .from('apunte')
+        .select('id_apunte, titulo, id_materia')
+        .ilike('titulo', `%${q}%`)
         .limit(50);
-    const { data, error } = q
-        ? await base.or(`autor_nombre.ilike.*${q}*,materia_nombre.ilike.*${q}*`)
-        : await base;
-    return { data, error };
+
+    const transformed = (data || []).map(a => ({
+        id: a.id_apunte,
+        id_apunte: a.id_apunte,
+        titulo: a.titulo,
+        estrellas: 4.0,
+        materia_nombre: '',
+        autor_nombre: ''
+    }));
+
+    return { data: transformed, error };
 }
 
 async function searchMentors(term) {
     const q = (term || "").trim();
-    let base = supabase
-        .from("mentores_con_stats")
-        .select("id_mentor,mentor_nombre,mentor_correo,rating_promedio,estrellas_mentor,contacto,total_calificaciones")
+    if (!q) return { data: [], error: null };
+
+    const { data, error } = await supabase
+        .from('mentor')
+        .select(`
+            id_mentor,
+            estrellas_mentor,
+            contacto,
+            usuario!inner(nombre, correo)
+        `)
+        .ilike('usuario.nombre', `%${q}%`)
         .limit(50);
-    const { data, error } = q ? await base.ilike("mentor_nombre", `*${q}*`) : await base;
-    return { data, error };
+
+    const transformed = (data || []).map(m => ({
+        id: m.id_mentor,
+        id_mentor: m.id_mentor,
+        mentor_nombre: m.usuario?.nombre || 'Mentor',
+        mentor_correo: m.usuario?.correo,
+        estrellas_mentor: m.estrellas_mentor,
+        rating_promedio: m.estrellas_mentor,
+        contacto: m.contacto
+    }));
+
+    return { data: transformed, error };
 }
 
 export const searchAPI = {
@@ -164,7 +239,6 @@ export const searchAPI = {
         };
     },
 };
-
 // ==========================================
 // 🎯 MENTORES Y POSTULACIONES
 // ==========================================

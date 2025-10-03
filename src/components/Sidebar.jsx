@@ -3,7 +3,7 @@ import { supabase } from "../supabase";
 import { useMentorStatus } from '../hooks/useMentorStatus';
 import AuthModal_SignIn from "../components/AuthModal_SignIn";
 
-export default function Sidebar({ open, onClose, isAuthenticated, user, onLogout, onGo }) {
+export default function Sidebar({ open, onClose, isAuthenticated, user, onLogout, onGo, onOpenAuth }) {
     const panelRef = useRef(null);
     const [authOpen, setAuthOpen] = useState(false);
 
@@ -196,6 +196,8 @@ export default function Sidebar({ open, onClose, isAuthenticated, user, onLogout
                     <MenuLink icon="📄" label="Términos y condiciones" onClick={() => go("/terms")} />
                     <MenuLink icon="🔒" label="Política de privacidad" onClick={() => go("/privacy")} />
 
+
+                    {/*CUENTAA*/}
                     <Group title="Cuenta" />
                     {isAuthenticated ? (
                         <>

@@ -1,4 +1,4 @@
-// Header.jsx - VERSIÓN ACTUALIZADA
+// Header.jsx - VERSIÓN CORREGIDA
 import { useEffect, useState, useRef } from "react";
 import { Link, useNavigate, useLocation } from "react-router-dom";
 import AuthModal_SignIn from "../components/AuthModal_SignIn.jsx";
@@ -18,6 +18,15 @@ export default function Header() {
     const navigate = useNavigate();
     const headerRef = useRef(null);
 
+    // Función unificada para abrir login
+    const openAuthModal = () => {
+        setAuthOpen(true);
+    };
+
+    // Función unificada para cerrar login
+    const closeAuthModal = () => {
+        setAuthOpen(false);
+    };
 
     useEffect(() => {
         let mounted = true;
@@ -48,7 +57,7 @@ export default function Header() {
             if (session?.user) {
                 setUser(session.user);
                 await loadUserProfile();
-                setAuthOpen(false);
+                closeAuthModal(); // Usar función unificada
                 setMenuOpen(false); // Cerrar sidebar al autenticar
             } else {
                 setUser(null);
@@ -100,12 +109,15 @@ export default function Header() {
     }, []);
 
     const handleReseniaClick = () => {
-        if (!user) setAuthOpen(true);
-        else setReseniaOpen(true);
+        if (!user) {
+            openAuthModal(); // Usar función unificada
+        } else {
+            setReseniaOpen(true);
+        }
     };
 
     const handleSignedIn = (u) => {
-        setAuthOpen(false);
+        closeAuthModal(); // Usar función unificada
         setMenuOpen(false); // ← Cerrar sidebar también
         if (u) {
             setUser(u);
@@ -121,7 +133,7 @@ export default function Header() {
             setUser(null);
             setUserProfile(null);
             setMenuOpen(false);
-            setAuthOpen(false);
+            closeAuthModal(); // Usar función unificada
             setReseniaOpen(false);
             navigate('/');
         } else {
@@ -233,7 +245,7 @@ export default function Header() {
         return (
             <button
                 type="button"
-                onClick={() => setAuthOpen(true)}
+                onClick={openAuthModal} // ← Usar función unificada
                 style={signBtn}
                 onMouseEnter={handleSignInMouseEnter}
                 onMouseLeave={handleSignInMouseLeave}
@@ -242,8 +254,6 @@ export default function Header() {
             </button>
         );
     }
-
-
 
     const signBtn = {
         height: 40, padding: "0 16px", borderRadius: 9999,
@@ -318,11 +328,12 @@ export default function Header() {
                     {/* Centro: acciones */}
                     <nav style={{ display: "flex", alignItems: "center", gap: 10, justifyContent: "center" }}>
                         <PillLink to="/upload">Subir Apuntes</PillLink>
-                        <PillLink to="/mentores/postular">
+                        <PillButton onClick={() => navigate("/mentores/postular")}>
                             ¡Quiero ser Mentor!
-                        </PillLink>
+                        </PillButton>
                         <PillButton onClick={handleReseniaClick}>¡Hacé tu reseña!</PillButton>
                     </nav>
+
 
                     {/* Derecha */}
                     <div>
@@ -370,7 +381,7 @@ export default function Header() {
             <Sidebar
                 open={menuOpen}
                 onClose={() => setMenuOpen(false)}
-                isAuthenticated={!!user} // ← ESTA ES LA CLAVE
+                isAuthenticated={!!user}
                 user={user ? {
                     name: displayName,
                     email: user.email,
@@ -381,10 +392,11 @@ export default function Header() {
                 } : null}
                 onLogout={handleLogout}
                 onGo={(path) => navigate(path)}
+                onOpenAuth={openAuthModal}
             />
             <AuthModal_SignIn
                 open={authOpen}
-                onClose={() => setAuthOpen(false)}
+                onClose={closeAuthModal} // ← Usar función unificada
                 onSignedIn={handleSignedIn}
             />
             <AuthModal_HacerResenia

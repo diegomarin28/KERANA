@@ -69,16 +69,24 @@ function AppRoutes() {
     const location = useLocation();
     const navigate = useNavigate();
 
-    console.log("📍 Ruta actual en AppRoutes:", location.pathname); //Sacar cuando funcione
+    console.log("📍 Ruta actual en AppRoutes:", location.pathname);
 
     const params = new URLSearchParams(location.search);
     const openAuth = params.get("auth") === "signin" || params.get("completeProfile") === "1";
+    const returnUrl = params.get("return") || "/";
 
     const closeAuth = () => {
         const newParams = new URLSearchParams(location.search);
         newParams.delete("auth");
         newParams.delete("completeProfile");
+        newParams.delete("return");
         navigate(`${location.pathname}${newParams.toString() ? `?${newParams.toString()}` : ""}`, { replace: true });
+    };
+
+    const handleSignedIn = () => {
+        closeAuth();
+        // Navegar a la URL original después del login exitoso
+        navigate(returnUrl);
     };
 
         return (
@@ -181,6 +189,10 @@ function AppRoutes() {
                         <Route path="/help" element={<HelpCenter/>}/>
                         <Route path="/terms" element={<Terms/>}/>
                         <Route path="/privacy" element={<Privacy/>}/>
+
+
+                        <Route path="/profesores/:id" element={<ProfessorDetail />} />
+
 
                         {/* Funcionalidades */}
                         <Route

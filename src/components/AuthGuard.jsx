@@ -1,125 +1,105 @@
-import { useEffect, useState } from 'react';
+// AuthGuard.jsx - VERSIÓN MEJORADA
+import { useEffect } from 'react';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { supabase } from '../supabase';
-import AuthModal from './AuthModal';
+import { useState } from 'react';
 
-export default function AuthGuard({ children, requireAuth = false }) {
+export default function AuthGuard({ children, requireAuth = true }) {
     const [user, setUser] = useState(null);
     const [loading, setLoading] = useState(true);
-    const [showAuthModal, setShowAuthModal] = useState(false);
+    const navigate = useNavigate();
+    const location = useLocation();
 
     useEffect(() => {
-        // Verificar sesión actual
-        const getSession = async () => {
-            const { data: { session } } = await supabase.auth.getSession();
-            setUser(session?.user || null);
-            setLoading(false);
-        };
+        let mounted = true;
 
-        getSession();
+        const checkAuth = async () => {
+            try {
+                const { data: { session } } = await supabase.auth.getSession();
 
-        // Escuchar cambios de autenticación
-        const { data: { subscription } } = supabase.auth.onAuthStateChange(
-            async (event, session) => {
-                setUser(session?.user || null);
+                if (!mounted) return;
+
+                if (session?.user) {
+                    setUser(session.user);
+                } else {
+                    setUser(null);
+                }
+
                 setLoading(false);
 
-                if (event === 'SIGNED_IN') {
-                    setShowAuthModal(false);
+                // Si requiere autenticación y no hay usuario, redirigir al home con modal
+                if (requireAuth && !session?.user) {
+                    // Guardar la ruta original para volver después del login
+                    const returnUrl = location.pathname + location.search;
+                    navigate(`/?auth=signin&return=${encodeURIComponent(returnUrl)}`, { replace: true });
+                }
+            } catch (error) {
+                console.error('Error checking auth:', error);
+                setLoading(false);
+            }
+        };
 
-                    // Crear/actualizar perfil automáticamente
-                    if (session.user) {
-                        try {
-                            const { error } = await supabase
-                                .from('usuario')
-                                .upsert({
-                                    correo: session.user.email,
-                                    nombre: session.user.user_metadata?.name || session.user.email.split('@')[0],
-                                    username: session.user.email.split('@')[0],
-                                    fecha_creado: new Date().toISOString(),
-                                    creditos: 0
-                                }, {
-                                    onConflict: 'correo'
-                                });
+        checkAuth();
 
-                            if (error && !error.message.includes('duplicate key')) {
-                                console.error('Error actualizando perfil:', error);
-                            }
-                        } catch (error) {
-                            console.error('Error en upsert:', error);
-                        }
-                    }
+        // Escuchar cambios de autenticación
+        const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+            if (!mounted) return;
+
+            if (session?.user) {
+                setUser(session.user);
+                setLoading(false);
+            } else {
+                setUser(null);
+                setLoading(false);
+
+                if (requireAuth) {
+                    const returnUrl = location.pathname + location.search;
+                    navigate(`/?auth=signin&return=${encodeURIComponent(returnUrl)}`, { replace: true });
                 }
             }
-        );
+        });
 
-        return () => subscription.unsubscribe();
-    }, []);
+        return () => {
+            mounted = false;
+            subscription?.unsubscribe();
+        };
+    }, [requireAuth, navigate, location]);
 
-    // Mostrar loading mínimo durante verificación
     if (loading) {
         return (
-            <div style={{
-                display: 'flex',
-                justifyContent: 'center',
-                alignItems: 'center',
-                minHeight: '200px'
-            }}>
-                <div style={{
-                    width: 24,
-                    height: 24,
-                    border: "2px solid #f3f4f6",
-                    borderTop: "2px solid #2563eb",
-                    borderRadius: "50%",
-                    animation: "spin 0.8s linear infinite"
-                }} />
+            <div style={{ display: "flex", justifyContent: "center", alignItems: "center", height: "50vh" }}>
+                <div
+                    style={{
+                        width: 40,
+                        height: 40,
+                        border: "3px solid #f3f4f6",
+                        borderTop: "3px solid #2563eb",
+                        borderRadius: "50%",
+                        animation: "spin 1s linear infinite",
+                    }}
+                />
             </div>
         );
     }
 
-    // Si requiere autenticación y no hay usuario, mostrar modal
-    if (requireAuth && !user) {
-        return (
-            <>
-                <div style={{
-                    display: 'flex',
-                    justifyContent: 'center',
-                    alignItems: 'center',
-                    height: '60vh',
-                    flexDirection: 'column',
-                    gap: '20px',
-                    textAlign: 'center',
-                    padding: '20px'
-                }}>
-                    <div style={{ fontSize: '48px' }}>🔒</div>
-                    <h2 style={{ margin: 0, color: '#0b1e3a' }}>Acceso Requerido</h2>
-                    <p style={{ color: '#64748b', maxWidth: '400px' }}>
-                        Necesitás iniciar sesión para acceder a esta página.
-                    </p>
-                    <button
-                        onClick={() => setShowAuthModal(true)}
-                        style={{
-                            padding: '12px 24px',
-                            background: '#2563eb',
-                            color: 'white',
-                            border: 'none',
-                            borderRadius: '8px',
-                            fontSize: '16px',
-                            fontWeight: '600',
-                            cursor: 'pointer'
-                        }}
-                    >
-                        Iniciar Sesión
-                    </button>
-                </div>
-
-                <AuthModal
-                    open={showAuthModal}
-                    onClose={() => setShowAuthModal(false)}
-                    onSuccess={() => setShowAuthModal(false)}
-                />
-            </>
-        );
+    // Si no requiere autenticación o hay usuario, mostrar children
+    if (!requireAuth || user) {
+        return children;
     }
 
-    return children;
+    // Si requiere auth pero no hay usuario, mostrar loading (será redirigido)
+    return (
+        <div style={{ display: "flex", justifyContent: "center", alignItems: "center", height: "50vh" }}>
+            <div
+                style={{
+                    width: 40,
+                    height: 40,
+                    border: "3px solid #f3f4f6",
+                    borderTop: "3px solid #2563eb",
+                    borderRadius: "50%",
+                    animation: "spin 1s linear infinite",
+                }}
+            />
+        </div>
+    );
 }
