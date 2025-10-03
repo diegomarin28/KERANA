@@ -1,19 +1,28 @@
-// Sidebar.jsx
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import { supabase } from "../supabase";
-import { useMentorStatus } from '../hooks/useMentorStatus'
+import { useMentorStatus } from '../hooks/useMentorStatus';
+import AuthModal_SignIn from "../components/AuthModal_SignIn";
 
-
-export default function Sidebar({ open, onClose, user, onLogout, onGo }) {
+export default function Sidebar({ open, onClose, isAuthenticated, user, onLogout, onGo }) {
     const panelRef = useRef(null);
+    const [authOpen, setAuthOpen] = useState(false);
 
     // autoCheck: false → No verificar automáticamente al montar
     const { isMentor, loading: checkingMentor, refetch } = useMentorStatus(false);
 
+    // Efecto para bloquear el scroll del body cuando el sidebar está abierto
     useEffect(() => {
         if (open) {
+            document.body.style.overflow = "hidden";
             refetch();  // ← Solo verificar cuando se abre el sidebar
+        } else {
+            document.body.style.overflow = "unset";
         }
+
+        // Cleanup al desmontar
+        return () => {
+            document.body.style.overflow = "unset";
+        };
     }, [open, refetch]);
 
     useEffect(() => {
@@ -31,8 +40,6 @@ export default function Sidebar({ open, onClose, user, onLogout, onGo }) {
         };
     }, [open, onClose]);
 
-
-
     const username = user?.name || user?.username || "Invitado";
     const letter = (username[0] || "U").toUpperCase();
     const credits = user?.credits ?? 0;
@@ -42,6 +49,23 @@ export default function Sidebar({ open, onClose, user, onLogout, onGo }) {
     const go = (path) => {
         onGo?.(path);
         onClose?.();
+    };
+
+    // Función para abrir el modal de autenticación (cierra el sidebar)
+    const openAuthModal = () => {
+        onClose?.(); // Cerrar el sidebar primero
+        setAuthOpen(true); // Abrir el modal
+    };
+
+    // Función para cerrar el modal de autenticación
+    const closeAuthModal = () => {
+        setAuthOpen(false);
+    };
+
+    // Función cuando se inicia sesión exitosamente
+    const handleSignedIn = () => {
+        setAuthOpen(false);
+        // El sidebar ya está cerrado, no necesitamos cerrarlo de nuevo
     };
 
     return (
@@ -78,6 +102,7 @@ export default function Sidebar({ open, onClose, user, onLogout, onGo }) {
                     zIndex: 1000,
                     display: "grid",
                     gridTemplateRows: "auto auto 1fr auto",
+                    overflow: "hidden", // Prevenir scroll interno
                 }}
             >
                 <div style={headerStyle}>
@@ -165,26 +190,26 @@ export default function Sidebar({ open, onClose, user, onLogout, onGo }) {
                     <MenuLink icon="💡" label="Mentores" onClick={() => go("/mentors")} />
                     <MenuLink icon="📄" label="Apuntes" onClick={() => go("/notes")} />
 
-                    <Group title="Cuenta" />
-                    {user ? (
-                        <>
-                            <MenuLink icon="👤" label="Mi Perfil" onClick={() => go("/profile")} />
-                            <MenuLink icon="⚙️" label="Ajustes" onClick={() => go("/settings")} />
-                        </>
-                    ) : (
-                        <>
-                            <PrimaryButton label="Iniciar sesión" onClick={() => go("/signin")} />
-                            <SecondaryButton label="Crear cuenta" onClick={() => go("/signup")} />
-                        </>
-                    )}
-
                     <Group title="Ayuda" />
                     <MenuLink icon="📞" label="Contacto" onClick={() => go("/contact")} />
                     <MenuLink icon="❓" label="Centro de ayuda" onClick={() => go("/help")} />
                     <MenuLink icon="📄" label="Términos y condiciones" onClick={() => go("/terms")} />
                     <MenuLink icon="🔒" label="Política de privacidad" onClick={() => go("/privacy")} />
 
-                    {user && (
+                    <Group title="Cuenta" />
+                    {isAuthenticated ? (
+                        <>
+                            <MenuLink icon="👤" label="Mi Perfil" onClick={() => go("/profile")} />
+                            <MenuLink icon="⚙️" label="Ajustes" onClick={() => go("/settings")} />
+                        </>
+                    ) : (
+                        <>
+                            <PrimaryButton label="Iniciar sesión" onClick={openAuthModal} />
+                            <SecondaryButton label="Crear cuenta" onClick={openAuthModal} />
+                        </>
+                    )}
+
+                    {isAuthenticated && (
                         <>
                             <div style={{ marginTop: 20 }} />
                             <SmallDangerButton label="Cerrar sesión" onClick={() => { onLogout?.(); onClose?.(); }} />
@@ -197,11 +222,16 @@ export default function Sidebar({ open, onClose, user, onLogout, onGo }) {
                     <span style={{ marginLeft: "auto", opacity: .6, fontSize: 12 }}>v0.1</span>
                 </div>
             </aside>
+
+            <AuthModal_SignIn
+                open={authOpen}
+                onClose={closeAuthModal}
+                onSignedIn={handleSignedIn}
+            />
         </>
     );
 }
 
-// ... resto de los estilos y componentes igual que antes
 
 const headerStyle = {
     display: "flex",

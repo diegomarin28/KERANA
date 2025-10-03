@@ -1,11 +1,12 @@
-// Header.jsx (versión robusta)
+// Header.jsx - VERSIÓN ACTUALIZADA
 import { useEffect, useState, useRef } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { Link, useNavigate, useLocation } from "react-router-dom";
 import AuthModal_SignIn from "../components/AuthModal_SignIn.jsx";
 import AuthModal_HacerResenia from "../components/AuthModal_HacerReseña.jsx";
 import Sidebar from "../components/Sidebar.jsx";
 import HamburgerButton from "../components/HamburgerButton.jsx";
 import { supabase } from "../supabase";
+import { fetchUserProfile, cleanLogout } from "../utils/authHelpers";
 
 export default function Header() {
     const [menuOpen, setMenuOpen] = useState(false);
@@ -17,37 +18,38 @@ export default function Header() {
     const navigate = useNavigate();
     const headerRef = useRef(null);
 
-    // ---- AUTH SEGURA (no rompe la app si falla) ----
+
     useEffect(() => {
         let mounted = true;
 
-        const safe = (fn) => (...args) => {
-            try { return fn?.(...args); } catch { /* no-op */ }
-        };
+        const initializeAuth = async () => {
+            try {
+                const { data: { session }, error } = await supabase.auth.getSession();
+                if (error) {
+                    console.warn("[auth] getSession error:", error);
+                    return;
+                }
 
-        const initializeAuth = safe(async () => {
-            if (!supabase?.auth?.getSession) return; // guard si el cliente no está
-            const { data: { session }, error } = await supabase.auth.getSession();
-            if (error) {
-                console.warn("[auth] getSession error:", error);
-                return;
+                if (mounted && session?.user) {
+                    setUser(session.user);
+                    await loadUserProfile();
+                }
+            } catch (err) {
+                console.warn("[auth] initializeAuth error:", err);
             }
-            if (mounted && session?.user) {
-                setUser(session.user);
-                fetchUserProfile(session.user.id); // no esperes, no bloquees
-            }
-        });
+        };
 
         initializeAuth();
 
-        if (!supabase?.auth?.onAuthStateChange) return;
-
-        const { data: sub } = supabase.auth.onAuthStateChange((_event, session) => {
+        // Listener de cambios de autenticación
+        const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, session) => {
             if (!mounted) return;
+
             if (session?.user) {
                 setUser(session.user);
-                fetchUserProfile(session.user.id);
+                await loadUserProfile();
                 setAuthOpen(false);
+                setMenuOpen(false); // Cerrar sidebar al autenticar
             } else {
                 setUser(null);
                 setUserProfile(null);
@@ -57,94 +59,34 @@ export default function Header() {
 
         return () => {
             mounted = false;
-            try { sub?.subscription?.unsubscribe?.(); } catch {}
+            subscription?.unsubscribe();
         };
     }, []);
 
-
-    useEffect(() => {
-
-        for (let i = 0; i < localStorage.length; i++) {
-            const key = localStorage.key(i);
-            if (key.includes('supabase') || key.includes('auth')) {
-            }
+    // Cargar perfil usando la función unificada
+    const loadUserProfile = async () => {
+        if (!user) {
+            setUserProfile(null);
+            return;
         }
-    }, [user]);
 
-    const fetchUserProfile = async (userId) => {
-        try {
-            if (!supabase?.auth?.getUser) return;
-            const { data: { user: authUser }, error: authErr } = await supabase.auth.getUser();
-            if (authErr || !authUser) return;
-
-            const { data, error } = await supabase
-                .from("usuario")
-                .select("*")
-                .eq("correo", authUser.email)
-                .maybeSingle();
-
-            if (error) {
-                // PGRST116 = no rows; igual intentamos crear
-                if (error.code === "PGRST116" || error.message?.includes("No rows")) {
-                    await createUserProfile(userId);
-                } else {
-                    console.warn("[perfil] select error:", error);
-                }
-                return;
-            }
-
-
-            if (data) {
-                setUserProfile(data);
-
-                const { data: mentorData } = await supabase
-                    .from('mentor')
-                    .select('id_mentor, estrellas_mentor, contacto, descripcion')
-                    .eq('id_mentor', data.id_usuario)
-                    .maybeSingle();
-
-                setUserProfile({ ...data, isMentor: !!mentorData, mentorInfo: mentorData });
-            }
-        } catch (e) {
-            console.warn("[perfil] fetchUserProfile error:", e);
+        const { data, error } = await fetchUserProfile();
+        if (error) {
+            console.warn("[Header] Error cargando perfil:", error);
+            return;
+        }
+        if (data) {
+            setUserProfile(data);
         }
     };
 
-    const createUserProfile = async (userId) => {
-        try {
-            const { data: { user: authUser } } = await supabase.auth.getUser();
-            if (!authUser) return;
-
-            const username = (authUser.user_metadata?.name || authUser.email?.split("@")?.[0] || "usuario").slice(0, 32);
-            const { error } = await supabase
-                .from("usuario")
-                .insert([{
-                    correo: authUser.email,
-                    nombre: authUser.user_metadata?.name || username,
-                    username,
-                    fecha_creado: new Date().toISOString(),
-                    creditos: 0,
-                }]);
-
-            if (error) {
-                console.warn("[perfil] insert error:", error);
-                return;
-            }
-            // recarga el perfil en memoria, sin bloquear UI
-            fetchUserProfile(userId);
-        } catch (e) {
-            console.warn("[perfil] createUserProfile error:", e);
-        }
-    };
-
-    // ---- Trigger de color del header (usa #after-hero con offset) ----
+    // Detectar si estamos en el hero
     useEffect(() => {
         const update = () => {
             const headerH = headerRef.current?.offsetHeight ?? 64;
             const sentinel = document.getElementById("after-hero");
             const top = sentinel ? sentinel.getBoundingClientRect().top : Infinity;
-            const offset = 0; // ajustá para cambiar “antes”
-            setInHero(top > headerH + offset);
+            setInHero(top > headerH);
         };
         update();
         window.addEventListener("scroll", update, { passive: true });
@@ -162,64 +104,42 @@ export default function Header() {
         else setReseniaOpen(true);
     };
 
-    function handleSignedIn(u) {
+    const handleSignedIn = (u) => {
         setAuthOpen(false);
+        setMenuOpen(false); // ← Cerrar sidebar también
         if (u) {
             setUser(u);
-            fetchUserProfile(u.id);
+            loadUserProfile();
         }
-    }
+    };
 
+    // Logout con limpieza completa
     const handleLogout = async () => {
-        try {
-            // 1. Limpiar TODO el localStorage relacionado con auth
-            const keysToRemove = [];
-            for (let i = 0; i < localStorage.length; i++) {
-                const key = localStorage.key(i);
-                if (key && (
-                    key.includes('supabase') ||
-                    key.includes('auth') ||
-                    key.includes('sb-') ||
-                    key.includes('user')
-                )) {
-                    keysToRemove.push(key);
-                }
-            }
+        const { success } = await cleanLogout();
 
-            keysToRemove.forEach(key => {
-                localStorage.removeItem(key);
-            });
-
-            // 2. Sign out de Supabase
-            await supabase.auth.signOut();
-
-            // 3. Limpiar estado local
+        if (success) {
             setUser(null);
             setUserProfile(null);
             setMenuOpen(false);
             setAuthOpen(false);
             setReseniaOpen(false);
-
-            // 4. Navegar a home usando React Router (NO window.location)
             navigate('/');
-
-        } catch (error) {
-            console.warn("[auth] signOut error:", error);
-
-            // Fallback: limpiar estado y navegar
+        } else {
+            // Fallback: limpiar estado de todas formas
             setUser(null);
             setUserProfile(null);
             setMenuOpen(false);
             navigate('/');
         }
     };
+
     const displayName =
         userProfile?.nombre ||
         userProfile?.username ||
         user?.email?.split("@")?.[0] ||
         "Usuario";
 
-    // Colores
+    // Colores del header
     const TOKENS = inHero
         ? {
             headerBg: "#13346b",
@@ -280,6 +200,7 @@ export default function Header() {
         e.target.style.transform = "translateY(-2px)";
         e.target.style.boxShadow = "0 8px 25px rgba(37, 99, 235, 0.2)";
     };
+
     const handleMouseLeave = (e) => {
         e.target.style.background = TOKENS.pillBg;
         e.target.style.color = TOKENS.pillText;
@@ -291,39 +212,65 @@ export default function Header() {
     function PillLink({ to, children }) {
         return (
             <Link to={to} style={pillReset}>
-        <span style={pillBox} onMouseEnter={handleMouseEnter} onMouseLeave={handleMouseLeave}>
-          {children}
-        </span>
+                <span style={pillBox} onMouseEnter={handleMouseEnter} onMouseLeave={handleMouseLeave}>
+                    {children}
+                </span>
             </Link>
         );
     }
+
     function PillButton({ onClick, children }) {
         return (
             <button type="button" onClick={onClick} style={pillReset}>
-        <span style={pillBox} onMouseEnter={handleMouseEnter} onMouseLeave={handleMouseLeave}>
-          {children}
-        </span>
+                <span style={pillBox} onMouseEnter={handleMouseEnter} onMouseLeave={handleMouseLeave}>
+                    {children}
+                </span>
             </button>
         );
     }
+
+    function HeaderAuthButtons() {
+        return (
+            <button
+                type="button"
+                onClick={() => setAuthOpen(true)}
+                style={signBtn}
+                onMouseEnter={handleSignInMouseEnter}
+                onMouseLeave={handleSignInMouseLeave}
+            >
+                Iniciar sesión
+            </button>
+        );
+    }
+
+
 
     const signBtn = {
         height: 40, padding: "0 16px", borderRadius: 9999,
         background: TOKENS.signBg, color: TOKENS.signText, border: `1px solid ${TOKENS.signBorder}`,
         fontWeight: 700, cursor: "pointer", transition: "all 0.3s ease", transform: "translateY(0px)",
     };
+
     const handleSignInMouseEnter = (e) => {
         if (inHero) {
-            e.target.style.background = "#2563eb"; e.target.style.color = "#ffffff"; e.target.style.borderColor = "#1e40af";
+            e.target.style.background = "#2563eb";
+            e.target.style.color = "#ffffff";
+            e.target.style.borderColor = "#1e40af";
         } else {
-            e.target.style.background = "#ffffff"; e.target.style.color = "#2563eb"; e.target.style.borderColor = "#e5e7eb";
+            e.target.style.background = "#ffffff";
+            e.target.style.color = "#2563eb";
+            e.target.style.borderColor = "#e5e7eb";
         }
         e.target.style.transform = "translateY(-2px)";
         e.target.style.boxShadow = "0 8px 25px rgba(37, 99, 235, 0.2)";
     };
+
     const handleSignInMouseLeave = (e) => {
-        e.target.style.background = TOKENS.signBg; e.target.style.color = TOKENS.signText; e.target.style.borderColor = TOKENS.signBorder;
-        e.target.style.transform = "translateY(0px)"; e.target.style.boxShadow = "none";
+        e.target.style.background = TOKENS.signBg;
+        e.target.style.color = TOKENS.signText;
+        e.target.style.borderColor = TOKENS.signBorder;
+        e.target.style.transform = "translateY(0px)";
+        e.target.style.boxShadow = "none";
     };
 
     return (
@@ -331,21 +278,37 @@ export default function Header() {
             <header
                 ref={headerRef}
                 style={{
-                    width: "100%", position: "fixed", top: 0, left: 0, zIndex: 1000,
-                    background: TOKENS.headerBg, color: TOKENS.headerText,
+                    width: "100%",
+                    position: "fixed",
+                    top: 0,
+                    left: 0,
+                    zIndex: 1000,
+                    background: TOKENS.headerBg,
+                    color: TOKENS.headerText,
                     borderBottom: `1px solid ${TOKENS.border}`,
                     transition: "background .25s ease, color .25s ease, border-color .25s ease",
                 }}
             >
                 <div className="header-container" style={{
-                    display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, height: 64,
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "space-between",
+                    gap: 12,
+                    height: 64,
                 }}>
                     {/* Izquierda: menú + logo */}
                     <div style={{ display: "flex", alignItems: "center", gap: 12, minWidth: 0 }}>
                         <HamburgerButton open={menuOpen} onToggle={() => setMenuOpen((o) => !o)} />
                         <button
                             onClick={() => navigate("/")}
-                            style={{ background: "transparent", border: "none", cursor: "pointer", fontWeight: 800, fontSize: 20, color: TOKENS.headerText }}
+                            style={{
+                                background: "transparent",
+                                border: "none",
+                                cursor: "pointer",
+                                fontWeight: 800,
+                                fontSize: 20,
+                                color: TOKENS.headerText
+                            }}
                             aria-label="Ir al inicio"
                         >
                             KERANA
@@ -364,24 +327,36 @@ export default function Header() {
                     {/* Derecha */}
                     <div>
                         {!user ? (
-                            <button
-                                onClick={() => setAuthOpen(true)}
-                                style={signBtn}
-                                onMouseEnter={handleSignInMouseEnter}
-                                onMouseLeave={handleSignInMouseLeave}
-                            >
-                                Iniciar sesión
-                            </button>
+                            <HeaderAuthButtons />
                         ) : (
                             <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
                                 <span style={{ fontWeight: 700 }}>{displayName}</span>
-                                <div style={{
-                                    width: 36, height: 36, borderRadius: "50%",
-                                    background: "#fff", color: "#0b1e3a",
-                                    display: "grid", placeItems: "center", fontWeight: 800,
-                                }}>
-                                    {(displayName?.[0] || "U").toUpperCase()}
-                                </div>
+                                {userProfile?.foto ? (
+                                    <img
+                                        src={userProfile.foto}
+                                        alt={displayName}
+                                        style={{
+                                            width: 36,
+                                            height: 36,
+                                            borderRadius: "50%",
+                                            objectFit: "cover",
+                                            border: "2px solid #fff"
+                                        }}
+                                    />
+                                ) : (
+                                    <div style={{
+                                        width: 36,
+                                        height: 36,
+                                        borderRadius: "50%",
+                                        background: "#fff",
+                                        color: "#0b1e3a",
+                                        display: "grid",
+                                        placeItems: "center",
+                                        fontWeight: 800,
+                                    }}>
+                                        {(displayName?.[0] || "U").toUpperCase()}
+                                    </div>
+                                )}
                             </div>
                         )}
                     </div>
@@ -395,18 +370,28 @@ export default function Header() {
             <Sidebar
                 open={menuOpen}
                 onClose={() => setMenuOpen(false)}
-                user={{
+                isAuthenticated={!!user} // ← ESTA ES LA CLAVE
+                user={user ? {
                     name: displayName,
-                    email: user?.email ?? null,
+                    email: user.email,
+                    avatarUrl: userProfile?.foto,
                     credits: userProfile?.creditos || 0,
                     followers: 0,
                     following: 0,
-                }}
+                } : null}
                 onLogout={handleLogout}
                 onGo={(path) => navigate(path)}
             />
-            <AuthModal_SignIn open={authOpen} onClose={() => setAuthOpen(false)} onSignedIn={handleSignedIn} />
-            <AuthModal_HacerResenia open={reseniaOpen} onClose={() => setReseniaOpen(false)} onSave={() => {}} />
+            <AuthModal_SignIn
+                open={authOpen}
+                onClose={() => setAuthOpen(false)}
+                onSignedIn={handleSignedIn}
+            />
+            <AuthModal_HacerResenia
+                open={reseniaOpen}
+                onClose={() => setReseniaOpen(false)}
+                onSave={() => {}}
+            />
         </>
     );
 }

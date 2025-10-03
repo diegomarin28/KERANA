@@ -4,18 +4,17 @@ import { useNavigate } from 'react-router-dom';
 import { supabase } from '../supabase';
 import { Card } from '../components/ui/Card';
 import { Button } from '../components/ui/Button';
+import { createOrUpdateUserProfile } from '../utils/authHelpers';
 
 export default function AuthConfirm() {
     const [status, setStatus] = useState('loading');
     const [message, setMessage] = useState('');
     const navigate = useNavigate();
-    const hasRun = useRef(false); // ← PREVENIR EJECUCIÓN DUPLICADA
+    const hasRun = useRef(false);
 
     useEffect(() => {
-        // Prevenir que se ejecute más de una vez
         if (hasRun.current) return;
         hasRun.current = true;
-
         handleAuthCallback();
     }, []);
 
@@ -52,88 +51,39 @@ export default function AuthConfirm() {
 
     const handleUserProfile = async (user) => {
         try {
-            setMessage('Verificando tu perfil...');
+            setMessage('Configurando tu perfil...');
 
-            // Verificar si el usuario ya existe
-            const { data: existingUser, error: checkError } = await supabase
-                .from('usuario')
-                .select('id_usuario, correo, nombre, auth_id')
-                .eq('correo', user.email)
-                .maybeSingle();
+            // Usar la función unificada para crear/actualizar perfil
+            const { data: profile, error } = await createOrUpdateUserProfile(user);
 
-            if (checkError) {
-                console.warn('Error verificando usuario:', checkError);
-            }
+            if (error) {
+                console.error('Error creando/actualizando perfil:', error);
 
-            // SI EL USUARIO YA EXISTE - redirigir inmediatamente
-            if (existingUser) {
-                console.log('✅ Usuario ya existe en la base de datos:', existingUser);
+                // Aún así marcamos como éxito - la autenticación funcionó
                 setStatus('success');
-                setMessage('¡Bienvenido de vuelta! Redirigiendo...');
+                setMessage('¡Autenticación exitosa! Redirigiendo...');
                 setTimeout(() => navigate('/'), 1500);
                 return;
             }
 
-            // SOLO SI NO EXISTE - crear nuevo perfil
-            setMessage('Creando tu perfil...');
-
-            const userProfile = {
-                correo: user.email,
-                nombre: user.user_metadata?.full_name || user.user_metadata?.name || 'Usuario',
-                username: generateUsername(user.email),
-                fecha_creado: new Date().toISOString(),
-                creditos: 10,
-                auth_id: user.id,
-            };
-
-            console.log('Creando perfil con datos:', userProfile);
-
-            const { data: newUser, error: insertError } = await supabase
-                .from('usuario')
-                .insert([userProfile])
-                .select()
-                .single();
-
-            if (insertError) {
-                console.error('Error creando perfil:', insertError);
-
-                // Si es error de duplicado, significa que el usuario ya existe
-                if (insertError.code === '23505') {
-                    console.log('⚠️ Usuario ya existe (error de duplicado)');
-                    setStatus('success');
-                    setMessage('¡Bienvenido! Redirigiendo...');
-                    setTimeout(() => navigate('/'), 1500);
-                    return;
-                }
-
-                // Para otros errores
-                setMessage('Perfil creado con algunas limitaciones. Puedes completarlo después.');
+            if (profile) {
+                console.log('✅ Perfil configurado:', profile);
                 setStatus('success');
-                setTimeout(() => navigate('/profile'), 2000);
-                return;
+                setMessage('¡Bienvenido! Configurando tu cuenta...');
+                setTimeout(() => navigate('/'), 1500);
             }
-
-            console.log('✅ Nuevo usuario creado:', newUser);
-            setStatus('success');
-            setMessage('¡Perfil creado exitosamente! Redirigiendo...');
-            setTimeout(() => navigate('/'), 1500);
 
         } catch (err) {
             console.error('Error en handleUserProfile:', err);
-            // Aún así marcamos como éxito - la autenticación funcionó
+            // La autenticación funcionó, así que redirigimos de todas formas
             setStatus('success');
             setMessage('¡Autenticación exitosa! Redirigiendo...');
             setTimeout(() => navigate('/'), 1500);
         }
     };
 
-    const generateUsername = (email) => {
-        const base = email.split('@')[0];
-        const random = Math.floor(Math.random() * 10000);
-        return `${base}${random}`;
-    };
-
     const handleRetry = () => {
+        hasRun.current = false;
         setStatus('loading');
         setMessage('');
         handleAuthCallback();
@@ -143,7 +93,6 @@ export default function AuthConfirm() {
         navigate('/');
     };
 
-    // Estilos comunes
     const containerStyle = {
         minHeight: '60vh',
         display: 'flex',
@@ -198,7 +147,12 @@ export default function AuthConfirm() {
                     <p style={{ color: '#991b1b', margin: '0 0 24px 0' }}>
                         {message}
                     </p>
-                    <div style={{ display: 'flex', gap: 12, justifyContent: 'center', flexWrap: 'wrap' }}>
+                    <div style={{
+                        display: 'flex',
+                        gap: 12,
+                        justifyContent: 'center',
+                        flexWrap: 'wrap'
+                    }}>
                         <Button variant="primary" onClick={handleRetry}>
                             Reintentar
                         </Button>

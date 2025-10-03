@@ -1,51 +1,49 @@
+
 import { useState } from "react";
 import { supabase } from "../supabase";
+import { createOrUpdateUserProfile, ensureUniqueUsername } from "../utils/authHelpers";
 
 export default function AuthModal_SignIn({ open, onClose, onSignedIn }) {
+    const [mode, setMode] = useState("login"); // login | signup
     const [email, setEmail] = useState("");
-    const [name, setName] = useState("");
+    const [name, setName] = useState("");     // nombre completo
+    const [username, setUsername] = useState(""); // único
     const [pwd, setPwd] = useState("");
+    const [showPwd, setShowPwd] = useState(false);
     const [loading, setLoading] = useState(false);
-    const [error, setError] = useState("");
-    const [mode, setMode] = useState("login");
+    const [msg, setMsg] = useState({ type: "", text: "" });
 
     if (!open) return null;
 
-    const clearForm = () => {
-        setEmail("");
-        setName("");
-        setPwd("");
-        setError("");
+    const reset = () => {
+        setEmail(""); setName(""); setUsername(""); setPwd("");
+        setMsg({ type: "", text: "" });
+        setShowPwd(false);
     };
+
+    const onCloseModal = () => { reset(); onClose?.(); };
 
     async function handleLogin(e) {
         e.preventDefault();
-        setLoading(true);
-        setError("");
-
+        setLoading(true); setMsg({ type: "", text: "" });
         try {
             const { data, error } = await supabase.auth.signInWithPassword({
                 email: email.trim(),
                 password: pwd,
             });
-
             if (error) {
-                if (error.message.includes('Invalid login credentials')) {
-                    setError("Email o contraseña incorrectos");
-                } else if (error.message.includes('Email not confirmed')) {
-                    setError("Debes verificar tu email antes de iniciar sesión");
+                if (error.message?.includes("Invalid login credentials")) {
+                    setMsg({ type: "error", text: "Email o contraseña incorrectos." });
+                } else if (error.message?.includes("Email not confirmed")) {
+                    setMsg({ type: "warn", text: "Verificá tu email antes de iniciar sesión." });
                 } else {
-                    setError("Error al iniciar sesión: " + error.message);
+                    setMsg({ type: "error", text: "No se pudo iniciar sesión." });
                 }
                 return;
             }
-
-            onSignedIn(data.user);
-            onClose();
-            clearForm();
-
-        } catch (err) {
-            setError("Error inesperado al iniciar sesión");
+            if (data.user) await createOrUpdateUserProfile(data.user);
+            onSignedIn?.(data.user);
+            onCloseModal();
         } finally {
             setLoading(false);
         }
@@ -53,332 +51,409 @@ export default function AuthModal_SignIn({ open, onClose, onSignedIn }) {
 
     async function handleSignup(e) {
         e.preventDefault();
-        setError("");
+        setMsg({ type: "", text: "" });
 
-        if (!name.trim() || !email.trim() || !pwd) {
-            setError("Todos los campos son obligatorios");
+        if (!name.trim() || !email.trim() || !pwd || !username.trim()) {
+            setMsg({ type: "error", text: "Completá todos los campos." });
             return;
         }
-
         if (pwd.length < 6) {
-            setError("La contraseña debe tener al menos 6 caracteres");
+            setMsg({ type: "error", text: "La contraseña debe tener al menos 6 caracteres." });
             return;
         }
 
         setLoading(true);
-
         try {
+            const ok = await ensureUniqueUsername(username.trim());
+            if (!ok) {
+                setMsg({ type: "error", text: "Ese @usuario ya existe. Probá con otro." });
+                setLoading(false);
+                return;
+            }
+
             const { data: authData, error: authError } = await supabase.auth.signUp({
                 email: email.trim(),
                 password: pwd,
                 options: {
-                    data: {
-                        name: name.trim(),
-                    },
-                    emailRedirectTo: `${window.location.origin}/auth/confirm`
-                }
+                    data: { name: name.trim(), username: username.trim() },
+                    emailRedirectTo: `${window.location.origin}/auth/callback`,
+                },
             });
-
             if (authError) throw authError;
 
             if (authData.user) {
-                const { error: profileError } = await supabase
-                    .from('usuario')
-                    .insert([{
-                        correo: email.trim(),
-                        nombre: name.trim(),
-                        username: email.split('@')[0],
-                        fecha_creado: new Date().toISOString(),
-                        creditos: 0
-                    }]);
-
-                if (profileError && !profileError.message.includes('duplicate key')) {
-                    console.error('Error creando perfil:', profileError);
-                }
-
-                setError("¡Cuenta creada exitosamente! Revisa tu email para verificar.");
-                setTimeout(() => {
-                    setMode('login');
-                    clearForm();
-                }, 2000);
+                await createOrUpdateUserProfile(authData.user, {
+                    name: name.trim(),
+                    username: username.trim(),
+                });
             }
 
-        } catch (err) {
-            if (err.message.includes('User already registered')) {
-                setError("Ya existe una cuenta con este email");
-            } else {
-                setError("Error creando la cuenta: " + err.message);
-            }
+            setMsg({
+                type: "success",
+                text: "¡Cuenta creada! Revisá tu correo para confirmar.",
+            });
+            setMode("login");
+        } catch {
+            setMsg({ type: "error", text: "No se pudo crear la cuenta." });
         } finally {
             setLoading(false);
         }
     }
 
-    // OAuth con Google - entra directo sin verificación
-    async function handleGoogleLogin() {
-        setLoading(true);
-        setError("");
-
+    async function handleGoogle() {
+        setLoading(true); setMsg({ type: "", text: "" });
         try {
-            const { error } = await supabase.auth.signInWithOAuth({
-                provider: 'google',
+            const { data, error } = await supabase.auth.signInWithOAuth({
+                provider: "google",
                 options: {
-                    redirectTo: `${window.location.origin}/auth/confirm`
-                }
+                    redirectTo: `${window.location.origin}/auth/callback`,
+                    queryParams: {
+                        access_type: 'offline',
+                        prompt: 'consent'
+                    }
+                },
             });
-
-            if (error) {
-                setError("Error con Google: " + error.message);
-                setLoading(false);
-            }
-        } catch (err) {
-            setError("Error conectando con Google");
+            if (error) throw error;
+        } catch {
+            setMsg({ type: "error", text: "No se pudo continuar con Google." });
+        } finally {
             setLoading(false);
         }
     }
 
     return (
-        <>
-            <div
-                onClick={onClose}
-                style={{
-                    position: "fixed", inset: 0, background: "rgba(0,0,0,0.5)",
-                    zIndex: 4000, backdropFilter: "blur(4px)"
-                }}
-                aria-hidden="true"
-            />
-
-            <div
-                role="dialog"
-                aria-modal="true"
-                style={{
-                    position: "fixed",
-                    top: "50%",
-                    left: "50%",
-                    transform: "translate(-50%, -50%)",
-                    width: "min(90vw, 400px)",
-                    background: "#fff",
-                    borderRadius: "12px",
-                    boxShadow: "0 20px 60px rgba(0,0,0,.3)",
-                    zIndex: 4010,
-                    overflow: "hidden"
-                }}
-            >
-                <div style={{
-                    padding: "20px 24px 16px",
-                    background: "linear-gradient(135deg, #667eea 0%, #764ba2 100%)",
-                    color: "white"
-                }}>
-                    <h3 style={{ margin: 0, fontSize: "18px", fontWeight: "700" }}>
-                        {mode === "login" ? "Iniciar sesión" : "Crear cuenta"}
-                    </h3>
+        <div style={backdrop}>
+            <div style={modal}>
+                <div style={header}>
+                    <div style={badge}>KERANA</div>
+                    <h2 style={title}>{mode === "login" ? "Iniciar sesión" : "Crear cuenta"}</h2>
+                    <p style={subtitle}>
+                        {mode === "login"
+                            ? "Bienvenido de vuelta"
+                            : "Unite para publicar, comprar y guardar apuntes"}
+                    </p>
                 </div>
 
-                <div style={{ padding: "24px" }}>
-                    {/* Botón OAuth - Solo Google */}
-                    <button
-                        onClick={handleGoogleLogin}
-                        disabled={loading}
-                        style={{
-                            width: "100%",
-                            padding: "12px",
-                            border: "1px solid #e1e5e9",
-                            borderRadius: "8px",
-                            background: "#fff",
-                            cursor: loading ? "not-allowed" : "pointer",
-                            display: "flex",
-                            alignItems: "center",
-                            justifyContent: "center",
-                            gap: "8px",
-                            fontSize: "14px",
-                            fontWeight: "600",
-                            opacity: loading ? 0.6 : 1,
-                            marginBottom: "16px"
-                        }}
-                    >
-                        <svg width="18" height="18" viewBox="0 0 18 18">
-                            <path fill="#4285F4" d="M16.51 8H8.98v3h4.3c-.18 1-.74 1.48-1.6 2.04v2.01h2.6a7.8 7.8 0 0 0 2.38-5.88c0-.57-.05-.66-.15-1.18Z"/>
-                            <path fill="#34A853" d="M8.98 17c2.16 0 3.97-.72 5.3-1.94l-2.6-2a4.8 4.8 0 0 1-7.18-2.54H1.83v2.07A8 8 0 0 0 8.98 17Z"/>
-                            <path fill="#FBBC05" d="M4.5 10.52a4.8 4.8 0 0 1 0-3.04V5.41H1.83a8 8 0 0 0 0 7.18l2.67-2.07Z"/>
-                            <path fill="#EA4335" d="M8.98 4.18c1.17 0 2.23.4 3.06 1.2l2.3-2.3A8 8 0 0 0 1.83 5.4L4.5 7.49a4.77 4.77 0 0 1 4.48-3.3Z"/>
-                        </svg>
+                <div style={body}>
+                    {msg.text ? <Alert type={msg.type} text={msg.text} /> : null}
+
+                    <button style={googleBtn} onClick={handleGoogle} disabled={loading}>
+                        <GoogleIcon />
                         Continuar con Google
                     </button>
 
-                    <div style={{
-                        textAlign: "center",
-                        color: "#9ca3af",
-                        fontSize: "12px",
-                        margin: "12px 0",
-                        position: "relative"
-                    }}>
-                        <div style={{
-                            position: "absolute",
-                            top: "50%",
-                            left: 0,
-                            right: 0,
-                            height: "1px",
-                            background: "#e5e7eb"
-                        }} />
-                        <span style={{ background: "#fff", padding: "0 12px", position: "relative" }}>
-                            o con tu email
-                        </span>
-                    </div>
+                    <div style={divider}><span>o</span></div>
 
-                    {/* FORMULARIO LOGIN */}
-                    {mode === "login" && (
-                        <form onSubmit={handleLogin} style={{ display: "grid", gap: "12px" }}>
-                            <input
-                                type="email"
-                                value={email}
-                                onChange={e=>setEmail(e.target.value)}
-                                style={inputStyle}
-                                disabled={loading}
-                                placeholder="Tu email"
-                                required
-                            />
+                    <form onSubmit={mode === "login" ? handleLogin : handleSignup} style={{ display: "grid", gap: 12 }}>
+                        {mode === "signup" && (
+                            <>
+                                <Field
+                                    label="Nombre y apellido"
+                                    type="text"
+                                    value={name}
+                                    onChange={setName}
+                                    placeholder="Tu nombre"
+                                    icon="👤"
+                                />
+                                <Field
+                                    label="Usuario"
+                                    type="text"
+                                    value={username}
+                                    onChange={setUsername}
+                                    placeholder="@usuario"
+                                    icon="🔵"
+                                />
+                            </>
+                        )}
 
-                            <input
-                                type="password"
-                                value={pwd}
-                                onChange={e=>setPwd(e.target.value)}
-                                style={inputStyle}
-                                disabled={loading}
-                                placeholder="Tu contraseña"
-                                required
-                            />
+                        <Field
+                            label="Email"
+                            type="email"
+                            value={email}
+                            onChange={setEmail}
+                            placeholder="tu@correo.com"
+                            icon="✉️"
+                        />
 
-                            <button
-                                type="submit"
-                                disabled={loading}
-                                style={{
-                                    ...submitBtn,
-                                    opacity: loading ? 0.7 : 1,
-                                    background: "linear-gradient(135deg, #667eea 0%, #764ba2 100%)"
-                                }}
-                            >
-                                {loading ? "Ingresando..." : "Ingresar"}
-                            </button>
-
-                            <p style={{ textAlign: "center", margin: 0, fontSize: "14px", color: "#6b7280" }}>
-                                ¿No tienes cuenta?{" "}
+                        <Field
+                            label="Contraseña"
+                            type={showPwd ? "text" : "password"}
+                            value={pwd}
+                            onChange={setPwd}
+                            placeholder="••••••••"
+                            icon="🔒"
+                            rightAdornment={
                                 <button
                                     type="button"
-                                    onClick={()=>setMode("signup")}
-                                    style={{
-                                        background:"none",
-                                        border:"none",
-                                        color:"#667eea",
-                                        cursor:"pointer",
-                                        fontWeight: "600"
-                                    }}
+                                    onClick={() => setShowPwd(v => !v)}
+                                    style={plainIconBtn}
+                                    aria-label={showPwd ? "Ocultar contraseña" : "Mostrar contraseña"}
                                 >
-                                    Crear cuenta
+                                    {showPwd ? "🙈" : "👁️"}
                                 </button>
-                            </p>
-                        </form>
-                    )}
+                            }
+                        />
 
-                    {/* FORMULARIO SIGNUP */}
-                    {mode === "signup" && (
-                        <form onSubmit={handleSignup} style={{ display: "grid", gap: "12px" }}>
-                            <input
-                                type="text"
-                                value={name}
-                                onChange={e=>setName(e.target.value)}
-                                style={inputStyle}
-                                disabled={loading}
-                                placeholder="Tu nombre completo"
-                                required
-                            />
+                        <button type="submit" style={primaryBtn} disabled={loading}>
+                            {loading ? "Procesando..." : (mode === "login" ? "Iniciar sesión" : "Crear cuenta")}
+                        </button>
+                    </form>
 
-                            <input
-                                type="email"
-                                value={email}
-                                onChange={e=>setEmail(e.target.value)}
-                                style={inputStyle}
-                                disabled={loading}
-                                placeholder="Tu email"
-                                required
-                            />
-
-                            <input
-                                type="password"
-                                value={pwd}
-                                onChange={e=>setPwd(e.target.value)}
-                                style={inputStyle}
-                                disabled={loading}
-                                placeholder="Contraseña (mín. 6 caracteres)"
-                                minLength={6}
-                                required
-                            />
-
-                            <button
-                                type="submit"
-                                disabled={loading}
-                                style={{
-                                    ...submitBtn,
-                                    opacity: loading ? 0.7 : 1,
-                                    background: "linear-gradient(135deg, #667eea 0%, #764ba2 100%)"
-                                }}
-                            >
-                                {loading ? "Creando cuenta..." : "Crear cuenta"}
-                            </button>
-
-                            <p style={{ textAlign: "center", margin: 0, fontSize: "14px", color: "#6b7280" }}>
-                                ¿Ya tienes cuenta?{" "}
-                                <button
-                                    type="button"
-                                    onClick={()=>setMode("login")}
-                                    style={{
-                                        background:"none",
-                                        border:"none",
-                                        color:"#667eea",
-                                        cursor:"pointer",
-                                        fontWeight: "600"
-                                    }}
-                                >
+                    <div style={footSwitch}>
+                        {mode === "login" ? (
+                            <span>
+                                ¿No tenés cuenta?{" "}
+                                <button type="button" onClick={() => setMode("signup")} style={linkBtn}>
+                                    Crear una
+                                </button>
+                            </span>
+                        ) : (
+                            <span>
+                                ¿Ya tenés cuenta?{" "}
+                                <button type="button" onClick={() => setMode("login")} style={linkBtn}>
                                     Iniciar sesión
                                 </button>
-                            </p>
-                        </form>
-                    )}
-
-                    {/* Mensajes de error/éxito */}
-                    {error && (
-                        <div style={{
-                            marginTop: "12px",
-                            padding: "10px 12px",
-                            backgroundColor: error.includes("¡") ? "#d1fae5" : "#fee2e2",
-                            color: error.includes("¡") ? "#065f46" : "#991b1b",
-                            borderRadius: "8px",
-                            fontSize: "13px",
-                        }}>
-                            {error}
-                        </div>
-                    )}
+                            </span>
+                        )}
+                    </div>
                 </div>
+
+                <button onClick={onCloseModal} style={closeBtn} aria-label="Cerrar">✕</button>
             </div>
-        </>
+        </div>
     );
 }
 
-const inputStyle = {
-    padding: "12px 14px",
-    borderRadius: "8px",
-    border: "1px solid #e1e5e9",
-    outline: "none",
-    width: "100%",
-    boxSizing: "border-box",
-    fontSize: "14px"
+/** Componente del ícono de Google CORREGIDO */
+function GoogleIcon() {
+    return (
+        <svg width="18" height="18" viewBox="0 0 24 24">
+            <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
+            <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/>
+            <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"/>
+            <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/>
+        </svg>
+    );
+}
+
+/** UI bits (igual que antes pero con mejores estilos) */
+function Field({ label, type, value, onChange, placeholder, icon, rightAdornment }) {
+    return (
+        <label style={{ display: "grid", gap: 6 }}>
+            <span style={labelCss}>{label}</span>
+            <div style={inputWrap}>
+                <span style={inputIcon}>{icon}</span>
+                <input
+                    style={inputCss}
+                    type={type}
+                    value={value}
+                    onChange={(e) => onChange(e.target.value)}
+                    placeholder={placeholder}
+                    required
+                />
+                {rightAdornment ? <span style={rightAdornmentWrap}>{rightAdornment}</span> : null}
+            </div>
+        </label>
+    );
+}
+
+function Alert({ type, text }) {
+    const palette = {
+        error: { bg: "rgba(220,38,38,.08)", fg: "#dc2626", bd: "rgba(220,38,38,.25)" },
+        warn:  { bg: "rgba(234,179,8,.10)",  fg: "#b45309", bd: "rgba(234,179,8,.25)" },
+        success:{ bg: "rgba(16,185,129,.10)", fg: "#047857", bd: "rgba(16,185,129,.25)" },
+        info:  { bg: "rgba(59,130,246,.10)", fg: "#1d4ed8", bd: "rgba(59,130,246,.25)" },
+    }[type || "info"];
+    return (
+        <div style={{
+            padding: "10px 12px",
+            borderRadius: 10,
+            background: palette.bg,
+            color: palette.fg,
+            border: `1px solid ${palette.bd}`,
+            fontSize: 14,
+            marginBottom: 8
+        }}>
+            {text}
+        </div>
+    );
+}
+
+/** 🎨 NUEVOS ESTILOS - Azul más oscuro y elegante */
+const BLU1 = "#1d4ed8";   // azul más oscuro
+const BLU2 = "#1e40af";   // azul más intenso
+const BLU3 = "rgba(30, 64, 175, 0.05)"; // fondo sutil
+
+const backdrop = {
+    position: "fixed", inset: 0, background: "rgba(0,10,30,.65)",
+    backdropFilter: "blur(6px)", zIndex: 60, display: "grid", placeItems: "center",
 };
 
-const submitBtn = {
+const modal = {
+    position: "relative",
+    width: "min(92vw, 440px)", // un poco más angosto
+    borderRadius: 20,
+    overflow: "hidden",
+    boxShadow: "0 25px 70px rgba(0,0,0,.4)",
+    background: "white",
+};
+
+const header = {
+    background: `linear-gradient(135deg, ${BLU1} 0%, ${BLU2} 100%)`,
+    color: "white",
+    padding: "28px 26px",
+    textAlign: "center",
+};
+
+const badge = {
+    display: "inline-block",
+    fontSize: 11,
+    letterSpacing: 1.5,
+    textTransform: "uppercase",
+    padding: "6px 12px",
+    borderRadius: 999,
+    background: "rgba(255,255,255,.2)",
+    marginBottom: 10,
+    fontWeight: 700,
+};
+
+const title = {
+    margin: "4px 0 6px",
+    fontSize: 24,
+    fontWeight: 800,
+    letterSpacing: "-0.5px"
+};
+
+const subtitle = {
+    margin: 0,
+    opacity: .9,
+    fontSize: 14,
+    fontWeight: 400
+};
+
+const body = {
+    padding: 26,
+    background: BLU3
+};
+
+const googleBtn = {
+    width: "100%",
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 10,
+    border: "1px solid rgba(30, 64, 175, 0.2)",
+    borderRadius: 12,
     padding: "12px 16px",
-    borderRadius: "8px",
-    color: "#fff",
-    fontWeight: "600",
+    background: "white",
+    color: "#1e293b",
+    cursor: "pointer",
+    fontWeight: 600,
+    fontSize: 14,
+    transition: "all 0.2s ease",
+    boxShadow: "0 2px 8px rgba(30, 64, 175, 0.1)",
+};
+
+const divider = {
+    display: "grid",
+    alignItems: "center",
+    gridTemplateColumns: "1fr auto 1fr",
+    gap: 12,
+    color: "#64748b",
+    fontSize: 13,
+    margin: "18px 0",
+};
+
+const primaryBtn = {
+    marginTop: 8,
+    width: "100%",
+    border: "none",
+    borderRadius: 12,
+    padding: "14px 16px",
+    background: `linear-gradient(135deg, ${BLU2}, ${BLU1})`,
+    color: "white",
+    fontWeight: 700,
+    fontSize: 15,
+    cursor: "pointer",
+    boxShadow: "0 8px 20px rgba(30, 64, 175, 0.3)",
+    transition: "all 0.2s ease",
+};
+
+const footSwitch = {
+    marginTop: 16,
+    textAlign: "center",
+    color: "#475569",
+    fontSize: 14
+};
+
+const linkBtn = {
+    color: BLU2,
+    background: "transparent",
     border: "none",
     cursor: "pointer",
-    fontSize: "14px"
+    fontWeight: 700,
+    fontSize: 14,
+};
+
+const closeBtn = {
+    position: "absolute",
+    top: 12,
+    right: 12,
+    width: 36,
+    height: 36,
+    borderRadius: 10,
+    background: "rgba(255,255,255,.9)",
+    border: "1px solid rgba(15,23,42,.1)",
+    cursor: "pointer",
+    display: "grid",
+    placeItems: "center",
+    fontSize: 16,
+    fontWeight: 600,
+};
+
+const labelCss = {
+    fontSize: 13,
+    color: "#1e293b",
+    fontWeight: 600
+};
+
+const inputWrap = {
+    position: "relative",
+    display: "flex",
+    alignItems: "center",
+    background: "white",
+    border: "1px solid rgba(30, 64, 175, 0.15)",
+    borderRadius: 12,
+    transition: "all 0.2s ease",
+};
+
+const inputIcon = {
+    paddingLeft: 14,
+    opacity: .7,
+    fontSize: 15
+};
+
+const inputCss = {
+    flex: 1,
+    border: "none",
+    outline: "none",
+    padding: "14px 14px 14px 12px",
+    borderRadius: 12,
+    fontSize: 15,
+    background: "transparent",
+    color: "#1e293b",
+};
+
+const rightAdornmentWrap = {
+    paddingRight: 12,
+    display: "grid",
+    placeItems: "center"
+};
+
+const plainIconBtn = {
+    border: "none",
+    background: "transparent",
+    cursor: "pointer",
+    fontSize: 16,
+    opacity: 0.7,
 };
