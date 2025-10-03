@@ -230,15 +230,34 @@ export const mentorAPI = {
         const { data, error } = await supabase
             .from('mentor')
             .select(`
-                id_mentor,
-                estrellas,
-                contacto,
-                mentor_materia(
-                    materia(id_materia, nombre_materia, semestre)
-                )
-            `)
-            .eq('id_usuario', usuarioData.id_usuario)
-            .single()
+        id_mentor,
+        estrellas_mentor,
+        contacto,
+        descripcion
+    `)
+            .eq('id_mentor', usuarioData.id_usuario)
+            .maybeSingle()
+
+        if (data) {
+            const { data: materias } = await supabase
+                .from('mentor_materia')
+                .select(`
+            id_materia,
+            materia(nombre_materia, semestre)
+        `)
+                .eq('id_mentor', data.id_mentor)
+
+        }if (data) {
+            const { data: materias } = await supabase
+                .from('mentor_materia')
+                .select(`
+            id_materia,
+            materia(nombre_materia, semestre)
+        `)
+                .eq('id_mentor', data.id_mentor)
+
+            data.mentor_materias = materias
+        }
 
         return { data, error }
     },

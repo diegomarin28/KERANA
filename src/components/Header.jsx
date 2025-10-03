@@ -97,11 +97,10 @@ export default function Header() {
             if (data) {
                 setUserProfile(data);
 
-                // ✅ SOLO buscar datos de mentor si tenemos data.id_usuario
                 const { data: mentorData } = await supabase
                     .from('mentor')
-                    .select('id_mentor, estrellas, contacto')
-                    .eq('id_usuario', data.id_usuario)  // ← Ahora data existe
+                    .select('id_mentor, estrellas_mentor, contacto, descripcion')
+                    .eq('id_mentor', data.id_usuario)
                     .maybeSingle();
 
                 setUserProfile({ ...data, isMentor: !!mentorData, mentorInfo: mentorData });

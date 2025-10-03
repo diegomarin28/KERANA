@@ -1,4 +1,3 @@
-// src/pages/Favorites.jsx
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { Card } from '../components/ui/Card';
@@ -20,163 +19,143 @@ export default function Favorites() {
         setLoading(true);
         setErrorMsg('');
         try {
-            // Obtiene o crea el perfil del usuario
+            // Perfil (bigint)
             const userProfile = await getOrCreateUserProfile();
             const userId = userProfile.id_usuario;
 
             let allFavorites = [];
 
-            // 1. Favoritos de cursos (profesores)
-            try {
-                const { data: coursesFav, error: coursesError } = await supabase
-                    .from('usuario_fav')
+            // === APUNTES FAVORITOS ===
+            const { data: notesFav } = await supabase
+                .from('apunte_fav')
+                .select('id_usuario, id_apunte')
+                .eq('id_usuario', userId);
+
+            let noteItems = [];
+            if (notesFav?.length) {
+                const apIds = notesFav.map(r => r.id_apunte);
+                const { data: apuntes } = await supabase
+                    .from('apunte')
                     .select(`
-                        id,
-                        profesor_curso(
-                            id, 
-                            precio, 
-                            modalidad,
-                            usuario!inner(nombre),
-                            materia!inner(nombre),
-                            califica(puntuacion)
-                        )
-                    `)
-                    .eq('usuario_id', userId);
+            id_apunte,
+            titulo,
+            creditos,
+            estrellas,
+            id_materia,
+            id_usuario,
+            materia:id_materia!Apunte_id_materia_fkey(
+              id_materia,
+              nombre_materia
+            )
+          `)
+                    .in('id_apunte', apIds);
 
-                if (!coursesError && coursesFav) {
-                    const courseItems = coursesFav
-                        .filter(r => r.profesor_curso)
-                        .map(r => {
-                            const c = r.profesor_curso;
-                            const ratings = c.califica?.map(x => x.puntuacion) || [];
-                            const avg = ratings.length
-                                ? (ratings.reduce((a, b) => a + b, 0) / ratings.length).toFixed(1)
-                                : '0.0';
-
-                            return {
-                                favId: r.id,
-                                id: c.id,
-                                type: 'course',
-                                title: c.materia?.nombre || 'Curso',
-                                subtitle: c.usuario?.nombre || 'Docente',
-                                details: c.modalidad || 'Presencial',
-                                price: c.precio ?? 0,
-                                rating: avg,
-                                link: `/cursos/${c.id}`
-                            };
-                        });
-                    allFavorites = [...allFavorites, ...courseItems];
+                // autor (opcional)
+                let userMap = {};
+                const uIds = [...new Set((apuntes || []).map(a => a.id_usuario).filter(Boolean))];
+                if (uIds.length) {
+                    const { data: users } = await supabase
+                        .from('usuario')
+                        .select('id_usuario, nombre')
+                        .in('id_usuario', uIds);
+                    userMap = (users || []).reduce((acc, u) => {
+                        acc[u.id_usuario] = u.nombre;
+                        return acc;
+                    }, {});
                 }
-            } catch (error) {
-                console.log('Error procesando cursos favoritos:', error);
-            }
 
-            // 2. Favoritos de apuntes
-            try {
-                const { data: notesFav, error: notesError } = await supabase
-                    .from('apunte_fav')
-                    .select(`
-                        id,
-                        apunte!inner(
-                            id_apunte,
-                            titulo,
-                            creditos,
-                            estrellas,
-                            materia!inner(nombre_materia),
-                            usuario!inner(nombre)
-                        )
-                    `)
-                    .eq('usuario_id', userId);
-
-                if (!notesError && notesFav) {
-                    const noteItems = notesFav.map(r => {
-                        const a = r.apunte;
-                        return {
-                            favId: r.id,
+                noteItems = (notesFav || [])
+                    .map(r => {
+                        const a = (apuntes || []).find(x => x.id_apunte === r.id_apunte);
+                        return a ? {
+                            favId: `${userId}-${a.id_apunte}`,
                             id: a.id_apunte,
                             type: 'note',
                             title: a.titulo || 'Apunte',
-                            subtitle: a.usuario?.nombre || 'Autor',
+                            subtitle: userMap[a.id_usuario] || 'Autor',
                             details: a.materia?.nombre_materia || 'Materia',
                             price: a.creditos ?? 0,
                             rating: a.estrellas || '0.0',
                             link: `/apuntes/${a.id_apunte}`
-                        };
-                    });
-                    allFavorites = [...allFavorites, ...noteItems];
-                }
-            } catch (error) {
-                console.log('Error procesando apuntes favoritos:', error);
+                        } : null;
+                    })
+                    .filter(Boolean);
             }
+            allFavorites = [...allFavorites, ...noteItems];
 
-            // 3. Favoritos de mentores
-            try {
-                const { data: mentorsFav, error: mentorsError } = await supabase
+            // === MENTORES FAVORITOS ===
+            const { data: auth } = await supabase.auth.getUser();
+            const uid = auth?.user?.id; // uuid requerido por RLS
+            let mentorItems = [];
+            if (uid) {
+                const { data: mentorsFav } = await supabase
                     .from('usuario_fav_mentores')
-                    .select(`
-                        id,
-                        mentor!inner(
-                            id,
-                            nombre,
-                            especialidad,
-                            calificacion,
-                            precio_hora
-                        )
-                    `)
-                    .eq('usuario_id', userId);
+                    .select('id, id_mentor')
+                    .eq('usuario_id', uid);
 
-                if (!mentorsError && mentorsFav) {
-                    const mentorItems = mentorsFav.map(r => {
-                        const m = r.mentor;
-                        return {
-                            favId: r.id,
-                            id: m.id,
-                            type: 'mentor',
-                            title: m.nombre || 'Mentor',
-                            subtitle: m.especialidad || 'Especialidad',
-                            details: 'Mentoría personalizada',
-                            price: m.precio_hora ?? 0,
-                            rating: m.calificacion || '0.0',
-                            link: `/mentores/${m.id}`
-                        };
-                    });
-                    allFavorites = [...allFavorites, ...mentorItems];
+                if (mentorsFav?.length) {
+                    const mIds = mentorsFav.map(r => r.id_mentor);
+                    const { data: mentors } = await supabase
+                        .from('mentor')
+                        .select('id_mentor, estrellas_mentor, contacto, descripcion')
+                        .in('id_mentor', mIds);
+
+                    mentorItems = mentorsFav
+                        .map(r => {
+                            const m = (mentors || []).find(x => x.id_mentor === r.id_mentor);
+                            return m ? {
+                                favId: r.id,
+                                id: m.id_mentor,
+                                type: 'mentor',
+                                title: m.descripcion || 'Mentor',
+                                subtitle: String(m.contacto || '').trim() || 'Contacto',
+                                details: 'Mentoría personalizada',
+                                price: 0,
+                                rating: m.estrellas_mentor || '0',
+                                link: `/mentores/${m.id_mentor}`
+                            } : null;
+                        })
+                        .filter(Boolean);
                 }
-            } catch (error) {
-                console.log('Error procesando mentores favoritos:', error);
             }
+            allFavorites = [...allFavorites, ...mentorItems];
+
+            // (OPCIONAL) Cursos favoritos → hoy tu tabla usuario_fav apunta a usuario,
+            // no a profesor_curso. Si querés cursos, mejor crear curso_fav(id_usuario, id_profesor).
 
             setItems(allFavorites);
-
         } catch (error) {
-            console.error('Error general cargando favoritos:', error);
             setErrorMsg('Error cargando favoritos: ' + (error.message || 'verifica tu conexión'));
+        } finally {
+            setLoading(false);
         }
-        setLoading(false);
     };
 
     const removeFavorite = async (favId, type) => {
         try {
             let tableName;
+            let field;
             if (type === 'note') {
+                // favId lo generamos como `${id_usuario}-${id_apunte}`
+                const [u, a] = String(favId).split('-').map(x => Number(x));
                 tableName = 'apunte_fav';
+                field = { id_usuario: u, id_apunte: a };
+                const { error } = await supabase.from(tableName).delete().match(field);
+                if (error) throw error;
             } else if (type === 'mentor') {
                 tableName = 'usuario_fav_mentores';
+                const { error } = await supabase.from(tableName).delete().eq('id', favId);
+                if (error) throw error;
             } else {
+                // otro tipo → usuario_fav (estructura actual apunta a usuario)
                 tableName = 'usuario_fav';
+                const { error } = await supabase.from(tableName).delete().eq('id_favorito', favId);
+                if (error) throw error;
             }
 
-            const { error } = await supabase
-                .from(tableName)
-                .delete()
-                .eq('id', favId);
-
-            if (error) throw error;
-
-            load(); // Recargar
+            load();
         } catch (error) {
-            console.error('Error eliminando favorito:', error);
-            setErrorMsg('Error eliminando favorito: ' + error.message);
+            setErrorMsg('Error eliminando favorito: ' + (error.message || ''));
         }
     };
 
@@ -265,11 +244,7 @@ export default function Favorites() {
                 }}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                         <span>{errorMsg}</span>
-                        <Button
-                            variant="ghost"
-                            onClick={load}
-                            style={{ marginLeft: 10 }}
-                        >
+                        <Button variant="ghost" onClick={load} style={{ marginLeft: 10 }}>
                             Reintentar
                         </Button>
                     </div>
@@ -277,11 +252,7 @@ export default function Favorites() {
             )}
 
             {filteredItems.length === 0 ? (
-                <Card style={{
-                    textAlign: 'center',
-                    padding: 60,
-                    background: '#f8fafc'
-                }}>
+                <Card style={{ textAlign: 'center', padding: 60, background: '#f8fafc' }}>
                     <div style={{ fontSize: 48, marginBottom: 16 }}>⭐</div>
                     <h3 style={{ margin: '0 0 12px 0', color: '#334155' }}>
                         {activeFilter === 'all' ? 'No tenés favoritos' : `No tenés ${getTypeLabel(activeFilter).toLowerCase()}s favoritos`}
@@ -295,8 +266,7 @@ export default function Favorites() {
                     }}>
                         {activeFilter === 'all'
                             ? 'Guardá cursos, apuntes y mentores que te interesen para encontrarlos fácilmente después.'
-                            : `Explorá ${getTypeLabel(activeFilter).toLowerCase()}s y agregalos a favoritos.`
-                        }
+                            : `Explorá ${getTypeLabel(activeFilter).toLowerCase()}s y agregalos a favoritos.`}
                     </p>
                     <Button
                         variant="primary"
@@ -313,20 +283,9 @@ export default function Favorites() {
                             transition: 'transform 0.2s ease, box-shadow 0.2s ease',
                             border: '1px solid #e5e7eb'
                         }}>
-                            <div style={{
-                                display: 'flex',
-                                justifyContent: 'space-between',
-                                alignItems: 'flex-start',
-                                gap: 20
-                            }}>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 20 }}>
                                 <div style={{ flex: 1 }}>
-                                    <Link
-                                        to={item.link}
-                                        style={{
-                                            textDecoration: 'none',
-                                            color: 'inherit'
-                                        }}
-                                    >
+                                    <Link to={item.link} style={{ textDecoration: 'none', color: 'inherit' }}>
                                         <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
                                             <span style={{ fontSize: 18 }}>{getTypeIcon(item.type)}</span>
                                             <span style={{
@@ -337,43 +296,30 @@ export default function Favorites() {
                                                 fontSize: "12px",
                                                 fontWeight: "600"
                                             }}>
-                                                {getTypeLabel(item.type)}
-                                            </span>
+                        {getTypeLabel(item.type)}
+                      </span>
                                         </div>
-                                        <h3 style={{
-                                            margin: '0 0 8px 0',
-                                            fontSize: 18,
-                                            fontWeight: 600,
-                                            color: '#0b1e3a'
-                                        }}>
+                                        <h3 style={{ margin: '0 0 8px 0', fontSize: 18, fontWeight: 600, color: '#0b1e3a' }}>
                                             {item.title}
                                         </h3>
-                                        <p style={{
-                                            margin: '0 0 8px 0',
-                                            color: '#64748b',
-                                            fontSize: 14
-                                        }}>
+                                        <p style={{ margin: '0 0 8px 0', color: '#64748b', fontSize: 14 }}>
                                             {item.subtitle} {item.details && `· ${item.details}`}
                                         </p>
                                     </Link>
 
                                     <div style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
-                                        <span style={{
-                                            background: "#fef3c7",
-                                            color: "#d97706",
-                                            padding: "4px 8px",
-                                            borderRadius: "6px",
-                                            fontSize: "12px",
-                                            fontWeight: "600"
-                                        }}>
-                                            ⭐ {item.rating}
-                                        </span>
+                    <span style={{
+                        background: "#fef3c7",
+                        color: "#d97706",
+                        padding: "4px 8px",
+                        borderRadius: "6px",
+                        fontSize: "12px",
+                        fontWeight: "600"
+                    }}>
+                      ⭐ {item.rating}
+                    </span>
                                         {item.price > 0 && (
-                                            <div style={{
-                                                fontWeight: 700,
-                                                color: '#059669',
-                                                fontSize: 14
-                                            }}>
+                                            <div style={{ fontWeight: 700, color: '#059669', fontSize: 14 }}>
                                                 {item.type === 'note' ? `${item.price} créditos` : `$${item.price}`}
                                             </div>
                                         )}
@@ -381,10 +327,7 @@ export default function Favorites() {
                                 </div>
 
                                 <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-                                    <Button
-                                        variant="primary"
-                                        onClick={() => window.location.href = item.link}
-                                    >
+                                    <Button variant="primary" onClick={() => (window.location.href = item.link)}>
                                         Ver
                                     </Button>
                                     <Button
