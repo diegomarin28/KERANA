@@ -23,6 +23,9 @@ const MyMentorships = lazy(() => import("./pages/MyMentorships"));
 const MyCalendar = lazy(() => import('./pages/mentor/MyCalendar'));
 const IAmMentor = lazy(() => import('./pages/mentor/IAmMentor'));
 const MyStudents = lazy(() => import('./pages/mentor/MyStudents'));
+const Professors = lazy(() => import('./pages/Professors'));
+const Mentors = lazy(() => import('./pages/Mentors'));
+const Notes = lazy(() => import('./pages/Notes'));
 
 import AuthConfirm from './pages/AuthConfirm';
 import Purchased from './pages/Purchased';
@@ -129,6 +132,9 @@ export default function App() {
 
                     {/* Rutas de Exploración */}
                     <Route path="/subjects" element={<Subjects />} />
+                    <Route path="/professors" element={<Professors />} />
+                    <Route path="/mentors" element={<Mentors />} />
+                    <Route path="/notes" element={<Notes />} />
 
                     {/* Rutas de Autenticación */}
                     <Route path="/signin" element={<SignIn />} />

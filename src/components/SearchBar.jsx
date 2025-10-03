@@ -4,6 +4,8 @@ import { supabase } from '../supabase';
 export default function SearchBar() {
     const [q, setQ] = useState("");
     const [open, setOpen] = useState(false);
+    const [suggestions, setSuggestions] = useState([]);
+    const [loading, setLoading] = useState(false);
     const [recent, setRecent] = useState(() => {
         try { return JSON.parse(localStorage.getItem("kerana_recent") || "[]"); }
         catch { return []; }
@@ -19,6 +21,87 @@ export default function SearchBar() {
         return () => document.removeEventListener("pointerdown", onDocDown);
     }, []);
 
+    // Función para normalizar texto (quita tildes)
+    const normalizeText = (text) => {
+        return text
+            .toLowerCase()
+            .normalize('NFD')
+            .replace(/[\u0300-\u036f]/g, '');
+    };
+
+    // Búsqueda en tiempo real
+    useEffect(() => {
+        if (!q.trim()) {
+            setSuggestions([]);
+            return;
+        }
+
+        const searchSuggestions = async () => {
+            setLoading(true);
+            const term = normalizeText(q.trim());
+
+            try {
+                const [materias, profesores, apuntes] = await Promise.all([
+                    // Materias
+                    supabase.rpc('buscar_materias_sin_tildes', { termino: q.trim() }),
+
+                    // Profesores - buscar normalizado
+                    supabase.rpc('buscar_profesores_sin_tildes', { termino: q.trim() }),
+
+                    // Apuntes
+                    supabase.rpc('buscar_apuntes_sin_tildes', { termino: q.trim() })
+                ]);
+
+                const results = [];
+
+                // Agregar materias
+                materias.data?.forEach(m => {
+                    results.push({
+                        type: 'materia',
+                        id: m.id_materia,
+                        text: m.nombre_materia,
+                        icon: '📖'
+                    });
+                });
+
+                // Agregar profesores únicos
+                const seenProfs = new Set();
+                profesores.data?.forEach(p => {
+                    if (!seenProfs.has(p.id_profesor)) {
+                        seenProfs.add(p.id_profesor);
+                        results.push({
+                            type: 'profesor',
+                            id: p.id_profesor,
+                            text: p.profesor_nombre,
+                            icon: '👨‍🏫'
+                        });
+                    }
+                });
+
+                // Agregar apuntes
+                apuntes.data?.forEach(a => {
+                    results.push({
+                        type: 'apunte',
+                        id: a.id_apunte,
+                        text: a.titulo,
+                        icon: '📝'
+                    });
+                });
+
+                setSuggestions(results);
+            } catch (err) {
+                console.error('Error buscando sugerencias:', err);
+            } finally {
+                setLoading(false);
+            }
+        };
+
+        const debounce = setTimeout(() => {
+            searchSuggestions();
+        }, 300);
+
+        return () => clearTimeout(debounce);
+    }, [q]);
 
     const saveRecent = (term) => {
         const t = term.trim();
@@ -41,6 +124,22 @@ export default function SearchBar() {
         saveRecent(term);
         window.location.href = `/search?q=${encodeURIComponent(term)}`;
     };
+
+    const goToSuggestion = (suggestion) => {
+        saveRecent(suggestion.text);
+
+        // Navegar según el tipo
+        if (suggestion.type === 'materia') {
+            window.location.href = `/subjects#${suggestion.id}`;
+        } else if (suggestion.type === 'profesor') {
+            window.location.href = `/profesores/${suggestion.id}`;
+        } else if (suggestion.type === 'apunte') {
+            window.location.href = `/apuntes/${suggestion.id}`;
+        }
+    };
+
+    const showRecent = !q.trim() && recent.length > 0;
+    const showSuggestions = q.trim() && suggestions.length > 0;
 
     return (
         <div
@@ -96,8 +195,8 @@ export default function SearchBar() {
                 </button>
             </form>
 
-            {/* RECENTES */}
-            {open && recent.length > 0 && (
+            {/* DROPDOWN */}
+            {open && (showRecent || showSuggestions) && (
                 <div
                     style={{
                         position: "absolute",
@@ -112,11 +211,54 @@ export default function SearchBar() {
                         overflow: "hidden",
                     }}
                 >
-
-
-                    {/* Items */}
                     <ul style={{ listStyle: "none", margin: 0, padding: 0 }}>
-                        {recent.map((r) => (
+                        {/* SUGERENCIAS */}
+                        {showSuggestions && suggestions.map((s, idx) => (
+                            <li
+                                key={`${s.type}-${s.id}`}
+                                style={{
+                                    borderBottom: idx < suggestions.length - 1 ? "1px solid #f3f4f6" : "none",
+                                    transition: "all 0.2s ease",
+                                    position: "relative",
+                                    cursor: "pointer"
+                                }}
+                                onMouseEnter={(e) => {
+                                    e.currentTarget.style.background = "linear-gradient(90deg, rgba(37, 99, 235, 0.06) 0%, rgba(37, 99, 235, 0.04) 50%, rgba(37, 99, 235, 0.06) 100%)";
+                                    e.currentTarget.style.borderLeft = "3px solid #2563eb";
+                                    e.currentTarget.style.paddingLeft = "11px";
+                                }}
+                                onMouseLeave={(e) => {
+                                    e.currentTarget.style.background = "transparent";
+                                    e.currentTarget.style.borderLeft = "none";
+                                    e.currentTarget.style.paddingLeft = "0";
+                                }}
+                                onClick={() => goToSuggestion(s)}
+                            >
+                                <div style={{
+                                    display: "flex",
+                                    alignItems: "center",
+                                    gap: 10,
+                                    padding: "12px 14px",
+                                    textAlign: "left"
+                                }}>
+                                    <span style={{ fontSize: 18 }}>{s.icon}</span>
+                                    <span style={{ flex: 1, fontSize: 15, color: "#111827" }}>
+                                        {s.text}
+                                    </span>
+                                    <span style={{
+                                        fontSize: 11,
+                                        color: "#9ca3af",
+                                        textTransform: "uppercase",
+                                        fontWeight: 600
+                                    }}>
+                                        {s.type}
+                                    </span>
+                                </div>
+                            </li>
+                        ))}
+
+                        {/* RECIENTES */}
+                        {showRecent && recent.map((r) => (
                             <li
                                 key={r}
                                 style={{
@@ -129,40 +271,25 @@ export default function SearchBar() {
                                     e.currentTarget.style.background = "linear-gradient(90deg, rgba(37, 99, 235, 0.06) 0%, rgba(37, 99, 235, 0.04) 50%, rgba(37, 99, 235, 0.06) 100%)";
                                     e.currentTarget.style.borderLeft = "3px solid #2563eb";
                                     e.currentTarget.style.paddingLeft = "11px";
-                                    e.currentTarget.style.transform = "translateX(2px)";
-
-
-
-                                    // Cambiar el color del icono
                                     const svg = e.currentTarget.querySelector('svg');
-                                    if (svg) {
-                                        svg.style.color = "#2563eb";
-                                    }
+                                    if (svg) svg.style.color = "#2563eb";
                                 }}
                                 onMouseLeave={(e) => {
                                     e.currentTarget.style.background = "transparent";
                                     e.currentTarget.style.borderLeft = "none";
                                     e.currentTarget.style.paddingLeft = "0";
-                                    e.currentTarget.style.transform = "translateX(0px)";
-
-
-
-                                    // Restaurar el color del icono
                                     const svg = e.currentTarget.querySelector('svg');
-                                    if (svg) {
-                                        svg.style.color = "#9ca3af";
-                                    }
+                                    if (svg) svg.style.color = "#9ca3af";
                                 }}
                             >
-                                <div
-                                    style={{
-                                        display: "flex",
-                                        alignItems: "center",
-                                        justifyContent: "space-between",
-                                        gap: 10,
-                                        padding: "12px 14px",
-                                    }}
-                                >
+                                <div style={{
+                                    display: "flex",
+                                    alignItems: "center",
+                                    justifyContent: "space-between",
+                                    gap: 10,
+                                    textAlign: "left",
+                                    padding: "12px 14px",
+                                }}>
                                     <button
                                         onClick={() => {
                                             setQ(r);
@@ -181,11 +308,8 @@ export default function SearchBar() {
                                             padding: 0,
                                             color: "#111827",
                                             fontSize: 15,
-                                            transition: "all 0.2s ease",
                                         }}
-                                        title={r}
                                     >
-                                        {/* Icono de reloj/historial */}
                                         <svg
                                             xmlns="http://www.w3.org/2000/svg"
                                             fill="none"
@@ -196,7 +320,8 @@ export default function SearchBar() {
                                                 width: 18,
                                                 height: 18,
                                                 color: "#9ca3af",
-                                                transition: "all 0.2s ease"
+                                                transition: "all 0.2s ease",
+                                                textAlign: "left"
                                             }}
                                         >
                                             <path
@@ -208,10 +333,8 @@ export default function SearchBar() {
                                         {r}
                                     </button>
 
-                                    {/* "x" gris */}
                                     <button
                                         type="button"
-                                        aria-label="Eliminar búsqueda"
                                         onClick={() => removeRecent(r)}
                                         onMouseDown={(e) => e.stopPropagation()}
                                         style={{
@@ -221,21 +344,17 @@ export default function SearchBar() {
                                             borderRadius: 8,
                                             width: 28,
                                             height: 28,
-                                            lineHeight: "26px",
-                                            textAlign: "center",
                                             cursor: "pointer",
                                             fontSize: 16,
+                                            textAlign: "left",
                                             transition: "all 0.2s ease",
                                         }}
-                                        title="Eliminar"
                                         onMouseEnter={(e) => {
                                             e.target.style.color = "#ef4444";
-                                            e.target.style.transform = "scale(1.1)";
                                             e.target.style.borderColor = "#ef4444";
                                         }}
                                         onMouseLeave={(e) => {
                                             e.target.style.color = "#9ca3af";
-                                            e.target.style.transform = "scale(1)";
                                             e.target.style.borderColor = "#e5e7eb";
                                         }}
                                     >
@@ -245,6 +364,17 @@ export default function SearchBar() {
                             </li>
                         ))}
                     </ul>
+
+                    {loading && (
+                        <div style={{
+                            padding: 12,
+                            textAlign: "left",
+                            color: '#9ca3af',
+                            fontSize: 14
+                        }}>
+                            Buscando...
+                        </div>
+                    )}
                 </div>
             )}
         </div>
