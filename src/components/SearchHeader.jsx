@@ -8,7 +8,9 @@ export default function SearchHeader({ title, subtitle }) {
           radial-gradient(700px 300px at 60% -20%, rgba(245,158,11,.12), transparent),  /* amber */
           linear-gradient(180deg, rgba(14,165,163,.08), transparent)
         `,
-                borderBottom: "1px solid var(--border)"
+                borderBottom: "1px solid var(--border)",
+                position: "relative",
+                zIndex: 100
             }}
         >
             <div style={{ maxWidth: 1120, margin: "0 auto", padding: "40px 16px" }}>

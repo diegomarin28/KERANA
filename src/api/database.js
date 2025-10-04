@@ -52,7 +52,6 @@ export const userAPI = {
 // ==========================================
 // 🎓 MATERIAS Y CONTENIDO
 // ==========================================
-
 export const subjectsAPI = {
     async getAllSubjects() {
         const { data, error } = await supabase
@@ -100,70 +99,102 @@ export const subjectsAPI = {
     }
 }
 
-// En database.js - REEMPLAZA la sección de BÚSQUEDA GENERAL
-
 // ==========================================
 // 🔍 BÚSQUEDA GENERAL
 // ==========================================
-
 async function searchProfessors(term) {
     const q = (term || "").trim();
     if (!q) return { data: [], error: null };
 
     try {
-        console.log(`🔍 Buscando profesores para: "${q}"`);
+        // Buscar por nombre de profesor
+        const { data: profesoresDirectos, error: errorDirecto } = await supabase
+            .from('profesor_curso')
+            .select('id_profesor, profesor_nombre')
+            .ilike('profesor_nombre', `%${q}%`);
 
-        // Usar la misma RPC que funciona en el SearchBar
-        const { data: profesores, error } = await supabase
-            .rpc('buscar_profesores_sin_tildes', { termino: q });
+        // Buscar por materia
+        const { data: materiasEncontradas, error: errorMaterias } = await supabase
+            .rpc('buscar_materias_sin_tildes', { termino: q });
 
-        if (error) {
-            console.error('Error buscando profesores:', error);
-            return { data: [], error };
+        let profesoresPorMateria = [];
+
+        if (materiasEncontradas && materiasEncontradas.length > 0) {
+            const materiaIds = materiasEncontradas.map(m => m.id_materia);
+
+            const { data: relacionesImparte, error: errorImparte } = await supabase
+                .from('imparte')
+                .select(`
+                    id_profesor,
+                    profesor_curso!inner(id_profesor, profesor_nombre),
+                    materia!inner(id_materia, nombre_materia)
+                `)
+                .in('id_materia', materiaIds);
+
+            if (relacionesImparte) {
+                profesoresPorMateria = relacionesImparte.map(item => ({
+                    id_profesor: item.id_profesor,
+                    profesor_nombre: item.profesor_curso.profesor_nombre,
+                    materia_nombre: item.materia.nombre_materia,
+                    source: 'materia'
+                }));
+            }
         }
 
-        // Transformar los datos al formato que espera SearchResults
-        const transformed = (profesores || []).map(prof => ({
+        // Combinar y eliminar duplicados
+        const todosProfesores = [
+            ...(profesoresDirectos || []).map(p => ({
+                ...p,
+                materia_nombre: '',
+                source: 'nombre'
+            })),
+            ...profesoresPorMateria
+        ];
+
+        const profesoresUnicos = todosProfesores.filter((profesor, index, array) =>
+            array.findIndex(p => p.id_profesor === profesor.id_profesor) === index
+        );
+
+        const transformed = profesoresUnicos.map(prof => ({
             id: prof.id_profesor,
             id_profesor: prof.id_profesor,
             profesor_nombre: prof.profesor_nombre,
-            materia_nombre: '', // No tenemos esta info en la RPC
-            label: prof.profesor_nombre,
-            source: 'profesor',
-            rating_promedio: 0
+            materia_nombre: prof.materia_nombre || '',
+            rating_promedio: 0,
+            estrellas: 0
         }));
 
-        console.log(`✅ Profesores encontrados: ${transformed.length}`, transformed);
         return { data: transformed, error: null };
 
     } catch (error) {
-        console.error('Error crítico en searchProfessors:', error);
         return { data: [], error };
     }
 }
-
 
 async function searchSubjects(term) {
     const q = (term || "").trim();
     if (!q) return { data: [], error: null };
 
-    const { data, error } = await supabase
-        .from('materia')
-        .select('id_materia, nombre_materia, semestre')
-        .ilike('nombre_materia', `%${q}%`)
-        .limit(50);
+    try {
+        const { data: materias, error } = await supabase
+            .rpc('buscar_materias_sin_tildes', { termino: q });
 
-    // Transformar al formato esperado
-    const transformed = (data || []).map(m => ({
-        id: m.id_materia,
-        id_materia: m.id_materia,
-        nombre_materia: m.nombre_materia,
-        semestre: m.semestre,
-        label: m.nombre_materia,
-        source: 'materia'
-    }));
+        if (error) return { data: [], error };
 
-    return { data: transformed, error };
+        const transformed = (materias || []).map(materia => ({
+            id: materia.id_materia,
+            id_materia: materia.id_materia,
+            nombre_materia: materia.nombre_materia,
+            semestre: materia.semestre || '',
+            label: materia.nombre_materia,
+            source: 'materia'
+        }));
+
+        return { data: transformed, error: null };
+
+    } catch (error) {
+        return { data: [], error };
+    }
 }
 
 async function searchNotes(term) {
@@ -239,6 +270,7 @@ export const searchAPI = {
         };
     },
 };
+
 // ==========================================
 // 🎯 MENTORES Y POSTULACIONES
 // ==========================================

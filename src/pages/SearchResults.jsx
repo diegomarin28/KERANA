@@ -1,30 +1,25 @@
 import { useLocation } from "react-router-dom";
 import { useMemo, useState, useEffect } from "react";
-import ResultCard from "../components/ResultCard";
 import SearchBar from "../components/SearchBar";
 import { searchAPI } from "../api/Database";
-import SearchHeader from "../components/SearchHeader";
-import { Chip } from "../components/ui/Chip";
-import { Button } from "../components/ui/Button";
+import SubjectCard from "../components/SubjectCard";
+import ProfessorCard from "../components/ProfessorCard";
+import NoteCard from "../components/NoteCard";
 
 export default function SearchResults() {
     const { search } = useLocation();
     const q = (new URLSearchParams(search).get("q") || "").trim();
 
     const [tab, setTab] = useState("todo");
-    const [minRating, setMinRating] = useState(0);
     const [loading, setLoading] = useState(false);
 
-    // Estados por categoría que sí existen en Database.js → searchAPI.searchAll
-    const [subjects, setSubjects] = useState([]); // materias
-    const [professors, setProfessors] = useState([]); // profesores
-    const [mentors, setMentors] = useState([]); // mentores
-    const [notes, setNotes] = useState([]); // apuntes
-
+    const [subjects, setSubjects] = useState([]);
+    const [professors, setProfessors] = useState([]);
+    const [mentors, setMentors] = useState([]);
+    const [notes, setNotes] = useState([]);
 
     useEffect(() => {
         if (q) fetchAll(q);
-        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [q]);
 
     const fetchAll = async (query) => {
@@ -37,14 +32,7 @@ export default function SearchResults() {
             setNotes(data?.apuntes ?? []);
             setProfessors(data?.profesores ?? []);
             setMentors(data?.mentores ?? []);
-            console.log('Resultados de búsqueda:', {
-                materias: data?.materias,
-                profesores: data?.profesores,
-                apuntes: data?.apuntes,
-                mentores: data?.mentores
-            });
         } catch (e) {
-            console.error("Error buscando:", e);
             setSubjects([]);
             setNotes([]);
             setProfessors([]);
@@ -52,14 +40,9 @@ export default function SearchResults() {
         } finally {
             setLoading(false);
         }
-
     };
 
-// Filtro por rating (★) donde tiene sentido Y eliminar duplicados
     const filtered = useMemo(() => {
-        const byRating = (items, get) => items.filter((it) => (get(it) ?? 0) >= minRating);
-
-        // Función para eliminar duplicados por ID
         const removeDuplicates = (items, getId) => {
             const seen = new Set();
             return items.filter(item => {
@@ -72,145 +55,210 @@ export default function SearchResults() {
 
         return {
             subjects: removeDuplicates(subjects, (s) => s.id_materia ?? s.id),
-            professors: removeDuplicates(byRating(professors, (p) => p.estrellas ?? 0), (p) => p.id_profesor ?? p.id),
-            mentors: removeDuplicates(byRating(mentors, (m) => m.estrellas ?? 0), (m) => m.id_mentor ?? m.id),
-            notes: removeDuplicates(byRating(notes, () => 4.0), (n) => n.id_apunte ?? n.id),
+            professors: removeDuplicates(professors, (p) => p.id_profesor ?? p.id),
+            mentors: removeDuplicates(mentors, (m) => m.id_mentor ?? m.id),
+            notes: removeDuplicates(notes, (n) => n.id_apunte ?? n.id),
         };
-    }, [subjects, professors, mentors, notes, minRating]);
-
-    // ... después del useMemo de filtered
-
-
+    }, [subjects, professors, mentors, notes]);
 
     const show = (k) => tab === "todo" || tab === k;
-    const total =
-        filtered.subjects.length +
-        filtered.professors.length +
-        filtered.mentors.length +
-        filtered.notes.length;
+    const total = filtered.subjects.length + filtered.professors.length + filtered.mentors.length + filtered.notes.length;
+
+    // Contadores para los tabs
+    const counts = {
+        todo: total,
+        materias: filtered.subjects.length,
+        profesores: filtered.professors.length,
+        mentores: filtered.mentors.length,
+        apuntes: filtered.notes.length
+    };
 
     return (
-        <div className="container" style={{ padding: "18px 0 36px" }}>
-            <div style={{ marginBottom: 24 }}>
-                <SearchBar />
-                <SearchHeader title={q ? `Resultados para “${q}”` : "Explorar"} subtitle="Búsqueda" />
-            </div>
+        <div style={{
+            minHeight: "100vh",
+            background: "#F9FAFB",
+            padding: "20px 0 40px 0"
+        }}>
+            <div style={{ maxWidth: 1200, margin: "0 auto", padding: "0 20px" }}>
+                {/* Header */}
+                <div style={{ marginBottom: 32 }}>
+                    <SearchBar />
 
-            <div className="results-head" style={{ display: "flex", alignItems: "center", gap: 12 }}>
-                <h2 style={{ margin: 0 }}>
-                    Resultados {q && <>para "<em>{q}</em>"</>}
-                </h2>
-                <Chip tone="blue">{total} items</Chip>
+                    <div style={{
+                        textAlign: "center",
+                        marginTop: 32,
+                        marginBottom: 24
+                    }}>
+                        <h1 style={{
+                            margin: "0 0 8px 0",
+                            fontSize: 28,
+                            fontWeight: 700,
+                            color: "#111827"
+                        }}>
+                            {q ? `Resultados para "${q}"` : "Buscar en Kerana"}
+                        </h1>
+                        <p style={{
+                            margin: 0,
+                            fontSize: 16,
+                            color: "#6B7280"
+                        }}>
+                            {total > 0 ? `${total} resultados encontrados` : "Encuentra profesores, materias y apuntes"}
+                        </p>
+                    </div>
+                </div>
 
-                <div className="tabs" style={{ marginLeft: "auto", display: "flex", gap: 8, alignItems: "center" }}>
-                    {["todo", "materias", "profesores", "mentores", "apuntes"].map((t) => (
-                        <Button
+                {/* Tabs Simples */}
+                <div style={{
+                    display: "flex",
+                    gap: 8,
+                    marginBottom: 24,
+                    flexWrap: "wrap",
+                    justifyContent: "center"
+                }}>
+                    {["todo", "materias", "profesores", "apuntes"].map((t) => (
+                        <button
                             key={t}
-                            variant={tab === t ? "secondary" : "ghost"}
                             onClick={() => setTab(t)}
-                        >
-                            {t[0].toUpperCase() + t.slice(1)}
-                        </Button>
-                    ))}
-                    <select
-                        value={minRating}
-                        onChange={(e) => setMinRating(Number(e.target.value))}
-                        style={{
-                            height: 38,
-                            borderRadius: 10,
-                            border: "1px solid var(--border)",
-                            padding: "0 10px",
-                            marginLeft: 8,
-                            background: "var(--surface)",
-                            color: "var(--text)",
-                        }}
-                        title="Filtrar por ★ mínima"
-                    >
-                        {[0, 3, 3.5, 4, 4.5].map((v) => (
-                            <option key={v} value={v}>
-                                Min ★ {v}
-                            </option>
-                        ))}
-                    </select>
-                </div>
-            </div>
-
-            {loading ? (
-                <div className="grid">
-                    {Array.from({ length: 6 }).map((_, i) => (
-                        <div
-                            key={i}
-                            className="skel"
                             style={{
-                                height: 120,
-                                backgroundColor: "#f3f4f6",
+                                padding: "10px 20px",
                                 borderRadius: 8,
-                                animation: "pulse 1.5s ease-in-out infinite",
+                                background: tab === t ? "#2563EB" : "white",
+                                color: tab === t ? "white" : "#374151",
+                                fontWeight: 600,
+                                fontSize: 14,
+                                cursor: "pointer",
+                                border: tab === t ? "1px solid #2563EB" : "1px solid #D1D5DB",
+                                transition: "all 0.2s ease",
+                                display: "flex",
+                                alignItems: "center",
+                                gap: 8
                             }}
-                        />
+                        >
+                            {t === "todo" && "🔍 Todos"}
+                            {t === "materias" && "📖 Materias"}
+                            {t === "profesores" && "👨‍🏫 Profesores"}
+                            {t === "apuntes" && "📄 Apuntes"}
+
+                            {counts[t] > 0 && (
+                                <span style={{
+                                    background: tab === t ? "rgba(255,255,255,0.2)" : "#6B7280",
+                                    color: "white",
+                                    padding: "2px 8px",
+                                    borderRadius: 12,
+                                    fontSize: 12,
+                                    fontWeight: 600
+                                }}>
+                                    {counts[t]}
+                                </span>
+                            )}
+                        </button>
                     ))}
                 </div>
-            ) : total === 0 ? (
-                <div
-                    className="empty"
-                    style={{ textAlign: "center", padding: "60px 20px", color: "#6b7280" }}
-                >
-                    <div style={{ fontSize: "3rem", marginBottom: 20 }}>🔍</div>
-                    <h3>No encontramos resultados</h3>
-                    <p>Probá con otra palabra clave o bajá el filtro de ★ mínima.</p>
-                </div>
-            ) : (
-                <>
-                    {/* MATERIAS */}
-                    {show("materias") && filtered.subjects.map((m) => (
-                        <ResultCard
-                            key={`materia-${m.id_materia ?? m.id}`}
-                            title={m.nombre_materia}
-                            subtitle={`Semestre ${m.semestre ?? "-"}`}
-                            rating={0}
-                            pill="Materia"
-                            to={`/materias/${m.id_materia ?? m.id}`}
-                        />
-                    ))}
 
-                    {/* PROFESORES */}
-                    {show("profesores") && filtered.professors.map((p, index) => (
-                        <ResultCard
-                            key={`profesor-${p.id_profesor}-${index}`}
-                            title={`Prof. ${p.profesor_nombre}`} //* ← Usar profesor_nombre que SÍ existe */
-                            subtitle={p.materia_nombre} //* ← Usar materia_nombre que SÍ existe */}
-                            rating={p.rating_promedio ?? 0} //* ← Usar rating_promedio que SÍ existe */
-                            pill="Profesor"
-                            to={`/profesores/${p.id_profesor}`}
-                        />
-                    ))}
+                {/* Resultados */}
+                {loading ? (
+                    <div style={{
+                        display: "grid",
+                        gap: 16,
+                        gridTemplateColumns: "repeat(auto-fill, minmax(350px, 1fr))"
+                    }}>
+                        {Array.from({ length: 6 }).map((_, i) => (
+                            <div
+                                key={i}
+                                style={{
+                                    height: 120,
+                                    background: "white",
+                                    borderRadius: 12,
+                                    animation: "pulse 1.5s ease-in-out infinite",
+                                    border: "1px solid #E5E7EB"
+                                }}
+                            />
+                        ))}
+                    </div>
+                ) : total === 0 ? (
+                    <div style={{
+                        textAlign: "center",
+                        padding: "60px 20px",
+                        background: "white",
+                        borderRadius: 12,
+                        border: "1px solid #E5E7EB"
+                    }}>
+                        <div style={{ fontSize: "3rem", marginBottom: 16 }}>🔍</div>
+                        <h3 style={{ margin: "0 0 12px 0", color: "#111827" }}>
+                            No encontramos resultados
+                        </h3>
+                        <p style={{ margin: 0, color: "#6B7280", fontSize: 16 }}>
+                            {q ? `No hay resultados para "${q}". Prueba con otros términos.` : "Comienza buscando en el campo de arriba."}
+                        </p>
+                    </div>
+                ) : (
+                    <div style={{
+                        display: "grid",
+                        gap: 16,
+                        gridTemplateColumns: "repeat(auto-fill, minmax(350px, 1fr))"
+                    }}>
+                        {/* Materias */}
+                        {show("materias") && filtered.subjects.map((m) => (
+                            <SubjectCard key={`materia-${m.id_materia}`} subject={m} />
+                        ))}
 
+                        {/* Profesores */}
+                        {show("profesores") && filtered.professors.map((p, index) => (
+                            <ProfessorCard key={`profesor-${p.id_profesor}-${index}`} professor={p} />
+                        ))}
 
-                    {/* MENTORES */}
-                    {show("mentores") && filtered.mentors.map((m, index) => (
-                        <ResultCard
-                            key={`mentor-${m.id_mentor}-${index}`}
-                            title={`Mentor ${m.mentor_nombre ?? "—"}`} //* ← Cambiar aquí */
-                            subtitle={m.especialidad || "Mentor académico"}
-                            rating={m.rating_promedio ?? m.estrellas_mentor ?? 0} //* ← Y aquí */
-                            pill="Mentor"
-                            to={`/mentores/${m.id_mentor}`}
-                        />
-                    ))}
+                        {/* Apuntes */}
+                        {show("apuntes") && filtered.notes.map((a, index) => (
+                            <NoteCard key={`apunte-${a.id_apunte}-${index}`} note={a} />
+                        ))}
 
-                    {/* APUNTES */}
-                    {show("apuntes") && filtered.notes.map((a, index) => (
-                        <ResultCard
-                            key={`apunte-${a.id_apunte}-${index}`}
-                            title={a.titulo ?? "Apunte"}
-                            subtitle={a.materia_nombre ?? a.autor_nombre ?? ""} //* ← Y aquí */
-                            rating={a.estrellas ?? 4.0}
-                            pill="PDF"
-                            to={`/apuntes/${a.id_apunte}`}
-                        />
-                    ))}
-                </>
-            )}
+                        {/* Mentores (versión simple) */}
+                        {show("mentores") && filtered.mentors.map((m, index) => (
+                            <div key={`mentor-${m.id_mentor}-${index}`} style={{
+                                background: "white",
+                                borderRadius: 12,
+                                padding: 20,
+                                border: "1px solid #E5E7EB",
+                                boxShadow: "0 2px 8px rgba(0,0,0,0.04)"
+                            }}>
+                                <div style={{ display: "flex", alignItems: "flex-start", gap: 16 }}>
+                                    <div style={{
+                                        width: 48,
+                                        height: 48,
+                                        background: "#2563EB",
+                                        borderRadius: 8,
+                                        display: "flex",
+                                        alignItems: "center",
+                                        justifyContent: "center",
+                                        fontSize: 20,
+                                        color: "white"
+                                    }}>
+                                        💼
+                                    </div>
+                                    <div style={{ flex: 1 }}>
+                                        <h3 style={{ margin: "0 0 4px 0", fontSize: 18, fontWeight: 600 }}>
+                                            Mentor {m.mentor_nombre}
+                                        </h3>
+                                        <p style={{ margin: "0 0 8px 0", color: "#6B7280", fontSize: 14 }}>
+                                            {m.especialidad || "Mentor académico"}
+                                        </p>
+                                    </div>
+                                    <div style={{
+                                        background: "#2563EB",
+                                        color: "white",
+                                        padding: "6px 12px",
+                                        borderRadius: 6,
+                                        fontSize: 12,
+                                        fontWeight: 600
+                                    }}>
+                                        Mentor
+                                    </div>
+                                </div>
+                            </div>
+                        ))}
+                    </div>
+                )}
+            </div>
         </div>
     );
 }

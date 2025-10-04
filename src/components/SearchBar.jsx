@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { supabase } from '../supabase';
 
 export default function SearchBar() {
@@ -11,6 +12,7 @@ export default function SearchBar() {
         catch { return []; }
     });
     const wrapRef = useRef(null);
+    const navigate = useNavigate();
 
     useEffect(() => {
         const onDocDown = (e) => {
@@ -118,20 +120,29 @@ export default function SearchBar() {
         const term = q.trim();
         if (!term) return;
         saveRecent(term);
-        window.location.href = `/search?q=${encodeURIComponent(term)}`;
+        // ✅ Siempre lleva a /search para resultados generales
+        navigate(`/search?q=${encodeURIComponent(term)}`);
     };
 
     const goToSuggestion = (suggestion) => {
         saveRecent(suggestion.text);
         setOpen(false);
 
+        // ✅ CORREGIDO: Todas las sugerencias llevan a /search con filtros específicos
         if (suggestion.type === 'materia') {
-            window.location.href = `/subjects/${suggestion.id}`;
+            navigate(`/search?q=${encodeURIComponent(suggestion.text)}&type=materia`);
         } else if (suggestion.type === 'profesor') {
-            window.location.href = `/profesores/${suggestion.id}`;
+            navigate(`/search?q=${encodeURIComponent(suggestion.text)}&type=profesor`);
         } else if (suggestion.type === 'apunte') {
-            window.location.href = `/apuntes/${suggestion.id}`;
+            navigate(`/search?q=${encodeURIComponent(suggestion.text)}&type=apunte`);
         }
+    };
+
+    const handleRecentSearch = (term) => {
+        setQ(term);
+        saveRecent(term);
+        // ✅ CORREGIDO: Búsquedas recientes también van a /search
+        navigate(`/search?q=${encodeURIComponent(term)}`);
     };
 
     const showRecent = !q.trim() && recent.length > 0;
@@ -145,6 +156,7 @@ export default function SearchBar() {
                 position: "relative",
                 width: "min(780px, 92vw)",
                 margin: "0 auto",
+
             }}
         >
             <form
@@ -204,7 +216,8 @@ export default function SearchBar() {
                         boxShadow: "0 16px 32px rgba(0,0,0,.12)",
                         overflow: "hidden",
                         maxHeight: "400px",
-                        overflowY: "auto"
+                        overflowY: "auto",
+                        zIndex: 50
                     }}
                 >
                     <ul style={{ listStyle: "none", margin: 0, padding: 0 }}>
@@ -281,11 +294,7 @@ export default function SearchBar() {
                                     padding: "12px 14px",
                                 }}>
                                     <button
-                                        onClick={() => {
-                                            setQ(r);
-                                            saveRecent(r);
-                                            window.location.href = `/search?q=${encodeURIComponent(r)}`;
-                                        }}
+                                        onClick={() => handleRecentSearch(r)}
                                         style={{
                                             display: "flex",
                                             alignItems: "center",

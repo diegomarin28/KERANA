@@ -12,6 +12,8 @@ export default function AuthModal_SignIn({ open, onClose, onSignedIn }) {
     const [showPwd, setShowPwd] = useState(false);
     const [loading, setLoading] = useState(false);
     const [msg, setMsg] = useState({ type: "", text: "" });
+    const [acceptedTerms, setAcceptedTerms] = useState(false);
+    const [showTermsModal, setShowTermsModal] = useState(false);
 
     if (!open) return null;
 
@@ -59,6 +61,10 @@ export default function AuthModal_SignIn({ open, onClose, onSignedIn }) {
         }
         if (pwd.length < 6) {
             setMsg({ type: "error", text: "La contraseña debe tener al menos 6 caracteres." });
+            return;
+        }
+        if (!acceptedTerms) {
+            setMsg({ type: "error", text: "Debés aceptar los términos y condiciones para crear una cuenta." });
             return;
         }
 
@@ -194,6 +200,30 @@ export default function AuthModal_SignIn({ open, onClose, onSignedIn }) {
                             }
                         />
 
+                        {/* TÉRMINOS Y CONDICIONES - Solo en registro */}
+                        {mode === "signup" && (
+                            <div style={termsContainer}>
+                                <label style={termsLabel}>
+                                    <input
+                                        type="checkbox"
+                                        checked={acceptedTerms}
+                                        onChange={(e) => setAcceptedTerms(e.target.checked)}
+                                        style={checkboxStyle}
+                                    />
+                                    <span>
+                                        Acepto los{' '}
+                                        <button
+                                            type="button"
+                                            onClick={() => setShowTermsModal(true)}
+                                            style={termsLink}
+                                        >
+                                            términos y condiciones
+                                        </button>
+                                    </span>
+                                </label>
+                            </div>
+                        )}
+
                         <button type="submit" style={primaryBtn} disabled={loading}>
                             {loading ? "Procesando..." : (mode === "login" ? "Iniciar sesión" : "Crear cuenta")}
                         </button>
@@ -217,7 +247,12 @@ export default function AuthModal_SignIn({ open, onClose, onSignedIn }) {
                         )}
                     </div>
                 </div>
-
+                {showTermsModal && (
+                    <TermsModal onClose={() => setShowTermsModal(false)} onAccept={() => {
+                        setAcceptedTerms(true);
+                        setShowTermsModal(false);
+                    }} />
+                )}
                 <button onClick={onCloseModal} style={closeBtn} aria-label="Cerrar">✕</button>
             </div>
         </div>
@@ -286,9 +321,8 @@ const BLU3 = "rgba(30, 64, 175, 0.05)"; // fondo sutil
 
 const backdrop = {
     position: "fixed", inset: 0, background: "rgba(0,10,30,.65)",
-    backdropFilter: "blur(6px)", zIndex: 60, display: "grid", placeItems: "center",
+    backdropFilter: "blur(6px)", zIndex: 1001, display: "grid", placeItems: "center", //el header es 1000, pongo 1001
 };
-
 const modal = {
     position: "relative",
     width: "min(92vw, 440px)", // un poco más angosto
@@ -456,4 +490,178 @@ const plainIconBtn = {
     cursor: "pointer",
     fontSize: 16,
     opacity: 0.7,
+};
+// COMPONENTE DE TÉRMINOS Y CONDICIONES
+function TermsModal({ onClose, onAccept }) {
+    return (
+        <div style={termsBackdrop}>
+            <div style={termsModal}>
+                <div style={termsHeader}>
+                    <h3 style={termsTitle}>Términos y Condiciones</h3>
+                    <button onClick={onClose} style={termsCloseBtn}>✕</button>
+                </div>
+
+                <div style={termsContent}>
+                    <h4>1. Protección de Datos Personales</h4>
+                    <p>
+                        De conformidad con la Ley N° 18.331 de Protección de Datos Personales de Uruguay,
+                        se informa que los datos personales proporcionados serán incorporados a una base
+                        de datos de la cual es responsable KERANA.
+                    </p>
+
+                    <h4>2. Finalidad del Tratamiento</h4>
+                    <p>
+                        Sus datos serán utilizados para: gestión de usuarios, publicación y compra de apuntes,
+                        comunicación entre usuarios, y mejora de nuestros servicios.
+                    </p>
+
+                    <h4>3. Derechos del Usuario</h4>
+                    <p>
+                        Usted tiene derecho a acceder, rectificar, actualizar y, cuando corresponda,
+                        suprimir sus datos personales. Para ejercer estos derechos, puede contactarnos
+                        a través de nuestro formulario de contacto.
+                    </p>
+
+                    <h4>4. Seguridad de la Información</h4>
+                    <p>
+                        Implementamos medidas de seguridad técnicas y organizativas para proteger
+                        sus datos personales contra accesos no autorizados, pérdida o destrucción.
+                    </p>
+
+                    <h4>5. Consentimiento</h4>
+                    <p>
+                        Al aceptar estos términos, otorga su consentimiento libre, expreso e informado
+                        para el tratamiento de sus datos personales conforme a lo establecido en la
+                        legislación uruguaya.
+                    </p>
+                </div>
+
+                <div style={termsFooter}>
+                    <button onClick={onClose} style={termsCancelBtn}>
+                        Cancelar
+                    </button>
+                    <button onClick={onAccept} style={termsAcceptBtn}>
+                        Aceptar Términos
+                    </button>
+                </div>
+            </div>
+        </div>
+    );
+}
+
+// NUEVOS ESTILOS PARA TÉRMINOS Y CONDICIONES
+const termsContainer = {
+    margin: "8px 0"
+};
+
+const termsLabel = {
+    display: "flex",
+    alignItems: "flex-start",
+    gap: 8,
+    fontSize: 13,
+    color: "#475569",
+    cursor: "pointer",
+    lineHeight: 1.4
+};
+
+const checkboxStyle = {
+    marginTop: 2,
+    flexShrink: 0
+};
+
+const termsLink = {
+    background: "none",
+    border: "none",
+    color: "#2563eb",
+    cursor: "pointer",
+    textDecoration: "underline",
+    fontSize: 13,
+    padding: 0
+};
+
+const termsBackdrop = {
+    position: "fixed",
+    inset: 0,
+    background: "rgba(0,10,30,.75)",
+    backdropFilter: "blur(8px)",
+    zIndex: 70,
+    display: "grid",
+    placeItems: "center",
+    padding: 20
+};
+
+const termsModal = {
+    background: "white",
+    borderRadius: 16,
+    maxWidth: 600,
+    width: "100%",
+    maxHeight: "80vh",
+    display: "flex",
+    flexDirection: "column",
+    boxShadow: "0 25px 80px rgba(0,0,0,0.4)"
+};
+
+const termsHeader = {
+    padding: "20px 24px",
+    borderBottom: "1px solid #e5e7eb",
+    display: "flex",
+    justifyContent: "space-between",
+    alignItems: "center"
+};
+
+const termsTitle = {
+    margin: 0,
+    fontSize: 18,
+    fontWeight: 700,
+    color: "#1e293b"
+};
+
+const termsCloseBtn = {
+    background: "none",
+    border: "none",
+    fontSize: 20,
+    cursor: "pointer",
+    color: "#64748b",
+    width: 32,
+    height: 32,
+    borderRadius: 8,
+    display: "grid",
+    placeItems: "center"
+};
+
+const termsContent = {
+    padding: "24px",
+    flex: 1,
+    overflowY: "auto",
+    fontSize: 14,
+    lineHeight: 1.6,
+    color: "#475569"
+};
+
+const termsFooter = {
+    padding: "20px 24px",
+    borderTop: "1px solid #e5e7eb",
+    display: "flex",
+    gap: 12,
+    justifyContent: "flex-end"
+};
+
+const termsCancelBtn = {
+    padding: "10px 20px",
+    borderRadius: 8,
+    border: "1px solid #d1d5db",
+    background: "white",
+    color: "#374151",
+    cursor: "pointer",
+    fontWeight: 500
+};
+
+const termsAcceptBtn = {
+    padding: "10px 20px",
+    borderRadius: 8,
+    border: "none",
+    background: "#2563eb",
+    color: "white",
+    cursor: "pointer",
+    fontWeight: 600
 };

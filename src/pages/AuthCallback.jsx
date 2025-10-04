@@ -1,4 +1,3 @@
-// src/pages/AuthCallback.jsx - VERSIÓN SIMPLIFICADA
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "../supabase";
@@ -10,8 +9,6 @@ export default function AuthCallback() {
     const [message, setMessage] = useState("Procesando autenticación...");
 
     useEffect(() => {
-        console.log("🚀 AuthCallback montado");
-
         let isMounted = true;
 
         const processAuth = async () => {
@@ -19,7 +16,6 @@ export default function AuthCallback() {
                 setStatus("loading");
                 setMessage("Verificando autenticación...");
 
-                // 1. Obtener sesión actual
                 const { data: { session }, error: sessionError } = await supabase.auth.getSession();
 
                 if (sessionError) {
@@ -34,13 +30,9 @@ export default function AuthCallback() {
                     return;
                 }
 
-                console.log("✅ Usuario autenticado:", session.user.email);
-
                 if (!isMounted) return;
 
-                // 2. Verificar/Crear perfil
                 setMessage("Configurando tu perfil...");
-
                 const { data: existingProfile } = await supabase
                     .from("usuario")
                     .select("id_usuario, username")
@@ -52,17 +44,13 @@ export default function AuthCallback() {
                 } else {
                     console.log("🆕 Creando nuevo perfil...");
                     const profileResult = await createOrUpdateUserProfile(session.user);
-
                     if (profileResult.error) {
                         console.warn("⚠️ Error creando perfil:", profileResult.error);
-                        // Continuamos de todas formas
                     }
                 }
 
                 if (!isMounted) return;
 
-                // 3. Redirigir al home
-                console.log("🎯 Redirigiendo a /");
                 setStatus("success");
                 setMessage("¡Autenticación exitosa! Redirigiendo...");
 
@@ -77,7 +65,6 @@ export default function AuthCallback() {
                 if (isMounted) {
                     setStatus("error");
                     setMessage("Error durante el proceso de autenticación.");
-
                     setTimeout(() => {
                         navigate("/", { replace: true });
                     }, 3000);
@@ -88,18 +75,17 @@ export default function AuthCallback() {
         processAuth();
 
         return () => {
-            console.log("🧹 AuthCallback desmontado");
             isMounted = false;
         };
     }, [navigate]);
 
-    // 🎨 ESTILOS MEJORADOS
+    // 🎨 NUEVOS ESTILOS - AZUL Y BLANCO
     const containerStyle = {
         minHeight: "100vh",
         display: "flex",
         justifyContent: "center",
         alignItems: "center",
-        background: "linear-gradient(135deg, #667eea 0%, #764ba2 100%)",
+        background: "linear-gradient(135deg, #1e40af 0%, #2563eb 100%)", // Azul en lugar de violeta
         padding: "20px",
         fontFamily: "system-ui, -apple-system, sans-serif"
     };
@@ -128,9 +114,7 @@ export default function AuthCallback() {
         margin: "0 0 16px 0",
         fontSize: "24px",
         fontWeight: "700",
-        background: "linear-gradient(135deg, #2563eb, #1e40af)",
-        WebkitBackgroundClip: "text",
-        WebkitTextFillColor: "transparent"
+        color: "#1e40af", // Azul en lugar de gradiente
     };
 
     const messageStyle = {

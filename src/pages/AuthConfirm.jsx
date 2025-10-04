@@ -26,7 +26,6 @@ export default function AuthConfirm() {
             const { data: { session }, error: sessionError } = await supabase.auth.getSession();
 
             if (sessionError) {
-                console.error('Error de sesión:', sessionError);
                 setStatus('error');
                 setMessage('Error de autenticación. Por favor, intenta nuevamente.');
                 return;
@@ -39,11 +38,10 @@ export default function AuthConfirm() {
                 return;
             }
 
-            console.log('✅ Usuario autenticado:', session.user.email);
             await handleUserProfile(session.user);
 
         } catch (err) {
-            console.error('Error en auth callback:', err);
+
             setStatus('error');
             setMessage('Error durante el proceso de autenticación.');
         }
@@ -57,7 +55,6 @@ export default function AuthConfirm() {
             const { data: profile, error } = await createOrUpdateUserProfile(user);
 
             if (error) {
-                console.error('Error creando/actualizando perfil:', error);
 
                 // Aún así marcamos como éxito - la autenticación funcionó
                 setStatus('success');
@@ -67,7 +64,6 @@ export default function AuthConfirm() {
             }
 
             if (profile) {
-                console.log('✅ Perfil configurado:', profile);
                 setStatus('success');
                 setMessage('¡Bienvenido! Configurando tu cuenta...');
                 setTimeout(() => navigate('/'), 1500);
