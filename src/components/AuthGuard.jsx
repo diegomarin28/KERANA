@@ -15,21 +15,39 @@ export default function AuthGuard({ children, requireAuth = true }) {
 
         const checkAuth = async () => {
             try {
+                // PRIMERO intentar con la sesión actual
                 const { data: { session } } = await supabase.auth.getSession();
 
                 if (!mounted) return;
 
                 if (session?.user) {
                     setUser(session.user);
-                } else {
-                    setUser(null);
+                    setLoading(false);
+                    return; // Ya está autenticado
                 }
 
+                // SI NO HAY SESIÓN, verificar si hay token en localStorage (recordarme)
+                const rememberMe = JSON.parse(localStorage.getItem("kerana_remember") || "false");
+                const storedSession = localStorage.getItem("supabase.auth.token");
+
+                if (rememberMe && storedSession) {
+                    // Intentar refrescar la sesión automáticamente
+                    const { data: { session: refreshedSession }, error } = await supabase.auth.refreshSession();
+
+                    if (!mounted) return;
+
+                    if (refreshedSession?.user && !error) {
+                        setUser(refreshedSession.user);
+                        setLoading(false);
+                        return;
+                    }
+                }
+
+                setUser(null);
                 setLoading(false);
 
                 // Si requiere autenticación y no hay usuario, redirigir al home con modal
                 if (requireAuth && !session?.user) {
-                    // Guardar la ruta original para volver después del login
                     const returnUrl = location.pathname + location.search;
                     navigate(`/?auth=signin&return=${encodeURIComponent(returnUrl)}`, { replace: true });
                 }

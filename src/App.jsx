@@ -7,7 +7,7 @@ import AuthGuard from "./components/AuthGuard";
 import Equipo from "./pages/Equipo";
 
 
-// Componentes lazy
+// Componentes lazy, osea se cargan solo si el usuario entra , no al princiio de entrar a la pagina
 const HelpCenter = lazy(() => import("./pages/HelpCenter"));
 const Terms = lazy(() => import("./pages/Terms"));
 const Privacy = lazy(() => import("./pages/Privacy"));
@@ -28,17 +28,23 @@ const Professors = lazy(() => import("./pages/Professors"));
 const Mentors = lazy(() => import("./pages/Mentors"));
 const Notes = lazy(() => import("./pages/Notes"));
 const AuthCallback = lazy(() => import("./pages/AuthCallback"));
+const HowItWorks = lazy(() => import("./pages/HowItWorks"));
+const Suggestions = lazy(() => import("./pages/Suggestions"));
+const AmbientalImpact = lazy(() => import("./pages/AmbientalImpact"));
+const Subjects =  lazy(() => import("./pages/Subjects"));
+const Settings = lazy(() => import("./pages/Settings"));
+const Purchased = lazy(() => import("./pages/Purchased"));
+const Profile = lazy(() => import("./pages/Profile"));
+const EditProfile = lazy(() => import("./pages/EditProfile"));
+const Favorites = lazy(() => import("./pages/Favorites"));
+const MyPapers = lazy(() => import("./pages/MyPapers"));
 
-
+//se importa cuando la app carga por primera vez, aunque el usuario nunca entre a esa ruta. es lo esencial q cargamos siempre si o si
 import AuthConfirm from './pages/AuthConfirm';
-import Purchased from './pages/Purchased';
-import Profile from './pages/Profile';
-import Favorites from './pages/Favorites';
-import MyPapers from './pages/MyPapers';
-import Settings from './pages/Settings';
-import Subjects from './pages/Subjects';
 //import SignIn from './pages/SignIn';
 import AuthModal_SignIn from "./components/AuthModal_SignIn";
+import PrivacyBanner from './components/PrivacyBanner';
+
 
 
 const LoadingSpinner = () => (
@@ -69,8 +75,6 @@ function AppRoutes() {
     const location = useLocation();
     const navigate = useNavigate();
 
-    console.log("📍 Ruta actual en AppRoutes:", location.pathname);
-
     const params = new URLSearchParams(location.search);
     const openAuth = params.get("auth") === "signin" || params.get("completeProfile") === "1";
     const returnUrl = params.get("return") || "/";
@@ -82,6 +86,24 @@ function AppRoutes() {
         newParams.delete("return");
         navigate(`${location.pathname}${newParams.toString() ? `?${newParams.toString()}` : ""}`, { replace: true });
     };
+
+
+    useEffect(() => { //sino puse el recordarme me cierra la sesion automaticamente
+        const checkRememberMe = () => {
+            const rememberMe = JSON.parse(localStorage.getItem("kerana_remember") || "false");
+            if (!rememberMe) {
+                // Si no eligió "Recordarme", cerrar sesión al cerrar pestaña/recargar
+                const handleBeforeUnload = () => {
+                    supabase.auth.signOut();
+                };
+
+                window.addEventListener('beforeunload', handleBeforeUnload);
+                return () => window.removeEventListener('beforeunload', handleBeforeUnload);
+            }
+        };
+
+        checkRememberMe();
+    }, []);
 
     const handleSignedIn = () => {
         closeAuth();
@@ -97,6 +119,7 @@ function AppRoutes() {
                     <Routes>
                         {/* Principal */}
                         <Route path="/" element={<Home />} />
+                        <Route path="/impacto-ambiental" element={<AmbientalImpact />} />
 
                         {/* Búsqueda y exploración */}
                         <Route path="/search" element={<SearchResults />} />
@@ -107,71 +130,30 @@ function AppRoutes() {
                         <Route path="/mentor/courses" element={<IAmMentor />} />
                         <Route path="/mentor/students" element={<MyStudents />} />
                         {/* Evitamos duplicar /mentor/courses; MyMentorships en una ruta distinta */}
-                        <Route
-                            path="/mentor/my-mentorships"
-                            element={
-                                <AuthGuard requireAuth={true}>
-                                    <MyMentorships />
-                                </AuthGuard>
-                            }
-                        />
+                        <Route path="/mentor/my-mentorships" element={<AuthGuard requireAuth={true}><MyMentorships /></AuthGuard>}/>
 
                         {/* Detalles */}
                         <Route path="/profesores/:id" element={<ProfessorDetail />} />
                         <Route path="/cursos/:id" element={<CourseDetail />} />
 
                         {/* Usuario - PROTEGIDAS */}
-                        <Route
-                            path="/profile"
-                            element={
-                                <AuthGuard requireAuth={true}>
-                                    <Profile />
-                                </AuthGuard>
-                            }
-                        />
-                        <Route
-                            path="/settings"
-                            element={
-                                <AuthGuard requireAuth={true}>
-                                    <Settings />
-                                </AuthGuard>
-                            }
-                        />
-                        <Route
-                            path="/panel"
-                            element={
-                                <AuthGuard requireAuth={true}>
-                                    <UserDashboard />
-                                </AuthGuard>
-                            }
-                        />
+                        <Route path="/profile" element={<AuthGuard requireAuth={true}><Profile /></AuthGuard>}/>
+                        <Route path="/edit-profile" element={<EditProfile />} />
+                        <Route path="/settings" element={<AuthGuard requireAuth={true}><Settings /></AuthGuard>}/>
+
+                        <Route path="/panel" element={<AuthGuard requireAuth={true}><UserDashboard /></AuthGuard>}/>
+
+                        {/* Footer home */}
                         <Route path="/mision-vision" element={<MisionVision />} />
+                        <Route path="/how-it-works" element={<HowItWorks />} />
+                        <Route path="/suggestions" element={<Suggestions />} />
 
                         {/* Recursos del usuario - PROTEGIDAS */}
-                        <Route
-                            path="/purchased"
-                            element={
-                                <AuthGuard requireAuth={true}>
-                                    <Purchased />
-                                </AuthGuard>
-                            }
-                        />
-                        <Route
-                            path="/favorites"
-                            element={
-                                <AuthGuard requireAuth={true}>
-                                    <Favorites />
-                                </AuthGuard>
-                            }
-                        />
-                        <Route
-                            path="/my_papers"
-                            element={
-                                <AuthGuard requireAuth={true}>
-                                    <MyPapers />
-                                </AuthGuard>
-                            }
-                        />
+                        <Route path="/purchased" element={<AuthGuard requireAuth={true}><Purchased /></AuthGuard>}/>
+
+                        <Route path="/favorites" element={<AuthGuard requireAuth={true}><Favorites /></AuthGuard>}/>
+
+                        <Route path="/my_papers" element={<AuthGuard requireAuth={true}><MyPapers /></AuthGuard>}/>
 
                         {/* Varios */}
                         <Route path="/equipo" element={<Equipo />} />
@@ -195,29 +177,12 @@ function AppRoutes() {
 
 
                         {/* Funcionalidades */}
-                        <Route
-                            path="/upload"
-                            element={
-                                <AuthGuard requireAuth={true}>
-                                    <Upload />
-                                </AuthGuard>
-                            }
-                        />
+                        <Route path="/upload" element={<AuthGuard requireAuth={true}><Upload /></AuthGuard>}/>
                         <Route path="/contact" element={<Contact />} />
-                        <Route
-                            path="/mentores/postular"
-                            element={
-                                <AuthGuard requireAuth={true}>
-                                    <MentorApply />
-                                </AuthGuard>
-                            }
-                        />
+                        <Route path="/mentores/postular" element={<AuthGuard requireAuth={true}><MentorApply /></AuthGuard>}/>
 
                         {/* 404 */}
-                        <Route
-                            path="*"
-                            element={
-                                <div style={{ padding: "40px", textAlign: "center" }}>
+                        <Route path="*" element={<div style={{ padding: "40px", textAlign: "center" }}>
                                     <h1>404 - Página no encontrada</h1>
                                     <p>La página que buscas no existe.</p>
                                 </div>
@@ -239,6 +204,7 @@ function AppRoutes() {
     export default function App() {
         return (
             <BrowserRouter>
+                <PrivacyBanner />
                 <AppRoutes />
             </BrowserRouter>
         );

@@ -252,4 +252,7 @@ body { background: var(--bg); color: var(--fg); /* esta en rojo pq intelij no la
     outline: 3px solid var(--ring);
     outline-offset: 2px;
 }
-
+@keyframes spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+}

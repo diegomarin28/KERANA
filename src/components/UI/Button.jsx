@@ -1,25 +1,55 @@
-export function Button({ children, variant="primary", ...props }) {
+export function Button({ children, variant = "primary", ...props }) {
     const map = {
-        primary: { bg: "var(--primary)", hover: "var(--primary-700)", fg: "#fff", brd:"transparent" },
-        secondary: { bg: "var(--blue)", hover: "#1d4ed8", fg: "#fff", brd:"transparent" },
-        ghost: { bg: "transparent", hover: "rgba(14,165,163,.10)", fg: "var(--text)", brd:"var(--border)" }
+        primary: {
+            bg: "#2563eb",
+            hover: "#1d4ed8",
+            fg: "#fff",
+            brd: "transparent"
+        },
+        secondary: {
+            bg: "#1e40af",
+            hover: "#1e3a8a",
+            fg: "#fff",
+            brd: "transparent"
+        },
+        ghost: {
+            bg: "transparent",
+            hover: "rgba(37, 99, 235, 0.1)",
+            fg: "#374151",
+            brd: "#d1d5db"
+        },
+        outline: {
+            bg: "transparent",
+            hover: "#f3f4f6",
+            fg: "#374151",
+            brd: "#d1d5db"
+        }
     }[variant];
+
+    // Si no se encuentra la variante, usar primary como fallback
+    const styleMap = map || {
+        bg: "#2563eb",
+        hover: "#1d4ed8",
+        fg: "#fff",
+        brd: "transparent"
+    };
 
     return (
         <button
             {...props}
             style={{
-                background: map.bg,
-                color: map.fg,
-                border: `1px solid ${map.brd}`,
+                background: styleMap.bg,
+                color: styleMap.fg,
+                border: `1px solid ${styleMap.brd}`,
                 borderRadius: 12,
                 padding: "10px 14px",
                 fontWeight: 500,
                 cursor: "pointer",
-                transition: "background .15s"
+                transition: "background .15s",
+                ...props.style // Permitir estilos adicionales
             }}
-            onMouseEnter={(e)=> e.currentTarget.style.background = map.hover}
-            onMouseLeave={(e)=> e.currentTarget.style.background = map.bg}
+            onMouseEnter={(e) => e.currentTarget.style.background = styleMap.hover}
+            onMouseLeave={(e) => e.currentTarget.style.background = styleMap.bg}
         >
             {children}
         </button>

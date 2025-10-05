@@ -17,6 +17,10 @@ export default function Header() {
     const [inHero, setInHero] = useState(true);
     const navigate = useNavigate();
     const headerRef = useRef(null);
+    const location = useLocation();
+    const [usernameCache, setUsernameCache] = useState(() => localStorage.getItem('kerana_username_cache') || '');
+    const [nameCache, setNameCache] = useState(() => localStorage.getItem('kerana_name_cache') || '');
+
 
     // Función unificada para abrir login
     const openAuthModal = () => {
@@ -27,6 +31,20 @@ export default function Header() {
     const closeAuthModal = () => {
         setAuthOpen(false);
     };
+    useEffect(() => {
+        if (user?.id) loadUserProfile();
+    }, [location.pathname]);
+
+    useEffect(() => {
+        const onStorage = (e) => {
+            if (e.key === 'kerana_profile_updated' && user?.id) {
+                loadUserProfile();
+            }
+        };
+        window.addEventListener('storage', onStorage);
+        return () => window.removeEventListener('storage', onStorage);
+    }, [user?.id]);
+
 
     useEffect(() => {
         let mounted = true;
@@ -73,6 +91,7 @@ export default function Header() {
     }, []);
 
     // Cargar perfil usando la función unificada
+// Cargar perfil desde la DB (única fuente de verdad)
     const loadUserProfile = async () => {
         if (!user) {
             setUserProfile(null);
@@ -84,10 +103,32 @@ export default function Header() {
             console.warn("[Header] Error cargando perfil:", error);
             return;
         }
-        if (data) {
-            setUserProfile(data);
+        if (!data) return;
+
+        // 1) Fuente de verdad en memoria
+        setUserProfile(data);
+
+        // 2) Actualizar caches (solo si hay valores nuevos)
+        if (data.username && data.username !== usernameCache) {
+            localStorage.setItem("kerana_username_cache", data.username);
+            setUsernameCache(data.username);
+        }
+        if (data.nombre && data.nombre !== nameCache) {
+            localStorage.setItem("kerana_name_cache", data.nombre);
+            setNameCache(data.nombre);
+        }
+
+        // 3) Mantener auth.user_metadata alineado (no usarlo para render)
+        try {
+            const metaUsername = user?.user_metadata?.username;
+            if (metaUsername !== data.username) {
+                await supabase.auth.updateUser({ data: { username: data.username } });
+            }
+        } catch (e) {
+            console.warn("[Header] updateUser metadata skip:", e?.message);
         }
     };
+
 
     // Detectar si estamos en el hero
     useEffect(() => {
@@ -145,11 +186,17 @@ export default function Header() {
         }
     };
 
-    const displayName =
-        userProfile?.nombre ||
-        userProfile?.username ||
-        user?.email?.split("@")?.[0] ||
-        "Usuario";
+    const computeDisplayName = () => {
+        // Prioridad: DB.nombre > DB.username > cache.nombre > cache.username > email local-part
+        const n = (userProfile?.nombre || "").trim();
+        if (n) return n;
+        const u = (userProfile?.username || "").trim();
+        if (u) return u;
+        if (nameCache && nameCache.trim()) return nameCache.trim();
+        if (usernameCache && usernameCache.trim()) return usernameCache.trim();
+        return user?.email ? user.email.split("@")[0] : "";
+    };
+    const displayName = computeDisplayName();
 
     // Colores del header
     const TOKENS = inHero
@@ -340,34 +387,65 @@ export default function Header() {
                         {!user ? (
                             <HeaderAuthButtons />
                         ) : (
-                            <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                                <span style={{ fontWeight: 700 }}>{displayName}</span>
-                                {userProfile?.foto ? (
-                                    <img
-                                        src={userProfile.foto}
-                                        alt={displayName}
-                                        style={{
-                                            width: 36,
-                                            height: 36,
-                                            borderRadius: "50%",
-                                            objectFit: "cover",
-                                            border: "2px solid #fff"
-                                        }}
-                                    />
-                                ) : (
-                                    <div style={{
-                                        width: 36,
-                                        height: 36,
+                            <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+                                {/* Mostrar username en lugar del email */}
+                                <span style={{
+                                    fontWeight: 700,
+                                    fontSize: 14,
+                                    color: TOKENS.headerText
+                                }}>
+                                    {displayName}
+
+                                </span>
+
+                                {/* Avatar clickeable */}
+                                <button
+                                    onClick={() => navigate("/profile")}
+                                    style={{
+                                        background: "transparent",
+                                        border: "none",
+                                        cursor: "pointer",
+                                        padding: 0,
                                         borderRadius: "50%",
-                                        background: "#fff",
-                                        color: "#0b1e3a",
-                                        display: "grid",
-                                        placeItems: "center",
-                                        fontWeight: 800,
-                                    }}>
-                                        {(displayName?.[0] || "U").toUpperCase()}
-                                    </div>
-                                )}
+                                        transition: "transform 0.2s ease"
+                                    }}
+                                    onMouseEnter={(e) => {
+                                        e.currentTarget.style.transform = "scale(1.1)";
+                                    }}
+                                    onMouseLeave={(e) => {
+                                        e.currentTarget.style.transform = "scale(1)";
+                                    }}
+                                >
+                                    {userProfile?.foto ? (
+                                        <img
+                                            src={userProfile.foto}
+                                            alt={displayName}
+                                            style={{
+                                                width: 40,
+                                                height: 40,
+                                                borderRadius: "50%",
+                                                objectFit: "cover",
+                                                border: "2px solid #fff",
+                                                boxShadow: "0 2px 8px rgba(0,0,0,0.2)"
+                                            }}
+                                        />
+                                    ) : (
+                                        <div style={{
+                                            width: 40,
+                                            height: 40,
+                                            borderRadius: "50%",
+                                            background: "linear-gradient(135deg, #3b82f6 0%, #1e40af 100%)", //el fondo del logo
+                                            color: "#fff",
+                                            display: "grid",
+                                            placeItems: "center",
+                                            fontWeight: 800,
+                                            fontSize: 16,
+                                            boxShadow: "0 2px 8px rgba(0,0,0,0.2)"
+                                        }}>
+                                            {( displayName?.[0] || "U").toUpperCase()}
+                                        </div>
+                                    )}
+                                </button>
                             </div>
                         )}
                     </div>

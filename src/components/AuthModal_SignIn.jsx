@@ -15,6 +15,12 @@ export default function AuthModal_SignIn({ open, onClose, onSignedIn }) {
     const [acceptedTerms, setAcceptedTerms] = useState(false);
     const [showTermsModal, setShowTermsModal] = useState(false);
 
+    const [rememberMe, setRememberMe] = useState(() => {
+        // Leer preferencia guardada - Es para que la app recuerde la preferencia del usuario entre sesiones, sin que tenga que volver a marcar/desmarcar cada vez. El "leer preferencia guardada" significa que cuando el usuario abre el modal de login, automáticamente recupera su última elección del checkbox "Recordarme".
+        try { return JSON.parse(localStorage.getItem("kerana_remember") || "false"); }
+        catch { return false; }
+    });
+
     if (!open) return null;
 
     const reset = () => {
@@ -29,20 +35,36 @@ export default function AuthModal_SignIn({ open, onClose, onSignedIn }) {
         e.preventDefault();
         setLoading(true); setMsg({ type: "", text: "" });
         try {
-            const { data, error } = await supabase.auth.signInWithPassword({
+            console.log('Intentando login con:', {
                 email: email.trim(),
+                passwordLength: pwd.length,
+                rememberMe
+            });
+                const { data, error } = await supabase.auth.signInWithPassword({
+                email: email.trim().toLowerCase(),
                 password: pwd,
             });
             if (error) {
                 if (error.message?.includes("Invalid login credentials")) {
-                    setMsg({ type: "error", text: "Email o contraseña incorrectos." });
+                    setMsg({
+                        type: "error",
+                        text: "Email o contraseña incorrectos. Si creaste la cuenta con Google, usá 'Continuar con Google'."
+                    });
                 } else if (error.message?.includes("Email not confirmed")) {
                     setMsg({ type: "warn", text: "Verificá tu email antes de iniciar sesión." });
-                } else {
+                } else if (error.status === 500) {
+                    setMsg({
+                        type: "error",
+                        text: "Error del servidor. Si creaste la cuenta con Google, usá 'Continuar con Google'."
+                    });
+                }
+                else {
                     setMsg({ type: "error", text: "No se pudo iniciar sesión." });
                 }
                 return;
             }
+            localStorage.setItem("kerana_remember", JSON.stringify(rememberMe)); //para el recordarme
+
             if (data.user) await createOrUpdateUserProfile(data.user);
             onSignedIn?.(data.user);
             onCloseModal();
@@ -70,6 +92,13 @@ export default function AuthModal_SignIn({ open, onClose, onSignedIn }) {
 
         setLoading(true);
         try {
+            console.log('🔍 Intentando signup con:', {
+                email: email.trim(),
+                name: name.trim(),
+                username: username.trim(),
+                passwordLength: pwd.length
+            });
+
             const ok = await ensureUniqueUsername(username.trim());
             if (!ok) {
                 setMsg({ type: "error", text: "Ese @usuario ya existe. Probá con otro." });
@@ -77,17 +106,24 @@ export default function AuthModal_SignIn({ open, onClose, onSignedIn }) {
                 return;
             }
 
+            // 👇 PROBÁ SIN LOS OPTIONS PRIMERO
             const { data: authData, error: authError } = await supabase.auth.signUp({
                 email: email.trim(),
                 password: pwd,
-                options: {
-                    data: { name: name.trim(), username: username.trim() },
-                    emailRedirectTo: `${window.location.origin}/auth/callback`,
-                },
+                data: { name: name.trim(), username: username.trim() },
+                emailRedirectTo: `${window.location.origin}/auth/callback`,
+
             });
-            if (authError) throw authError;
+
+            console.log('🔍 Respuesta signup:', { authData, authError });
+
+            if (authError) {
+                console.error('❌ Error detallado signup:', authError);
+                throw authError;
+            }
 
             if (authData.user) {
+                console.log('✅ Usuario creado, creando perfil...');
                 await createOrUpdateUserProfile(authData.user, {
                     name: name.trim(),
                     username: username.trim(),
@@ -99,8 +135,12 @@ export default function AuthModal_SignIn({ open, onClose, onSignedIn }) {
                 text: "¡Cuenta creada! Revisá tu correo para confirmar.",
             });
             setMode("login");
-        } catch {
-            setMsg({ type: "error", text: "No se pudo crear la cuenta." });
+        } catch (error) {
+            console.error('❌ Error general signup:', error);
+            setMsg({
+                type: "error",
+                text: `No se pudo crear la cuenta. Error: ${error.message}`
+            });
         } finally {
             setLoading(false);
         }
@@ -113,19 +153,18 @@ export default function AuthModal_SignIn({ open, onClose, onSignedIn }) {
                 provider: "google",
                 options: {
                     redirectTo: `${window.location.origin}/auth/callback`,
-                    queryParams: {
-                        access_type: 'offline',
-                        prompt: 'consent'
-                    }
+                    queryParams: { access_type: 'offline', prompt: 'consent' }
                 },
             });
             if (error) throw error;
+            if (data?.user) await createOrUpdateUserProfile(data.user);
         } catch {
             setMsg({ type: "error", text: "No se pudo continuar con Google." });
         } finally {
             setLoading(false);
         }
     }
+
 
     return (
         <div style={backdrop}>
@@ -166,7 +205,7 @@ export default function AuthModal_SignIn({ open, onClose, onSignedIn }) {
                                     type="text"
                                     value={username}
                                     onChange={setUsername}
-                                    placeholder="@usuario"
+                                    placeholder="usuario"
                                     icon="🔵"
                                 />
                             </>
@@ -199,6 +238,28 @@ export default function AuthModal_SignIn({ open, onClose, onSignedIn }) {
                                 </button>
                             }
                         />
+
+                        {/* RECORDARME- Lo pongo dsp de la contra asi aparece ahi bien  */}
+                        {mode === "login" && (
+                            <div style={rememberContainer}>
+                                <label style={rememberLabel}>
+                                    <input
+                                        type="checkbox"
+                                        checked={rememberMe}
+                                        onChange={(e) => setRememberMe(e.target.checked)}
+                                        style={checkboxStyle}
+                                    />
+                                    <span>Recordarme</span>
+                                </label>
+                                <button
+                                    type="button"
+                                    style={forgotLink}
+                                    onClick={() => setMsg({ type: "info", text: "Funcionalidad en desarrollo. Contactá soporte." })}
+                                >
+                                    ¿Olvidaste tu contraseña?
+                                </button>
+                            </div>
+                        )}
 
                         {/* TÉRMINOS Y CONDICIONES - Solo en registro */}
                         {mode === "signup" && (
@@ -664,4 +725,30 @@ const termsAcceptBtn = {
     color: "white",
     cursor: "pointer",
     fontWeight: 600
+};
+
+const rememberContainer = {
+    display: "flex",
+    justifyContent: "space-between",
+    alignItems: "center",
+    margin: "8px 0"
+};
+
+const rememberLabel = {
+    display: "flex",
+    alignItems: "center",
+    gap: 8,
+    fontSize: 14,
+    color: "#475569",
+    cursor: "pointer"
+};
+
+const forgotLink = {
+    background: "none",
+    border: "none",
+    color: "#2563eb",
+    cursor: "pointer",
+    fontSize: 13,
+    textDecoration: "underline",
+    padding: 0
 };

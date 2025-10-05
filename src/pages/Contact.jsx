@@ -1,12 +1,37 @@
-import { useRef, useState } from "react";
+import { useRef, useState, useEffect } from "react";
 import emailjs from "@emailjs/browser";
 import { Button } from "../components/ui/Button";
 import { Card } from "../components/ui/Card";
+import { supabase } from "../supabase";
 
 export default function Contact() {
     const form = useRef(null);
     const [sending, setSending] = useState(false);
-    const [status, setStatus] = useState(null); // "ok" | "err" | null
+    const [status, setStatus] = useState(null);
+    const [email, setEmail] = useState("");
+    const [userName, setUserName] = useState("");
+
+    // Obtener usuario autenticado
+    useEffect(() => {
+        const getUser = async () => {
+            const { data: { user } } = await supabase.auth.getUser();
+            if (user?.email) {
+                setEmail(user.email);
+
+                // Obtener nombre del usuario desde la tabla usuario
+                const { data: profile } = await supabase
+                    .from('usuario')
+                    .select('nombre, username')
+                    .eq('auth_id', user.id)
+                    .single();
+
+                if (profile) {
+                    setUserName(profile.nombre || profile.username || user.email);
+                }
+            }
+        };
+        getUser();
+    }, []);
 
     const sendEmail = async (e) => {
         e.preventDefault();
@@ -14,15 +39,26 @@ export default function Contact() {
         setStatus(null);
 
         try {
-            await emailjs.sendForm(
+            // Agregar datos del usuario al formulario
+            const formData = new FormData(form.current);
+            const templateParams = {
+                name: formData.get('name'),
+                email: formData.get('email') || email || 'sin-email@kerana.app',
+                message: formData.get('message'),
+                user_name: userName || 'Usuario anónimo',
+                user_email: email || 'No autenticado'
+            };
+
+            await emailjs.send(
                 "service_dan74a5",
                 "template_ueime5o",
-                form.current,
+                templateParams,
                 "DMO310micvFWXx-j4"
             );
             setStatus("ok");
             form.current?.reset();
-        } catch {
+        } catch (err) {
+            console.error('Error enviando email:', err);
             setStatus("err");
         } finally {
             setSending(false);
@@ -48,13 +84,7 @@ export default function Contact() {
 
     return wrap(
         <div style={{ width: "100%", maxWidth: 960 }}>
-            {/* Header / Hero */}
-            <div
-                style={{
-                    textAlign: "center",
-                    marginBottom: 24,
-                }}
-            >
+            <div style={{ textAlign: "center", marginBottom: 24 }}>
                 <div
                     style={{
                         display: "inline-flex",
@@ -62,8 +92,7 @@ export default function Contact() {
                         gap: 10,
                         padding: "8px 14px",
                         borderRadius: 999,
-                        background:
-                            "linear-gradient(90deg, rgba(37,99,235,.08), rgba(59,130,246,.08))",
+                        background: "linear-gradient(90deg, rgba(37,99,235,.08), rgba(59,130,246,.08))",
                         color: "#1e40af",
                         fontWeight: 600,
                         fontSize: 12,
@@ -86,17 +115,11 @@ export default function Contact() {
                     Hablemos de tu proyecto académico
                 </h1>
 
-                <p
-                    style={{
-                        margin: 0,
-                        color: "#475569",
-                    }}
-                >
+                <p style={{ margin: 0, color: "#475569" }}>
                     Escribinos y te respondemos a la brevedad. Cualquier consulta o sugerencia es bienvenida!
                 </p>
             </div>
 
-            {/* Content */}
             <div
                 style={{
                     display: "grid",
@@ -104,12 +127,10 @@ export default function Contact() {
                     gap: 24,
                 }}
             >
-                {/* Form card */}
                 <Card
                     style={{
                         border: "1px solid #e6eefc",
-                        boxShadow:
-                            "0 8px 30px -12px rgba(30, 64, 175, .18), 0 1px 0 rgba(15, 23, 42, .02)",
+                        boxShadow: "0 8px 30px -12px rgba(30, 64, 175, .18), 0 1px 0 rgba(15, 23, 42, .02)",
                         backdropFilter: "saturate(140%) blur(4px)",
                     }}
                 >
@@ -134,6 +155,7 @@ export default function Contact() {
                                 name="name"
                                 type="text"
                                 required
+                                defaultValue={userName}
                                 placeholder="Tu nombre completo"
                                 style={inputStyle}
                             />
@@ -144,16 +166,19 @@ export default function Contact() {
                                 htmlFor="email"
                                 style={{ fontSize: 13, color: "#0f172a", fontWeight: 600 }}
                             >
-                                Email
+                                Email (opcional)
                             </label>
                             <input
                                 id="email"
                                 name="email"
                                 type="email"
-                                required
+                                defaultValue={email}
                                 placeholder="tu@email.com"
                                 style={inputStyle}
                             />
+                            <small style={{ fontSize: 12, color: "#64748b" }}>
+                                Solo si querés que te contactemos sobre tu mensaje
+                            </small>
                         </div>
 
                         <div style={{ display: "grid", gap: 6 }}>
@@ -172,8 +197,8 @@ export default function Contact() {
                                     Mensaje
                                 </label>
                                 <span style={{ fontSize: 12, color: "#5b6b8a" }}>
-                  Contanos qué necesitás ✨
-                </span>
+                                    Contanos qué necesitás
+                                </span>
                             </div>
 
                             <textarea
@@ -198,11 +223,9 @@ export default function Contact() {
                             <Button
                                 type="submit"
                                 disabled={sending}
-                                // asumimos que tu Button admite variant="primary"
                                 variant="primary"
                                 style={{
-                                    background:
-                                        "linear-gradient(90deg, #2563eb, #3b82f6 60%, #60a5fa)",
+                                    background: "linear-gradient(90deg, #2563eb, #3b82f6 60%, #60a5fa)",
                                     color: "white",
                                     border: "none",
                                 }}
@@ -221,8 +244,8 @@ export default function Contact() {
                                         borderRadius: 8,
                                     }}
                                 >
-                  ✅ ¡Mensaje enviado!
-                </span>
+                                    Mensaje enviado
+                                </span>
                             )}
                             {status === "err" && (
                                 <span
@@ -235,31 +258,22 @@ export default function Contact() {
                                         borderRadius: 8,
                                     }}
                                 >
-                  ❌ Ocurrió un error. Probá de nuevo.
-                </span>
+                                    Ocurrió un error
+                                </span>
                             )}
                         </div>
                     </form>
                 </Card>
 
-                {/* Side panel */}
                 <Card
                     style={{
                         border: "1px solid #e6eefc",
                         padding: 22,
-                        background:
-                            "linear-gradient(180deg, rgba(59,130,246,.06), rgba(59,130,246,.03))",
+                        background: "linear-gradient(180deg, rgba(59,130,246,.06), rgba(59,130,246,.03))",
                     }}
                 >
                     <div style={{ display: "grid", gap: 14 }}>
-                        <h3
-                            style={{
-                                margin: 0,
-                                fontSize: 18,
-                                color: "#0f172a",
-                                letterSpacing: -0.2,
-                            }}
-                        >
+                        <h3 style={{ margin: 0, fontSize: 18, color: "#0f172a", letterSpacing: -0.2 }}>
                             ¿Por qué contactarnos?
                         </h3>
                         <Feature
@@ -271,7 +285,7 @@ export default function Contact() {
                             desc="Nos adaptamos a tu flujo actual, sin romper tu UI ni tu base."
                         />
                         <Feature
-                            title="En tonos azules 😉"
+                            title="En tonos azules"
                             desc="Coherencia visual con el resto del proyecto."
                         />
 
@@ -281,13 +295,12 @@ export default function Contact() {
                                 padding: 14,
                                 borderRadius: 12,
                                 border: "1px dashed rgba(37,99,235,.35)",
-                                background:
-                                    "linear-gradient(180deg, rgba(219,234,254,.45), rgba(219,234,254,.18))",
+                                background: "linear-gradient(180deg, rgba(219,234,254,.45), rgba(219,234,254,.18))",
                             }}
                         >
                             <p style={{ margin: 0, fontSize: 13, color: "#1e3a8a" }}>
                                 También podés escribirnos luego a{" "}
-                                <strong>soporte.kerana@gmail.com</strong>. Te respondemos en 24–48 hs.
+                                <strong>kerana.soporte@gmail.com</strong>. Te respondemos en 24-48 hs.
                             </p>
                         </div>
                     </div>
@@ -296,8 +309,6 @@ export default function Contact() {
         </div>
     );
 }
-
-/* --- Subcomponentes & estilos --- */
 
 function Feature({ title, desc }) {
     return (
@@ -312,17 +323,16 @@ function Feature({ title, desc }) {
                     gap: 8,
                 }}
             >
-        <span
-            aria-hidden
-            style={{
-                width: 8,
-                height: 8,
-                borderRadius: 999,
-                background:
-                    "radial-gradient(circle at 30% 30%, #93c5fd 0 45%, #2563eb 55% 100%)",
-                boxShadow: "0 0 0 4px rgba(59,130,246,.15)",
-            }}
-        />
+                <span
+                    aria-hidden
+                    style={{
+                        width: 8,
+                        height: 8,
+                        borderRadius: 999,
+                        background: "radial-gradient(circle at 30% 30%, #93c5fd 0 45%, #2563eb 55% 100%)",
+                        boxShadow: "0 0 0 4px rgba(59,130,246,.15)",
+                    }}
+                />
                 {title}
             </div>
             <p style={{ margin: 0, fontSize: 13, color: "#475569" }}>{desc}</p>
@@ -334,12 +344,10 @@ const inputStyle = {
     appearance: "none",
     outline: "none",
     border: "1px solid #cfe0ff",
-    background:
-        "linear-gradient(180deg, #ffffff, rgba(248, 250, 255, .7))",
+    background: "linear-gradient(180deg, #ffffff, rgba(248, 250, 255, .7))",
     padding: "12px 14px",
     borderRadius: 10,
     fontSize: 14,
     color: "#0f172a",
-    boxShadow:
-        "inset 0 1px 0 rgba(255,255,255,.8), 0 1px 0 rgba(15,23,42,.03)",
+    boxShadow: "inset 0 1px 0 rgba(255,255,255,.8), 0 1px 0 rgba(15,23,42,.03)",
 };

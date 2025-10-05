@@ -44,7 +44,7 @@ export default function Home() {
                 id="hero"
                 style={{
                     position: "relative", minHeight: "72vh", display: "grid", placeItems: "center",
-                    padding: "64px 16px 0", background: heroBackground, color: "#fff" //aca con padding le achicamos el tamaño del home asi no qureda tan grotesco
+                    padding: "64px 16px 0", background: heroBackground, color: "#fff"
                 }}
             >
                 <div style={{ width: "min(1080px, 92vw)", textAlign: "center" }}>
@@ -85,34 +85,36 @@ export default function Home() {
                 <section
                     id="after-hero"
                     style={{
-                        scrollMarginTop: "72px",        // evita que el header tape el título
+                        scrollMarginTop: "72px",
                         padding: "64px 16px",
                         borderBottom: "1px solid #e5e7eb",
+                        background: "#f8fafc"
                     }}
                 >
                     <div style={{ width: "min(1080px, 92vw)", margin: "0 auto" }}>
-                        <h2>¿Por qué apuntes digitales?</h2>
+                        <h2 style={{ margin: 0 }}>¿Por qué apuntes digitales?</h2>
                         <p style={{ color: "#6b7280", marginTop: 6 }}>
-                            Ahorrás papel, tinta y transporte compartiendo PDF.
+                            Ahorro ambiental por cada apunte compartido en PDF.
                         </p>
-                        <div
-                            style={{
-                                display: "grid",
-                                gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))",
-                                gap: 16,
-                                marginTop: 20,
-                            }}
-                        >
-                            <Card>
-                                <StatCard title="Papel ahorrado" value="~12 hojas/apunte" />
-                            </Card>
-                            <Card>
-                                <StatCard title="Agua ahorrada" value="~10 L/apunte" />
-                            </Card>
-                            <Card>
-                                <StatCard title="CO₂ evitado" value="~80 g/apunte" />
-                            </Card>
-                        </div>
+
+                        {/*
+                          Parámetros conservadores:
+                          - Páginas típicas por apunte: 20
+                          - Agua por hoja: 0.15 L/hoja (fabricación y procesado)
+                          - CO2 por hoja: 1.2 g/hoja (impresión hogareña + transporte mínimo)
+                        */}
+                        <EcoStats
+                            pagesPerNote={20}
+                            waterPerSheetL={0.15}
+                            co2PerSheetG={1.2}
+                        />
+
+                        <p style={{ color: "#94a3b8", fontSize: 12, marginTop: 12 }}>
+                            Estimaciones conservadoras basadas en literatura general. Los valores reales varían según tipo de papel, tinta y logística.
+                            <Link to="/impacto-ambiental" style={{ color: "#2563eb", marginLeft: 8 }}>
+                                Ver metodología
+                            </Link>
+                        </p>
                     </div>
                 </section>
 
@@ -162,12 +164,25 @@ export default function Home() {
                     >
                         <FooterCol
                             title="Sobre nosotros"
-                            items={["Misión Visión", "Equipo", "Cómo funciona Kerana"]}
+                            items={[
+                                { label: "Misión Visión", to: "/mision-vision" },
+                                { label: "Equipo", to: "/equipo" },
+                                { label: "Cómo funciona Kerana", to: "/how-it-works" }
+                            ]}
                         />
-                        <FooterCol title="Contacto" items={["hola@kerana.app", "Soporte", "Prensa"]} />
+                        <FooterCol
+                            title="Contacto"
+                            items={[
+                                { label: "kerana.soporte@gmail.com", to: "/contact" },
+                                { label: "Enviar mensaje", to: "/contact" }
+                            ]}
+                        />
                         <FooterCol
                             title="Sugerencias"
-                            items={["Mejora", "Problema", "Unirse como colaborador"]}
+                            items={[
+                                { label: "Mejora o problema", to: "/suggestions" },
+                                { label: "Colaborar con nosotros", to: "/suggestions" }
+                            ]}
                         />
                     </div>
                 </section>
@@ -176,14 +191,111 @@ export default function Home() {
     );
 }
 
-function StatCard({ title, value }) {
+/* ======================= */
+/*  COMPONENTES AMBIENTALES */
+/* ======================= */
+
+function EcoStats({ pagesPerNote, waterPerSheetL, co2PerSheetG }) {
+    const paperSaved = `${pagesPerNote} hojas por apunte`;
+    const waterSaved = `~${(pagesPerNote * waterPerSheetL).toFixed(1)} L por apunte`;
+    const co2Saved = `~${Math.round(pagesPerNote * co2PerSheetG)} g por apunte`;
+
     return (
-        <div>
-            <div style={{ fontSize: 14, color: "#6b7280" }}>{title}</div>
-            <div style={{ fontSize: 22, fontWeight: 800, marginTop: 6 }}>{value}</div>
+        <div
+            style={{
+                display: "grid",
+                gridTemplateColumns: "repeat(auto-fit, minmax(260px, 1fr))",
+                gap: 16,
+                marginTop: 20,
+            }}
+        >
+            <Card style={{ padding: 16 }}>
+                <StatCard
+                    title="Papel ahorrado"
+                    value={paperSaved}
+                    subtitle="Estimado para un apunte de 20 páginas."
+                >
+                    <LeafIcon />
+                </StatCard>
+            </Card>
+            <Card style={{ padding: 16 }}>
+                <StatCard
+                    title="Agua evitada"
+                    value={waterSaved}
+                    subtitle="Consumo de fabricación por hoja."
+                >
+                    <DropIcon />
+                </StatCard>
+            </Card>
+            <Card style={{ padding: 16 }}>
+                <StatCard
+                    title="CO₂ evitado"
+                    value={co2Saved}
+                    subtitle="Impresión doméstica y traslado mínimo."
+                >
+                    <CloudIcon />
+                </StatCard>
+            </Card>
         </div>
     );
 }
+
+function StatCard({ title, value, subtitle, children }) {
+    return (
+        <div style={{ display: "grid", gridTemplateColumns: "48px 1fr", gap: 12, alignItems: "center" }}>
+            <div
+                style={{
+                    width: 48,
+                    height: 48,
+                    borderRadius: 12,
+                    background: "#e2e8f0",
+                    display: "grid",
+                    placeItems: "center"
+                }}
+            >
+                {children}
+            </div>
+            <div>
+                <div style={{ fontSize: 13, color: "#6b7280" }}>{title}</div>
+                <div style={{ fontSize: 22, fontWeight: 800, marginTop: 2 }}>{value}</div>
+                {subtitle ? (
+                    <div style={{ fontSize: 12, color: "#94a3b8", marginTop: 2 }}>{subtitle}</div>
+                ) : null}
+            </div>
+        </div>
+    );
+}
+
+/* Iconos simples en SVG para evitar dependencias */
+function LeafIcon() {
+    return (
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#0f172a" strokeWidth="1.8">
+            <path d="M5 21c8 0 14-6 14-14 0-1-.1-2-.3-3C17 5 13 6 9 6 6 6 4 5.5 3 5c0 8 6 14 14 14" />
+            <path d="M9 6c0 6 3 9 9 9" />
+        </svg>
+    );
+}
+
+function DropIcon() {
+    return (
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#0f172a" strokeWidth="1.8">
+            <path d="M12 2s6 6 6 10a6 6 0 0 1-12 0C6 8 12 2 12 2z" />
+        </svg>
+    );
+}
+
+function CloudIcon() {
+    return (
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#0f172a" strokeWidth="1.8">
+            <path d="M20 17.5a4.5 4.5 0 0 0-2-8.5 6 6 0 0 0-11 2" />
+            <path d="M6 17h11a3 3 0 0 0 3-3" />
+        </svg>
+    );
+}
+
+/* ======================= */
+/*  FOOTER (igual)         */
+/* ======================= */
 
 function FooterCol({ title, items }) {
     return (
@@ -198,19 +310,15 @@ function FooterCol({ title, items }) {
                     gap: 8,
                 }}
             >
-                {items.map((t) => (
-                    <li key={t}>
+                {items.map((item) => (
+                    <li key={item.label}>
                         <Link
-                            to={
-                                t === "Equipo"
-                                    ? "/equipo"
-                                    : t === "Misión Visión"
-                                        ? "/mision-vision"
-                                        : "#"
-                            }
-                            style={{ color: "rgba(255,255,255,.9)" }}
-                        >
-                            {t}
+                            to={item.to}
+                            style={{ color: "rgba(255,255,255,.9)", textDecoration: "none" }}
+                            onMouseEnter={(e) => (e.currentTarget.style.textDecoration = "underline")}
+                            onMouseLeave={(e) => (e.currentTarget.style.textDecoration = "none")}
+                            >
+                            {item.label}
                         </Link>
                     </li>
                 ))}

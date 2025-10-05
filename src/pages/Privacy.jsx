@@ -8,11 +8,34 @@ export default function Privacy() {
                 <header style={headerStyle}>
                     <h1 style={titleStyle}>Política de Privacidad</h1>
                     <p style={subtitleStyle}>
-                        Última actualización: {new Date().toLocaleDateString()}
+                        De acuerdo con la Ley N° 18.331 de Uruguay - Última actualización: {new Date().toLocaleDateString()}
                     </p>
                 </header>
 
                 <Card style={contentStyle}>
+                    {/* Sección específica de Uruguay */}
+                    <div style={sectionStyle}>
+                        <h2 style={sectionTitleStyle}>👤 Tus Derechos según la Ley Uruguaya</h2>
+                        <div style={rightsGridStyle}>
+                            <div style={rightItemStyle}>
+                                <strong>Acceso</strong>
+                                <p>Podés solicitar qué datos tenemos sobre vos en cualquier momento</p>
+                            </div>
+                            <div style={rightItemStyle}>
+                                <strong>Rectificación</strong>
+                                <p>Podés corregir datos incorrectos desde tu perfil</p>
+                            </div>
+                            <div style={rightItemStyle}>
+                                <strong>Cancelación</strong>
+                                <p>Podés solicitar la eliminación de tu cuenta y datos permanentemente</p>
+                            </div>
+                            <div style={rightItemStyle}>
+                                <strong>Oposición</strong>
+                                <p>Podés oponerte a ciertos usos de tus datos personales</p>
+                            </div>
+                        </div>
+                    </div>
+
                     <div style={sectionStyle}>
                         <h2 style={sectionTitleStyle}>1. Información que Recopilamos</h2>
                         <p style={textStyle}>
@@ -23,13 +46,10 @@ export default function Privacy() {
                                 <strong>Información personal:</strong> Nombre, email, información de perfil
                             </li>
                             <li>
-                                <strong>Información académica:</strong> Materias de interés, cursos tomados, calificaciones
+                                <strong>Información académica:</strong> Materias de interés, cursos tomados
                             </li>
                             <li>
-                                <strong>Información de transacciones:</strong> Historial de compras, créditos, pagos
-                            </li>
-                            <li>
-                                <strong>Contenido generado:</strong> Apuntes, comentarios, reseñas, mensajes
+                                <strong>Contenido generado:</strong> Apuntes, comentarios, reseñas
                             </li>
                             <li>
                                 <strong>Datos técnicos:</strong> Dirección IP, tipo de dispositivo, logs de uso
@@ -46,126 +66,43 @@ export default function Privacy() {
                             <li>Proporcionar y mantener nuestros servicios</li>
                             <li>Personalizar tu experiencia educativa</li>
                             <li>Procesar transacciones y gestionar créditos</li>
-                            <li>Comunicarnos contigo sobre actualizaciones y novedades</li>
-                            <li>Mejorar y desarrollar nuevos servicios</li>
+                            <li>Comunicarnos contigo sobre actualizaciones</li>
                             <li>Garantizar la seguridad de la plataforma</li>
-                            <li>Cumplir con obligaciones legales</li>
                         </ul>
                     </div>
 
                     <div style={sectionStyle}>
-                        <h2 style={sectionTitleStyle}>3. Compartición de Información</h2>
+                        <h2 style={sectionTitleStyle}>3. Seguridad de los Datos</h2>
                         <p style={textStyle}>
-                            No vendemos tu información personal. Podemos compartir información en los siguientes casos:
-                        </p>
-                        <ul style={listStyle}>
-                            <li>
-                                <strong>Con otros usuarios:</strong> Tu nombre y perfil son visibles en tus publicaciones
-                            </li>
-                            <li>
-                                <strong>Proveedores de servicio:</strong> Con empresas que nos ayudan a operar la plataforma
-                            </li>
-                            <li>
-                                <strong>Cumplimiento legal:</strong> Cuando sea requerido por ley o para proteger nuestros derechos
-                            </li>
-                            <li>
-                                <strong>Transferencias empresariales:</strong> En caso de fusión, venta o reorganización
-                            </li>
-                        </ul>
-                    </div>
-
-                    <div style={sectionStyle}>
-                        <h2 style={sectionTitleStyle}>4. Cookies y Tecnologías Similares</h2>
-                        <p style={textStyle}>
-                            Utilizamos cookies y tecnologías similares para:
-                        </p>
-                        <ul style={listStyle}>
-                            <li>Mantener tu sesión activa</li>
-                            <li>Recordar tus preferencias</li>
-                            <li>Analizar el uso de la plataforma</li>
-                            <li>Personalizar el contenido</li>
-                            <li>Mejorar la seguridad</li>
-                        </ul>
-                        <p style={textStyle}>
-                            Puedes controlar el uso de cookies través de la configuración de tu navegador.
-                        </p>
-                    </div>
-
-                    <div style={sectionStyle}>
-                        <h2 style={sectionTitleStyle}>5. Seguridad de los Datos</h2>
-                        <p style={textStyle}>
-                            Implementamos medidas de seguridad técnicas y organizativas para proteger tu información:
+                            Implementamos medidas de seguridad para proteger tu información:
                         </p>
                         <ul style={listStyle}>
                             <li>Encriptación de datos sensibles</li>
                             <li>Accesos controlados y autenticación</li>
                             <li>Monitoreo continuo de seguridad</li>
                             <li>Copias de seguridad regulares</li>
-                            <li>Capacitación del personal en protección de datos</li>
                         </ul>
                     </div>
 
                     <div style={sectionStyle}>
-                        <h2 style={sectionTitleStyle}>6. Tus Derechos</h2>
+                        <h2 style={sectionTitleStyle}>4. Ejercicio de Derechos</h2>
                         <p style={textStyle}>
-                            Tienes derecho a:
+                            Para ejercer tus derechos según la Ley 18.331:
                         </p>
-                        <ul style={listStyle}>
-                            <li>Acceder a tu información personal</li>
-                            <li>Corregir información inexacta</li>
-                            <li>Eliminar tu cuenta y datos personales</li>
-                            <li>Oponerte al procesamiento de tus datos</li>
-                            <li>Exportar tus datos en formato legible</li>
-                            <li>Retirar tu consentimiento en cualquier momento</li>
-                        </ul>
+                        <div style={contactBoxStyle}>
+                            <strong>Email:</strong> kerana.uy@gmail.com<br/>
+                            <strong>Respuesta:</strong> En un plazo máximo de 10 días hábiles
+                        </div>
                         <p style={textStyle}>
-                            Para ejercer estos derechos, contáctanos a través de los canales indicados al final de esta política.
+                            También podés eliminar tu cuenta directamente desde la configuración de tu perfil.
                         </p>
                     </div>
 
                     <div style={sectionStyle}>
-                        <h2 style={sectionTitleStyle}>7. Retención de Datos</h2>
-                        <p style={textStyle}>
-                            Conservamos tu información personal durante el tiempo necesario para cumplir con los
-                            propósitos descritos en esta política, a menos que la ley requiera un período de
-                            retención más largo. Cuando ya no necesitemos tu información, la eliminaremos de
-                            forma segura.
-                        </p>
-                    </div>
-
-                    <div style={sectionStyle}>
-                        <h2 style={sectionTitleStyle}>8. Transferencias Internacionales</h2>
-                        <p style={textStyle}>
-                            Tus datos pueden ser procesados y almacenados en servidores ubicados fuera de tu
-                            país de residencia. Nos aseguramos de que estas transferencias cumplan con las
-                            leyes aplicables de protección de datos mediante cláusulas contractuales estándar
-                            u otros mecanismos aprobados.
-                        </p>
-                    </div>
-
-                    <div style={sectionStyle}>
-                        <h2 style={sectionTitleStyle}>9. Cambios en esta Política</h2>
+                        <h2 style={sectionTitleStyle}>5. Cambios en esta Política</h2>
                         <p style={textStyle}>
                             Podemos actualizar esta política de privacidad periódicamente. Te notificaremos sobre
-                            cambios significativos a través de la plataforma o por email. El uso continuado de
-                            KERANA después de los cambios constituye la aceptación de la política revisada.
-                        </p>
-                    </div>
-
-                    <div style={sectionStyle}>
-                        <h2 style={sectionTitleStyle}>10. Contacto</h2>
-                        <p style={textStyle}>
-                            Si tienes preguntas sobre esta política de privacidad o sobre el tratamiento de tus
-                            datos personales, contáctanos en:
-                        </p>
-                        <ul style={listStyle}>
-                            <li>Email: privacidad@kerana.com</li>
-                            <li>Formulario de contacto: kerana.com/contact</li>
-                            <li>Dirección postal: [Tu dirección física]</li>
-                        </ul>
-                        <p style={textStyle}>
-                            También tienes derecho a presentar una queja ante la autoridad de protección de
-                            datos de tu país.
+                            cambios significativos a través de la plataforma.
                         </p>
                     </div>
                 </Card>
@@ -174,7 +111,7 @@ export default function Privacy() {
     );
 }
 
-// Estilos (reutilizamos los mismos de Terms.jsx)
+// Estilos
 const pageStyle = {
     minHeight: '100vh',
     background: '#f8fafc',
@@ -223,5 +160,28 @@ const textStyle = {
 const listStyle = {
     color: '#475569',
     paddingLeft: '1.5rem',
+    margin: '1rem 0',
+};
+
+// Nuevos estilos para la sección uruguaya
+const rightsGridStyle = {
+    display: 'grid',
+    gridTemplateColumns: '1fr 1fr',
+    gap: '16px',
+    margin: '1rem 0',
+};
+
+const rightItemStyle = {
+    padding: '16px',
+    background: '#f0f9ff',
+    borderRadius: '8px',
+    border: '1px solid #bae6fd',
+};
+
+const contactBoxStyle = {
+    padding: '16px',
+    background: '#f0f9ff',
+    borderRadius: '8px',
+    border: '1px solid #bae6fd',
     margin: '1rem 0',
 };
