@@ -10,10 +10,11 @@ export const userAPI = {
         const { data: { user } } = await supabase.auth.getUser()
         if (!user) return { data: null, error: 'No hay usuario logueado' }
 
+        // CORREGIDO: buscar por auth_id en lugar de id
         const { data, error } = await supabase
             .from('usuario')
             .select('*')
-            .eq('id', user.id)
+            .eq('auth_id', user.id)  // ← CAMBIAR A auth_id
             .single()
 
         return { data, error }
@@ -26,8 +27,8 @@ export const userAPI = {
         const { data, error } = await supabase
             .from('usuario')
             .insert([{
-                id: user.id,
-                email: user.email,
+                auth_id: user.id,  // ← CAMBIAR A auth_id
+                correo: user.email,
                 ...profileData
             }])
             .select()
@@ -42,13 +43,12 @@ export const userAPI = {
         const { data, error } = await supabase
             .from('usuario')
             .update(profileData)
-            .eq('id', user.id)
+            .eq('auth_id', user.id)  // ← CAMBIAR A auth_id
             .select()
 
         return { data, error }
     }
 }
-
 // ==========================================
 // 🎓 MATERIAS Y CONTENIDO
 // ==========================================

@@ -70,7 +70,6 @@ export default function Terms() {
                         <ul style={listStyle}>
                             <li>Los créditos comprados no son reembolsables</li>
                             <li>Las transacciones entre usuarios son finales</li>
-                            <li>KERANA se reserva el derecho de retener comisiones por transacciones</li>
                             <li>Los precios pueden cambiar sin previo aviso</li>
                         </ul>
                     </div>
@@ -112,6 +111,9 @@ export default function Terms() {
                         <p style={textStyle}>
                             Podemos suspender o terminar tu acceso a KERANA si violas estos términos o
                             realizas actividades que consideremos perjudiciales para la comunidad.
+                            Al eliminar tu cuenta, todos tus datos personales y contenido son eliminados permanentemente.
+                            Tu dirección de email permanece en nuestros sistemas de autenticación por seguridad,
+                            pero no está asociada a ningún dato personal ni puede ser utilizada para identificarte.
                         </p>
                     </div>
 
