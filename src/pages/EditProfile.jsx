@@ -28,6 +28,9 @@ export default function EditProfile() {
         if (tab === 'password') {
             setActiveTab('password');
         }
+        if (tab === 'delete') {
+            setActiveTab('delete');
+        }
         fetchProfile();
     }, []);
 
@@ -195,6 +198,58 @@ export default function EditProfile() {
         }
     };
 
+    const handleDeleteAccount = async () => {
+        if (!window.confirm(
+            '¿Estás seguro de que querés eliminar tu cuenta?\n\n' +
+            'Se eliminarán todos tus datos permanentemente.\n' +
+            'Esta acción NO se puede deshacer.'
+        )) {
+            return;
+        }
+
+        const confirmation = window.confirm('¿Realmente querés eliminar tu cuenta?');
+        if (!confirmation) return;
+
+        setSaving(true);
+        setMessage({ type: '', text: '' });
+
+        try {
+            const { data: { user } } = await supabase.auth.getUser();
+            if (!user) throw new Error('No hay usuario logueado');
+
+            // Obtener el ID numérico del usuario
+            const { data: usuarioData } = await supabase
+                .from('usuario')
+                .select('id_usuario')
+                .eq('auth_id', user.id)
+                .single();
+
+            const usuarioId = usuarioData.id_usuario;
+
+            // Eliminar datos del usuario
+            await Promise.all([
+                supabase.from('apunte').delete().eq('id_usuario', usuarioId),
+                supabase.from('califica').delete().eq('id_usuario', usuarioId),
+                supabase.from('evalua').delete().eq('id_usuario', usuarioId)
+            ]);
+
+            // Eliminar el usuario
+            await supabase.from('usuario').delete().eq('auth_id', user.id);
+
+            // Cerrar sesión
+            await supabase.auth.signOut();
+
+            setMessage({ type: 'success', text: 'Cuenta eliminada. Redirigiendo...' });
+            setTimeout(() => navigate('/'), 2000);
+
+        } catch (err) {
+            console.error('Error eliminando cuenta:', err);
+            setMessage({ type: 'error', text: 'Error al eliminar la cuenta' });
+        } finally {
+            setSaving(false);
+        }
+    };
+
     if (loading) {
         return (
             <div style={pageStyle}>
@@ -210,8 +265,8 @@ export default function EditProfile() {
         <div style={pageStyle}>
             <div style={{ maxWidth: 600, margin: '0 auto' }}>
                 <div style={headerStyle}>
-                    <h1 style={titleStyle}>Editar Perfil</h1>
-                    <p style={subtitleStyle}>Gestioná tu información personal y contraseña</p>
+                    <h1 style={titleStyle}>Configuración de Perfil</h1>
+                    <p style={subtitleStyle}>Gestioná tu información personal, contraseña y cuenta</p>
                 </div>
 
                 {/* Tabs */}
@@ -227,6 +282,12 @@ export default function EditProfile() {
                         style={activeTab === 'password' ? activeTabStyle : tabStyle}
                     >
                         🔐 Contraseña
+                    </button>
+                    <button
+                        onClick={() => setActiveTab('delete')}
+                        style={activeTab === 'delete' ? activeTabStyle : tabStyle}
+                    >
+                        🗑️ Eliminar Cuenta
                     </button>
                 </div>
 
@@ -304,7 +365,7 @@ export default function EditProfile() {
                                 </Button>
                             </div>
                         </form>
-                    ) : (
+                    ) : activeTab === 'password' ? (
                         <form onSubmit={handlePasswordSubmit} style={formStyle}>
                             <div style={inputGroupStyle}>
                                 <label style={labelStyle}>Contraseña actual</label>
@@ -379,6 +440,49 @@ export default function EditProfile() {
                                 </Button>
                             </div>
                         </form>
+                    ) : (
+                        // TAB: ELIMINAR CUENTA
+                        <div style={deleteSectionStyle}>
+                            <div style={warningSectionStyle}>
+                                <h3 style={warningTitleStyle}>⚠️ Eliminar Cuenta Permanentemente</h3>
+                                <p style={warningTextStyle}>
+                                    Esta acción <strong>no se puede deshacer</strong>. Se eliminarán todos tus datos:
+                                </p>
+                                <ul style={warningListStyle}>
+                                    <li>Tu perfil y información personal</li>
+                                    <li>Todos los apuntes que hayas subido</li>
+                                    <li>Tus reseñas y calificaciones</li>
+                                    <li>Tu historial de transacciones</li>
+                                    <li>Tus créditos restantes</li>
+                                </ul>
+                                <p style={warningTextStyle}>
+                                    <strong>Advertencia:</strong> Si tenés apuntes que otros usuarios han comprado,
+                                    perderán acceso a ellos.
+                                </p>
+                            </div>
+
+                            <div style={buttonsStyle}>
+                                <Button
+                                    onClick={handleDeleteAccount}
+                                    disabled={saving}
+                                    style={{
+                                        flex: 1,
+                                        background: '#dc2626',
+                                        border: '1px solid #dc2626'
+                                    }}
+                                >
+                                    {saving ? 'Eliminando...' : 'Sí, eliminar mi cuenta'}
+                                </Button>
+                                <Button
+                                    type="button"
+                                    variant="outline"
+                                    onClick={() => navigate('/profile')}
+                                    style={{ flex: 1 }}
+                                >
+                                    Cancelar
+                                </Button>
+                            </div>
+                        </div>
                     )}
                 </Card>
             </div>
@@ -386,7 +490,7 @@ export default function EditProfile() {
     );
 }
 
-// Estilos (los mismos que antes)
+// Estilos (agregar los nuevos para la sección de eliminar cuenta)
 const pageStyle = {
     minHeight: '100vh',
     background: 'linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%)',
@@ -435,6 +539,7 @@ const tabsContainerStyle = {
     padding: '8px',
     marginBottom: '24px',
     border: '1px solid #e2e8f0',
+    gap: '8px',
 };
 
 const tabStyle = {
@@ -447,6 +552,7 @@ const tabStyle = {
     fontWeight: '600',
     color: '#64748b',
     transition: 'all 0.2s ease',
+    fontSize: '14px',
 };
 
 const activeTabStyle = {
@@ -525,4 +631,38 @@ const buttonsStyle = {
     display: 'flex',
     gap: '12px',
     marginTop: '8px',
+};
+
+// Nuevos estilos para la sección de eliminar cuenta
+const deleteSectionStyle = {
+    display: 'grid',
+    gap: '24px',
+};
+
+const warningSectionStyle = {
+    padding: '20px',
+    background: '#fef2f2',
+    borderRadius: '12px',
+    border: '1px solid #fecaca',
+};
+
+const warningTitleStyle = {
+    fontSize: '18px',
+    fontWeight: '700',
+    color: '#dc2626',
+    margin: '0 0 16px 0',
+    textAlign: 'center',
+};
+
+const warningTextStyle = {
+    color: '#7f1d1d',
+    margin: '0 0 12px 0',
+    lineHeight: '1.5',
+};
+
+const warningListStyle = {
+    color: '#7f1d1d',
+    paddingLeft: '20px',
+    margin: '12px 0',
+    lineHeight: '1.6',
 };

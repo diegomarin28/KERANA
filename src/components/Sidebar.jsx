@@ -190,6 +190,15 @@ export default function Sidebar({ open, onClose, isAuthenticated, user, onLogout
                     <MenuLink icon="💡" label="Mentores" onClick={() => go("/mentors")} />
                     <MenuLink icon="📄" label="Apuntes" onClick={() => go("/notes")} />
 
+                    {/*CUENTAA*/}
+                    <Group title="Cuenta" />
+                    {isAuthenticated && (
+                        <>
+                            <MenuLink icon="👤" label="Mi Perfil" onClick={() => go("/profile")} />
+                            <MenuLink icon="🔔" label="Notificaciones" onClick={() => go("/notifications")} />
+                        </>
+                    )}
+
                     <Group title="Ayuda" />
                     <MenuLink icon="📞" label="Contacto" onClick={() => go("/contact")} />
                     <MenuLink icon="❓" label="Centro de ayuda" onClick={() => go("/help")} />
@@ -197,21 +206,13 @@ export default function Sidebar({ open, onClose, isAuthenticated, user, onLogout
                     <MenuLink icon="🔒" label="Política de privacidad" onClick={() => go("/privacy")} />
 
 
-                    {/*CUENTAA*/}
-                    <Group title="Cuenta" />
-                    {isAuthenticated ? (
-                        <>
-                            <MenuLink icon="👤" label="Mi Perfil" onClick={() => go("/profile")} />
-                            <MenuLink icon="⚙️" label="Ajustes" onClick={() => go("/settings")} />
-                        </>
-                    ) : (
+                    {/* SESIÓN - Al final */}
+                    {!isAuthenticated ? (
                         <>
                             <PrimaryButton label="Iniciar sesión" onClick={openAuthModal} />
                             <SecondaryButton label="Crear cuenta" onClick={openAuthModal} />
                         </>
-                    )}
-
-                    {isAuthenticated && (
+                    ) : (
                         <>
                             <div style={{ marginTop: 20 }} />
                             <SmallDangerButton label="Cerrar sesión" onClick={() => { onLogout?.(); onClose?.(); }} />

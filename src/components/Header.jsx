@@ -1,4 +1,3 @@
-// Header.jsx - VERSIÓN CORREGIDA
 import { useEffect, useState, useRef } from "react";
 import { Link, useNavigate, useLocation } from "react-router-dom";
 import AuthModal_SignIn from "../components/AuthModal_SignIn.jsx";
@@ -20,7 +19,7 @@ export default function Header() {
     const location = useLocation();
     const [usernameCache, setUsernameCache] = useState(() => localStorage.getItem('kerana_username_cache') || '');
     const [nameCache, setNameCache] = useState(() => localStorage.getItem('kerana_name_cache') || '');
-
+    const [displayName, setDisplayName] = useState('');
 
     // Función unificada para abrir login
     const openAuthModal = () => {
@@ -31,6 +30,7 @@ export default function Header() {
     const closeAuthModal = () => {
         setAuthOpen(false);
     };
+
     useEffect(() => {
         if (user?.id) loadUserProfile();
     }, [location.pathname]);
@@ -45,6 +45,25 @@ export default function Header() {
         return () => window.removeEventListener('storage', onStorage);
     }, [user?.id]);
 
+    // Calcular displayName cuando cambien los datos
+    useEffect(() => {
+        const computeDisplayName = () => {
+            // Prioridad: DB.nombre > DB.username > email local-part > cache
+            const n = (userProfile?.nombre || "").trim();
+            if (n) return n;
+
+            const u = (userProfile?.username || "").trim();
+            if (u) return u;
+
+            // Si no hay userProfile aún, usar cache
+            if (!userProfile && nameCache) return nameCache;
+            if (!userProfile && usernameCache) return usernameCache;
+
+            return user?.email ? user.email.split("@")[0] : "";
+        };
+
+        setDisplayName(computeDisplayName());
+    }, [userProfile, user, nameCache, usernameCache]);
 
     useEffect(() => {
         let mounted = true;
@@ -75,11 +94,12 @@ export default function Header() {
             if (session?.user) {
                 setUser(session.user);
                 await loadUserProfile();
-                closeAuthModal(); // Usar función unificada
-                setMenuOpen(false); // Cerrar sidebar al autenticar
+                closeAuthModal();
+                setMenuOpen(false);
             } else {
                 setUser(null);
                 setUserProfile(null);
+                setDisplayName('');
                 setMenuOpen(false);
             }
         });
@@ -90,11 +110,11 @@ export default function Header() {
         };
     }, []);
 
-    // Cargar perfil usando la función unificada
-// Cargar perfil desde la DB (única fuente de verdad)
+    // Cargar perfil desde la DB (única fuente de verdad)
     const loadUserProfile = async () => {
         if (!user) {
             setUserProfile(null);
+            setDisplayName('');
             return;
         }
 
@@ -105,10 +125,9 @@ export default function Header() {
         }
         if (!data) return;
 
-        // 1) Fuente de verdad en memoria
         setUserProfile(data);
 
-        // 2) Actualizar caches (solo si hay valores nuevos)
+        // Actualizar caches (solo si hay valores nuevos)
         if (data.username && data.username !== usernameCache) {
             localStorage.setItem("kerana_username_cache", data.username);
             setUsernameCache(data.username);
@@ -118,17 +137,8 @@ export default function Header() {
             setNameCache(data.nombre);
         }
 
-        // 3) Mantener auth.user_metadata alineado (no usarlo para render)
-        try {
-            const metaUsername = user?.user_metadata?.username;
-            if (metaUsername !== data.username) {
-                await supabase.auth.updateUser({ data: { username: data.username } });
-            }
-        } catch (e) {
-            console.warn("[Header] updateUser metadata skip:", e?.message);
-        }
+        // El displayName se actualizará automáticamente por el useEffect
     };
-
 
     // Detectar si estamos en el hero
     useEffect(() => {
@@ -151,15 +161,15 @@ export default function Header() {
 
     const handleReseniaClick = () => {
         if (!user) {
-            openAuthModal(); // Usar función unificada
+            openAuthModal();
         } else {
             setReseniaOpen(true);
         }
     };
 
     const handleSignedIn = (u) => {
-        closeAuthModal(); // Usar función unificada
-        setMenuOpen(false); // ← Cerrar sidebar también
+        closeAuthModal();
+        setMenuOpen(false);
         if (u) {
             setUser(u);
             loadUserProfile();
@@ -173,30 +183,20 @@ export default function Header() {
         if (success) {
             setUser(null);
             setUserProfile(null);
+            setDisplayName('');
             setMenuOpen(false);
-            closeAuthModal(); // Usar función unificada
+            closeAuthModal();
             setReseniaOpen(false);
             navigate('/');
         } else {
             // Fallback: limpiar estado de todas formas
             setUser(null);
             setUserProfile(null);
+            setDisplayName('');
             setMenuOpen(false);
             navigate('/');
         }
     };
-
-    const computeDisplayName = () => {
-        // Prioridad: DB.nombre > DB.username > cache.nombre > cache.username > email local-part
-        const n = (userProfile?.nombre || "").trim();
-        if (n) return n;
-        const u = (userProfile?.username || "").trim();
-        if (u) return u;
-        if (nameCache && nameCache.trim()) return nameCache.trim();
-        if (usernameCache && usernameCache.trim()) return usernameCache.trim();
-        return user?.email ? user.email.split("@")[0] : "";
-    };
-    const displayName = computeDisplayName();
 
     // Colores del header
     const TOKENS = inHero
@@ -292,7 +292,7 @@ export default function Header() {
         return (
             <button
                 type="button"
-                onClick={openAuthModal} // ← Usar función unificada
+                onClick={openAuthModal}
                 style={signBtn}
                 onMouseEnter={handleSignInMouseEnter}
                 onMouseLeave={handleSignInMouseLeave}
@@ -381,21 +381,19 @@ export default function Header() {
                         <PillButton onClick={handleReseniaClick}>¡Hacé tu reseña!</PillButton>
                     </nav>
 
-
                     {/* Derecha */}
                     <div>
                         {!user ? (
                             <HeaderAuthButtons />
                         ) : (
                             <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-                                {/* Mostrar username en lugar del email */}
+                                {/* Mostrar nombre estable */}
                                 <span style={{
                                     fontWeight: 700,
                                     fontSize: 14,
                                     color: TOKENS.headerText
                                 }}>
                                     {displayName}
-
                                 </span>
 
                                 {/* Avatar clickeable */}
@@ -434,7 +432,7 @@ export default function Header() {
                                             width: 40,
                                             height: 40,
                                             borderRadius: "50%",
-                                            background: "linear-gradient(135deg, #3b82f6 0%, #1e40af 100%)", //el fondo del logo
+                                            background: "linear-gradient(135deg, #3b82f6 0%, #1e40af 100%)",
                                             color: "#fff",
                                             display: "grid",
                                             placeItems: "center",
@@ -442,7 +440,7 @@ export default function Header() {
                                             fontSize: 16,
                                             boxShadow: "0 2px 8px rgba(0,0,0,0.2)"
                                         }}>
-                                            {( displayName?.[0] || "U").toUpperCase()}
+                                            {(displayName?.[0] || "U").toUpperCase()}
                                         </div>
                                     )}
                                 </button>
@@ -474,7 +472,7 @@ export default function Header() {
             />
             <AuthModal_SignIn
                 open={authOpen}
-                onClose={closeAuthModal} // ← Usar función unificada
+                onClose={closeAuthModal}
                 onSignedIn={handleSignedIn}
             />
             <AuthModal_HacerResenia

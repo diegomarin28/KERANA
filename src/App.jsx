@@ -32,18 +32,20 @@ const HowItWorks = lazy(() => import("./pages/HowItWorks"));
 const Suggestions = lazy(() => import("./pages/Suggestions"));
 const AmbientalImpact = lazy(() => import("./pages/AmbientalImpact"));
 const Subjects =  lazy(() => import("./pages/Subjects"));
-const Settings = lazy(() => import("./pages/Settings"));
 const Purchased = lazy(() => import("./pages/Purchased"));
 const Profile = lazy(() => import("./pages/Profile"));
 const EditProfile = lazy(() => import("./pages/EditProfile"));
 const Favorites = lazy(() => import("./pages/Favorites"));
 const MyPapers = lazy(() => import("./pages/MyPapers"));
+const Notifications = lazy(() => import("./pages/Notifications"));
+
 
 //se importa cuando la app carga por primera vez, aunque el usuario nunca entre a esa ruta. es lo esencial q cargamos siempre si o si
 import AuthConfirm from './pages/AuthConfirm';
 //import SignIn from './pages/SignIn';
 import AuthModal_SignIn from "./components/AuthModal_SignIn";
 import PrivacyBanner from './components/PrivacyBanner';
+import { NotificationProvider } from "./components/NotificationProvider";
 
 
 
@@ -121,6 +123,8 @@ function AppRoutes() {
                         <Route path="/" element={<Home />} />
                         <Route path="/impacto-ambiental" element={<AmbientalImpact />} />
 
+                        <Route path="/notifications" element={<AuthGuard requireAuth={true}><Notifications /></AuthGuard>}/>
+
                         {/* Búsqueda y exploración */}
                         <Route path="/search" element={<SearchResults />} />
                         <Route path="/cursos/buscar" element={<CourseSearch />} />
@@ -139,7 +143,6 @@ function AppRoutes() {
                         {/* Usuario - PROTEGIDAS */}
                         <Route path="/profile" element={<AuthGuard requireAuth={true}><Profile /></AuthGuard>}/>
                         <Route path="/edit-profile" element={<EditProfile />} />
-                        <Route path="/settings" element={<AuthGuard requireAuth={true}><Settings /></AuthGuard>}/>
 
                         <Route path="/panel" element={<AuthGuard requireAuth={true}><UserDashboard /></AuthGuard>}/>
 
@@ -204,8 +207,10 @@ function AppRoutes() {
     export default function App() {
         return (
             <BrowserRouter>
+                <NotificationProvider>
                 <PrivacyBanner />
                 <AppRoutes />
+                </NotificationProvider>
             </BrowserRouter>
         );
     }

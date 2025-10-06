@@ -1,4 +1,3 @@
-
 import { useState } from "react";
 import { supabase } from "../supabase";
 import { createOrUpdateUserProfile, ensureUniqueUsername } from "../utils/authHelpers";
@@ -14,12 +13,6 @@ export default function AuthModal_SignIn({ open, onClose, onSignedIn }) {
     const [msg, setMsg] = useState({ type: "", text: "" });
     const [acceptedTerms, setAcceptedTerms] = useState(false);
     const [showTermsModal, setShowTermsModal] = useState(false);
-
-    const [rememberMe, setRememberMe] = useState(() => {
-        // Leer preferencia guardada - Es para que la app recuerde la preferencia del usuario entre sesiones, sin que tenga que volver a marcar/desmarcar cada vez. El "leer preferencia guardada" significa que cuando el usuario abre el modal de login, automáticamente recupera su última elección del checkbox "Recordarme".
-        try { return JSON.parse(localStorage.getItem("kerana_remember") || "false"); }
-        catch { return false; }
-    });
 
     if (!open) return null;
 
@@ -37,13 +30,13 @@ export default function AuthModal_SignIn({ open, onClose, onSignedIn }) {
         try {
             console.log('Intentando login con:', {
                 email: email.trim(),
-                passwordLength: pwd.length,
-                rememberMe
+                passwordLength: pwd.length
             });
-                const { data, error } = await supabase.auth.signInWithPassword({
+            const { data, error } = await supabase.auth.signInWithPassword({
                 email: email.trim().toLowerCase(),
                 password: pwd,
             });
+
             if (error) {
                 if (error.message?.includes("Invalid login credentials")) {
                     setMsg({
@@ -63,7 +56,6 @@ export default function AuthModal_SignIn({ open, onClose, onSignedIn }) {
                 }
                 return;
             }
-            localStorage.setItem("kerana_remember", JSON.stringify(rememberMe)); //para el recordarme
 
             if (data.user) await createOrUpdateUserProfile(data.user);
             onSignedIn?.(data.user);
@@ -238,28 +230,6 @@ export default function AuthModal_SignIn({ open, onClose, onSignedIn }) {
                                 </button>
                             }
                         />
-
-                        {/* RECORDARME- Lo pongo dsp de la contra asi aparece ahi bien  */}
-                        {mode === "login" && (
-                            <div style={rememberContainer}>
-                                <label style={rememberLabel}>
-                                    <input
-                                        type="checkbox"
-                                        checked={rememberMe}
-                                        onChange={(e) => setRememberMe(e.target.checked)}
-                                        style={checkboxStyle}
-                                    />
-                                    <span>Recordarme</span>
-                                </label>
-                                <button
-                                    type="button"
-                                    style={forgotLink}
-                                    onClick={() => setMsg({ type: "info", text: "Funcionalidad en desarrollo. Contactá soporte." })}
-                                >
-                                    ¿Olvidaste tu contraseña?
-                                </button>
-                            </div>
-                        )}
 
                         {/* TÉRMINOS Y CONDICIONES - Solo en registro */}
                         {mode === "signup" && (
