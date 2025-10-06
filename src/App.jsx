@@ -38,7 +38,8 @@ const EditProfile = lazy(() => import("./pages/EditProfile"));
 const Favorites = lazy(() => import("./pages/Favorites"));
 const MyPapers = lazy(() => import("./pages/MyPapers"));
 const Notifications = lazy(() => import("./pages/Notifications"));
-
+const NotificationsMessages = lazy(() => import("./components/NotificationsMessages"));
+const UserCard = lazy(() => import("./components/UserCard"));
 
 //se importa cuando la app carga por primera vez, aunque el usuario nunca entre a esa ruta. es lo esencial q cargamos siempre si o si
 import AuthConfirm from './pages/AuthConfirm';
@@ -125,6 +126,8 @@ function AppRoutes() {
 
                         <Route path="/notifications" element={<AuthGuard requireAuth={true}><Notifications /></AuthGuard>}/>
 
+                        < Route path= "/notifications-messages" element={ <NotificationsMessages />} />
+
                         {/* Búsqueda y exploración */}
                         <Route path="/search" element={<SearchResults />} />
                         <Route path="/cursos/buscar" element={<CourseSearch />} />
@@ -145,6 +148,7 @@ function AppRoutes() {
                         <Route path="/edit-profile" element={<EditProfile />} />
 
                         <Route path="/panel" element={<AuthGuard requireAuth={true}><UserDashboard /></AuthGuard>}/>
+                        <Route path="/user-card" element={<UserCard />}/>
 
                         {/* Footer home */}
                         <Route path="/mision-vision" element={<MisionVision />} />

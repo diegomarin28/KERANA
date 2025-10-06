@@ -1,3 +1,4 @@
+// SearchResults.jsx (modificado)
 import { useLocation } from "react-router-dom";
 import { useMemo, useState, useEffect } from "react";
 import SearchBar from "../components/SearchBar";
@@ -5,18 +6,22 @@ import { searchAPI } from "../api/Database";
 import SubjectCard from "../components/SubjectCard";
 import ProfessorCard from "../components/ProfessorCard";
 import NoteCard from "../components/NoteCard";
+import { UserCard } from "../components/UserCard"; // Nuevo componente
 
 export default function SearchResults() {
     const { search } = useLocation();
-    const q = (new URLSearchParams(search).get("q") || "").trim();
+    const params = new URLSearchParams(search);
+    const q = (params.get("q") || "").trim();
+    const type = params.get("type") || "todo";
 
-    const [tab, setTab] = useState("todo");
+    const [tab, setTab] = useState(type);
     const [loading, setLoading] = useState(false);
 
     const [subjects, setSubjects] = useState([]);
     const [professors, setProfessors] = useState([]);
     const [mentors, setMentors] = useState([]);
     const [notes, setNotes] = useState([]);
+    const [users, setUsers] = useState([]); // Nuevo estado para usuarios
 
     useEffect(() => {
         if (q) fetchAll(q);
@@ -32,11 +37,14 @@ export default function SearchResults() {
             setNotes(data?.apuntes ?? []);
             setProfessors(data?.profesores ?? []);
             setMentors(data?.mentores ?? []);
+            setUsers(data?.usuarios ?? []); // Nuevo
+
         } catch (e) {
             setSubjects([]);
             setNotes([]);
             setProfessors([]);
             setMentors([]);
+            setUsers([]);
         } finally {
             setLoading(false);
         }
@@ -58,11 +66,13 @@ export default function SearchResults() {
             professors: removeDuplicates(professors, (p) => p.id_profesor ?? p.id),
             mentors: removeDuplicates(mentors, (m) => m.id_mentor ?? m.id),
             notes: removeDuplicates(notes, (n) => n.id_apunte ?? n.id),
+            users: removeDuplicates(users, (u) => u.id_usuario ?? u.id), // Nuevo
         };
-    }, [subjects, professors, mentors, notes]);
+    }, [subjects, professors, mentors, notes, users]);
 
     const show = (k) => tab === "todo" || tab === k;
-    const total = filtered.subjects.length + filtered.professors.length + filtered.mentors.length + filtered.notes.length;
+    const total = filtered.subjects.length + filtered.professors.length +
+        filtered.mentors.length + filtered.notes.length + filtered.users.length;
 
     // Contadores para los tabs
     const counts = {
@@ -70,7 +80,8 @@ export default function SearchResults() {
         materias: filtered.subjects.length,
         profesores: filtered.professors.length,
         mentores: filtered.mentors.length,
-        apuntes: filtered.notes.length
+        apuntes: filtered.notes.length,
+        usuarios: filtered.users.length // Nuevo
     };
 
     return (
@@ -102,7 +113,7 @@ export default function SearchResults() {
                             fontSize: 16,
                             color: "#6B7280"
                         }}>
-                            {total > 0 ? `${total} resultados encontrados` : "Encuentra profesores, materias y apuntes"}
+                            {total > 0 ? `${total} resultados encontrados` : "Encuentra profesores, materias, usuarios y apuntes"}
                         </p>
                     </div>
                 </div>
@@ -115,7 +126,7 @@ export default function SearchResults() {
                     flexWrap: "wrap",
                     justifyContent: "center"
                 }}>
-                    {["todo", "materias", "profesores", "apuntes"].map((t) => (
+                    {["todo", "materias", "profesores", "apuntes", "usuarios"].map((t) => (
                         <button
                             key={t}
                             onClick={() => setTab(t)}
@@ -138,6 +149,7 @@ export default function SearchResults() {
                             {t === "materias" && "📖 Materias"}
                             {t === "profesores" && "👨‍🏫 Profesores"}
                             {t === "apuntes" && "📄 Apuntes"}
+                            {t === "usuarios" && "👤 Usuarios"}
 
                             {counts[t] > 0 && (
                                 <span style={{
@@ -210,6 +222,11 @@ export default function SearchResults() {
                         {/* Apuntes */}
                         {show("apuntes") && filtered.notes.map((a, index) => (
                             <NoteCard key={`apunte-${a.id_apunte}-${index}`} note={a} />
+                        ))}
+
+                        {/* Usuarios - NUEVO */}
+                        {show("usuarios") && filtered.users.map((user, index) => (
+                            <UserCard key={`usuario-${user.id_usuario}-${index}`} usuario={user} />
                         ))}
 
                         {/* Mentores (versión simple) */}

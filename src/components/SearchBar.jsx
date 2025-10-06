@@ -36,12 +36,11 @@ export default function SearchBar() {
             try {
                 const results = [];
 
+                // Buscar materias (prioridad 1)
                 const { data: materias, error: materiasError } = await supabase
                     .rpc('buscar_materias_sin_tildes', { termino: term });
 
-                if (materiasError) {
-                    console.error('Error buscando materias:', materiasError);
-                } else if (materias) {
+                if (!materiasError && materias) {
                     materias.forEach(m => {
                         results.push({
                             type: 'materia',
@@ -52,12 +51,11 @@ export default function SearchBar() {
                     });
                 }
 
+                // Buscar profesores (prioridad 2)
                 const { data: profesores, error: profesoresError } = await supabase
                     .rpc('buscar_profesores_sin_tildes', { termino: term });
 
-                if (profesoresError) {
-                    console.error('Error buscando profesores:', profesoresError);
-                } else if (profesores) {
+                if (!profesoresError && profesores) {
                     profesores.forEach(p => {
                         results.push({
                             type: 'profesor',
@@ -68,18 +66,35 @@ export default function SearchBar() {
                     });
                 }
 
+                // Buscar apuntes (prioridad 3)
                 const { data: apuntes, error: apuntesError } = await supabase
                     .rpc('buscar_apuntes_sin_tildes', { termino: term });
 
-                if (apuntesError) {
-                    console.error('Error buscando apuntes:', apuntesError);
-                } else if (apuntes) {
+                if (!apuntesError && apuntes) {
                     apuntes.forEach(a => {
                         results.push({
                             type: 'apunte',
                             id: a.id_apunte,
                             text: a.titulo,
                             icon: '📄'
+                        });
+                    });
+                }
+
+                // Buscar usuarios (prioridad 4) - NUEVO
+                const { data: usuarios, error: usuariosError } = await supabase
+                    .rpc('buscar_usuarios_sin_tildes', { termino: term });
+
+                if (!usuariosError && usuarios) {
+                    usuarios.forEach(u => {
+                        results.push({
+                            type: 'usuario',
+                            id: u.id_usuario,
+                            text: u.nombre,
+                            username: u.username,
+                            icon: '👤',
+                            correo: u.correo,
+                            foto: u.foto
                         });
                     });
                 }
@@ -120,7 +135,6 @@ export default function SearchBar() {
         const term = q.trim();
         if (!term) return;
         saveRecent(term);
-        // ✅ Siempre lleva a /search para resultados generales
         navigate(`/search?q=${encodeURIComponent(term)}`);
     };
 
@@ -128,26 +142,63 @@ export default function SearchBar() {
         saveRecent(suggestion.text);
         setOpen(false);
 
-        // ✅ CORREGIDO: Todas las sugerencias llevan a /search con filtros específicos
         if (suggestion.type === 'materia') {
             navigate(`/search?q=${encodeURIComponent(suggestion.text)}&type=materia`);
         } else if (suggestion.type === 'profesor') {
             navigate(`/search?q=${encodeURIComponent(suggestion.text)}&type=profesor`);
         } else if (suggestion.type === 'apunte') {
             navigate(`/search?q=${encodeURIComponent(suggestion.text)}&type=apunte`);
+        } else if (suggestion.type === 'usuario') {
+            navigate(`/search?q=${encodeURIComponent(suggestion.text)}&type=usuario`);
         }
     };
 
     const handleRecentSearch = (term) => {
         setQ(term);
         saveRecent(term);
-        // ✅ CORREGIDO: Búsquedas recientes también van a /search
         navigate(`/search?q=${encodeURIComponent(term)}`);
     };
 
     const showRecent = !q.trim() && recent.length > 0;
     const showSuggestions = q.trim() && suggestions.length > 0;
     const showNoResults = q.trim() && !loading && suggestions.length === 0;
+
+    // Función para renderizar el contenido de cada sugerencia
+    const renderSuggestionContent = (suggestion) => {
+        if (suggestion.type === 'usuario') {
+            return (
+                <div style={{ display: 'flex', alignItems: 'center', gap: 10, width: '100%' }}>
+                    <img
+                        src={suggestion.foto || '/default-avatar.png'}
+                        alt={suggestion.text}
+                        style={{
+                            width: 24,
+                            height: 24,
+                            borderRadius: '50%',
+                            objectFit: 'cover'
+                        }}
+                    />
+                    <div style={{ flex: 1 }}>
+                        <div style={{ fontSize: 15, color: "#111827", fontWeight: 500 }}>
+                            {suggestion.text}
+                        </div>
+                        <div style={{ fontSize: 12, color: "#6b7280" }}>
+                            @{suggestion.username}
+                        </div>
+                    </div>
+                </div>
+            );
+        } else {
+            return (
+                <div style={{ display: 'flex', alignItems: 'center', gap: 10, width: '100%' }}>
+                    <span style={{ fontSize: 18 }}>{suggestion.icon}</span>
+                    <span style={{ flex: 1, fontSize: 15, color: "#111827" }}>
+                        {suggestion.text}
+                    </span>
+                </div>
+            );
+        }
+    };
 
     return (
         <div
@@ -156,7 +207,6 @@ export default function SearchBar() {
                 position: "relative",
                 width: "min(780px, 92vw)",
                 margin: "0 auto",
-
             }}
         >
             <form
@@ -176,7 +226,7 @@ export default function SearchBar() {
                     onFocus={() => setOpen(true)}
                     value={q}
                     onChange={(e) => setQ(e.target.value)}
-                    placeholder="Buscá profesores, cursos, mentores, apuntes…"
+                    placeholder="Buscá profesores, cursos, mentores, apuntes, usuarios…"
                     style={{
                         border: "none",
                         outline: "none",
@@ -247,16 +297,16 @@ export default function SearchBar() {
                                     gap: 10,
                                     padding: "12px 14px",
                                     textAlign: "left",
+                                    width: '100%'
                                 }}>
-                                    <span style={{ fontSize: 18 }}>{s.icon}</span>
-                                    <span style={{ flex: 1, fontSize: 15, color: "#111827" }}>
-                                        {s.text}
-                                    </span>
+                                    {renderSuggestionContent(s)}
                                     <span style={{
                                         fontSize: 11,
                                         color: "#9ca3af",
                                         textTransform: "uppercase",
-                                        fontWeight: 600
+                                        fontWeight: 600,
+                                        minWidth: 60,
+                                        textAlign: 'right'
                                     }}>
                                         {s.type}
                                     </span>
