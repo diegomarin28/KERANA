@@ -10,6 +10,7 @@ export default function MyPapers() {
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
     const [deletingId, setDeletingId] = useState(null);
+    const [deleteConfirm, setDeleteConfirm] = useState(null);
 
     useEffect(() => { loadNotes(); }, []);
 
@@ -63,12 +64,36 @@ export default function MyPapers() {
     };
 
     const handleDelete = async (noteId) => {
-        if (!confirm("¿Estás seguro de que querés eliminar este apunte?")) return;
         try {
             setDeletingId(noteId);
-            const { error } = await supabase.from("apunte").delete().eq("id_apunte", noteId);
-            if (error) throw error;
+
+            // Buscar el apunte para obtener el file_path
+            const noteToDelete = notes.find(n => n.id_apunte === noteId);
+
+            if (noteToDelete?.file_path) {
+                // Eliminar archivo del bucket
+                const { error: storageError } = await supabase.storage
+                    .from('apuntes')
+                    .remove([noteToDelete.file_path]);
+
+                if (storageError) {
+                    console.error('Error eliminando archivo del storage:', storageError);
+                    // Continuar aunque falle el storage
+                }
+            }
+
+            // Eliminar registro de la base de datos
+            const { error: dbError } = await supabase
+                .from("apunte")
+                .delete()
+                .eq("id_apunte", noteId);
+
+            if (dbError) throw dbError;
+
+            // Actualizar la lista local
             setNotes((prev) => prev.filter((note) => note.id_apunte !== noteId));
+            setDeleteConfirm(null);
+
         } catch (err) {
             alert("Error eliminando apunte: " + (err.message || err));
         } finally {
@@ -92,6 +117,95 @@ export default function MyPapers() {
 
     return (
         <div style={{ width: "min(800px, 92vw)", margin: "0 auto", padding: "32px 0" }}>
+            {deleteConfirm && (
+                <div style={{
+                    position: 'fixed',
+                    top: 0,
+                    left: 0,
+                    right: 0,
+                    bottom: 0,
+                    background: 'rgba(0, 0, 0, 0.6)',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    zIndex: 1000,
+                    backdropFilter: 'blur(4px)'
+                }}>
+                    <Card style={{
+                        maxWidth: 450,
+                        padding: 32,
+                        background: '#fff',
+                        boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1)',
+                        border: '2px solid #ef4444'
+                    }}>
+                        <div style={{
+                            width: 64,
+                            height: 64,
+                            background: '#fee2e2',
+                            borderRadius: '50%',
+                            margin: '0 auto 20px',
+                            fontSize: 32,
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                        }}>
+                            ⚠️
+                        </div>
+                        <h3 style={{
+                            margin: '0 0 12px 0',
+                            fontSize: 22,
+                            fontWeight: 700,
+                            color: '#991b1b',
+                            textAlign: 'center'
+                        }}>
+                            ¿Eliminar apunte?
+                        </h3>
+                        <p style={{
+                            color: '#6b7280',
+                            fontSize: 15,
+                            lineHeight: 1.6,
+                            marginBottom: 24,
+                            textAlign: 'center'
+                        }}>
+                            Esta acción no se puede deshacer. El archivo se eliminará permanentemente del sistema.
+                        </p>
+                        <div style={{ display: 'flex', gap: 12 }}>
+                            <Button
+                                onClick={() => setDeleteConfirm(null)}
+                                style={{
+                                    flex: 1,
+                                    padding: '12px 24px',
+                                    background: '#fff',
+                                    color: '#374151',
+                                    border: '1px solid #d1d5db',
+                                    borderRadius: 8,
+                                    fontWeight: 600,
+                                    cursor: 'pointer'
+                                }}
+                            >
+                                Cancelar
+                            </Button>
+                            <Button
+                                onClick={() => handleDelete(deleteConfirm)}
+                                disabled={deletingId === deleteConfirm}
+                                style={{
+                                    flex: 1,
+                                    padding: '12px 24px',
+                                    background: '#ef4444',
+                                    color: '#fff',
+                                    border: 'none',
+                                    borderRadius: 8,
+                                    fontWeight: 600,
+                                    cursor: deletingId === deleteConfirm ? 'not-allowed' : 'pointer',
+                                    opacity: deletingId === deleteConfirm ? 0.6 : 1
+                                }}
+                            >
+                                {deletingId === deleteConfirm ? 'Eliminando...' : 'Eliminar'}
+                            </Button>
+                        </div>
+                    </Card>
+                </div>
+            )}
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 24 }}>
                 <div>
                     <h1 style={{ margin: "0 0 8px 0" }}>Mis Apuntes</h1>
@@ -127,6 +241,7 @@ export default function MyPapers() {
                                     <div style={{ display: "flex", gap: 8, alignItems: "center", marginBottom: 12, flexWrap: "wrap" }}>
                                         {note.materia?.nombre_materia && <Chip tone="blue">{note.materia.nombre_materia}</Chip>}
                                         <Chip tone="green">{note.creditos || 0} créditos</Chip>
+
                                         {note.mime_type && <Chip tone="gray">{note.mime_type}</Chip>}
                                     </div>
 
@@ -136,13 +251,22 @@ export default function MyPapers() {
 
                                     <div style={{ display: "flex", gap: 12, fontSize: 12, color: "#9ca3af" }}>
                                         <span>Subido: {new Date(note.created_at).toLocaleDateString()}</span>
-                                        {note.file_size && <span>• {Math.round(note.file_size / 1024)} KB</span>}
+                                        {note.file_size && (
+                                            <span>• {note.file_size > 1024 * 1024
+                                                ? (note.file_size / (1024 * 1024)).toFixed(2) + ' MB'
+                                                : Math.round(note.file_size / 1024) + ' KB'
+                                            }</span>
+                                        )}
                                     </div>
                                 </div>
 
                                 <div style={{ display: "flex", gap: 8, flexShrink: 0 }}>
                                     <Button variant="primary" onClick={() => handleDownload(note)} disabled={!note.file_path}>Descargar</Button>
-                                    <Button variant="ghost" onClick={() => handleDelete(note.id_apunte)} disabled={deletingId === note.id_apunte} style={{ color: "#ef4444", borderColor: "#ef4444" }}>
+                                    <Button variant="ghost"
+                                        onClick={() => setDeleteConfirm(note.id_apunte)}  // <-- CAMBIAR ESTA LÍNEA
+                                        disabled={deletingId === note.id_apunte}
+                                        style={{ color: "#ef4444", borderColor: "#ef4444" }}
+                                    >
                                         {deletingId === note.id_apunte ? "Eliminando..." : "Eliminar"}
                                     </Button>
                                 </div>

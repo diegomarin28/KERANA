@@ -21,6 +21,7 @@ export default function Upload() {
     });
     const [uploading, setUploading] = useState(false);
     const [error, setError] = useState('');
+    const [showSuccessModal, setShowSuccessModal] = useState(false);
     const dropdownRef = useRef(null);
 
     // Cargar materias al inicio
@@ -83,10 +84,20 @@ export default function Upload() {
 
     const handleFileChange = (file) => {
         if (file) {
-            if (file.type !== 'application/pdf') {
+            console.log('Archivo seleccionado:', {
+                name: file.name,
+                type: file.type,
+                size: file.size,
+                sizeKB: (file.size / 1024).toFixed(2) + ' KB'
+            });
+
+            // Verificar que sea PDF por extensión (más confiable que el MIME type)
+            const fileName = file.name.toLowerCase();
+            if (!fileName.endsWith('.pdf')) {
                 setError('El archivo debe ser un PDF');
                 return;
             }
+
             if (file.size > 20 * 1024 * 1024) {
                 setError('El archivo no puede pesar más de 20MB');
                 return;
@@ -178,7 +189,8 @@ export default function Upload() {
                     id_usuario: usuarioData.id_usuario,
                     file_path: fileName,  // Ruta en el bucket
                     file_name: formData.file.name,  // Nombre original del archivo
-                    mime_type: 'application/pdf',
+                    mime_type: 'pdf',
+                    file_size: formData.file.size,
                     created_at: new Date().toISOString()
                 }]);
 
@@ -189,8 +201,8 @@ export default function Upload() {
                 throw new Error('Error al guardar en base de datos: ' + insertError.message);
             }
 
-            alert('✅ Apunte cargado exitosamente');
-            navigate('/');
+            // Mostrar modal de éxito
+            setShowSuccessModal(true);
 
         } catch (err) {
             console.error('Error al subir:', err);
@@ -205,6 +217,84 @@ export default function Upload() {
 
     return (
         <div style={{ maxWidth: 700, margin: '0 auto', padding: 20 }}>
+            {/* Modal de éxito */}
+            {showSuccessModal && (
+                <div style={{
+                    position: 'fixed',
+                    top: 0,
+                    left: 0,
+                    right: 0,
+                    bottom: 0,
+                    background: 'rgba(0, 0, 0, 0.5)',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    zIndex: 1000,
+                    backdropFilter: 'blur(4px)'
+                }}>
+                    <Card style={{
+                        maxWidth: 450,
+                        padding: 40,
+                        textAlign: 'center',
+                        background: '#fff',
+                        boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)',
+                        animation: 'fadeIn 0.3s ease-out'
+                    }}>
+                        <div style={{
+                            width: 80,
+                            height: 80,
+                            background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+                            borderRadius: '50%',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            margin: '0 auto 24px',
+                            fontSize: 40
+                        }}>
+                            📝
+                        </div>
+                        <h2 style={{
+                            margin: '0 0 12px 0',
+                            fontSize: 28,
+                            fontWeight: 700,
+                            background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+                            WebkitBackgroundClip: 'text',
+                            WebkitTextFillColor: 'transparent',
+                            backgroundClip: 'text'
+                        }}>
+                            ¡Apunte publicado!
+                        </h2>
+                        <p style={{
+                            color: '#6b7280',
+                            fontSize: 16,
+                            lineHeight: 1.6,
+                            marginBottom: 32
+                        }}>
+                            <strong style={{ color: '#374151' }}>KERANA</strong> y toda su comunidad te agradecen por compartir tu conocimiento. 🎓
+                        </p>
+                        <Button
+                            onClick={() => navigate('/')}
+                            style={{
+                                padding: '14px 32px',
+                                background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+                                color: '#fff',
+                                border: 'none',
+                                borderRadius: 8,
+                                fontWeight: 600,
+                                cursor: 'pointer',
+                                fontSize: 16,
+                                width: '100%',
+                                transition: 'transform 0.2s'
+                            }}
+                            onMouseEnter={(e) => e.currentTarget.style.transform = 'scale(1.02)'}
+                            onMouseLeave={(e) => e.currentTarget.style.transform = 'scale(1)'}
+                        >
+                            Volver al inicio
+                        </Button>
+                    </Card>
+                </div>
+            )}
+
             <h1 style={{ marginBottom: 12 }}>Subir apunte</h1>
             <p style={{ color: '#6b7280', marginBottom: 32 }}>
                 Compartí tus apuntes con la comunidad. Completá los campos y subí el PDF.
