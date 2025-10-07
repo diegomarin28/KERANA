@@ -253,32 +253,19 @@ async function searchUsers(term) {
 
     try {
         const { data, error } = await supabase
-            .from('usuario')
-            .select(`
-                id_usuario,
-                nombre,
-                correo,
-                foto,
-                username,
-                creditos,
-                mentor(id_mentor),
-                seguidores:seguidores!seguidores_seguido_id_fkey(count)
-            `)
-            .or(`nombre.ilike.%${q}%,correo.ilike.%${q}%,username.ilike.%${q}%`)
-            .limit(10);
+            .rpc('buscar_usuarios_sin_tildes', { termino: q });
 
-        if (error) return { data: [], error };
+        if (error) {
+            console.error('Error buscando usuarios:', error);
+            return { data: [], error };
+        }
 
         const transformed = (data || []).map(usuario => ({
             id: usuario.id_usuario,
             id_usuario: usuario.id_usuario,
             nombre: usuario.nombre,
-            correo: usuario.correo,
             foto: usuario.foto,
             username: usuario.username,
-            creditos: usuario.creditos || 0,
-            es_mentor: !!usuario.mentor,
-            seguidores_count: usuario.seguidores?.[0]?.count || 0,
             tipo: 'usuario',
             label: usuario.nombre
         }));
@@ -286,6 +273,7 @@ async function searchUsers(term) {
         return { data: transformed, error: null };
 
     } catch (error) {
+        console.error('Error en searchUsers:', error);
         return { data: [], error };
     }
 }
@@ -310,7 +298,7 @@ export const searchAPI = {
                 materias: mat.data ?? [],
                 apuntes: ap.data ?? [],
                 mentores: men.data ?? [],
-                users: users.data ?? [],
+                usuarios: users.data ?? [],
             },
             error: prof.error || mat.error || ap.error || men.error || users.error || null,
         };

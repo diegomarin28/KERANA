@@ -1,10 +1,13 @@
 // src/components/UserCard.jsx
 import { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom'; // ← Agregado
+import { supabase } from '../supabase'; // ← Agregado
 import { useSeguidores } from '../hooks/useSeguidores';
 
 export const UserCard = ({ usuario }) => {
     const [siguiendo, setSiguiendo] = useState(false);
     const [cargando, setCargando] = useState(false);
+    const navigate = useNavigate(); // ← Agregado
     const { seguirUsuario, dejarSeguir, obtenerMiUsuarioId } = useSeguidores();
 
     useEffect(() => {
@@ -22,7 +25,7 @@ export const UserCard = ({ usuario }) => {
                 .eq('seguidor_id', miId)
                 .eq('seguido_id', usuario.id_usuario)
                 .eq('estado', 'activo')
-                .single();
+                .maybeSingle(); // ← Cambiar .single() por .maybeSingle()
 
             setSiguiendo(!!data);
         } catch (error) {
@@ -30,7 +33,8 @@ export const UserCard = ({ usuario }) => {
         }
     };
 
-    const manejarSeguir = async () => {
+    const manejarSeguir = async (e) => {
+        e.stopPropagation();
         try {
             setCargando(true);
 
@@ -38,36 +42,71 @@ export const UserCard = ({ usuario }) => {
                 await dejarSeguir(usuario.id_usuario);
                 setSiguiendo(false);
             } else {
-                await seguirUsuario(usuario.id_usuario);
-                setSiguiendo(true);
+                const resultado = await seguirUsuario(usuario.id_usuario);
+                setSiguiendo(resultado.estado); // 'pendiente' o 'activo'
             }
         } catch (error) {
-            console.error('Error al seguir/dejar de seguir:', error);
+            console.error('Error al seguir:', error);
         } finally {
             setCargando(false);
         }
     };
 
+    const irAlPerfil = () => {
+        navigate(`/profile/${usuario.username || usuario.id_usuario}`);
+    };
+
     return (
-        <div style={{
-            background: "white",
-            borderRadius: 12,
-            padding: 20,
-            border: "1px solid #E5E7EB",
-            boxShadow: "0 2px 8px rgba(0,0,0,0.04)",
-            transition: "all 0.2s ease"
-        }}>
+        <div
+            onClick={irAlPerfil} // ← Click en la card navega al perfil
+            style={{
+                background: "white",
+                borderRadius: 12,
+                padding: 20,
+                border: "1px solid #E5E7EB",
+                boxShadow: "0 2px 8px rgba(0,0,0,0.04)",
+                transition: "all 0.2s ease",
+                cursor: "pointer" // ← Agregar cursor pointer
+            }}
+            onMouseEnter={(e) => {
+                e.currentTarget.style.boxShadow = "0 8px 16px rgba(0,0,0,0.1)";
+                e.currentTarget.style.transform = "translateY(-2px)";
+            }}
+            onMouseLeave={(e) => {
+                e.currentTarget.style.boxShadow = "0 2px 8px rgba(0,0,0,0.04)";
+                e.currentTarget.style.transform = "translateY(0)";
+            }}
+        >
             <div style={{ display: "flex", alignItems: "flex-start", gap: 16, marginBottom: 16 }}>
-                <img
-                    src={usuario.avatar_url || '/default-avatar.png'}
-                    alt={usuario.nombre}
-                    style={{
+                {usuario.foto ? (
+                    <img
+                        src={usuario.foto}
+                        alt={usuario.nombre}
+                        style={{
+                            width: 60,
+                            height: 60,
+                            borderRadius: '50%',
+                            objectFit: 'cover',
+                            border: '2px solid #E5E7EB'
+                        }}
+                    />
+                ) : (
+                    <div style={{
                         width: 60,
                         height: 60,
                         borderRadius: '50%',
-                        objectFit: 'cover'
-                    }}
-                />
+                        background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+                        color: '#fff',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        fontSize: 24,
+                        fontWeight: 700,
+                        border: '2px solid #E5E7EB'
+                    }}>
+                        {(usuario.nombre?.[0] || 'U').toUpperCase()}
+                    </div>
+                )}
                 <div style={{ flex: 1 }}>
                     <h3 style={{
                         margin: "0 0 4px 0",
@@ -82,18 +121,8 @@ export const UserCard = ({ usuario }) => {
                         color: "#6B7280",
                         fontSize: 14
                     }}>
-                        {usuario.correo}
+                        @{usuario.username}
                     </p>
-                    {usuario.bio && (
-                        <p style={{
-                            margin: "0 0 8px 0",
-                            color: "#4B5563",
-                            fontSize: 14,
-                            lineHeight: 1.4
-                        }}>
-                            {usuario.bio}
-                        </p>
-                    )}
                     <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
                         <span style={{
                             fontSize: 12,
@@ -125,15 +154,20 @@ export const UserCard = ({ usuario }) => {
                     padding: '8px 16px',
                     borderRadius: '6px',
                     border: '1px solid #2563EB',
-                    background: siguiendo ? 'white' : '#2563EB',
-                    color: siguiendo ? '#2563EB' : 'white',
+                    background: siguiendo === 'activo' ? 'white' :
+                        siguiendo === 'pendiente' ? '#FCD34D' : '#2563EB',
+                    color: siguiendo === 'activo' ? '#2563EB' :
+                        siguiendo === 'pendiente' ? '#78350F' : 'white',
                     fontWeight: 600,
                     fontSize: 14,
-                    cursor: 'pointer',
+                    cursor: cargando ? 'not-allowed' : 'pointer',
+                    opacity: cargando ? 0.6 : 1,
                     transition: 'all 0.2s ease'
                 }}
             >
-                {cargando ? '...' : (siguiendo ? 'Siguiendo' : 'Seguir')}
+                {cargando ? 'Procesando...' :
+                    siguiendo === 'activo' ? 'Siguiendo' :
+                        siguiendo === 'pendiente' ? 'Pendiente' : 'Seguir'}
             </button>
         </div>
     );

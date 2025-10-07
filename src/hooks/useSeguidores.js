@@ -18,14 +18,33 @@ export const useSeguidores = () => {
             .rpc('seguir_usuario', { usuario_a_seguir_id: usuarioId });
 
         if (error) throw error;
+        if (data && data.error) throw new Error(data.error);
 
-        // Si la función retorna un error en el JSON
-        if (data && data.error) {
-            throw new Error(data.error);
-        }
+        return data; // Retorna { success: true, estado: 'pendiente' }
+    };
 
+    const aceptarSeguidor = async (seguidorId) => {
+        const { data, error } = await supabase
+            .rpc('responder_solicitud_seguidor', {
+                seguidor_id: seguidorId,
+                aceptar: true
+            });
+
+        if (error) throw error;
         return data;
     };
+
+    const rechazarSeguidor = async (seguidorId) => {
+        const { data, error } = await supabase
+            .rpc('responder_solicitud_seguidor', {
+                seguidor_id: seguidorId,
+                aceptar: false
+            });
+
+        if (error) throw error;
+        return data;
+    };
+
 
     // Dejar de seguir
     const dejarSeguir = async (usuarioId) => {
@@ -92,6 +111,8 @@ export const useSeguidores = () => {
         bloquearUsuario,
         obtenerSeguidores,
         obtenerSiguiendo,
-        obtenerMiUsuarioId
+        obtenerMiUsuarioId,
+        aceptarSeguidor,
+        rechazarSeguidor
     };
 };

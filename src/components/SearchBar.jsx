@@ -98,6 +98,11 @@ export default function SearchBar() {
                         });
                     });
                 }
+                console.log('🔍 Búsqueda usuarios:', {
+                    termino: term,
+                    error: usuariosError,
+                    resultados: usuarios
+                });
 
                 setSuggestions(results);
 
@@ -168,16 +173,33 @@ export default function SearchBar() {
         if (suggestion.type === 'usuario') {
             return (
                 <div style={{ display: 'flex', alignItems: 'center', gap: 10, width: '100%' }}>
-                    <img
-                        src={suggestion.foto || '/default-avatar.png'}
-                        alt={suggestion.text}
-                        style={{
+                    {suggestion.foto ? (
+                        <img
+                            src={suggestion.foto}
+                            alt={suggestion.text}
+                            style={{
+                                width: 24,
+                                height: 24,
+                                borderRadius: '50%',
+                                objectFit: 'cover'
+                            }}
+                        />
+                    ) : (
+                        <div style={{
                             width: 24,
                             height: 24,
                             borderRadius: '50%',
-                            objectFit: 'cover'
-                        }}
-                    />
+                            background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+                            color: '#fff',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            fontSize: 12,
+                            fontWeight: 700
+                        }}>
+                            {(suggestion.text?.[0] || 'U').toUpperCase()}
+                        </div>
+                    )}
                     <div style={{ flex: 1 }}>
                         <div style={{ fontSize: 15, color: "#111827", fontWeight: 500 }}>
                             {suggestion.text}
@@ -297,16 +319,20 @@ export default function SearchBar() {
                                     gap: 10,
                                     padding: "12px 14px",
                                     textAlign: "left",
-                                    width: '100%'
+                                    width: '100%',
+                                    position: 'relative'
                                 }}>
                                     {renderSuggestionContent(s)}
                                     <span style={{
-                                        fontSize: 11,
+                                        fontSize: 10,
                                         color: "#9ca3af",
                                         textTransform: "uppercase",
                                         fontWeight: 600,
-                                        minWidth: 60,
-                                        textAlign: 'right'
+                                        position: 'absolute',
+                                        right: '14px',
+                                        textAlign: 'right',
+                                        flexShrink: 0,
+                                        whiteSpace: 'nowrap'
                                     }}>
                                         {s.type}
                                     </span>
