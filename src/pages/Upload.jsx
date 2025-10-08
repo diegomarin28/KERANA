@@ -24,6 +24,23 @@ export default function Upload() {
     const [showSuccessModal, setShowSuccessModal] = useState(false);
     const dropdownRef = useRef(null);
 
+
+    const sanitizeFilename = (filename) => {
+        const lastDot = filename.lastIndexOf('.');
+        const name = lastDot !== -1 ? filename.slice(0, lastDot) : filename;
+        const ext = lastDot !== -1 ? filename.slice(lastDot) : '';
+
+        const sanitized = name
+            .normalize('NFD')
+            .replace(/[\u0300-\u036f]/g, '')
+            .replace(/\s+/g, '_')
+            .replace(/[^a-zA-Z0-9_-]/g, '')
+            .replace(/_+/g, '_')
+            .replace(/^_+|_+$/g, '');
+
+        return sanitized + ext.toLowerCase();
+    };
+
     // Cargar materias al inicio
     useEffect(() => {
         fetchMaterias();
@@ -84,14 +101,7 @@ export default function Upload() {
 
     const handleFileChange = (file) => {
         if (file) {
-            console.log('Archivo seleccionado:', {
-                name: file.name,
-                type: file.type,
-                size: file.size,
-                sizeKB: (file.size / 1024).toFixed(2) + ' KB'
-            });
-
-            // Verificar que sea PDF por extensión (más confiable que el MIME type)
+            // Verificar que sea PDF por extensión
             const fileName = file.name.toLowerCase();
             if (!fileName.endsWith('.pdf')) {
                 setError('El archivo debe ser un PDF');
@@ -102,7 +112,17 @@ export default function Upload() {
                 setError('El archivo no puede pesar más de 20MB');
                 return;
             }
-            setFormData({ ...formData, file });
+
+            // Sanitizar el nombre del archivo
+            const sanitizedName = sanitizeFilename(file.name);
+            const sanitizedFile = new File([file], sanitizedName, {
+                type: file.type,
+                lastModified: file.lastModified
+            });
+
+            console.log('Archivo:', file.name, '→', sanitizedName);
+
+            setFormData({ ...formData, file: sanitizedFile });
             setError('');
         }
     };
@@ -188,7 +208,7 @@ export default function Upload() {
                     id_materia: selectedMateria.id_materia,
                     id_usuario: usuarioData.id_usuario,
                     file_path: fileName,  // Ruta en el bucket
-                    file_name: formData.file.name,  // Nombre original del archivo
+                    file_name: formData.file.name,
                     mime_type: 'pdf',
                     file_size: formData.file.size,
                     created_at: new Date().toISOString()
@@ -484,7 +504,7 @@ export default function Upload() {
                                 disabled={loading}
                                 style={{ marginTop: 2 }}
                             />
-                            <span>Confirmo que tengo derecho a compartir este apunte.</span>
+                            <span><strong>Confirmo que tengo derecho a compartir este apunte.</strong></span>
                         </label>
                     </div>
 

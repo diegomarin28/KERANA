@@ -101,9 +101,42 @@ export default function MyPapers() {
         }
     };
 
-    const handleDownload = (note) => {
-        if (note?.file_path) window.open(note.file_path, "_blank");
-        else alert("No hay archivo disponible para descargar");
+    const handleDownload = async (note) => {
+        if (!note?.file_path) {
+            alert("No hay archivo disponible para descargar");
+            return;
+        }
+
+        try {
+            // Obtener la URL pública del archivo
+            const { data } = supabase.storage
+                .from('apuntes')
+                .getPublicUrl(note.file_path);
+
+            if (!data?.publicUrl) {
+                alert("Error al obtener el archivo");
+                return;
+            }
+
+            // Descargar el archivo
+            const response = await fetch(data.publicUrl);
+            const blob = await response.blob();
+            const url = window.URL.createObjectURL(blob);
+
+            // Crear un enlace temporal y hacer clic en él
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = note.file_name || note.titulo + '.pdf';
+            document.body.appendChild(a);
+            a.click();
+
+            // Limpiar
+            window.URL.revokeObjectURL(url);
+            document.body.removeChild(a);
+        } catch (error) {
+            console.error('Error descargando archivo:', error);
+            alert("Error al descargar el archivo");
+        }
     };
 
     if (loading) {
