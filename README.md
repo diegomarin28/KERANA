@@ -1,12 +1,13 @@
-# React + Vite
+# Kerana
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+Somos un grupo diseñando un proyecto para estudiantes de la facultad.
 
-Currently, two official plugins are available:
+Queremos ayudarlos para que puedan avanzar de forma más amena en sus carreras y que utilizen Kerana para aprender y estudiar.
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Babel](https://babeljs.io/) for Fast Refresh
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/) for Fast Refresh
 
-## Expanding the ESLint configuration
+## Cuáles son nuestros objetivos?
 
-If you are developing a production application, we recommend using TypeScript with type-aware lint rules enabled. Check out the [TS template](https://github.com/vitejs/vite/tree/main/packages/create-vite/template-react-ts) for information on how to integrate TypeScript and [`typescript-eslint`](https://typescript-eslint.io) in your project.
+- Conectar alumnos que quieren brindar su conocimiento con aquellos que buscan a alguien que se los ofrezca
+- Orientar a los alumnos en la elección de profesores
+- Proveer de apuntes a los alumnos interesados
+
