@@ -7,7 +7,7 @@ import { Link } from "react-router-dom";
 const HERO_BG = "gradient"; // podés cambiar: "solid" | "gradient" | "radial"
 
 const heroBackground = {
-    solid: "#0b5ed7",
+    solid: "#0b5ed7", // #0097b2 turquesa , #386641 verde
     gradient: "linear-gradient(135deg, #0ea5a3 0%, #2563eb 40%, #f59e0b 100%)",
     radial: "radial-gradient(1200px 600px at 20% 20%, #2563eb 0%, #0ea5a3 45%, #f59e0b 80%)",
 }[HERO_BG];

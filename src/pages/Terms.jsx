@@ -121,7 +121,7 @@ export default function Terms() {
                         <h2 style={sectionTitleStyle}>10. Contacto</h2>
                         <p style={textStyle}>
                             Para preguntas sobre estos términos, contáctanos a través de nuestra
-                            página de contacto o envía un email a legal@kerana.com
+                            página de contacto o envía un email a kerana.soporte@gmail.com
                         </p>
                     </div>
                 </Card>

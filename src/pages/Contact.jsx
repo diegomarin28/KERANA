@@ -281,12 +281,12 @@ export default function Contact() {
                             desc="Integraciones de IA para corrección de apuntes, rúbricas y créditos."
                         />
                         <Feature
-                            title="Implementación rápida"
-                            desc="Nos adaptamos a tu flujo actual, sin romper tu UI ni tu base."
+                            title="No está tu profesor"
+                            desc="Lo ingresamos de inmediato asi podes realizar tu reseña"
                         />
                         <Feature
-                            title="En tonos azules"
-                            desc="Coherencia visual con el resto del proyecto."
+                            title="No tenemos una materia que cursas"
+                            desc="Contactaté y lo cambiamos a la brevedad."
                         />
 
                         <div

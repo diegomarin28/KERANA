@@ -90,7 +90,7 @@ export default function Privacy() {
                             Para ejercer tus derechos según la Ley 18.331:
                         </p>
                         <div style={contactBoxStyle}>
-                            <strong>Email:</strong> kerana.uy@gmail.com<br/>
+                            <strong>Email:</strong> kerana.soporte@gmail.com<br/>
                             <strong>Respuesta:</strong> En un plazo máximo de 10 días hábiles
                         </div>
                         <p style={textStyle}>
