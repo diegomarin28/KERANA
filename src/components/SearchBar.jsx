@@ -329,7 +329,7 @@ export default function SearchBar() {
                                         textTransform: "uppercase",
                                         fontWeight: 600,
                                         position: 'absolute',
-                                        right: '14px',
+                                        right: '35px', //com esto traemos mas a la derecha lo de apunte, profesor y usuario en las sugerencias del search bar, creo q esta bien asi igual.
                                         textAlign: 'right',
                                         flexShrink: 0,
                                         whiteSpace: 'nowrap'

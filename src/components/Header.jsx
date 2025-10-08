@@ -20,6 +20,8 @@ export default function Header() {
     const [usernameCache, setUsernameCache] = useState(() => localStorage.getItem('kerana_username_cache') || '');
     const [nameCache, setNameCache] = useState(() => localStorage.getItem('kerana_name_cache') || '');
     const [displayName, setDisplayName] = useState('');
+    const [avatarOk, setAvatarOk] = useState(true);
+
 
     // Función unificada para abrir login
     const openAuthModal = () => {
@@ -44,6 +46,11 @@ export default function Header() {
         window.addEventListener('storage', onStorage);
         return () => window.removeEventListener('storage', onStorage);
     }, [user?.id]);
+
+    useEffect(() => {
+        setAvatarOk(true);
+    }, [userProfile?.foto]);
+
 
     // Calcular displayName cuando cambien los datos
     useEffect(() => {
@@ -330,6 +337,15 @@ export default function Header() {
         e.target.style.boxShadow = "none";
     };
 
+    function getAppAvatarSrc(raw) {
+        const url = (raw || "").trim();
+        // aceptar solo URLs de tu storage público de Supabase
+        const isHttp = /^https?:\/\//.test(url);
+        const isSupabasePublic = isHttp && url.includes("/storage/v1/object/public/");
+        return isSupabasePublic ? url : ""; // si no es válido, forzá placeholder
+    }
+
+
     return (
         <>
             <header
@@ -346,13 +362,16 @@ export default function Header() {
                     transition: "background .25s ease, color .25s ease, border-color .25s ease",
                 }}
             >
-                <div className="header-container" style={{
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "space-between",
-                    gap: 12,
-                    height: 64,
-                }}>
+                <div
+                    className="header-container"
+                    style={{
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "space-between",
+                        gap: 12,
+                        height: 64,
+                    }}
+                >
                     {/* Izquierda: menú + logo */}
                     <div style={{ display: "flex", alignItems: "center", gap: 12, minWidth: 0 }}>
                         <HamburgerButton open={menuOpen} onToggle={() => setMenuOpen((o) => !o)} />
@@ -364,7 +383,7 @@ export default function Header() {
                                 cursor: "pointer",
                                 fontWeight: 800,
                                 fontSize: 20,
-                                color: TOKENS.headerText
+                                color: TOKENS.headerText,
                             }}
                             aria-label="Ir al inicio"
                         >
@@ -375,9 +394,7 @@ export default function Header() {
                     {/* Centro: acciones */}
                     <nav style={{ display: "flex", alignItems: "center", gap: 10, justifyContent: "center" }}>
                         <PillLink to="/upload">Subir Apuntes</PillLink>
-                        <PillButton onClick={() => navigate("/mentores/postular")}>
-                            ¡Quiero ser Mentor!
-                        </PillButton>
+                        <PillButton onClick={() => navigate("/mentores/postular")}>¡Quiero ser Mentor!</PillButton>
                         <PillButton onClick={handleReseniaClick}>¡Hacé tu reseña!</PillButton>
                     </nav>
 
@@ -388,13 +405,15 @@ export default function Header() {
                         ) : (
                             <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
                                 {/* Mostrar nombre estable */}
-                                <span style={{
-                                    fontWeight: 700,
-                                    fontSize: 14,
-                                    color: TOKENS.headerText
-                                }}>
-                                    {displayName}
-                                </span>
+                                <span
+                                    style={{
+                                        fontWeight: 700,
+                                        fontSize: 14,
+                                        color: TOKENS.headerText,
+                                    }}
+                                >
+                {displayName}
+              </span>
 
                                 {/* Avatar clickeable */}
                                 <button
@@ -405,7 +424,7 @@ export default function Header() {
                                         cursor: "pointer",
                                         padding: 0,
                                         borderRadius: "50%",
-                                        transition: "transform 0.2s ease"
+                                        transition: "transform 0.2s ease",
                                     }}
                                     onMouseEnter={(e) => {
                                         e.currentTarget.style.transform = "scale(1.1)";
@@ -413,37 +432,47 @@ export default function Header() {
                                     onMouseLeave={(e) => {
                                         e.currentTarget.style.transform = "scale(1)";
                                     }}
+                                    aria-label="Ir a mi perfil"
                                 >
-                                    {userProfile?.foto ? (
-                                        <img
-                                            src={userProfile.foto}
-                                            alt={displayName}
-                                            style={{
-                                                width: 40,
-                                                height: 40,
-                                                borderRadius: "50%",
-                                                objectFit: "cover",
-                                                border: "2px solid #fff",
-                                                boxShadow: "0 2px 8px rgba(0,0,0,0.2)"
-                                            }}
-                                        />
-                                    ) : (
-                                        <div style={{
-                                            width: 40,
-                                            height: 40,
-                                            borderRadius: "50%",
-                                            background: "linear-gradient(135deg, #3b82f6 0%, #1e40af 100%)",
-                                            color: "#fff",
-                                            display: "grid",
-                                            placeItems: "center",
-                                            fontWeight: 800,
-                                            fontSize: 16,
-                                            boxShadow: "0 2px 8px rgba(0,0,0,0.2)"
-                                        }}>
-                                            {(displayName?.[0] || "U").toUpperCase()}
-                                        </div>
-                                    )}
+                                    {(() => {
+                                        const avatarSrc = getAppAvatarSrc(userProfile?.foto);
+                                        return avatarSrc && avatarOk ? (
+                                            <img
+                                                src={avatarSrc}
+                                                alt={displayName}
+                                                onError={() => setAvatarOk(false)}
+                                                style={{
+                                                    width: 40,
+                                                    height: 40,
+                                                    borderRadius: "50%",
+                                                    objectFit: "cover",
+                                                    border: "2px solid #fff",
+                                                    boxShadow: "0 2px 8px rgba(0,0,0,0.2)",
+                                                }}
+                                                loading="lazy"
+                                                referrerPolicy="no-referrer"
+                                            />
+                                        ) : (
+                                            <div
+                                                style={{
+                                                    width: 40,
+                                                    height: 40,
+                                                    borderRadius: "50%",
+                                                    background: "linear-gradient(135deg, #3b82f6 0%, #1e40af 100%)",
+                                                    color: "#fff",
+                                                    display: "grid",
+                                                    placeItems: "center",
+                                                    fontWeight: 800,
+                                                    fontSize: 16,
+                                                    boxShadow: "0 2px 8px rgba(0,0,0,0.2)",
+                                                }}
+                                            >
+                                                {(displayName?.[0] || "U").toUpperCase()}
+                                            </div>
+                                        );
+                                    })()}
                                 </button>
+
                             </div>
                         )}
                     </div>
@@ -458,23 +487,23 @@ export default function Header() {
                 open={menuOpen}
                 onClose={() => setMenuOpen(false)}
                 isAuthenticated={!!user}
-                user={user ? {
-                    name: displayName,
-                    email: user.email,
-                    avatarUrl: userProfile?.foto,
-                    credits: userProfile?.creditos || 0,
-                    followers: 0,
-                    following: 0,
-                } : null}
+                user={
+                    user
+                        ? {
+                            name: displayName,
+                            email: user.email,
+                            avatarUrl: userProfile?.foto,
+                            credits: userProfile?.creditos || 0,
+                            followers: 0,
+                            following: 0,
+                        }
+                        : null
+                }
                 onLogout={handleLogout}
                 onGo={(path) => navigate(path)}
                 onOpenAuth={openAuthModal}
             />
-            <AuthModal_SignIn
-                open={authOpen}
-                onClose={closeAuthModal}
-                onSignedIn={handleSignedIn}
-            />
+            <AuthModal_SignIn open={authOpen} onClose={closeAuthModal} onSignedIn={handleSignedIn} />
             <AuthModal_HacerResenia
                 open={reseniaOpen}
                 onClose={() => setReseniaOpen(false)}
@@ -482,4 +511,4 @@ export default function Header() {
             />
         </>
     );
-}
+    }

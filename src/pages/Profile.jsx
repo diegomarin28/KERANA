@@ -13,11 +13,17 @@ export default function Profile() {
         seguidores: 0,
         siguiendo: 0
     });
+    const [avatarOk, setAvatarOk] = useState(true);
 
     useEffect(() => {
         fetchProfile();
         fetchRealStats();
     }, []);
+
+    // reset del fallback cuando cambia la foto
+    useEffect(() => {
+        setAvatarOk(true);
+    }, [profile?.foto]);
 
     const fetchProfile = async () => {
         try {
@@ -32,7 +38,6 @@ export default function Profile() {
 
             if (error) throw error;
             setProfile(data);
-
         } catch (err) {
             console.error('Error cargando perfil:', err);
         } finally {
@@ -43,58 +48,53 @@ export default function Profile() {
     const fetchRealStats = async () => {
         try {
             const { data: { user } } = await supabase.auth.getUser();
-
             if (!user) {
                 console.log("No hay usuario autenticado");
                 return;
             }
 
-            // Obtener el ID numérico del usuario usando auth_id
+            // id numérico usando auth_id
             const { data: usuarioData, error: usuarioError } = await supabase
                 .from('usuario')
                 .select('id_usuario')
-                .eq('auth_id', user.id)  // ← Campo correcto: auth_id
+                .eq('auth_id', user.id)
                 .single();
 
             if (usuarioError || !usuarioData) {
                 console.log("No se pudo obtener el usuario:", usuarioError);
-                setStats({ apuntes: 0, reseñas: 0 });
+                setStats({
+                    apuntesSubidos: 0,
+                    reseñasEscritas: 0,
+                    seguidores: 0,
+                    siguiendo: 0
+                });
                 return;
             }
 
             const usuarioId = usuarioData.id_usuario;
 
-            console.log("Usuario ID numérico:", usuarioId);
-
-            // Consulta para apuntes
+            // apuntes del usuario
             const { count: apuntesCount, error: apuntesError } = await supabase
                 .from('apunte')
                 .select('*', { count: 'exact', head: true })
                 .eq('id_usuario', usuarioId);
 
-            // Consultas para reseñas desde las tablas base
+            // reseñas (profes y mentores)
             const [evaluaResult, calificaResult] = await Promise.all([
                 supabase
-                    .from('evalua')  // Reseñas de profesores
+                    .from('evalua')  // reseñas de profesores
                     .select('*', { count: 'exact', head: true })
                     .eq('id_usuario', usuarioId),
                 supabase
-                    .from('califica')  // Reseñas de mentores
+                    .from('califica')  // reseñas de mentores
                     .select('*', { count: 'exact', head: true })
                     .eq('id_usuario', usuarioId)
             ]);
 
-            // Manejar errores y calcular totals
             const totalApuntes = apuntesError ? 0 : (apuntesCount || 0);
-            const totalReseñas = (evaluaResult.error ? 0 : (evaluaResult.count || 0)) +
+            const totalReseñas =
+                (evaluaResult.error ? 0 : (evaluaResult.count || 0)) +
                 (calificaResult.error ? 0 : (calificaResult.count || 0));
-
-            console.log("Resultados:", {
-                totalApuntes,
-                totalReseñas,
-                evaluaCount: evaluaResult.count || 0,
-                calificaCount: calificaResult.count || 0
-            });
 
             setStats({
                 apuntesSubidos: totalApuntes,
@@ -102,10 +102,14 @@ export default function Profile() {
                 seguidores: 0,
                 siguiendo: 0
             });
-
         } catch (error) {
             console.error('Error cargando estadísticas:', error);
-            setStats({ apuntes: 0, reseñas: 0 });
+            setStats({
+                apuntesSubidos: 0,
+                reseñasEscritas: 0,
+                seguidores: 0,
+                siguiendo: 0
+            });
         }
     };
 
@@ -120,27 +124,43 @@ export default function Profile() {
         );
     }
 
+    function getAppAvatarSrc(raw) {
+        const url = (raw || "").trim();
+        const isHttp = /^https?:\/\//.test(url);
+        const isSupabasePublic = isHttp && url.includes("/storage/v1/object/public/");
+        return isSupabasePublic ? url : "";
+    }
+
+
     return (
         <div style={pageStyle}>
-            <div style={{ maxWidth: 900, margin: '0 auto' }}> {/*el max with cambia el ancho de la pag*/}
+            <div style={{ maxWidth: 900, margin: '0 auto' }}>
                 {/* Header del Perfil - BLOQUE AZUL GRANDE */}
                 <Card style={profileHeaderStyle}>
                     <div style={headerContentStyle}>
-                        {/* Sección izquierda: Avatar e información */}
+                        {/* Izquierda: Avatar + info */}
                         <div style={leftSectionStyle}>
                             <div style={avatarStyle}>
-                                {profile?.foto ? (
-                                    <img
-                                        src={profile.foto}
-                                        alt={profile.nombre}
-                                        style={avatarImageStyle}
-                                    />
-                                ) : (
-                                    <div style={avatarPlaceholderStyle}>
-                                        {(profile?.username?.[0] || profile?.nombre?.[0] || 'U').toUpperCase()}
-                                    </div>
-                                )}
+                                {(() => {
+                                    const avatarSrc = getAppAvatarSrc(profile?.foto);
+                                    return avatarSrc && avatarOk ? (
+                                        <img
+                                            src={avatarSrc}
+                                            alt={profile?.nombre || "Usuario"}
+                                            onError={() => setAvatarOk(false)}
+                                            style={avatarImageStyle}
+                                            loading="lazy"
+                                            referrerPolicy="no-referrer"
+                                        />
+                                    ) : (
+                                        <div style={avatarPlaceholderStyle}>
+                                            {(profile?.username?.[0] || profile?.nombre?.[0] || "U").toUpperCase()}
+                                        </div>
+                                    );
+                                })()}
                             </div>
+
+
                             <div style={profileInfoStyle}>
                                 <h1 style={profileNameStyle}>{profile?.nombre || 'Usuario'}</h1>
                                 <p style={profileUsernameStyle}>@{profile?.username || 'usuario'}</p>
@@ -151,7 +171,7 @@ export default function Profile() {
                                     <span style={creditsTextStyle}>{profile?.creditos ?? 10} créditos</span>
                                 </div>
 
-                                {/* Estadísticas en el header */}
+                                {/* Stats en header */}
                                 <div style={headerStatsStyle}>
                                     <div style={headerStatItemStyle}>
                                         <div style={headerStatNumberStyle}>{stats.seguidores}</div>
@@ -170,7 +190,7 @@ export default function Profile() {
                             </div>
                         </div>
 
-                        {/* Sección derecha: Mi Contenido DENTRO DEL BLOQUE AZUL - MÁS GRANDE */}
+                        {/* Derecha: Mi Contenido */}
                         <div style={rightSectionStyle}>
                             <Card style={contentStatsCardStyle}>
                                 <h3 style={sectionTitleStyle}>Mi Contenido</h3>
@@ -189,11 +209,11 @@ export default function Profile() {
                     </div>
                 </Card>
 
-                {/* Actividad Reciente - COMO NOTIFICACIONES */}
+                {/* Actividad Reciente */}
                 <Card style={activityCardStyle}>
                     <h3 style={sectionTitleStyle}>Actividad Reciente</h3>
                     <div style={activityStyle}>
-                        {/* Notificación de créditos - SIEMPRE VISIBLE */}
+                        {/* créditos bienvenida */}
                         <div style={notificationItemStyle}>
                             <div style={notificationIconStyle}>💰</div>
                             <div style={notificationContentStyle}>
@@ -210,7 +230,7 @@ export default function Profile() {
                                 <div style={notificationIconStyle}>📚</div>
                                 <div style={notificationContentStyle}>
                                     <div style={notificationTextStyle}>
-                                        Tienes <strong>{stats.apuntesSubidos} apuntes</strong> subidos a la comunidad
+                                        Tenés <strong>{stats.apuntesSubidos} apuntes</strong> subidos
                                     </div>
                                     <div style={notificationTimeStyle}>Actividad continua</div>
                                 </div>
@@ -220,13 +240,13 @@ export default function Profile() {
                                 <div style={notificationIconStyle}>📚</div>
                                 <div style={notificationContentStyle}>
                                     <div style={notificationTextStyle}>
-                                        <strong>Comienza a compartir</strong> tus apuntes
+                                        <strong>Comenzá a compartir</strong> tus apuntes
                                     </div>
                                     <div style={notificationTimeStyle}>
                                         <Button
                                             variant="primary"
                                             size="small"
-                                            onClick={() => window.location.href = '/upload'}
+                                            onClick={() => (window.location.href = '/upload')}
                                             style={notificationButtonStyle}
                                         >
                                             Subir primer apunte
@@ -241,7 +261,7 @@ export default function Profile() {
                                 <div style={notificationIconStyle}>⭐</div>
                                 <div style={notificationContentStyle}>
                                     <div style={notificationTextStyle}>
-                                        Has escrito <strong>{stats.reseñasEscritas} reseñas</strong>
+                                        Escribiste <strong>{stats.reseñasEscritas} reseñas</strong>
                                     </div>
                                     <div style={notificationTimeStyle}>Tu opinión cuenta</div>
                                 </div>
@@ -251,13 +271,13 @@ export default function Profile() {
                                 <div style={notificationIconStyle}>⭐</div>
                                 <div style={notificationContentStyle}>
                                     <div style={notificationTextStyle}>
-                                        <strong>Califica apuntes</strong> que hayas usado
+                                        <strong>Calificá</strong> apuntes que hayas usado
                                     </div>
                                     <div style={notificationTimeStyle}>
                                         <Button
                                             variant="primary"
                                             size="small"
-                                            onClick={() => window.location.href = '/reviews'}
+                                            onClick={() => (window.location.href = '/reviews')}
                                             style={notificationButtonStyle}
                                         >
                                             Escribir reseña
@@ -271,13 +291,13 @@ export default function Profile() {
                             <div style={notificationIconStyle}>🎓</div>
                             <div style={notificationContentStyle}>
                                 <div style={notificationTextStyle}>
-                                    <strong>Conviértete en mentor</strong> de la comunidad
+                                    <strong>Convertite en mentor</strong> de la comunidad
                                 </div>
                                 <div style={notificationTimeStyle}>
                                     <Button
                                         variant="outline"
                                         size="small"
-                                        onClick={() => window.location.href = '/become-mentor'}
+                                        onClick={() => (window.location.href = '/become-mentor')}
                                         style={notificationButtonStyle}
                                     >
                                         Ser mentor
@@ -286,12 +306,11 @@ export default function Profile() {
                             </div>
                         </div>
 
-                        {/* Notificación de bienvenida */}
                         <div style={notificationItemStyle}>
                             <div style={notificationIconStyle}>👋</div>
                             <div style={notificationContentStyle}>
                                 <div style={notificationTextStyle}>
-                                    <strong>¡Bienvenido a KERANA!</strong> Tu viaje comienza aquí
+                                    <strong>¡Bienvenido a KERANA!</strong> Tu viaje comienza acá
                                 </div>
                                 <div style={notificationTimeStyle}>Recién llegado</div>
                             </div>
@@ -303,13 +322,13 @@ export default function Profile() {
     );
 }
 
-// Componente del botón Editar Perfil
+// Componente botón Editar Perfil
 function EditProfileButton() {
     const [isHovered, setIsHovered] = useState(false);
 
     return (
         <button
-            onClick={() => window.location.href = '/edit-profile'}
+            onClick={() => (window.location.href = '/edit-profile')}
             style={isHovered ? editButtonHoverStyle : editButtonStyle}
             onMouseEnter={() => setIsHovered(true)}
             onMouseLeave={() => setIsHovered(false)}
@@ -323,7 +342,7 @@ function EditProfileButton() {
 const pageStyle = {
     minHeight: '100vh',
     background: 'linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%)',
-    padding: '14px 12px', // ACHICADO
+    padding: '14px 12px',
 };
 
 const centerStyle = {
@@ -335,49 +354,48 @@ const centerStyle = {
 };
 
 const spinnerStyle = {
-    width: 32, // ACHICADO
-    height: 32, // ACHICADO
-    border: '2px solid #f3f4f6', // ACHICADO
-    borderTop: '2px solid #2563eb', // ACHICADO
+    width: 32,
+    height: 32,
+    border: '2px solid #f3f4f6',
+    borderTop: '2px solid #2563eb',
     borderRadius: '50%',
     animation: 'spin 1s linear infinite',
 };
 
-// HEADER - BLOQUE AZUL GRANDE (ACHICADO)
+// HEADER - BLOQUE AZUL
 const profileHeaderStyle = {
-    padding: '22px', // ACHICADO
-    marginBottom: '15px', // ACHICADO
+    padding: '22px',
+    marginBottom: '15px',
     background: 'linear-gradient(135deg, #1e40af 0%, #2563eb 100%)',
     color: 'white',
-    borderRadius: '18px', // ACHICADO
+    borderRadius: '18px',
     border: '2px solid rgba(255,255,255,0.2)',
 };
 
 const headerContentStyle = {
     display: 'flex',
-    gap: '24px', // ACHICADO
+    gap: '24px',
     alignItems: 'flex-start',
 };
 
 const leftSectionStyle = {
     flex: 1,
     display: 'flex',
-    gap: '20px', // ACHICADO
+    gap: '20px',
     alignItems: 'flex-start',
 };
 
-// AQUÍ SE AGREGA EL ANCHO PARA "MI CONTENIDO" - CAMBIA ESTE VALOR PARA AJUSTAR
 const rightSectionStyle = {
-    width: 480, // AGREGADO - PUEDES CAMBIAR ESTE NÚMERO (380, 400, 450, etc.)
+    width: 480,
     flexShrink: 0,
 };
 
 const avatarStyle = {
-    width: 80, // ACHICADO
-    height: 80, // ACHICADO
+    width: 80,
+    height: 80,
     borderRadius: '50%',
     overflow: 'hidden',
-    border: '4px solid rgba(255,255,255,0.3)', // ACHICADO
+    border: '4px solid rgba(255,255,255,0.3)',
     flexShrink: 0,
 };
 
@@ -394,237 +412,33 @@ const avatarPlaceholderStyle = {
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
-    fontSize: '32px', // ACHICADO
+    fontSize: '32px',
     fontWeight: 'bold',
     color: 'white',
 };
 
-const profileInfoStyle = {
-    flex: 1,
-};
+const profileInfoStyle = { flex: 1 };
 
 const profileNameStyle = {
-    margin: '0 0 6px 0', // ACHICADO
-    fontSize: '28px', // ACHICADO
+    margin: '0 0 6px 0',
+    fontSize: '28px',
     fontWeight: '800',
 };
 
 const profileUsernameStyle = {
-    margin: '0 0 6px 0', // ACHICADO
-    fontSize: '16px', // ACHICADO
+    margin: '0 0 6px 0',
+    fontSize: '16px',
     opacity: 0.9,
 };
 
 const profileEmailStyle = {
-    margin: '0 0 12px 0', // ACHICADO
-    fontSize: '14px', // ACHICADO
+    margin: '0 0 12px 0',
+    fontSize: '14px',
     opacity: 0.8,
 };
 
 // Créditos
-const creditsContainerStyle = {
-    marginBottom: '16px', // ACHICADO
-};
-
-// Estadísticas en el header
-const headerStatsStyle = {
-    display: 'flex',
-    alignItems: 'center',
-    gap: '24px', // ACHICADO
-    flexWrap: 'wrap',
-    marginBottom: '16px', // ACHICADO
-};
-
-const headerStatItemStyle = {
-    textAlign: 'center',
-};
-
-const headerStatNumberStyle = {
-    fontSize: '22px', // ACHICADO
-    fontWeight: '800',
-    marginBottom: '2px', // ACHICADO
-};
-
-const headerStatLabelStyle = {
-    fontSize: '12px', // ACHICADO
-    opacity: 0.9,
-    fontWeight: '600',
-};
-
-const actionsStyle = {
-    display: 'flex',
-    gap: '10px', // ACHICADO
-};
-
-// Botón Editar Perfil
-const editButtonStyle = {
-    padding: '10px 20px', // ACHICADO
-    borderRadius: '6px', // ACHICADO
-    border: '2px solid white',
-    background: 'transparent',
-    color: 'white',
-    fontWeight: '600',
-    cursor: 'pointer',
-    fontSize: '13px', // ACHICADO
-    transition: 'all 0.2s ease',
-};
-
-const editButtonHoverStyle = {
-    ...editButtonStyle,
-    background: 'white',
-    color: '#2563eb',
-};
-
-// MI CONTENIDO - DENTRO DEL BLOQUE AZUL (MÁS GRANDE)
-const contentStatsCardStyle = {
-    padding: '20px', // ACHICADO pero más ancho por el rightSectionStyle
-    background: 'white',
-    borderRadius: '12px',
-    border: '1px solid rgba(255,255,255,0.3)',
-    boxShadow: '0 4px 20px rgba(0, 0, 0, 0.1)',
-    height: '100%', // Para que ocupe todo el espacio disponible
-};
-
-// ACTIVIDAD RECIENTE - ABAJO DEL BLOQUE AZUL (ACHICADO)
-const activityCardStyle = {
-    padding: '24px', // ACHICADO
-    background: 'white',
-    borderRadius: '12px', // ACHICADO
-    border: '1px solid #e2e8f0',
-    boxShadow: '0 4px 6px rgba(0, 0, 0, 0.05)',
-};
-
-const sectionTitleStyle = {
-    margin: '0 0 16px 0', // ACHICADO
-    fontSize: '18px', // ACHICADO
-    fontWeight: '700',
-    color: '#1e293b',
-    borderBottom: '1px solid #e2e8f0', // ACHICADO
-    paddingBottom: '8px', // ACHICADO
-};
-
-// ESTADÍSTICAS DE CONTENIDO (MÁS GRANDES)
-const contentStatsGridStyle = {
-    display: 'grid',
-    gridTemplateColumns: '1fr 1fr',
-    gap: '16px',
-};
-
-const contentStatItemStyle = {
-    textAlign: 'center',
-    padding: '20px 16px', // ACHICADO
-    background: '#f8fafc',
-    borderRadius: '8px',
-    border: '1px solid #e2e8f0',
-};
-
-const contentStatNumberStyle = {
-    fontSize: '32px', // MANTENIDO GRANDE
-    fontWeight: '800',
-    color: '#1e40af',
-    marginBottom: '6px', // ACHICADO
-};
-
-const contentStatLabelStyle = {
-    fontSize: '14px',
-    color: '#64748b',
-    fontWeight: '600',
-};
-
-// ACTIVIDAD RECIENTE (ACHICADO)
-const activityStyle = {
-    display: 'grid',
-    gap: '16px', // ACHICADO
-};
-
-const activityItemStyle = {
-    display: 'flex',
-    alignItems: 'flex-start',
-    gap: '12px', // ACHICADO
-    padding: '16px', // ACHICADO
-    background: '#f8fafc',
-    borderRadius: '8px', // ACHICADO
-    border: '1px solid #e2e8f0',
-};
-
-const activityIconStyle = {
-    fontSize: '20px', // ACHICADO
-    flexShrink: 0,
-    marginTop: '2px',
-};
-
-const activityTextStyle = {
-    fontWeight: '600',
-    color: '#334155',
-    fontSize: '14px', // ACHICADO
-    marginBottom: '4px',
-};
-
-const activityTimeStyle = {
-    fontSize: '12px', // ACHICADO
-    color: '#64748b',
-};
-// NUEVOS ESTILOS PARA NOTIFICACIONES
-const notificationItemStyle = {
-    display: 'flex',
-    alignItems: 'flex-start',
-    gap: '12px',
-    padding: '16px',
-    background: 'white',
-    borderRadius: '8px',
-    border: '1px solid #e2e8f0',
-    marginBottom: '8px',
-    position: 'relative',
-    transition: 'all 0.2s ease',
-    cursor: 'pointer',
-};
-
-const notificationIconStyle = {
-    fontSize: '18px',
-    flexShrink: 0,
-    marginTop: '2px',
-    background: '#f1f5f9',
-    borderRadius: '6px',
-    width: '32px',
-    height: '32px',
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-};
-
-const notificationContentStyle = {
-    flex: 1,
-};
-
-const notificationTextStyle = {
-    fontWeight: '600',
-    color: '#334155',
-    fontSize: '14px',
-    marginBottom: '4px',
-};
-
-const notificationTimeStyle = {
-    fontSize: '12px',
-    color: '#64748b',
-};
-
-const notificationBadgeStyle = {
-    background: '#dc2626',
-    color: 'white',
-    fontSize: '10px',
-    fontWeight: '700',
-    padding: '2px 6px',
-    borderRadius: '4px',
-    position: 'absolute',
-    top: '12px',
-    right: '12px',
-};
-
-const notificationButtonStyle = {
-    marginTop: '8px',
-};
-
-//Estilo de creditos
+const creditsContainerStyle = { marginBottom: '16px' };
 const creditsTextStyle = {
     display: 'inline-flex',
     alignItems: 'center',
@@ -638,3 +452,120 @@ const creditsTextStyle = {
     border: '1px solid rgba(255, 255, 255, 0.3)',
     backdropFilter: 'blur(10px)',
 };
+
+// Stats header
+const headerStatsStyle = {
+    display: 'flex',
+    alignItems: 'center',
+    gap: '24px',
+    flexWrap: 'wrap',
+    marginBottom: '16px',
+};
+const headerStatItemStyle = { textAlign: 'center' };
+const headerStatNumberStyle = { fontSize: '22px', fontWeight: '800', marginBottom: '2px' };
+const headerStatLabelStyle = { fontSize: '12px', opacity: 0.9, fontWeight: '600' };
+const actionsStyle = { display: 'flex', gap: '10px' };
+
+// Botón Editar Perfil
+const editButtonStyle = {
+    padding: '10px 20px',
+    borderRadius: '6px',
+    border: '2px solid white',
+    background: 'transparent',
+    color: 'white',
+    fontWeight: '600',
+    cursor: 'pointer',
+    fontSize: '13px',
+    transition: 'all 0.2s ease',
+};
+const editButtonHoverStyle = { ...editButtonStyle, background: 'white', color: '#2563eb' };
+
+// Mi Contenido
+const contentStatsCardStyle = {
+    padding: '20px',
+    background: 'white',
+    borderRadius: '12px',
+    border: '1px solid rgba(255,255,255,0.3)',
+    boxShadow: '0 4px 20px rgba(0, 0, 0, 0.1)',
+    height: '100%',
+};
+
+// Actividad Reciente
+const activityCardStyle = {
+    padding: '24px',
+    background: 'white',
+    borderRadius: '12px',
+    border: '1px solid #e2e8f0',
+    boxShadow: '0 4px 6px rgba(0, 0, 0, 0.05)',
+};
+const sectionTitleStyle = {
+    margin: '0 0 16px 0',
+    fontSize: '18px',
+    fontWeight: '700',
+    color: '#1e293b',
+    borderBottom: '1px solid #e2e8f0',
+    paddingBottom: '8px',
+};
+
+const contentStatsGridStyle = {
+    display: 'grid',
+    gridTemplateColumns: '1fr 1fr',
+    gap: '16px',
+};
+const contentStatItemStyle = {
+    textAlign: 'center',
+    padding: '20px 16px',
+    background: '#f8fafc',
+    borderRadius: '8px',
+    border: '1px solid #e2e8f0',
+};
+const contentStatNumberStyle = {
+    fontSize: '32px',
+    fontWeight: '800',
+    color: '#1e40af',
+    marginBottom: '6px',
+};
+const contentStatLabelStyle = { fontSize: '14px', color: '#64748b', fontWeight: '600' };
+
+// Notificaciones (UI)
+const activityStyle = { display: 'grid', gap: '16px' };
+const notificationItemStyle = {
+    display: 'flex',
+    alignItems: 'flex-start',
+    gap: '12px',
+    padding: '16px',
+    background: 'white',
+    borderRadius: '8px',
+    border: '1px solid #e2e8f0',
+    marginBottom: '8px',
+    position: 'relative',
+    transition: 'all 0.2s ease',
+    cursor: 'pointer',
+};
+const notificationIconStyle = {
+    fontSize: '18px',
+    flexShrink: 0,
+    marginTop: '2px',
+    background: '#f1f5f9',
+    borderRadius: '6px',
+    width: '32px',
+    height: '32px',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+};
+const notificationContentStyle = { flex: 1 };
+const notificationTextStyle = { fontWeight: '600', color: '#334155', fontSize: '14px', marginBottom: '4px' };
+const notificationTimeStyle = { fontSize: '12px', color: '#64748b' };
+const notificationBadgeStyle = {
+    background: '#dc2626',
+    color: 'white',
+    fontSize: '10px',
+    fontWeight: '700',
+    padding: '2px 6px',
+    borderRadius: '4px',
+    position: 'absolute',
+    top: '12px',
+    right: '12px',
+};
+const notificationButtonStyle = { marginTop: '8px' };
