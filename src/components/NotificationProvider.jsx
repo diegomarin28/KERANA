@@ -1,12 +1,18 @@
-// components/NotificationProvider.jsx
 import { createContext, useContext, useState, useCallback } from 'react';
 
-const NotificationContext = createContext();
+const NotificationContext = createContext(null);
 
 export const useNotifications = () => {
     const context = useContext(NotificationContext);
     if (!context) {
-        throw new Error('useNotifications debe ser usado dentro de NotificationProvider');
+        // En lugar de throw, retornar funciones dummy
+        console.warn('useNotifications usado fuera de NotificationProvider');
+        return {
+            notifications: [],
+            addNotification: () => {},
+            removeNotification: () => {},
+            clearAll: () => {}
+        };
     }
     return context;
 };
@@ -15,31 +21,44 @@ export const NotificationProvider = ({ children }) => {
     const [notifications, setNotifications] = useState([]);
 
     const addNotification = useCallback((notification) => {
-        const id = Date.now() + Math.random();
-        const newNotification = {
-            id,
-            type: 'info',
-            duration: 5000,
-            ...notification,
-        };
+        try {
+            const id = Date.now() + Math.random();
+            const newNotification = {
+                id,
+                type: 'info',
+                duration: 5000,
+                ...notification,
+            };
 
-        setNotifications(prev => [...prev, newNotification]);
+            setNotifications(prev => [...prev, newNotification]);
 
-        if (newNotification.duration !== 0) {
-            setTimeout(() => {
-                removeNotification(id);
-            }, newNotification.duration);
+            if (newNotification.duration !== 0) {
+                setTimeout(() => {
+                    removeNotification(id);
+                }, newNotification.duration);
+            }
+
+            return id;
+        } catch (e) {
+            console.error('Error adding notification:', e);
+            return null;
         }
-
-        return id;
     }, []);
 
     const removeNotification = useCallback((id) => {
-        setNotifications(prev => prev.filter(notification => notification.id !== id));
+        try {
+            setNotifications(prev => prev.filter(notification => notification.id !== id));
+        } catch (e) {
+            console.error('Error removing notification:', e);
+        }
     }, []);
 
     const clearAll = useCallback(() => {
-        setNotifications([]);
+        try {
+            setNotifications([]);
+        } catch (e) {
+            console.error('Error clearing notifications:', e);
+        }
     }, []);
 
     const value = {
@@ -60,19 +79,20 @@ export const NotificationProvider = ({ children }) => {
 const NotificationContainer = () => {
     const { notifications, removeNotification } = useNotifications();
 
-    if (notifications.length === 0) return null;
+    if (!notifications || notifications.length === 0) return null;
 
     return (
         <div
             style={{
                 position: 'fixed',
-                top: 20,
+                top: 80, // Debajo del header
                 right: 20,
-                zIndex: 1000,
+                zIndex: 9999,
                 display: 'flex',
                 flexDirection: 'column',
                 gap: 10,
                 maxWidth: 400,
+                pointerEvents: 'none'
             }}
         >
             {notifications.map((notification) => (
@@ -89,67 +109,102 @@ const NotificationContainer = () => {
 const NotificationItem = ({ notification, onClose }) => {
     const getStyles = (type) => {
         const baseStyle = {
-            padding: '12px 16px',
-            borderRadius: '8px',
-            boxShadow: '0 4px 12px rgba(0, 0, 0, 0.15)',
+            padding: '16px 20px',
+            borderRadius: '12px',
+            boxShadow: '0 8px 24px rgba(0, 0, 0, 0.15)',
             display: 'flex',
             justifyContent: 'space-between',
             alignItems: 'flex-start',
             gap: '12px',
             maxWidth: '400px',
             animation: 'slideInRight 0.3s ease-out',
+            pointerEvents: 'auto',
+            backdropFilter: 'blur(12px)',
+            border: '1px solid rgba(255,255,255,0.2)',
         };
 
         const typeStyles = {
             success: {
-                backgroundColor: '#d1fae5',
-                border: '1px solid #10b981',
-                color: '#065f46',
+                background: 'linear-gradient(135deg, rgba(16, 185, 129, 0.95) 0%, rgba(5, 150, 105, 0.95) 100%)',
+                color: '#ffffff',
             },
             error: {
-                backgroundColor: '#fee2e2',
-                border: '1px solid #ef4444',
-                color: '#7f1d1d',
+                background: 'linear-gradient(135deg, rgba(239, 68, 68, 0.95) 0%, rgba(220, 38, 38, 0.95) 100%)',
+                color: '#ffffff',
             },
             warning: {
-                backgroundColor: '#fef3c7',
-                border: '1px solid #f59e0b',
-                color: '#78350f',
+                background: 'linear-gradient(135deg, rgba(245, 158, 11, 0.95) 0%, rgba(217, 119, 6, 0.95) 100%)',
+                color: '#ffffff',
             },
             info: {
-                backgroundColor: '#dbeafe',
-                border: '1px solid #3b82f6',
-                color: '#1e3a8a',
+                background: 'linear-gradient(135deg, rgba(37, 99, 235, 0.95) 0%, rgba(29, 78, 216, 0.95) 100%)',
+                color: '#ffffff',
             },
         };
 
-        return { ...baseStyle, ...typeStyles[type] };
+        return { ...baseStyle, ...(typeStyles[type] || typeStyles.info) };
     };
 
     return (
         <div style={getStyles(notification.type)}>
             <div style={{ flex: 1 }}>
                 {notification.title && (
-                    <div style={{ fontWeight: 'bold', marginBottom: '4px' }}>
+                    <div style={{
+                        fontWeight: '700',
+                        marginBottom: '6px',
+                        fontSize: '15px',
+                        letterSpacing: '-0.01em',
+                    }}>
                         {notification.title}
                     </div>
                 )}
-                <div>{notification.message}</div>
+                <div style={{
+                    fontSize: '14px',
+                    lineHeight: '1.5',
+                    opacity: 0.95,
+                }}>
+                    {notification.message}
+                </div>
             </div>
             <button
                 onClick={onClose}
                 style={{
-                    background: 'none',
+                    background: 'rgba(255,255,255,0.2)',
                     border: 'none',
-                    fontSize: '18px',
+                    fontSize: '20px',
                     cursor: 'pointer',
-                    padding: 0,
-                    color: 'inherit',
-                    opacity: 0.7,
+                    padding: '4px 8px',
+                    color: '#ffffff',
+                    borderRadius: '6px',
+                    lineHeight: 1,
+                    transition: 'background 0.2s ease',
+                    fontWeight: '600',
                 }}
+                onMouseEnter={(e) => e.target.style.background = 'rgba(255,255,255,0.3)'}
+                onMouseLeave={(e) => e.target.style.background = 'rgba(255,255,255,0.2)'}
+                aria-label="Cerrar notificación"
             >
                 ×
             </button>
         </div>
     );
 };
+
+// Agregar animación CSS si no existe
+if (typeof document !== 'undefined' && !document.getElementById('notification-animation')) {
+    const style = document.createElement('style');
+    style.id = 'notification-animation';
+    style.textContent = `
+        @keyframes slideInRight {
+            from {
+                transform: translateX(120%);
+                opacity: 0;
+            }
+            to {
+                transform: translateX(0);
+                opacity: 1;
+            }
+        }
+    `;
+    document.head.appendChild(style);
+}

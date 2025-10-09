@@ -48,7 +48,8 @@ import AuthModal_SignIn from "./components/AuthModal_SignIn";
 import PrivacyBanner from './components/PrivacyBanner';
 import { NotificationProvider } from "./components/NotificationProvider";
 import FollowersTest from "./pages/FollowersTest";
-
+import { NotificationsProvider } from './contexts/NotificationsContext';
+import NotificationsRealtimeSubscriber from "./components/NotificationsRealtimeSubscriber";
 
 const LoadingSpinner = () => (
     <div style={{ display: "flex", justifyContent: "center", alignItems: "center", height: "50vh", flexDirection: "column", gap: 16 }}>
@@ -215,8 +216,11 @@ function AppRoutes() {
         return (
             <BrowserRouter>
                 <NotificationProvider>
-                <PrivacyBanner />
-                <AppRoutes />
+                    <NotificationsProvider>
+                        <NotificationsRealtimeSubscriber />
+                        <PrivacyBanner />
+                        <AppRoutes />
+                    </NotificationsProvider>
                 </NotificationProvider>
             </BrowserRouter>
         );

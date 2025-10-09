@@ -22,6 +22,9 @@ export default function Header() {
     const [nameCache, setNameCache] = useState(() => localStorage.getItem('kerana_name_cache') || '');
     const [displayName, setDisplayName] = useState('');
     const [avatarOk, setAvatarOk] = useState(true);
+    const [avatarMenuOpen, setAvatarMenuOpen] = useState(false);
+    const avatarBtnRef = useRef(null);
+    const avatarMenuRef = useRef(null);
 
 
     // Función unificada para abrir login
@@ -72,6 +75,26 @@ export default function Header() {
 
         setDisplayName(computeDisplayName());
     }, [userProfile, user, nameCache, usernameCache]);
+
+    useEffect(() => {
+        if (!avatarMenuOpen) return;
+        const onKey = (e) => e.key === "Escape" && setAvatarMenuOpen(false);
+        const onClick = (e) => {
+            const m = avatarMenuRef.current, b = avatarBtnRef.current;
+            if (m && !m.contains(e.target) && b && !b.contains(e.target)) setAvatarMenuOpen(false);
+        };
+        document.addEventListener("keydown", onKey);
+        document.addEventListener("mousedown", onClick);
+        return () => {
+            document.removeEventListener("keydown", onKey);
+            document.removeEventListener("mousedown", onClick);
+        };
+    }, [avatarMenuOpen]);
+
+    const go = (path) => {
+        navigate(path);
+        setAvatarMenuOpen(false);
+    };
 
     useEffect(() => {
         let mounted = true;
@@ -316,6 +339,21 @@ export default function Header() {
         fontWeight: 700, cursor: "pointer", transition: "all 0.3s ease", transform: "translateY(0px)",
     };
 
+    const menuItemStyle = {
+        all: "unset",
+        display: "flex",
+        alignItems: "center",
+        gap: 10,
+        width: "100%",
+        padding: "10px 12px",
+        borderRadius: 8,
+        cursor: "pointer",
+        transition: "background .15s ease",
+    };
+    const menuItemTextLeft = { fontSize: 14, fontWeight: 600, textAlign: "left", flex: 1 };
+    const dividerStyle = { height: 1, background: "#e5e7eb", margin: "6px 4px" };
+
+
     const handleSignInMouseEnter = (e) => {
         if (inHero) {
             e.target.style.background = "#2563eb";
@@ -419,62 +457,139 @@ export default function Header() {
                          </span>
 
                                 {/* Avatar clickeable */}
-                                <button
-                                    onClick={() => navigate("/profile")}
-                                    style={{
-                                        background: "transparent",
-                                        border: "none",
-                                        cursor: "pointer",
-                                        padding: 0,
-                                        borderRadius: "50%",
-                                        transition: "transform 0.2s ease",
-                                    }}
-                                    onMouseEnter={(e) => {
-                                        e.currentTarget.style.transform = "scale(1.1)";
-                                    }}
-                                    onMouseLeave={(e) => {
-                                        e.currentTarget.style.transform = "scale(1)";
-                                    }}
-                                    aria-label="Ir a mi perfil"
-                                >
-                                    {(() => {
-                                        const avatarSrc = getAppAvatarSrc(userProfile?.foto);
-                                        return avatarSrc && avatarOk ? (
-                                            <img
-                                                src={avatarSrc}
-                                                alt={displayName}
-                                                onError={() => setAvatarOk(false)}
+                                <div style={{ position: "relative" }}>
+                                    <button
+                                        ref={avatarBtnRef}
+                                        onClick={() => setAvatarMenuOpen((o) => !o)}
+                                        style={{
+                                            background: "transparent",
+                                            border: "none",
+                                            cursor: "pointer",
+                                            padding: 0,
+                                            borderRadius: "50%",
+                                            transition: "transform 0.2s ease",
+                                        }}
+                                        onMouseEnter={(e) => { e.currentTarget.style.transform = "scale(1.1)"; }}
+                                        onMouseLeave={(e) => { e.currentTarget.style.transform = "scale(1)"; }}
+                                        aria-haspopup="menu"
+                                        aria-expanded={avatarMenuOpen ? "true" : "false"}
+                                        aria-label="Abrir menú de usuario"
+                                    >
+                                        {(() => {
+                                            const avatarSrc = (typeof getAppAvatarSrc === "function")
+                                                ? getAppAvatarSrc(userProfile?.foto)
+                                                : (userProfile?.foto || "").trim(); // fallback si no tenés helper
+                                            return avatarSrc && avatarOk ? (
+                                                <img
+                                                    src={avatarSrc}
+                                                    alt={displayName}
+                                                    onError={() => setAvatarOk(false)}
+                                                    style={{
+                                                        width: 40,
+                                                        height: 40,
+                                                        borderRadius: "50%",
+                                                        objectFit: "cover",
+                                                        border: "2px solid #fff",
+                                                        boxShadow: "0 2px 8px rgba(0,0,0,0.2)",
+                                                    }}
+                                                    loading="lazy"
+                                                    referrerPolicy="no-referrer"
+                                                />
+                                            ) : (
+                                                <div
+                                                    style={{
+                                                        width: 40,
+                                                        height: 40,
+                                                        borderRadius: "50%",
+                                                        background: "linear-gradient(135deg, #3b82f6 0%, #1e40af 100%)",
+                                                        color: "#fff",
+                                                        display: "grid",
+                                                        placeItems: "center",
+                                                        fontWeight: 800,
+                                                        fontSize: 16,
+                                                        boxShadow: "0 2px 8px rgba(0,0,0,0.2)",
+                                                    }}
+                                                >
+                                                    {(displayName?.[0] || "U").toUpperCase()}
+                                                </div>
+                                            );
+                                        })()}
+                                    </button>
+
+                                    {avatarMenuOpen && (
+                                        <div
+                                            ref={avatarMenuRef}
+                                            role="menu"
+                                            style={{
+                                                position: "absolute",
+                                                right: 0,
+                                                top: "calc(100% + 8px)",
+                                                width: 224,
+                                                background: "#ffffff",
+                                                color: "#0b1e3a",
+                                                border: "1px solid #e5e7eb",
+                                                borderRadius: 10,
+                                                boxShadow: "0 12px 28px rgba(0,0,0,.18)",
+                                                padding: 8,
+                                                zIndex: 1100,
+                                            }}
+                                        >
+                                            {/* Mi perfil */}
+                                            <button type="button" onClick={() => go("/profile")} style={menuItemStyle}>
+                                                <span style={menuItemTextLeft}>Mi perfil</span>
+                                            </button>
+
+                                            {/* Mis apuntes */}
+                                            <button type="button" onClick={() => go("/my_papers")} style={menuItemStyle}>
+                                                <span style={menuItemTextLeft}>Mis apuntes</span>
+                                            </button>
+
+                                            {/* Favoritos */}
+                                            <button type="button" onClick={() => go("/favorites")} style={menuItemStyle}>
+                                                <span style={menuItemTextLeft}>Favoritos</span>
+                                            </button>
+
+                                            {/* Compras */}
+                                            <button type="button" onClick={() => go("/purchased")} style={menuItemStyle}>
+                                                <span style={menuItemTextLeft}>Compras</span>
+                                            </button>
+
+                                            <div style={dividerStyle} />
+
+                                            {/* Comprar créditos (no hace nada por ahora) */}
+                                            <button type="button" disabled style={{ ...menuItemStyle, cursor: "not-allowed", opacity: .6 }}>
+                                                <span style={menuItemTextLeft}>Comprar créditos</span>
+                                            </button>
+
+                                            <div style={dividerStyle} />
+
+                                            {/* Cerrar sesión (ROJO, texto centrado como en el sidebar) */}
+                                            <button
+                                                type="button"
+                                                onClick={() => { handleLogout?.(); setAvatarMenuOpen(false); }}
                                                 style={{
-                                                    width: 40,
-                                                    height: 40,
-                                                    borderRadius: "50%",
-                                                    objectFit: "cover",
-                                                    border: "2px solid #fff",
-                                                    boxShadow: "0 2px 8px rgba(0,0,0,0.2)",
+                                                    all: "unset",
+                                                    display: "flex",
+                                                    alignItems: "center",
+                                                    justifyContent: "center",
+                                                    width: "100%",
+                                                    padding: "10px 12px",
+                                                    borderRadius: 8,
+                                                    cursor: "pointer",
+                                                    color: "#b91c1c",
+                                                    border: "1px solid rgba(185,28,28,.25)",
+                                                    background: "rgba(239,68,68,.06)",
+                                                    fontWeight: 600,
+                                                    transition: "background .15s ease, border-color .15s ease",
                                                 }}
-                                                loading="lazy"
-                                                referrerPolicy="no-referrer"
-                                            />
-                                        ) : (
-                                            <div
-                                                style={{
-                                                    width: 40,
-                                                    height: 40,
-                                                    borderRadius: "50%",
-                                                    background: "linear-gradient(135deg, #3b82f6 0%, #1e40af 100%)",
-                                                    color: "#fff",
-                                                    display: "grid",
-                                                    placeItems: "center",
-                                                    fontWeight: 800,
-                                                    fontSize: 16,
-                                                    boxShadow: "0 2px 8px rgba(0,0,0,0.2)",
-                                                }}
+                                                onMouseEnter={(e) => e.currentTarget.style.background = "rgba(239,68,68,.12)"}
+                                                onMouseLeave={(e) => e.currentTarget.style.background = "rgba(239,68,68,.06)"}
                                             >
-                                                {(displayName?.[0] || "U").toUpperCase()}
-                                            </div>
-                                        );
-                                    })()}
-                                </button>
+                                                Cerrar sesión
+                                            </button>
+                                        </div>
+                                    )}
+                                </div>
 
                             </div>
                         )}

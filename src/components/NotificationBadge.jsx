@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
-import useNotifications from '../hooks/useNotifications';
+import { useNotificationsContext } from '../contexts/NotificationsContext';
 
 export default function NotificationBadge() {
     const [isOpen, setIsOpen] = useState(false);
@@ -14,7 +14,7 @@ export default function NotificationBadge() {
         marcarComoLeida,
         marcarTodasLeidas,
         cargarNotificaciones
-    } = useNotifications();
+    } =useNotificationsContext();
 
     // Cerrar con ESC
     useEffect(() => {

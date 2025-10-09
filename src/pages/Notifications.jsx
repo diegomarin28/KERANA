@@ -1,6 +1,6 @@
 import { Card } from '../components/ui/Card';
 import { Button } from '../components/ui/Button';
-import useNotifications from '../hooks/useNotifications';
+import { useNotificationsContext } from '../contexts/NotificationsContext';
 import { useSeguidores } from '../hooks/useSeguidores';
 
 export default function Notifications() {
@@ -10,7 +10,7 @@ export default function Notifications() {
         marcarComoLeida,
         marcarTodasLeidas,
         eliminarNotificacion,
-    } = useNotifications();
+    } = useNotificationsContext();
 
     const { seguirUsuario } = useSeguidores();
 
