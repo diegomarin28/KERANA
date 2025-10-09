@@ -6,6 +6,7 @@ import Sidebar from "../components/Sidebar.jsx";
 import HamburgerButton from "../components/HamburgerButton.jsx";
 import { supabase } from "../supabase";
 import { fetchUserProfile, cleanLogout } from "../utils/authHelpers";
+import NotificationBadge from "../components/NotificationBadge";
 
 export default function Header() {
     const [menuOpen, setMenuOpen] = useState(false);
@@ -399,21 +400,23 @@ export default function Header() {
                     </nav>
 
                     {/* Derecha */}
+                    {/* Derecha */}
                     <div>
                         {!user ? (
                             <HeaderAuthButtons />
                         ) : (
                             <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-                                {/* Mostrar nombre estable */}
-                                <span
-                                    style={{
-                                        fontWeight: 700,
-                                        fontSize: 14,
-                                        color: TOKENS.headerText,
-                                    }}
-                                >
-                {displayName}
-              </span>
+                                {/* 🔔 BADGE DE NOTIFICACIONES */}
+                                <NotificationBadge />
+
+                                {/* Nombre */}
+                                <span style={{
+                                    fontWeight: 700,
+                                    fontSize: 14,
+                                    color: TOKENS.headerText,
+                                }}>
+                                {displayName}
+                         </span>
 
                                 {/* Avatar clickeable */}
                                 <button

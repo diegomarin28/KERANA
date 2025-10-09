@@ -38,7 +38,7 @@ const EditProfile = lazy(() => import("./pages/EditProfile"));
 const Favorites = lazy(() => import("./pages/Favorites"));
 const MyPapers = lazy(() => import("./pages/MyPapers"));
 const Notifications = lazy(() => import("./pages/Notifications"));
-const NotificationsMessages = lazy(() => import("./components/NotificationsMessages"));
+const NotificationBadge = lazy(() => import("./components/NotificationBadge"));
 const UserCard = lazy(() => import("./components/UserCard"));
 
 //se importa cuando la app carga por primera vez, aunque el usuario nunca entre a esa ruta. es lo esencial q cargamos siempre si o si
@@ -47,7 +47,7 @@ import AuthConfirm from './pages/AuthConfirm';
 import AuthModal_SignIn from "./components/AuthModal_SignIn";
 import PrivacyBanner from './components/PrivacyBanner';
 import { NotificationProvider } from "./components/NotificationProvider";
-
+import FollowersTest from "./pages/FollowersTest";
 
 
 const LoadingSpinner = () => (
@@ -126,11 +126,14 @@ function AppRoutes() {
 
                         <Route path="/notifications" element={<AuthGuard requireAuth={true}><Notifications /></AuthGuard>}/>
 
-                        < Route path= "/notifications-messages" element={ <NotificationsMessages />} />
+                        < Route path= "/notifications-badge" element={ <NotificationBadge />} />
 
                         {/* Búsqueda y exploración */}
                         <Route path="/search" element={<SearchResults />} />
                         <Route path="/cursos/buscar" element={<CourseSearch />} />
+
+                        <Route path="/test/followers" element={<FollowersTest />} />
+
 
                         {/* Mentoría */}
                         <Route path="/mentor/calendar" element={<MyCalendar />} />

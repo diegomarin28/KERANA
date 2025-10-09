@@ -1,118 +1,163 @@
-import { useState } from 'react';
-import { supabase } from '../supabase'; // Cambié la ruta
+import { useState, useCallback } from 'react';
+import { followersAPI } from '../api/followers';
 
-export const useSeguidores = () => {
-    const [seguidores, setSeguidores] = useState([]);
-    const [siguiendo, setSiguiendo] = useState([]);
+export function useSeguidores() {
+    const [loading, setLoading] = useState(false);
+    const [error, setError] = useState(null);
 
-    // Función auxiliar para obtener ID del usuario actual
-    const obtenerMiUsuarioId = async () => {
-        const { data, error } = await supabase.rpc('obtener_usuario_actual_id');
-        if (error) throw error;
-        return data;
-    };
+    /**
+     * Seguir a un usuario
+     */
+    const seguirUsuario = useCallback(async (usuarioId) => {
+        try {
+            setLoading(true);
+            setError(null);
 
-    // Seguir a un usuario
-    const seguirUsuario = async (usuarioId) => {
-        const { data, error } = await supabase
-            .rpc('seguir_usuario', { usuario_a_seguir_id: usuarioId });
+            const result = await followersAPI.seguirUsuario(usuarioId);
 
-        if (error) throw error;
-        if (data && data.error) throw new Error(data.error);
+            if (!result.success) {
+                setError(result.error);
+                return { success: false, error: result.error };
+            }
 
-        return data; // Retorna { success: true, estado: 'pendiente' }
-    };
+            return { success: true, estado: result.estado };
+        } catch (e) {
+            const errorMsg = e.message || 'Error al seguir usuario';
+            setError(errorMsg);
+            return { success: false, error: errorMsg };
+        } finally {
+            setLoading(false);
+        }
+    }, []);
 
-    const aceptarSeguidor = async (seguidorId) => {
-        const { data, error } = await supabase
-            .rpc('responder_solicitud_seguidor', {
-                seguidor_id: seguidorId,
-                aceptar: true
-            });
+    /**
+     * Dejar de seguir a un usuario
+     */
+    const dejarDeSeguir = useCallback(async (usuarioId) => {
+        try {
+            setLoading(true);
+            setError(null);
 
-        if (error) throw error;
-        return data;
-    };
+            const result = await followersAPI.dejarDeSeguir(usuarioId);
 
-    const rechazarSeguidor = async (seguidorId) => {
-        const { data, error } = await supabase
-            .rpc('responder_solicitud_seguidor', {
-                seguidor_id: seguidorId,
-                aceptar: false
-            });
+            if (!result.success) {
+                setError(result.error);
+                return { success: false, error: result.error };
+            }
 
-        if (error) throw error;
-        return data;
-    };
+            return { success: true };
+        } catch (e) {
+            const errorMsg = e.message || 'Error al dejar de seguir';
+            setError(errorMsg);
+            return { success: false, error: errorMsg };
+        } finally {
+            setLoading(false);
+        }
+    }, []);
 
+    /**
+     * Verificar si sigo a un usuario
+     */
+    const verificarSiSigue = useCallback(async (usuarioId) => {
+        try {
+            const result = await followersAPI.verificarSiSigue(usuarioId);
+            return result;
+        } catch (e) {
+            console.error('[useSeguidores] Error verificando:', e);
+            return { sigue: false };
+        }
+    }, []);
 
-    // Dejar de seguir
-    const dejarSeguir = async (usuarioId) => {
-        const miId = await obtenerMiUsuarioId();
-        const { error } = await supabase
-            .from('seguidores')
-            .delete()
-            .eq('seguidor_id', miId)
-            .eq('seguido_id', usuarioId);
+    /**
+     * Obtener seguidores de un usuario
+     */
+    const obtenerSeguidores = useCallback(async (usuarioId) => {
+        try {
+            setLoading(true);
+            setError(null);
 
-        if (error) throw error;
-    };
+            const result = await followersAPI.obtenerSeguidores(usuarioId);
 
-    // Bloquear usuario
-    const bloquearUsuario = async (usuarioId) => {
-        const miId = await obtenerMiUsuarioId();
-        const { error } = await supabase
-            .from('bloqueos')
-            .insert({
-                bloqueador_id: miId,
-                bloqueado_id: usuarioId
-            });
+            if (result.error) {
+                setError(result.error);
+                return { data: [], error: result.error };
+            }
 
-        if (error) throw error;
-    };
+            return { data: result.data, error: null };
+        } catch (e) {
+            const errorMsg = e.message || 'Error obteniendo seguidores';
+            setError(errorMsg);
+            return { data: [], error: errorMsg };
+        } finally {
+            setLoading(false);
+        }
+    }, []);
 
-    // Obtener seguidores
-    const obtenerSeguidores = async (usuarioId) => {
-        const { data, error } = await supabase
-            .from('seguidores')
-            .select(`
-                id,
-                creado_en,
-                seguidor:seguidor_id(*)
-            `)
-            .eq('seguido_id', usuarioId)
-            .eq('estado', 'activo');
+    /**
+     * Obtener usuarios que sigue
+     */
+    const obtenerSiguiendo = useCallback(async (usuarioId) => {
+        try {
+            setLoading(true);
+            setError(null);
 
-        if (error) throw error;
-        return data;
-    };
+            const result = await followersAPI.obtenerSiguiendo(usuarioId);
 
-    // Obtener a quién sigue un usuario
-    const obtenerSiguiendo = async (usuarioId) => {
-        const { data, error } = await supabase
-            .from('seguidores')
-            .select(`
-                id,
-                creado_en,
-                seguido:seguido_id(*)
-            `)
-            .eq('seguidor_id', usuarioId)
-            .eq('estado', 'activo');
+            if (result.error) {
+                setError(result.error);
+                return { data: [], error: result.error };
+            }
 
-        if (error) throw error;
-        return data;
-    };
+            return { data: result.data, error: null };
+        } catch (e) {
+            const errorMsg = e.message || 'Error obteniendo siguiendo';
+            setError(errorMsg);
+            return { data: [], error: errorMsg };
+        } finally {
+            setLoading(false);
+        }
+    }, []);
+
+    /**
+     * Obtener contadores
+     */
+    const obtenerContadores = useCallback(async (usuarioId) => {
+        try {
+            const result = await followersAPI.obtenerContadores(usuarioId);
+            return result;
+        } catch (e) {
+            console.error('[useSeguidores] Error obteniendo contadores:', e);
+            return { seguidores: 0, siguiendo: 0 };
+        }
+    }, []);
+
+    /**
+     * Toggle seguir/dejar de seguir
+     */
+    const toggleSeguir = useCallback(async (usuarioId, siguiendo) => {
+        if (siguiendo) {
+            return await dejarDeSeguir(usuarioId);
+        } else {
+            return await seguirUsuario(usuarioId);
+        }
+    }, [seguirUsuario, dejarDeSeguir]);
 
     return {
-        seguidores,
-        siguiendo,
+        // Estado
+        loading,
+        error,
+
+        // Acciones
         seguirUsuario,
-        dejarSeguir,
-        bloquearUsuario,
+        dejarDeSeguir,
+        toggleSeguir,
+
+        // Queries
+        verificarSiSigue,
         obtenerSeguidores,
         obtenerSiguiendo,
-        obtenerMiUsuarioId,
-        aceptarSeguidor,
-        rechazarSeguidor
+        obtenerContadores,
     };
-};
+}
+
+export default useSeguidores;

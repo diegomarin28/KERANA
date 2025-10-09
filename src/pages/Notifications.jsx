@@ -1,59 +1,26 @@
-// src/pages/Notifications.jsx
-import { useState, useEffect } from 'react';
-import { supabase } from '../supabase';
 import { Card } from '../components/ui/Card';
 import { Button } from '../components/ui/Button';
+import useNotifications from '../hooks/useNotifications';
+import { useSeguidores } from '../hooks/useSeguidores';
 
 export default function Notifications() {
-    const [notifications, setNotifications] = useState([]);
-    const [loading, setLoading] = useState(true);
+    const {
+        notificaciones,
+        loading,
+        marcarComoLeida,
+        marcarTodasLeidas,
+        eliminarNotificacion,
+    } = useNotifications();
 
-    useEffect(() => {
-        fetchNotifications();
-    }, []);
+    const { seguirUsuario } = useSeguidores();
 
-    const fetchNotifications = async () => {
+    const handleFollowBack = async (emisorId, notifId) => {
         try {
-            // Notificaciones hardcodeadas por ahora
-            const mockNotifications = [
-                {
-                    id: 2,
-                    type: 'system',
-                    title: 'Bienvenido a KERANA',
-                    message: 'Tu cuenta ha sido verificada correctamente',
-                    date: new Date(Date.now() - 86400000).toISOString(), // 1 día atrás
-                    read: true
-                },
-                {
-                    id: 3,
-                    type: 'update',
-                    title: 'Nueva funcionalidad',
-                    message: 'Ya podés subir apuntes en formato PDF',
-                    date: new Date(Date.now() - 172800000).toISOString(), // 2 días atrás
-                    read: true
-                }
-            ];
-
-            setNotifications(mockNotifications);
+            await seguirUsuario(emisorId);
+            await marcarComoLeida(notifId);
         } catch (error) {
-            console.error('Error cargando notificaciones:', error);
-        } finally {
-            setLoading(false);
+            console.error('Error haciendo follow back:', error);
         }
-    };
-
-    const markAsRead = (id) => {
-        setNotifications(prev =>
-            prev.map(notif =>
-                notif.id === id ? { ...notif, read: true } : notif
-            )
-        );
-    };
-
-    const markAllAsRead = () => {
-        setNotifications(prev =>
-            prev.map(notif => ({ ...notif, read: true }))
-        );
     };
 
     if (loading) {
@@ -74,9 +41,9 @@ export default function Notifications() {
                     <h1 style={titleStyle}>Notificaciones</h1>
                     <p style={subtitleStyle}>Mantenete al tanto de tu actividad</p>
 
-                    {notifications.some(n => !n.read) && (
+                    {notificaciones.some(n => !n.leida) && (
                         <Button
-                            onClick={markAllAsRead}
+                            onClick={marcarTodasLeidas}
                             variant="outline"
                             size="small"
                         >
@@ -86,7 +53,7 @@ export default function Notifications() {
                 </div>
 
                 <div style={notificationsListStyle}>
-                    {notifications.length === 0 ? (
+                    {notificaciones.length === 0 ? (
                         <Card style={emptyStateStyle}>
                             <div style={emptyStateContentStyle}>
                                 <div style={emptyIconStyle}>🔔</div>
@@ -95,11 +62,13 @@ export default function Notifications() {
                             </div>
                         </Card>
                     ) : (
-                        notifications.map(notification => (
+                        notificaciones.map(notification => (
                             <NotificationCard
                                 key={notification.id}
                                 notification={notification}
-                                onMarkAsRead={markAsRead}
+                                onMarkAsRead={marcarComoLeida}
+                                onDelete={eliminarNotificacion}
+                                onFollowBack={handleFollowBack}
                             />
                         ))
                     )}
@@ -110,10 +79,10 @@ export default function Notifications() {
 }
 
 // Componente individual de notificación
-function NotificationCard({ notification, onMarkAsRead }) {
+function NotificationCard({ notification, onMarkAsRead, onDelete, onFollowBack }) {
     const getIcon = (type) => {
         switch (type) {
-            case 'sale': return '💰';
+            case 'nuevo_seguidor': return '👤';
             case 'system': return '⚙️';
             case 'update': return '🆕';
             default: return '🔔';
@@ -128,44 +97,107 @@ function NotificationCard({ notification, onMarkAsRead }) {
         const diffHours = Math.floor(diffMs / 3600000);
         const diffDays = Math.floor(diffMs / 86400000);
 
+        if (diffMins < 1) return 'Ahora';
         if (diffMins < 60) return `Hace ${diffMins} min`;
         if (diffHours < 24) return `Hace ${diffHours} h`;
         if (diffDays < 7) return `Hace ${diffDays} d`;
         return date.toLocaleDateString();
     };
 
+    const isFollowNotif = notification.tipo === 'nuevo_seguidor';
+
     return (
         <Card style={{
             ...notificationCardStyle,
-            background: notification.read ? '#fff' : '#f0f9ff',
-            borderLeft: notification.read ? '4px solid #fff' : '4px solid #2563eb'
+            background: notification.leida ? '#fff' : '#f0f9ff',
+            borderLeft: notification.leida ? '4px solid #e5e7eb' : '4px solid #2563eb'
         }}>
             <div style={notificationHeaderStyle}>
-                <div style={notificationIconStyle}>
-                    {getIcon(notification.type)}
-                </div>
-                <div style={notificationContentStyle}>
-                    <h4 style={notificationTitleStyle}>{notification.title}</h4>
-                    <p style={notificationMessageStyle}>{notification.message}</p>
-                    <span style={notificationDateStyle}>
-                        {formatDate(notification.date)}
-                    </span>
-                </div>
-                {!notification.read && (
-                    <Button
-                        onClick={() => onMarkAsRead(notification.id)}
-                        variant="outline"
-                        size="small"
-                    >
-                        Marcar leída
-                    </Button>
+                {/* Avatar */}
+                {notification.emisor?.foto ? (
+                    <img
+                        src={notification.emisor.foto}
+                        alt={notification.emisor.nombre}
+                        style={{
+                            width: 48,
+                            height: 48,
+                            borderRadius: '50%',
+                            objectFit: 'cover',
+                            border: '2px solid #e5e7eb',
+                        }}
+                    />
+                ) : (
+                    <div style={{
+                        width: 48,
+                        height: 48,
+                        borderRadius: '50%',
+                        background: 'linear-gradient(135deg, #3b82f6 0%, #1e40af 100%)',
+                        color: '#fff',
+                        display: 'grid',
+                        placeItems: 'center',
+                        fontSize: 20,
+                        fontWeight: 700,
+                    }}>
+                        {getIcon(notification.tipo)}
+                    </div>
                 )}
+
+                {/* Contenido */}
+                <div style={notificationContentStyle}>
+                    <h4 style={notificationTitleStyle}>
+                        {notification.emisor?.nombre || 'Notificación'}
+                    </h4>
+                    <p style={notificationMessageStyle}>{notification.mensaje}</p>
+                    <span style={notificationDateStyle}>
+            {formatDate(notification.creado_en)}
+          </span>
+
+                    {/* Acciones especiales según tipo */}
+                    {isFollowNotif && !notification.leida && (
+                        <div style={{ marginTop: 12, display: 'flex', gap: 8 }}>
+                            <Button
+                                onClick={() => onFollowBack(notification.emisor_id, notification.id)}
+                                size="small"
+                                style={{ fontSize: 13 }}
+                            >
+                                Seguir también
+                            </Button>
+                        </div>
+                    )}
+                </div>
+
+                {/* Botones de acción */}
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                    {!notification.leida && (
+                        <Button
+                            onClick={() => onMarkAsRead(notification.id)}
+                            variant="outline"
+                            size="small"
+                        >
+                            Marcar leída
+                        </Button>
+                    )}
+                    <button
+                        onClick={() => onDelete(notification.id)}
+                        style={{
+                            padding: '6px 12px',
+                            fontSize: 12,
+                            color: '#ef4444',
+                            background: 'none',
+                            border: '1px solid #fecaca',
+                            borderRadius: 6,
+                            cursor: 'pointer',
+                        }}
+                    >
+                        Eliminar
+                    </button>
+                </div>
             </div>
         </Card>
     );
 }
 
-// Estilos (los mismos que EditProfile)
+// Estilos
 const pageStyle = {
     minHeight: '100vh',
     background: 'linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%)',
@@ -223,11 +255,6 @@ const notificationHeaderStyle = {
     display: 'flex',
     alignItems: 'flex-start',
     gap: '12px',
-};
-
-const notificationIconStyle = {
-    fontSize: '20px',
-    marginTop: '2px',
 };
 
 const notificationContentStyle = {
