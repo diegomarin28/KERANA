@@ -1,10 +1,16 @@
 // src/pages/Settings.jsx
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useNotificationSettings } from '../hooks/useNotificationSettings';
+import { supabase } from '../supabase';
+
+const TAB_STORAGE_KEY = 'kerana_settings_active_tab';
 
 export default function Settings() {
-    const [activeTab, setActiveTab] = useState('notifications');
+    // Recuperar tab activo desde localStorage
+    const [activeTab, setActiveTab] = useState(() => {
+        return localStorage.getItem(TAB_STORAGE_KEY) || 'account';
+    });
     const [saved, setSaved] = useState(false);
     const navigate = useNavigate();
 
@@ -12,14 +18,18 @@ export default function Settings() {
         settings,
         toggleSetting,
         resetToDefault,
-        saveSettings
     } = useNotificationSettings();
 
+    // Persistir tab activo
+    useEffect(() => {
+        localStorage.setItem(TAB_STORAGE_KEY, activeTab);
+    }, [activeTab]);
+
     const tabs = [
-        { id: 'notifications', label: '🔔 Notificaciones', icon: '🔔' },
-        { id: 'account', label: '👤 Cuenta', icon: '👤' },
-        { id: 'privacy', label: '🔒 Privacidad', icon: '🔒' },
-        { id: 'appearance', label: '🎨 Apariencia', icon: '🎨' },
+        { id: 'account', label: 'Cuenta', icon: '👤' },
+        { id: 'notifications', label: 'Notificaciones', icon: '🔔' },
+        { id: 'privacy', label: 'Privacidad', icon: '🔒' },
+        { id: 'appearance', label: 'Apariencia', icon: '🎨' },
     ];
 
     const handleSave = () => {
@@ -34,11 +44,11 @@ export default function Settings() {
         { key: 'nuevo_like', label: 'Likes en mis apuntes', icon: '❤️' },
         { key: 'nueva_resenia', label: 'Nuevas reseñas', icon: '⭐' },
         { key: 'mentor_acepto', label: 'Mentores aceptaron', icon: '🎓' },
-        { key: 'nuevo_apunte', label: 'Nuevos apuntes en materias', icon: '📄' },
-        { key: 'apunte_aprobado', label: 'Mis apuntes aprobados', icon: '✔️' },
-        { key: 'mentor_aprobado', label: 'Aplicación de mentor aprobada', icon: '🏆' },
-        { key: 'system', label: 'Notificaciones del sistema', icon: '⚙️' },
-        { key: 'update', label: 'Actualizaciones de Kerana', icon: '🆕' },
+        { key: 'nuevo_apunte', label: 'Nuevos apuntes', icon: '📄' },
+        { key: 'apunte_aprobado', label: 'Apuntes aprobados', icon: '✔️' },
+        { key: 'mentor_aprobado', label: 'Mentor aprobado', icon: '🏆' },
+        { key: 'system', label: 'Sistema', icon: '⚙️' },
+        { key: 'update', label: 'Actualizaciones', icon: '🆕' },
     ];
 
     return (
@@ -54,7 +64,7 @@ export default function Settings() {
                     >
                         ← Volver
                     </button>
-                    <h1 style={titleStyle}>⚙️ Configuración</h1>
+                    <h1 style={titleStyle}>Configuración</h1>
                     <p style={subtitleStyle}>
                         Personalizá tu experiencia en Kerana
                     </p>
@@ -73,9 +83,9 @@ export default function Settings() {
                                 borderColor: activeTab === tab.id ? '#2563eb' : '#e5e7eb',
                             }}
                         >
-                            <span style={{ fontSize: 18 }}>{tab.icon}</span>
-                            <span style={{ fontSize: 14, fontWeight: 600 }}>
-                                {tab.label.split(' ')[1]}
+                            <span style={{ fontSize: 16 }}>{tab.icon}</span>
+                            <span style={{ fontSize: 13, fontWeight: 600 }}>
+                                {tab.label}
                             </span>
                         </button>
                     ))}
@@ -83,6 +93,10 @@ export default function Settings() {
 
                 {/* Tab Content */}
                 <div style={contentStyle}>
+                    {activeTab === 'account' && (
+                        <AccountTab navigate={navigate} />
+                    )}
+
                     {activeTab === 'notifications' && (
                         <NotificationsTab
                             settings={settings}
@@ -92,10 +106,6 @@ export default function Settings() {
                             saved={saved}
                             onSave={handleSave}
                         />
-                    )}
-
-                    {activeTab === 'account' && (
-                        <AccountTab navigate={navigate} />
                     )}
 
                     {activeTab === 'privacy' && (
@@ -112,96 +122,53 @@ export default function Settings() {
 }
 
 // ============================================
-// TAB: NOTIFICACIONES
-// ============================================
-function NotificationsTab({ settings, toggleSetting, resetToDefault, notificationTypes, saved, onSave }) {
-    return (
-        <>
-            {/* Configuraciones generales */}
-            <Card title="Configuraciones Generales">
-                <div style={{ display: 'grid', gap: 16 }}>
-                    <SettingToggle
-                        label="Sonido"
-                        description="Reproducir sonido cuando llega una notificación"
-                        checked={settings.sonido}
-                        onChange={() => toggleSetting('sonido')}
-                        icon="🔊"
-                    />
-
-                    <SettingToggle
-                        label="Toast (Popups)"
-                        description="Mostrar notificaciones emergentes en la pantalla"
-                        checked={settings.toasts}
-                        onChange={() => toggleSetting('toasts')}
-                        icon="💬"
-                    />
-
-                    <SettingToggle
-                        label="Badge en header"
-                        description="Mostrar contador de notificaciones en el header"
-                        checked={settings.badge}
-                        onChange={() => toggleSetting('badge')}
-                        icon="🔔"
-                    />
-
-                    <SettingToggle
-                        label="Email (Próximamente)"
-                        description="Recibir resumen diario por email"
-                        checked={settings.email}
-                        onChange={() => toggleSetting('email')}
-                        icon="📧"
-                        disabled={true}
-                    />
-                </div>
-            </Card>
-
-            {/* Tipos de notificaciones */}
-            <Card title="Tipos de Notificaciones">
-                <div style={{ display: 'grid', gap: 16 }}>
-                    {notificationTypes.map(type => (
-                        <SettingToggle
-                            key={type.key}
-                            label={type.label}
-                            checked={settings[type.key]}
-                            onChange={() => toggleSetting(type.key)}
-                            icon={type.icon}
-                        />
-                    ))}
-                </div>
-            </Card>
-
-            {/* Botones de acción */}
-            <div style={{ display: 'flex', gap: 12, justifyContent: 'center', marginTop: 20 }}>
-                <button
-                    onClick={onSave}
-                    style={primaryButtonStyle}
-                    onMouseEnter={(e) => e.target.style.background = '#1d4ed8'}
-                    onMouseLeave={(e) => e.target.style.background = '#2563eb'}
-                >
-                    {saved ? '✓ Guardado' : 'Guardar cambios'}
-                </button>
-
-                <button
-                    onClick={resetToDefault}
-                    style={secondaryButtonStyle}
-                    onMouseEnter={(e) => e.target.style.background = '#f1f5f9'}
-                    onMouseLeave={(e) => e.target.style.background = '#fff'}
-                >
-                    Restaurar por defecto
-                </button>
-            </div>
-        </>
-    );
-}
-
-// ============================================
 // TAB: CUENTA
 // ============================================
 function AccountTab({ navigate }) {
+    const [changePasswordOpen, setChangePasswordOpen] = useState(false);
+    const [currentPassword, setCurrentPassword] = useState('');
+    const [newPassword, setNewPassword] = useState('');
+    const [confirmPassword, setConfirmPassword] = useState('');
+    const [loading, setLoading] = useState(false);
+    const [message, setMessage] = useState('');
+
+    const handleChangePassword = async () => {
+        if (newPassword !== confirmPassword) {
+            setMessage('❌ Las contraseñas no coinciden');
+            return;
+        }
+        if (newPassword.length < 6) {
+            setMessage('❌ La contraseña debe tener al menos 6 caracteres');
+            return;
+        }
+
+        setLoading(true);
+        try {
+            const { error } = await supabase.auth.updateUser({
+                password: newPassword
+            });
+
+            if (error) throw error;
+
+            setMessage('✅ Contraseña actualizada correctamente');
+            setCurrentPassword('');
+            setNewPassword('');
+            setConfirmPassword('');
+            setTimeout(() => {
+                setChangePasswordOpen(false);
+                setMessage('');
+            }, 2000);
+        } catch (error) {
+            setMessage(`❌ Error: ${error.message}`);
+        } finally {
+            setLoading(false);
+        }
+    };
+
     return (
         <>
             <Card title="Información de la Cuenta">
-                <p style={{ color: '#64748b', marginBottom: 16 }}>
+                <p style={{ color: '#64748b', marginBottom: 16, fontSize: 14 }}>
                     Administrá tu información personal y preferencias de cuenta.
                 </p>
                 <button
@@ -223,18 +190,143 @@ function AccountTab({ navigate }) {
             </Card>
 
             <Card title="Seguridad">
-                <p style={{ color: '#64748b', marginBottom: 16 }}>
+                <p style={{ color: '#64748b', marginBottom: 16, fontSize: 14 }}>
                     Protegé tu cuenta con opciones de seguridad adicionales.
                 </p>
+
+                {!changePasswordOpen ? (
+                    <button
+                        onClick={() => setChangePasswordOpen(true)}
+                        style={linkButtonStyle}
+                        onMouseEnter={(e) => e.target.style.background = '#f0f9ff'}
+                        onMouseLeave={(e) => e.target.style.background = '#fff'}
+                    >
+                        🔑 Cambiar contraseña →
+                    </button>
+                ) : (
+                    <div style={{ marginTop: 16 }}>
+                        <input
+                            type="password"
+                            placeholder="Nueva contraseña"
+                            value={newPassword}
+                            onChange={(e) => setNewPassword(e.target.value)}
+                            style={inputStyle}
+                        />
+                        <input
+                            type="password"
+                            placeholder="Confirmar contraseña"
+                            value={confirmPassword}
+                            onChange={(e) => setConfirmPassword(e.target.value)}
+                            style={inputStyle}
+                        />
+                        {message && (
+                            <p style={{ fontSize: 13, margin: '8px 0', color: message.includes('✅') ? '#10b981' : '#ef4444' }}>
+                                {message}
+                            </p>
+                        )}
+                        <div style={{ display: 'flex', gap: 8, marginTop: 12 }}>
+                            <button
+                                onClick={handleChangePassword}
+                                disabled={loading}
+                                style={{
+                                    ...primaryButtonStyle,
+                                    flex: 1,
+                                    opacity: loading ? 0.5 : 1,
+                                }}
+                                onMouseEnter={(e) => !loading && (e.target.style.background = '#1d4ed8')}
+                                onMouseLeave={(e) => !loading && (e.target.style.background = '#2563eb')}
+                            >
+                                {loading ? 'Cambiando...' : 'Cambiar'}
+                            </button>
+                            <button
+                                onClick={() => {
+                                    setChangePasswordOpen(false);
+                                    setMessage('');
+                                    setNewPassword('');
+                                    setConfirmPassword('');
+                                }}
+                                style={{
+                                    ...secondaryButtonStyle,
+                                    flex: 1,
+                                }}
+                            >
+                                Cancelar
+                            </button>
+                        </div>
+                    </div>
+                )}
+            </Card>
+        </>
+    );
+}
+
+// ============================================
+// TAB: NOTIFICACIONES
+// ============================================
+function NotificationsTab({ settings, toggleSetting, resetToDefault, notificationTypes, saved, onSave }) {
+    return (
+        <>
+            {/* Configuraciones generales */}
+            <Card title="Configuraciones Generales">
+                <div style={{ display: 'grid', gap: 10 }}>
+                    <SettingToggle
+                        label="Sonido"
+                        description="Reproducir sonido al recibir notificaciones"
+                        checked={settings.sonido}
+                        onChange={() => toggleSetting('sonido')}
+                        icon="🔊"
+                    />
+                    <SettingToggle
+                        label="Popups"
+                        description="Mostrar notificaciones emergentes"
+                        checked={settings.toasts}
+                        onChange={() => toggleSetting('toasts')}
+                        icon="💬"
+                    />
+                    <SettingToggle
+                        label="Badge"
+                        description="Contador en el header"
+                        checked={settings.badge}
+                        onChange={() => toggleSetting('badge')}
+                        icon="🔔"
+                    />
+                </div>
+            </Card>
+
+            {/* Tipos de notificaciones */}
+            <Card title="Tipos de Notificaciones">
+                <div style={{ display: 'grid', gap: 5 ,alignContent: "start", gridAutoRows: "minmax(20px, auto)",}}>
+                    {notificationTypes.map(type => (
+                        <SettingToggle
+                            key={type.key}
+                            label={type.label}
+                            checked={settings[type.key]}
+                            onChange={() => toggleSetting(type.key)}
+                            icon={type.icon}
+                        />
+                    ))}
+                </div>
+            </Card>
+
+            {/* Botones de acción */}
+            <div style={{ display: 'flex', gap: 12, justifyContent: 'center', marginTop: 16 }}>
                 <button
-                    onClick={() => alert('Función próximamente')}
-                    style={linkButtonStyle}
-                    onMouseEnter={(e) => e.target.style.background = '#f0f9ff'}
+                    onClick={onSave}
+                    style={primaryButtonStyle}
+                    onMouseEnter={(e) => e.target.style.background = '#1d4ed8'}
+                    onMouseLeave={(e) => e.target.style.background = '#2563eb'}
+                >
+                    {saved ? '✓ Guardado' : 'Guardar cambios'}
+                </button>
+                <button
+                    onClick={resetToDefault}
+                    style={secondaryButtonStyle}
+                    onMouseEnter={(e) => e.target.style.background = '#f1f5f9'}
                     onMouseLeave={(e) => e.target.style.background = '#fff'}
                 >
-                    🔑 Cambiar contraseña →
+                    Restaurar
                 </button>
-            </Card>
+            </div>
         </>
     );
 }
@@ -250,26 +342,24 @@ function PrivacyTab({ navigate }) {
     return (
         <>
             <Card title="Privacidad del Perfil">
-                <div style={{ display: 'grid', gap: 16 }}>
+                <div style={{ display: 'grid', gap: 10 }}>
                     <SettingToggle
                         label="Perfil público"
-                        description="Permitir que otros usuarios vean tu perfil"
+                        description="Otros usuarios pueden ver tu perfil"
                         checked={perfilPublico}
                         onChange={() => setPerfilPublico(!perfilPublico)}
                         icon="👁️"
                     />
-
                     <SettingToggle
                         label="Mostrar email"
-                        description="Tu email será visible en tu perfil público"
+                        description="Email visible en tu perfil"
                         checked={mostrarEmail}
                         onChange={() => setMostrarEmail(!mostrarEmail)}
                         icon="📧"
                     />
-
                     <SettingToggle
-                        label="Permitir mensajes directos"
-                        description="Otros usuarios pueden enviarte mensajes"
+                        label="Mensajes directos"
+                        description="Permitir que te contacten"
                         checked={permitirMensajes}
                         onChange={() => setPermitirMensajes(!permitirMensajes)}
                         icon="💬"
@@ -278,9 +368,6 @@ function PrivacyTab({ navigate }) {
             </Card>
 
             <Card title="Políticas y Términos">
-                <p style={{ color: '#64748b', marginBottom: 16 }}>
-                    Revisá nuestras políticas de privacidad y términos de uso.
-                </p>
                 <button
                     onClick={() => navigate('/privacy')}
                     style={linkButtonStyle}
@@ -300,9 +387,6 @@ function PrivacyTab({ navigate }) {
             </Card>
 
             <Card title="Gestión de Datos">
-                <p style={{ color: '#64748b', marginBottom: 16 }}>
-                    Controlá tus datos personales.
-                </p>
                 <button
                     onClick={() => alert('Función próximamente')}
                     style={linkButtonStyle}
@@ -335,29 +419,24 @@ function AppearanceTab() {
     return (
         <>
             <Card title="Tema">
-                <div style={{ display: 'grid', gap: 16 }}>
-                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 12 }}>
-                        <ThemeCard
-                            icon="☀️"
-                            label="Claro"
-                            active={theme === 'light'}
-                            onClick={() => setTheme('light')}
-                        />
-                        <ThemeCard
-                            icon="🌙"
-                            label="Oscuro"
-                            active={theme === 'dark'}
-                            onClick={() => alert('Modo oscuro próximamente')}
-                            disabled
-                        />
-                    </div>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 12 }}>
+                    <ThemeCard
+                        icon="☀️"
+                        label="Claro"
+                        active={theme === 'light'}
+                        onClick={() => setTheme('light')}
+                    />
+                    <ThemeCard
+                        icon="🌙"
+                        label="Oscuro"
+                        active={theme === 'dark'}
+                        onClick={() => alert('Modo oscuro próximamente')}
+                        disabled
+                    />
                 </div>
             </Card>
 
             <Card title="Idioma">
-                <p style={{ color: '#64748b', marginBottom: 16 }}>
-                    Seleccioná tu idioma preferido.
-                </p>
                 <select
                     value={idioma}
                     onChange={(e) => setIdioma(e.target.value)}
@@ -370,15 +449,13 @@ function AppearanceTab() {
             </Card>
 
             <Card title="Visualización">
-                <div style={{ display: 'grid', gap: 16 }}>
-                    <SettingToggle
-                        label="Modo compacto"
-                        description="Reduce el espaciado para mostrar más contenido"
-                        checked={compactMode}
-                        onChange={() => setCompactMode(!compactMode)}
-                        icon="📏"
-                    />
-                </div>
+                <SettingToggle
+                    label="Modo compacto"
+                    description="Reduce el espaciado"
+                    checked={compactMode}
+                    onChange={() => setCompactMode(!compactMode)}
+                    icon="📏"
+                />
             </Card>
         </>
     );
@@ -391,14 +468,14 @@ function Card({ title, children }) {
     return (
         <div style={{
             background: '#fff',
-            borderRadius: 12,
-            padding: 24,
-            marginBottom: 20,
-            boxShadow: '0 1px 3px rgba(0,0,0,0.1)',
+            borderRadius: 10,
+            padding: 20,
+            marginBottom: 16,
+            boxShadow: '0 1px 3px rgba(0,0,0,0.08)',
         }}>
             <h2 style={{
-                margin: '0 0 20px 0',
-                fontSize: 18,
+                margin: '0 0 16px 0',
+                fontSize: 16,
                 fontWeight: 700,
                 color: '#0f172a',
             }}>
@@ -413,29 +490,35 @@ function SettingToggle({ label, description, checked, onChange, icon, disabled =
     return (
         <div style={{
             display: 'flex',
-            alignItems: 'flex-start',
+            alignItems: 'center',
             justifyContent: 'space-between',
-            gap: 16,
-            padding: 12,
+            gap: 12,
+            padding: '10px 12px',
             borderRadius: 8,
-            background: checked ? '#f0f9ff' : '#f8fafc',
+            background: checked ? '#eff6ff' : '#f8fafc',
             transition: 'background 0.2s ease',
             opacity: disabled ? 0.5 : 1,
             cursor: disabled ? 'not-allowed' : 'default',
+            minHeight: 48,
         }}>
-            <div style={{ display: 'flex', gap: 12, alignItems: 'flex-start', flex: 1 }}>
-                <span style={{ fontSize: 24 }}>{icon}</span>
-                <div>
+            <div style={{ display: 'flex', gap: 10, alignItems: 'center', flex: 1 }}>
+                <span style={{ fontSize: 18, flexShrink: 0 }}>{icon}</span>
+                <div style={{ display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
                     <div style={{
                         fontWeight: 600,
-                        fontSize: 15,
+                        fontSize: 13,
                         color: '#0f172a',
-                        marginBottom: description ? 4 : 0
+                        lineHeight: 1.3,
                     }}>
                         {label}
                     </div>
                     {description && (
-                        <div style={{ fontSize: 13, color: '#64748b', lineHeight: 1.4 }}>
+                        <div style={{
+                            fontSize: 11,
+                            color: '#94a3b8',
+                            lineHeight: 1.3,
+                            marginTop: 2,
+                        }}>
                             {description}
                         </div>
                     )}
@@ -447,9 +530,9 @@ function SettingToggle({ label, description, checked, onChange, icon, disabled =
                 onClick={onChange}
                 disabled={disabled}
                 style={{
-                    width: 48,
-                    height: 28,
-                    borderRadius: 14,
+                    width: 44,
+                    height: 24,
+                    borderRadius: 12,
                     background: checked ? '#2563eb' : '#cbd5e1',
                     border: 'none',
                     position: 'relative',
@@ -459,15 +542,15 @@ function SettingToggle({ label, description, checked, onChange, icon, disabled =
                 }}
             >
                 <div style={{
-                    width: 22,
-                    height: 22,
+                    width: 18,
+                    height: 18,
                     borderRadius: '50%',
                     background: '#fff',
                     position: 'absolute',
                     top: 3,
                     left: checked ? 23 : 3,
                     transition: 'left 0.2s ease',
-                    boxShadow: '0 2px 4px rgba(0,0,0,0.2)',
+                    boxShadow: '0 1px 3px rgba(0,0,0,0.2)',
                 }} />
             </button>
         </div>
@@ -480,8 +563,8 @@ function ThemeCard({ icon, label, active, onClick, disabled }) {
             onClick={onClick}
             disabled={disabled}
             style={{
-                padding: 20,
-                borderRadius: 12,
+                padding: 16,
+                borderRadius: 10,
                 border: `2px solid ${active ? '#2563eb' : '#e5e7eb'}`,
                 background: active ? '#f0f9ff' : '#fff',
                 cursor: disabled ? 'not-allowed' : 'pointer',
@@ -495,16 +578,16 @@ function ThemeCard({ icon, label, active, onClick, disabled }) {
                 if (!disabled && !active) e.target.style.borderColor = '#e5e7eb';
             }}
         >
-            <div style={{ fontSize: 40, marginBottom: 8 }}>{icon}</div>
+            <div style={{ fontSize: 32, marginBottom: 6 }}>{icon}</div>
             <div style={{
-                fontSize: 14,
+                fontSize: 13,
                 fontWeight: 600,
                 color: active ? '#2563eb' : '#64748b'
             }}>
                 {label}
             </div>
             {disabled && (
-                <div style={{ fontSize: 11, color: '#94a3b8', marginTop: 4 }}>
+                <div style={{ fontSize: 10, color: '#94a3b8', marginTop: 4 }}>
                     Próximamente
                 </div>
             )}
@@ -518,22 +601,22 @@ function ThemeCard({ icon, label, active, onClick, disabled }) {
 const pageStyle = {
     minHeight: '100vh',
     background: 'linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%)',
-    padding: '40px 16px',
+    padding: '30px 16px',
 };
 
 const containerStyle = {
-    maxWidth: 900,
+    maxWidth: 800,
     margin: '0 auto',
 };
 
 const headerStyle = {
     textAlign: 'center',
-    marginBottom: 32,
+    marginBottom: 24,
 };
 
 const backButtonStyle = {
-    padding: '8px 16px',
-    fontSize: 14,
+    padding: '6px 14px',
+    fontSize: 13,
     fontWeight: 600,
     color: '#64748b',
     background: '#fff',
@@ -541,35 +624,35 @@ const backButtonStyle = {
     borderRadius: 8,
     cursor: 'pointer',
     transition: 'all 0.2s ease',
-    marginBottom: 16,
+    marginBottom: 12,
 };
 
 const titleStyle = {
-    fontSize: 32,
+    fontSize: 28,
     fontWeight: 800,
     color: '#0b1e3a',
-    margin: '0 0 8px 0',
+    margin: '0 0 6px 0',
 };
 
 const subtitleStyle = {
-    fontSize: 16,
+    fontSize: 14,
     color: '#64748b',
     margin: 0,
 };
 
 const tabsContainerStyle = {
     display: 'grid',
-    gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))',
-    gap: 12,
-    marginBottom: 32,
+    gridTemplateColumns: 'repeat(auto-fit, minmax(120px, 1fr))',
+    gap: 10,
+    marginBottom: 24,
     background: '#fff',
-    padding: 12,
-    borderRadius: 12,
-    boxShadow: '0 1px 3px rgba(0,0,0,0.1)',
+    padding: 10,
+    borderRadius: 10,
+    boxShadow: '0 1px 3px rgba(0,0,0,0.08)',
 };
 
 const tabButtonStyle = {
-    padding: '12px 16px',
+    padding: '10px 12px',
     border: '2px solid',
     borderRadius: 8,
     cursor: 'pointer',
@@ -577,7 +660,7 @@ const tabButtonStyle = {
     display: 'flex',
     flexDirection: 'column',
     alignItems: 'center',
-    gap: 6,
+    gap: 4,
 };
 
 const contentStyle = {
@@ -585,8 +668,8 @@ const contentStyle = {
 };
 
 const primaryButtonStyle = {
-    padding: '12px 32px',
-    fontSize: 15,
+    padding: '10px 24px',
+    fontSize: 14,
     fontWeight: 600,
     color: '#fff',
     background: '#2563eb',
@@ -597,8 +680,8 @@ const primaryButtonStyle = {
 };
 
 const secondaryButtonStyle = {
-    padding: '12px 32px',
-    fontSize: 15,
+    padding: '10px 24px',
+    fontSize: 14,
     fontWeight: 600,
     color: '#64748b',
     background: '#fff',
@@ -610,8 +693,8 @@ const secondaryButtonStyle = {
 
 const linkButtonStyle = {
     width: '100%',
-    padding: '12px 16px',
-    fontSize: 14,
+    padding: '10px 14px',
+    fontSize: 13,
     fontWeight: 600,
     color: '#2563eb',
     background: '#fff',
@@ -625,8 +708,8 @@ const linkButtonStyle = {
 
 const selectStyle = {
     width: '100%',
-    padding: '12px 16px',
-    fontSize: 14,
+    padding: '10px 14px',
+    fontSize: 13,
     color: '#0f172a',
     background: '#fff',
     border: '2px solid #e5e7eb',
@@ -634,7 +717,19 @@ const selectStyle = {
     cursor: 'pointer',
 };
 
-// Agregar animación fadeIn
+const inputStyle = {
+    width: '100%',
+    padding: '10px 14px',
+    fontSize: 13,
+    color: '#0f172a',
+    background: '#fff',
+    border: '2px solid #e5e7eb',
+    borderRadius: 8,
+    marginBottom: 10,
+    boxSizing: 'border-box',
+};
+
+// Animación
 if (typeof document !== 'undefined' && !document.getElementById('settings-animations')) {
     const style = document.createElement('style');
     style.id = 'settings-animations';

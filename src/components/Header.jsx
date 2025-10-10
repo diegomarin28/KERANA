@@ -1,7 +1,7 @@
 import { useEffect, useState, useRef } from "react";
 import { Link, useNavigate, useLocation } from "react-router-dom";
 import AuthModal_SignIn from "../components/AuthModal_SignIn.jsx";
-import AuthModal_HacerResenia from "../components/AuthModal_HacerReseña.jsx";
+import AuthModal_HacerReseña from "../components/AuthModal_HacerReseña.jsx";
 import Sidebar from "../components/Sidebar.jsx";
 import HamburgerButton from "../components/HamburgerButton.jsx";
 import { supabase } from "../supabase";
@@ -26,16 +26,8 @@ export default function Header() {
     const avatarBtnRef = useRef(null);
     const avatarMenuRef = useRef(null);
 
-
-    // Función unificada para abrir login
-    const openAuthModal = () => {
-        setAuthOpen(true);
-    };
-
-    // Función unificada para cerrar login
-    const closeAuthModal = () => {
-        setAuthOpen(false);
-    };
+    const openAuthModal = () => setAuthOpen(true);
+    const closeAuthModal = () => setAuthOpen(false);
 
     useEffect(() => {
         if (user?.id) loadUserProfile();
@@ -55,24 +47,16 @@ export default function Header() {
         setAvatarOk(true);
     }, [userProfile?.foto]);
 
-
-    // Calcular displayName cuando cambien los datos
     useEffect(() => {
         const computeDisplayName = () => {
-            // Prioridad: DB.nombre > DB.username > email local-part > cache
             const n = (userProfile?.nombre || "").trim();
             if (n) return n;
-
             const u = (userProfile?.username || "").trim();
             if (u) return u;
-
-            // Si no hay userProfile aún, usar cache
             if (!userProfile && nameCache) return nameCache;
             if (!userProfile && usernameCache) return usernameCache;
-
             return user?.email ? user.email.split("@")[0] : "";
         };
-
         setDisplayName(computeDisplayName());
     }, [userProfile, user, nameCache, usernameCache]);
 
@@ -106,7 +90,6 @@ export default function Header() {
                     console.warn("[auth] getSession error:", error);
                     return;
                 }
-
                 if (mounted && session?.user) {
                     setUser(session.user);
                     await loadUserProfile();
@@ -118,10 +101,8 @@ export default function Header() {
 
         initializeAuth();
 
-        // Listener de cambios de autenticación
         const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, session) => {
             if (!mounted) return;
-
             if (session?.user) {
                 setUser(session.user);
                 await loadUserProfile();
@@ -141,7 +122,6 @@ export default function Header() {
         };
     }, []);
 
-    // Cargar perfil desde la DB (única fuente de verdad)
     const loadUserProfile = async () => {
         if (!user) {
             setUserProfile(null);
@@ -158,7 +138,6 @@ export default function Header() {
 
         setUserProfile(data);
 
-        // Actualizar caches (solo si hay valores nuevos)
         if (data.username && data.username !== usernameCache) {
             localStorage.setItem("kerana_username_cache", data.username);
             setUsernameCache(data.username);
@@ -167,11 +146,8 @@ export default function Header() {
             localStorage.setItem("kerana_name_cache", data.nombre);
             setNameCache(data.nombre);
         }
-
-        // El displayName se actualizará automáticamente por el useEffect
     };
 
-    // Detectar si estamos en el hero
     useEffect(() => {
         const update = () => {
             const headerH = headerRef.current?.offsetHeight ?? 64;
@@ -207,10 +183,8 @@ export default function Header() {
         }
     };
 
-    // Logout con limpieza completa
     const handleLogout = async () => {
         const { success } = await cleanLogout();
-
         if (success) {
             setUser(null);
             setUserProfile(null);
@@ -220,7 +194,6 @@ export default function Header() {
             setReseniaOpen(false);
             navigate('/');
         } else {
-            // Fallback: limpiar estado de todas formas
             setUser(null);
             setUserProfile(null);
             setDisplayName('');
@@ -229,7 +202,6 @@ export default function Header() {
         }
     };
 
-    // Colores del header
     const TOKENS = inHero
         ? {
             headerBg: "#13346b",
@@ -334,9 +306,17 @@ export default function Header() {
     }
 
     const signBtn = {
-        height: 40, padding: "0 16px", borderRadius: 9999,
-        background: TOKENS.signBg, color: TOKENS.signText, border: `1px solid ${TOKENS.signBorder}`,
-        fontWeight: 700, cursor: "pointer", transition: "all 0.3s ease", transform: "translateY(0px)",
+        height: 40,
+        padding: "0 20px",
+        borderRadius: 9999,
+        background: TOKENS.signBg,
+        color: TOKENS.signText,
+        border: `1px solid ${TOKENS.signBorder}`,
+        fontWeight: 700,
+        fontSize: 14,
+        cursor: "pointer",
+        transition: "all 0.3s ease",
+        transform: "translateY(0px)",
     };
 
     const menuItemStyle = {
@@ -355,19 +335,19 @@ export default function Header() {
         transition: "background .15s ease, transform .06s ease",
         willChange: "background, transform",
     };
+
     const menuItemTextLeft = {
         flex: 1,
         textAlign: "left",
         letterSpacing: ".1px",
     };
+
     const dividerStyle = {
         height: 1,
         background: "#eef2f7",
         margin: "8px 6px",
         borderRadius: 1,
     };
-
-
 
     const handleSignInMouseEnter = (e) => {
         if (inHero) {
@@ -393,12 +373,26 @@ export default function Header() {
 
     function getAppAvatarSrc(raw) {
         const url = (raw || "").trim();
-        // aceptar solo URLs de tu storage público de Supabase
         const isHttp = /^https?:\/\//.test(url);
         const isSupabasePublic = isHttp && url.includes("/storage/v1/object/public/");
-        return isSupabasePublic ? url : ""; // si no es válido, forzá placeholder
+        return isSupabasePublic ? url : "";
     }
 
+    // ✅ BOTÓN UNIFICADO (40x40px)
+    const iconButtonStyle = {
+        width: 40,
+        height: 40,
+        display: "grid",
+        placeItems: "center",
+        borderRadius: "50%",
+        background: "rgba(255,255,255,0.1)",
+        border: "1px solid rgba(255,255,255,0.2)",
+        color: TOKENS.headerText,
+        cursor: "pointer",
+        padding: 0,
+        outline: "none",
+        transition: "all 0.2s ease",
+    };
 
     return (
         <>
@@ -422,12 +416,15 @@ export default function Header() {
                         display: "flex",
                         alignItems: "center",
                         justifyContent: "space-between",
-                        gap: 12,
+                        gap: 16,
                         height: 64,
+                        padding: "0 20px",
+                        maxWidth: 1400,
+                        margin: "0 auto",
                     }}
                 >
                     {/* Izquierda: menú + logo */}
-                    <div style={{ display: "flex", alignItems: "center", gap: 12, minWidth: 0 }}>
+                    <div style={{ display: "flex", alignItems: "center", gap: 16, minWidth: 0 }}>
                         <HamburgerButton open={menuOpen} onToggle={() => setMenuOpen((o) => !o)} />
                         <button
                             onClick={() => navigate("/")}
@@ -438,6 +435,7 @@ export default function Header() {
                                 fontWeight: 800,
                                 fontSize: 20,
                                 color: TOKENS.headerText,
+                                letterSpacing: "0.5px",
                             }}
                             aria-label="Ir al inicio"
                         >
@@ -446,104 +444,94 @@ export default function Header() {
                     </div>
 
                     {/* Centro: acciones */}
-                    <nav style={{ display: "flex", alignItems: "center", gap: 10, justifyContent: "center" }}>
+                    <nav style={{
+                        display: "flex",
+                        alignItems: "center",
+                        gap: 12,
+                        justifyContent: "center",
+                        flexWrap: "wrap",
+                    }}>
                         <PillLink to="/upload">Subir Apuntes</PillLink>
-                        <PillButton onClick={() => navigate("/mentores/postular")}>¡Quiero ser Mentor!</PillButton>
-                        <PillButton onClick={handleReseniaClick}>¡Hacé tu reseña!</PillButton>
+                        <PillButton onClick={() => navigate("/mentores/postular")}>
+                            ¡Quiero ser Mentor!
+                        </PillButton>
+                        <PillButton onClick={handleReseniaClick}>
+                            ¡Hacé tu reseña!
+                        </PillButton>
                     </nav>
 
-                    {/* Derecha */}
-                    {/* Derecha */}
-                    <div>
+                    {/* Derecha - REDISEÑADO */}
+                    <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
                         {!user ? (
                             <HeaderAuthButtons />
                         ) : (
-                            <div style={{ display: "flex", alignItems: "center", columnGap: 20 }}>
-
-
-                                {user && (
-                                    <button
-                                        onClick={() => navigate("/favorites")}
-                                        aria-label="Favoritos"
-                                        style={{
-                                            width: 36,
-                                            height: 36,
-                                            display: "grid",
-                                            placeItems: "center",
-                                            borderRadius: "50%",
-                                            background: "transparent",
-                                            border: "1px solid rgba(255,255,255,0.25)",
-                                            color: TOKENS.headerText,
-                                            cursor: "pointer",
-                                            padding: 0,
-                                            outline: "none",
-                                            transition: "background .2s ease, border-color .2s ease",
-                                        }}
-                                        onMouseEnter={(e) => {
-                                            e.currentTarget.style.background = "rgba(255,255,255,0.08)";
-                                            e.currentTarget.style.borderColor = "rgba(255,255,255,0.35)";
-                                        }}
-                                        onMouseLeave={(e) => {
-                                            e.currentTarget.style.background = "transparent";
-                                            e.currentTarget.style.borderColor = "rgba(255,255,255,0.25)";
-                                        }}
+                            <>
+                                {/* Favoritos */}
+                                <button
+                                    onClick={() => navigate("/favorites")}
+                                    aria-label="Favoritos"
+                                    style={iconButtonStyle}
+                                    onMouseEnter={(e) => {
+                                        e.currentTarget.style.background = "rgba(255,255,255,0.15)";
+                                        e.currentTarget.style.borderColor = "rgba(255,255,255,0.3)";
+                                        e.currentTarget.style.transform = "scale(1.05)";
+                                    }}
+                                    onMouseLeave={(e) => {
+                                        e.currentTarget.style.background = "rgba(255,255,255,0.1)";
+                                        e.currentTarget.style.borderColor = "rgba(255,255,255,0.2)";
+                                        e.currentTarget.style.transform = "scale(1)";
+                                    }}
+                                >
+                                    <svg
+                                        width="18"
+                                        height="18"
+                                        viewBox="0 0 24 24"
+                                        fill="none"
+                                        stroke="currentColor"
+                                        strokeWidth="2"
+                                        strokeLinecap="round"
+                                        strokeLinejoin="round"
                                     >
-                                        <svg
-                                            width="22"
-                                            height="22"
-                                            viewBox="0 0 24 24"
-                                            fill="none"
-                                            stroke="currentColor"
-                                            strokeWidth="1.8"
-                                            strokeLinecap="round"
-                                            strokeLinejoin="round"
-                                        >
-                                            <path d="M6 4.5a2.5 2.5 0 0 1 2.5-2.5h7A2.5 2.5 0 0 1 18 4.5V21l-6-3-6 3V4.5z" />
-                                        </svg>
-                                    </button>
-                                )}
+                                        <path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z" />
+                                    </svg>
+                                </button>
 
-
-
-                                {/* 🔔 BADGE DE NOTIFICACIONES */}
+                                {/* Notificaciones */}
                                 <NotificationBadge />
 
-
-                                {/* Avatar clickeable */}
+                                {/* Avatar */}
                                 <div style={{ position: "relative" }}>
                                     <button
                                         ref={avatarBtnRef}
                                         onClick={() => setAvatarMenuOpen((o) => !o)}
                                         style={{
-                                            background: "transparent",
-                                            border: "none",
-                                            cursor: "pointer",
+                                            ...iconButtonStyle,
                                             padding: 0,
-                                            borderRadius: "50%",
-                                            transition: "transform 0.2s ease",
+                                            overflow: "hidden",
                                         }}
-                                        onMouseEnter={(e) => { e.currentTarget.style.transform = "scale(1.1)"; }}
-                                        onMouseLeave={(e) => { e.currentTarget.style.transform = "scale(1)"; }}
+                                        onMouseEnter={(e) => {
+                                            e.currentTarget.style.transform = "scale(1.05)";
+                                            e.currentTarget.style.borderColor = "rgba(255,255,255,0.4)";
+                                        }}
+                                        onMouseLeave={(e) => {
+                                            e.currentTarget.style.transform = "scale(1)";
+                                            e.currentTarget.style.borderColor = "rgba(255,255,255,0.2)";
+                                        }}
                                         aria-haspopup="menu"
                                         aria-expanded={avatarMenuOpen ? "true" : "false"}
                                         aria-label="Abrir menú de usuario"
                                     >
                                         {(() => {
-                                            const avatarSrc = (typeof getAppAvatarSrc === "function")
-                                                ? getAppAvatarSrc(userProfile?.foto)
-                                                : (userProfile?.foto || "").trim(); // fallback si no tenés helper
+                                            const avatarSrc = getAppAvatarSrc(userProfile?.foto);
                                             return avatarSrc && avatarOk ? (
                                                 <img
                                                     src={avatarSrc}
                                                     alt={displayName}
                                                     onError={() => setAvatarOk(false)}
                                                     style={{
-                                                        width: 40,
-                                                        height: 40,
-                                                        borderRadius: "50%",
+                                                        width: "100%",
+                                                        height: "100%",
                                                         objectFit: "cover",
-                                                        border: "2px solid #fff",
-                                                        boxShadow: "0 2px 8px rgba(0,0,0,0.2)",
                                                     }}
                                                     loading="lazy"
                                                     referrerPolicy="no-referrer"
@@ -551,16 +539,14 @@ export default function Header() {
                                             ) : (
                                                 <div
                                                     style={{
-                                                        width: 40,
-                                                        height: 40,
-                                                        borderRadius: "50%",
+                                                        width: "100%",
+                                                        height: "100%",
                                                         background: "linear-gradient(135deg, #3b82f6 0%, #1e40af 100%)",
                                                         color: "#fff",
                                                         display: "grid",
                                                         placeItems: "center",
                                                         fontWeight: 800,
                                                         fontSize: 16,
-                                                        boxShadow: "0 2px 8px rgba(0,0,0,0.2)",
                                                     }}
                                                 >
                                                     {(displayName?.[0] || "U").toUpperCase()}
@@ -569,6 +555,7 @@ export default function Header() {
                                         })()}
                                     </button>
 
+                                    {/* Dropdown menu */}
                                     {avatarMenuOpen && (
                                         <div
                                             ref={avatarMenuRef}
@@ -577,27 +564,22 @@ export default function Header() {
                                                 position: "absolute",
                                                 right: 0,
                                                 top: "calc(100% + 10px)",
-                                                width: 300,
+                                                width: 280,
                                                 background: "#ffffff",
                                                 color: "#0b1e3a",
                                                 border: "1px solid #e6eaf2",
-                                                borderRadius: 14,
-                                                boxShadow:
-                                                    "0 24px 60px rgba(2, 6, 23, .18), 0 4px 10px rgba(2, 6, 23, .08)",
-                                                padding: 12,
+                                                borderRadius: 12,
+                                                boxShadow: "0 10px 40px rgba(0,0,0,0.15)",
+                                                padding: 10,
                                                 zIndex: 1100,
-                                                transformOrigin: "top right",
-                                                transform: "scale(0.98)",
-                                                opacity: 0.98,
-                                                animation: "menuIn 120ms ease forwards",
-                                                backdropFilter: "saturate(1.2) blur(2px)",
+                                                animation: "menuIn 150ms ease forwards",
                                             }}
                                         >
-                                            {/* triangulito */}
+                                            {/* Triangulito */}
                                             <div
                                                 style={{
                                                     position: "absolute",
-                                                    right: 16,
+                                                    right: 14,
                                                     top: -6,
                                                     width: 12,
                                                     height: 12,
@@ -608,119 +590,113 @@ export default function Header() {
                                                 }}
                                             />
 
-                                            <div style={{ display: "flex", alignItems: "center", gap: 12, padding: "8px 10px" }}>
+                                            {/* Header con info del usuario */}
+                                            <div style={{
+                                                display: "flex",
+                                                alignItems: "center",
+                                                gap: 12,
+                                                padding: "10px 8px",
+                                                marginBottom: 8,
+                                            }}>
                                                 {(() => {
-                                                    const avatarSrc = (typeof getAppAvatarSrc === "function")
-                                                        ? getAppAvatarSrc(userProfile?.foto)
-                                                        : (userProfile?.foto || "").trim();
+                                                    const avatarSrc = getAppAvatarSrc(userProfile?.foto);
                                                     return avatarSrc && avatarOk ? (
                                                         <img
                                                             src={avatarSrc}
                                                             alt={displayName}
                                                             onError={() => setAvatarOk(false)}
-                                                            style={{ width: 44, height: 44, borderRadius: "50%", objectFit: "cover" }}
+                                                            style={{
+                                                                width: 40,
+                                                                height: 40,
+                                                                borderRadius: "50%",
+                                                                objectFit: "cover",
+                                                                border: "2px solid #e5e7eb",
+                                                            }}
                                                         />
                                                     ) : (
                                                         <div
                                                             style={{
-                                                                width: 44,
-                                                                height: 44,
+                                                                width: 40,
+                                                                height: 40,
                                                                 borderRadius: "50%",
                                                                 background: "linear-gradient(135deg, #3b82f6 0%, #1e40af 100%)",
                                                                 color: "#fff",
                                                                 display: "grid",
                                                                 placeItems: "center",
                                                                 fontWeight: 800,
-                                                                fontSize: 18,
+                                                                fontSize: 16,
                                                             }}
                                                         >
                                                             {(displayName?.[0] || "U").toUpperCase()}
                                                         </div>
                                                     );
                                                 })()}
-                                                <div>
-                                                    <div style={{ fontWeight: 700, fontSize: 15 }}>{displayName}</div>
-                                                    <div style={{ fontSize: 13, opacity: 0.7 }}>
-                                                        {userProfile?.username ? `@${userProfile.username}` : ""}
+                                                <div style={{ flex: 1, minWidth: 0 }}>
+                                                    <div style={{
+                                                        fontWeight: 700,
+                                                        fontSize: 14,
+                                                        whiteSpace: "nowrap",
+                                                        overflow: "hidden",
+                                                        textOverflow: "ellipsis",
+                                                    }}>
+                                                        {displayName}
+                                                    </div>
+                                                    <div style={{
+                                                        fontSize: 12,
+                                                        color: "#64748b",
+                                                        whiteSpace: "nowrap",
+                                                        overflow: "hidden",
+                                                        textOverflow: "ellipsis",
+                                                    }}>
+                                                        {userProfile?.username ? `@${userProfile.username}` : user?.email}
                                                     </div>
                                                 </div>
                                             </div>
 
-                                            <div style={{ height: 1, background: "#e6eaf2", margin: "8px 0" }} />
+                                            <div style={dividerStyle} />
 
-
-                                            {/* Mi perfil */}
+                                            {/* Menu items */}
                                             <button
                                                 type="button"
                                                 onClick={() => go("/profile")}
                                                 style={menuItemStyle}
-                                                onMouseEnter={(e) =>
-                                                    (e.currentTarget.style.background = "#f4f6fb")
-                                                }
-                                                onMouseLeave={(e) =>
-                                                    (e.currentTarget.style.background = "transparent")
-                                                }
-                                                onMouseDown={(e) =>
-                                                    (e.currentTarget.style.transform = "scale(0.995)")
-                                                }
-                                                onMouseUp={(e) =>
-                                                    (e.currentTarget.style.transform = "scale(1)")
-                                                }
+                                                onMouseEnter={(e) => e.currentTarget.style.background = "#f4f6fb"}
+                                                onMouseLeave={(e) => e.currentTarget.style.background = "transparent"}
                                             >
                                                 <span style={menuItemTextLeft}>Mi perfil</span>
                                             </button>
 
-
-                                            {/* Favoritos */}
                                             <button
                                                 type="button"
                                                 onClick={() => go("/favorites")}
                                                 style={menuItemStyle}
-                                                onMouseEnter={(e) =>
-                                                    (e.currentTarget.style.background = "#f4f6fb")
-                                                }
-                                                onMouseLeave={(e) =>
-                                                    (e.currentTarget.style.background = "transparent")
-                                                }
-                                                onMouseDown={(e) =>
-                                                    (e.currentTarget.style.transform = "scale(0.995)")
-                                                }
-                                                onMouseUp={(e) =>
-                                                    (e.currentTarget.style.transform = "scale(1)")
-                                                }
+                                                onMouseEnter={(e) => e.currentTarget.style.background = "#f4f6fb"}
+                                                onMouseLeave={(e) => e.currentTarget.style.background = "transparent"}
                                             >
                                                 <span style={menuItemTextLeft}>Favoritos</span>
                                             </button>
 
-                                            {/* Compras */}
                                             <button
                                                 type="button"
                                                 onClick={() => go("/purchased")}
                                                 style={menuItemStyle}
-                                                onMouseEnter={(e) => (e.currentTarget.style.background = "#f4f6fb")}
-                                                onMouseLeave={(e) => (e.currentTarget.style.background = "transparent")}
-                                                onMouseDown={(e) => (e.currentTarget.style.transform = "scale(0.995)")}
-                                                onMouseUp={(e) => (e.currentTarget.style.transform = "scale(1)")}
+                                                onMouseEnter={(e) => e.currentTarget.style.background = "#f4f6fb"}
+                                                onMouseLeave={(e) => e.currentTarget.style.background = "transparent"}
                                             >
                                                 <span style={menuItemTextLeft}>Descargas</span>
                                             </button>
 
-
                                             <div style={dividerStyle} />
 
-                                            {/* Comprar créditos */}
                                             <button
                                                 type="button"
                                                 onClick={() => go("/credits")}
                                                 style={menuItemStyle}
-                                                onMouseEnter={(e) => (e.currentTarget.style.background = "#f4f6fb")}
-                                                onMouseLeave={(e) => (e.currentTarget.style.background = "transparent")}
-                                                onMouseDown={(e) => (e.currentTarget.style.transform = "scale(0.995)")}
-                                                onMouseUp={(e) => (e.currentTarget.style.transform = "scale(1)")}
+                                                onMouseEnter={(e) => e.currentTarget.style.background = "#f4f6fb"}
+                                                onMouseLeave={(e) => e.currentTarget.style.background = "transparent"}
                                             >
                                                 <span style={menuItemTextLeft}>Mis créditos</span>
                                             </button>
-
 
                                             <div style={dividerStyle} />
 
@@ -737,39 +713,25 @@ export default function Header() {
                                                     alignItems: "center",
                                                     justifyContent: "center",
                                                     width: "100%",
-                                                    height: 40,
-                                                    borderRadius: 10,
+                                                    height: 38,
+                                                    borderRadius: 8,
                                                     cursor: "pointer",
                                                     fontWeight: 700,
-                                                    fontSize: 14,
-                                                    letterSpacing: ".15px",
+                                                    fontSize: 13,
                                                     color: "#b91c1c",
                                                     background: "rgba(239,68,68,.06)",
-                                                    border: "1px solid rgba(185,28,28,.25)",
-                                                    transition:
-                                                        "background .15s ease, border-color .15s ease, transform .06s ease",
+                                                    border: "1px solid rgba(185,28,28,.2)",
+                                                    transition: "all .15s ease",
                                                 }}
-                                                onMouseEnter={(e) =>
-                                                    (e.currentTarget.style.background = "rgba(239,68,68,.12)")
-                                                }
-                                                onMouseLeave={(e) =>
-                                                    (e.currentTarget.style.background = "rgba(239,68,68,.06)")
-                                                }
-                                                onMouseDown={(e) =>
-                                                    (e.currentTarget.style.transform = "scale(0.995)")
-                                                }
-                                                onMouseUp={(e) =>
-                                                    (e.currentTarget.style.transform = "scale(1)")
-                                                }
+                                                onMouseEnter={(e) => e.currentTarget.style.background = "rgba(239,68,68,.12)"}
+                                                onMouseLeave={(e) => e.currentTarget.style.background = "rgba(239,68,68,.06)"}
                                             >
                                                 Cerrar sesión
                                             </button>
                                         </div>
                                     )}
-
                                 </div>
-
-                            </div>
+                            </>
                         )}
                     </div>
                 </div>
@@ -800,11 +762,25 @@ export default function Header() {
                 onOpenAuth={openAuthModal}
             />
             <AuthModal_SignIn open={authOpen} onClose={closeAuthModal} onSignedIn={handleSignedIn} />
-            <AuthModal_HacerResenia
+            <AuthModal_HacerReseña
                 open={reseniaOpen}
                 onClose={() => setReseniaOpen(false)}
                 onSave={() => {}}
             />
+
+            {/* Animación para dropdown */}
+            <style>{`
+                @keyframes menuIn {
+                    from {
+                        opacity: 0;
+                        transform: translateY(-8px);
+                    }
+                    to {
+                        opacity: 1;
+                        transform: translateY(0);
+                    }
+                }
+            `}</style>
         </>
     );
-    }
+}
