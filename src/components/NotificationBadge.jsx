@@ -1,11 +1,16 @@
 import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useNotificationsContext } from '../contexts/NotificationsContext';
+import useTabBadge from '../hooks/useTabBadge';
+import { getNotificationRoute, isNotificationClickable } from '../utils/notificationRouter';
 
 export default function NotificationBadge() {
     const [isOpen, setIsOpen] = useState(false);
     const dropdownRef = useRef(null);
     const navigate = useNavigate();
+
+
+
 
     const {
         notificaciones,
@@ -15,6 +20,8 @@ export default function NotificationBadge() {
         marcarTodasLeidas,
         cargarNotificaciones
     } =useNotificationsContext();
+
+    useTabBadge(unreadCount);
 
     // Cerrar con ESC
     useEffect(() => {

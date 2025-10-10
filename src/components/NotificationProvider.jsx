@@ -153,7 +153,6 @@ const NotificationItem = ({ notification, onClose }) => {
                         fontWeight: '700',
                         marginBottom: '6px',
                         fontSize: '15px',
-                        letterSpacing: '-0.01em',
                     }}>
                         {notification.title}
                     </div>
@@ -165,27 +164,38 @@ const NotificationItem = ({ notification, onClose }) => {
                 }}>
                     {notification.message}
                 </div>
+
+                {/* ✅ BOTÓN DE ACCIÓN */}
+                {notification.action && (
+                    <button
+                        onClick={(e) => {
+                            e.stopPropagation();
+                            notification.action.onClick();
+                            onClose();
+                        }}
+                        style={{
+                            marginTop: '10px',
+                            padding: '6px 14px',
+                            background: 'rgba(255,255,255,0.3)',
+                            border: '1px solid rgba(255,255,255,0.4)',
+                            borderRadius: '6px',
+                            color: '#ffffff',
+                            fontSize: '13px',
+                            fontWeight: '600',
+                            cursor: 'pointer',
+                            transition: 'all 0.2s ease',
+                        }}
+                        onMouseEnter={(e) => {
+                            e.target.style.background = 'rgba(255,255,255,0.4)';
+                        }}
+                        onMouseLeave={(e) => {
+                            e.target.style.background = 'rgba(255,255,255,0.3)';
+                        }}
+                    >
+                        {notification.action.label}
+                    </button>
+                )}
             </div>
-            <button
-                onClick={onClose}
-                style={{
-                    background: 'rgba(255,255,255,0.2)',
-                    border: 'none',
-                    fontSize: '20px',
-                    cursor: 'pointer',
-                    padding: '4px 8px',
-                    color: '#ffffff',
-                    borderRadius: '6px',
-                    lineHeight: 1,
-                    transition: 'background 0.2s ease',
-                    fontWeight: '600',
-                }}
-                onMouseEnter={(e) => e.target.style.background = 'rgba(255,255,255,0.3)'}
-                onMouseLeave={(e) => e.target.style.background = 'rgba(255,255,255,0.2)'}
-                aria-label="Cerrar notificación"
-            >
-                ×
-            </button>
         </div>
     );
 };

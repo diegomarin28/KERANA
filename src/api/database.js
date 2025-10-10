@@ -247,11 +247,17 @@ async function searchMentors(term) {
     return { data: transformed, error };
 }
 
+// En tu archivo database.js o donde tengas searchUsers
+
 async function searchUsers(term) {
     const q = (term || "").trim();
     if (!q) return { data: [], error: null };
 
     try {
+        // ✅ OBTENER MI ID PRIMERO
+        const { data: miIdData } = await supabase.rpc('obtener_usuario_actual_id');
+        const miId = miIdData || null;
+
         const { data, error } = await supabase
             .rpc('buscar_usuarios_sin_tildes', { termino: q });
 
@@ -260,7 +266,12 @@ async function searchUsers(term) {
             return { data: [], error };
         }
 
-        const transformed = (data || []).map(usuario => ({
+        // ✅ FILTRAR MI PROPIO USUARIO
+        const usuariosFiltrados = (data || []).filter(usuario => {
+            return miId ? usuario.id_usuario !== miId : true;
+        });
+
+        const transformed = usuariosFiltrados.map(usuario => ({
             id: usuario.id_usuario,
             id_usuario: usuario.id_usuario,
             nombre: usuario.nombre,

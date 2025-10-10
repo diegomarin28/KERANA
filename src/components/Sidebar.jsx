@@ -7,19 +7,15 @@ export default function Sidebar({ open, onClose, isAuthenticated, user, onLogout
     const panelRef = useRef(null);
     const [authOpen, setAuthOpen] = useState(false);
 
-    // autoCheck: false → No verificar automáticamente al montar
     const { isMentor, loading: checkingMentor, refetch } = useMentorStatus(false);
 
-    // Efecto para bloquear el scroll del body cuando el sidebar está abierto
     useEffect(() => {
         if (open) {
             document.body.style.overflow = "hidden";
-            refetch();  // ← Solo verificar cuando se abre el sidebar
+            refetch();
         } else {
             document.body.style.overflow = "unset";
         }
-
-        // Cleanup al desmontar
         return () => {
             document.body.style.overflow = "unset";
         };
@@ -51,21 +47,17 @@ export default function Sidebar({ open, onClose, isAuthenticated, user, onLogout
         onClose?.();
     };
 
-    // Función para abrir el modal de autenticación (cierra el sidebar)
     const openAuthModal = () => {
-        onClose?.(); // Cerrar el sidebar primero
-        setAuthOpen(true); // Abrir el modal
+        onClose?.();
+        setAuthOpen(true);
     };
 
-    // Función para cerrar el modal de autenticación
     const closeAuthModal = () => {
         setAuthOpen(false);
     };
 
-    // Función cuando se inicia sesión exitosamente
     const handleSignedIn = () => {
         setAuthOpen(false);
-        // El sidebar ya está cerrado, no necesitamos cerrarlo de nuevo
     };
 
     return (
@@ -102,7 +94,7 @@ export default function Sidebar({ open, onClose, isAuthenticated, user, onLogout
                     zIndex: 1000,
                     display: "grid",
                     gridTemplateRows: "auto auto 1fr auto",
-                    overflow: "hidden", // Prevenir scroll interno
+                    overflow: "hidden",
                 }}
             >
                 <div style={headerStyle}>
@@ -144,7 +136,7 @@ export default function Sidebar({ open, onClose, isAuthenticated, user, onLogout
                             <div style={usernameStyle}>
                                 {username}
                             </div>
-                            {isMentor && ( // ← Usar isMentor del hook
+                            {isMentor && (
                                 <div style={{
                                     display: 'inline-block',
                                     padding: '2px 8px',
@@ -172,9 +164,9 @@ export default function Sidebar({ open, onClose, isAuthenticated, user, onLogout
                     <Group title="Mis Recursos" />
                     <MenuLink icon="📚" label="Comprados" onClick={() => go("/purchased")} />
                     <MenuLink icon="⭐" label="Favoritos" onClick={() => go("/favorites")} />
-                    <MenuLink icon="📝" label="Mis Apuntes" onClick={() => go("/my_papers")} />
+                    <MenuLink icon="📄" label="Mis Apuntes" onClick={() => go("/my_papers")} />
 
-                    {/* SECCIÓN DE MENTOR - Usar isMentor del hook */}
+                    {/* SECCIÓN DE MENTOR */}
                     {isMentor && !checkingMentor && (
                         <>
                             <Group title="Panel de Mentor" />
@@ -190,12 +182,13 @@ export default function Sidebar({ open, onClose, isAuthenticated, user, onLogout
                     <MenuLink icon="💡" label="Mentores" onClick={() => go("/mentors")} />
                     <MenuLink icon="📄" label="Apuntes" onClick={() => go("/notes")} />
 
-                    {/*CUENTAA*/}
+                    {/* CUENTA */}
                     <Group title="Cuenta" />
                     {isAuthenticated && (
                         <>
                             <MenuLink icon="👤" label="Mi Perfil" onClick={() => go("/profile")} />
                             <MenuLink icon="🔔" label="Notificaciones" onClick={() => go("/notifications")} />
+                            <MenuLink icon="⚙️" label="Ajustes" onClick={() => go("/settings")} />
                         </>
                     )}
 
@@ -203,10 +196,9 @@ export default function Sidebar({ open, onClose, isAuthenticated, user, onLogout
                     <MenuLink icon="📞" label="Contacto" onClick={() => go("/contact")} />
                     <MenuLink icon="❓" label="Centro de ayuda" onClick={() => go("/help")} />
                     <MenuLink icon="📄" label="Términos y condiciones" onClick={() => go("/terms")} />
-                    <MenuLink icon="🔒" label="Política de privacidad" onClick={() => go("/privacy")} />
+                    <MenuLink icon="🔐" label="Política de privacidad" onClick={() => go("/privacy")} />
 
-
-                    {/* SESIÓN - Al final */}
+                    {/* SESIÓN */}
                     {!isAuthenticated ? (
                         <>
                             <PrimaryButton label="Iniciar sesión" onClick={openAuthModal} />
@@ -235,7 +227,9 @@ export default function Sidebar({ open, onClose, isAuthenticated, user, onLogout
     );
 }
 
-
+// ============================================
+// COMPONENTES Y ESTILOS
+// ============================================
 const headerStyle = {
     display: "flex",
     alignItems: "center",

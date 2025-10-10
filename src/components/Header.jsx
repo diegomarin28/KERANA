@@ -343,15 +343,30 @@ export default function Header() {
         all: "unset",
         display: "flex",
         alignItems: "center",
-        gap: 10,
+        gap: 12,
         width: "100%",
-        padding: "10px 12px",
-        borderRadius: 8,
+        height: 44,
+        padding: "0 12px",
+        borderRadius: 10,
         cursor: "pointer",
-        transition: "background .15s ease",
+        fontSize: 15,
+        fontWeight: 600,
+        color: "#0b1e3a",
+        transition: "background .15s ease, transform .06s ease",
+        willChange: "background, transform",
     };
-    const menuItemTextLeft = { fontSize: 14, fontWeight: 600, textAlign: "left", flex: 1 };
-    const dividerStyle = { height: 1, background: "#e5e7eb", margin: "6px 4px" };
+    const menuItemTextLeft = {
+        flex: 1,
+        textAlign: "left",
+        letterSpacing: ".1px",
+    };
+    const dividerStyle = {
+        height: 1,
+        background: "#eef2f7",
+        margin: "8px 6px",
+        borderRadius: 1,
+    };
+
 
 
     const handleSignInMouseEnter = (e) => {
@@ -443,18 +458,56 @@ export default function Header() {
                         {!user ? (
                             <HeaderAuthButtons />
                         ) : (
-                            <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+                            <div style={{ display: "flex", alignItems: "center", columnGap: 20 }}>
+
+
+                                {user && (
+                                    <button
+                                        onClick={() => navigate("/favorites")}
+                                        aria-label="Favoritos"
+                                        style={{
+                                            width: 36,
+                                            height: 36,
+                                            display: "grid",
+                                            placeItems: "center",
+                                            borderRadius: "50%",
+                                            background: "transparent",
+                                            border: "1px solid rgba(255,255,255,0.25)",
+                                            color: TOKENS.headerText,
+                                            cursor: "pointer",
+                                            padding: 0,
+                                            outline: "none",
+                                            transition: "background .2s ease, border-color .2s ease",
+                                        }}
+                                        onMouseEnter={(e) => {
+                                            e.currentTarget.style.background = "rgba(255,255,255,0.08)";
+                                            e.currentTarget.style.borderColor = "rgba(255,255,255,0.35)";
+                                        }}
+                                        onMouseLeave={(e) => {
+                                            e.currentTarget.style.background = "transparent";
+                                            e.currentTarget.style.borderColor = "rgba(255,255,255,0.25)";
+                                        }}
+                                    >
+                                        <svg
+                                            width="22"
+                                            height="22"
+                                            viewBox="0 0 24 24"
+                                            fill="none"
+                                            stroke="currentColor"
+                                            strokeWidth="1.8"
+                                            strokeLinecap="round"
+                                            strokeLinejoin="round"
+                                        >
+                                            <path d="M6 4.5a2.5 2.5 0 0 1 2.5-2.5h7A2.5 2.5 0 0 1 18 4.5V21l-6-3-6 3V4.5z" />
+                                        </svg>
+                                    </button>
+                                )}
+
+
+
                                 {/* 🔔 BADGE DE NOTIFICACIONES */}
                                 <NotificationBadge />
 
-                                {/* Nombre */}
-                                <span style={{
-                                    fontWeight: 700,
-                                    fontSize: 14,
-                                    color: TOKENS.headerText,
-                                }}>
-                                {displayName}
-                         </span>
 
                                 {/* Avatar clickeable */}
                                 <div style={{ position: "relative" }}>
@@ -523,72 +576,197 @@ export default function Header() {
                                             style={{
                                                 position: "absolute",
                                                 right: 0,
-                                                top: "calc(100% + 8px)",
-                                                width: 224,
+                                                top: "calc(100% + 10px)",
+                                                width: 300,
                                                 background: "#ffffff",
                                                 color: "#0b1e3a",
-                                                border: "1px solid #e5e7eb",
-                                                borderRadius: 10,
-                                                boxShadow: "0 12px 28px rgba(0,0,0,.18)",
-                                                padding: 8,
+                                                border: "1px solid #e6eaf2",
+                                                borderRadius: 14,
+                                                boxShadow:
+                                                    "0 24px 60px rgba(2, 6, 23, .18), 0 4px 10px rgba(2, 6, 23, .08)",
+                                                padding: 12,
                                                 zIndex: 1100,
+                                                transformOrigin: "top right",
+                                                transform: "scale(0.98)",
+                                                opacity: 0.98,
+                                                animation: "menuIn 120ms ease forwards",
+                                                backdropFilter: "saturate(1.2) blur(2px)",
                                             }}
                                         >
+                                            {/* triangulito */}
+                                            <div
+                                                style={{
+                                                    position: "absolute",
+                                                    right: 16,
+                                                    top: -6,
+                                                    width: 12,
+                                                    height: 12,
+                                                    background: "#fff",
+                                                    borderLeft: "1px solid #e6eaf2",
+                                                    borderTop: "1px solid #e6eaf2",
+                                                    transform: "rotate(45deg)",
+                                                }}
+                                            />
+
+                                            <div style={{ display: "flex", alignItems: "center", gap: 12, padding: "8px 10px" }}>
+                                                {(() => {
+                                                    const avatarSrc = (typeof getAppAvatarSrc === "function")
+                                                        ? getAppAvatarSrc(userProfile?.foto)
+                                                        : (userProfile?.foto || "").trim();
+                                                    return avatarSrc && avatarOk ? (
+                                                        <img
+                                                            src={avatarSrc}
+                                                            alt={displayName}
+                                                            onError={() => setAvatarOk(false)}
+                                                            style={{ width: 44, height: 44, borderRadius: "50%", objectFit: "cover" }}
+                                                        />
+                                                    ) : (
+                                                        <div
+                                                            style={{
+                                                                width: 44,
+                                                                height: 44,
+                                                                borderRadius: "50%",
+                                                                background: "linear-gradient(135deg, #3b82f6 0%, #1e40af 100%)",
+                                                                color: "#fff",
+                                                                display: "grid",
+                                                                placeItems: "center",
+                                                                fontWeight: 800,
+                                                                fontSize: 18,
+                                                            }}
+                                                        >
+                                                            {(displayName?.[0] || "U").toUpperCase()}
+                                                        </div>
+                                                    );
+                                                })()}
+                                                <div>
+                                                    <div style={{ fontWeight: 700, fontSize: 15 }}>{displayName}</div>
+                                                    <div style={{ fontSize: 13, opacity: 0.7 }}>
+                                                        {userProfile?.username ? `@${userProfile.username}` : ""}
+                                                    </div>
+                                                </div>
+                                            </div>
+
+                                            <div style={{ height: 1, background: "#e6eaf2", margin: "8px 0" }} />
+
+
                                             {/* Mi perfil */}
-                                            <button type="button" onClick={() => go("/profile")} style={menuItemStyle}>
+                                            <button
+                                                type="button"
+                                                onClick={() => go("/profile")}
+                                                style={menuItemStyle}
+                                                onMouseEnter={(e) =>
+                                                    (e.currentTarget.style.background = "#f4f6fb")
+                                                }
+                                                onMouseLeave={(e) =>
+                                                    (e.currentTarget.style.background = "transparent")
+                                                }
+                                                onMouseDown={(e) =>
+                                                    (e.currentTarget.style.transform = "scale(0.995)")
+                                                }
+                                                onMouseUp={(e) =>
+                                                    (e.currentTarget.style.transform = "scale(1)")
+                                                }
+                                            >
                                                 <span style={menuItemTextLeft}>Mi perfil</span>
                                             </button>
 
-                                            {/* Mis apuntes */}
-                                            <button type="button" onClick={() => go("/my_papers")} style={menuItemStyle}>
-                                                <span style={menuItemTextLeft}>Mis apuntes</span>
-                                            </button>
 
                                             {/* Favoritos */}
-                                            <button type="button" onClick={() => go("/favorites")} style={menuItemStyle}>
+                                            <button
+                                                type="button"
+                                                onClick={() => go("/favorites")}
+                                                style={menuItemStyle}
+                                                onMouseEnter={(e) =>
+                                                    (e.currentTarget.style.background = "#f4f6fb")
+                                                }
+                                                onMouseLeave={(e) =>
+                                                    (e.currentTarget.style.background = "transparent")
+                                                }
+                                                onMouseDown={(e) =>
+                                                    (e.currentTarget.style.transform = "scale(0.995)")
+                                                }
+                                                onMouseUp={(e) =>
+                                                    (e.currentTarget.style.transform = "scale(1)")
+                                                }
+                                            >
                                                 <span style={menuItemTextLeft}>Favoritos</span>
                                             </button>
 
                                             {/* Compras */}
-                                            <button type="button" onClick={() => go("/purchased")} style={menuItemStyle}>
-                                                <span style={menuItemTextLeft}>Compras</span>
-                                            </button>
-
-                                            <div style={dividerStyle} />
-
-                                            {/* Comprar créditos (no hace nada por ahora) */}
-                                            <button type="button" disabled style={{ ...menuItemStyle, cursor: "not-allowed", opacity: .6 }}>
-                                                <span style={menuItemTextLeft}>Comprar créditos</span>
-                                            </button>
-
-                                            <div style={dividerStyle} />
-
-                                            {/* Cerrar sesión (ROJO, texto centrado como en el sidebar) */}
                                             <button
                                                 type="button"
-                                                onClick={() => { handleLogout?.(); setAvatarMenuOpen(false); }}
+                                                onClick={() => go("/purchased")}
+                                                style={menuItemStyle}
+                                                onMouseEnter={(e) => (e.currentTarget.style.background = "#f4f6fb")}
+                                                onMouseLeave={(e) => (e.currentTarget.style.background = "transparent")}
+                                                onMouseDown={(e) => (e.currentTarget.style.transform = "scale(0.995)")}
+                                                onMouseUp={(e) => (e.currentTarget.style.transform = "scale(1)")}
+                                            >
+                                                <span style={menuItemTextLeft}>Descargas</span>
+                                            </button>
+
+
+                                            <div style={dividerStyle} />
+
+                                            {/* Comprar créditos */}
+                                            <button
+                                                type="button"
+                                                onClick={() => go("/credits")}
+                                                style={menuItemStyle}
+                                                onMouseEnter={(e) => (e.currentTarget.style.background = "#f4f6fb")}
+                                                onMouseLeave={(e) => (e.currentTarget.style.background = "transparent")}
+                                                onMouseDown={(e) => (e.currentTarget.style.transform = "scale(0.995)")}
+                                                onMouseUp={(e) => (e.currentTarget.style.transform = "scale(1)")}
+                                            >
+                                                <span style={menuItemTextLeft}>Mis créditos</span>
+                                            </button>
+
+
+                                            <div style={dividerStyle} />
+
+                                            {/* Cerrar sesión */}
+                                            <button
+                                                type="button"
+                                                onClick={() => {
+                                                    handleLogout?.();
+                                                    setAvatarMenuOpen(false);
+                                                }}
                                                 style={{
                                                     all: "unset",
                                                     display: "flex",
                                                     alignItems: "center",
                                                     justifyContent: "center",
                                                     width: "100%",
-                                                    padding: "10px 12px",
-                                                    borderRadius: 8,
+                                                    height: 40,
+                                                    borderRadius: 10,
                                                     cursor: "pointer",
+                                                    fontWeight: 700,
+                                                    fontSize: 14,
+                                                    letterSpacing: ".15px",
                                                     color: "#b91c1c",
-                                                    border: "1px solid rgba(185,28,28,.25)",
                                                     background: "rgba(239,68,68,.06)",
-                                                    fontWeight: 600,
-                                                    transition: "background .15s ease, border-color .15s ease",
+                                                    border: "1px solid rgba(185,28,28,.25)",
+                                                    transition:
+                                                        "background .15s ease, border-color .15s ease, transform .06s ease",
                                                 }}
-                                                onMouseEnter={(e) => e.currentTarget.style.background = "rgba(239,68,68,.12)"}
-                                                onMouseLeave={(e) => e.currentTarget.style.background = "rgba(239,68,68,.06)"}
+                                                onMouseEnter={(e) =>
+                                                    (e.currentTarget.style.background = "rgba(239,68,68,.12)")
+                                                }
+                                                onMouseLeave={(e) =>
+                                                    (e.currentTarget.style.background = "rgba(239,68,68,.06)")
+                                                }
+                                                onMouseDown={(e) =>
+                                                    (e.currentTarget.style.transform = "scale(0.995)")
+                                                }
+                                                onMouseUp={(e) =>
+                                                    (e.currentTarget.style.transform = "scale(1)")
+                                                }
                                             >
                                                 Cerrar sesión
                                             </button>
                                         </div>
                                     )}
+
                                 </div>
 
                             </div>

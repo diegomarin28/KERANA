@@ -1,110 +1,139 @@
+// src/components/NotificationsRealtimeSubscriber.jsx
 import { useEffect, useRef } from 'react';
 import { supabase } from '../supabase';
 import { useNotificationsContext } from '../contexts/NotificationsContext';
-import { useNotifications } from './NotificationProvider'; // Toast provider
+import { useNotifications } from './NotificationProvider';
+import { useNotificationSettings } from '../hooks/useNotificationSettings';
 
 export default function NotificationsRealtimeSubscriber() {
     const { cargarNotificaciones, contarNoLeidas } = useNotificationsContext();
     const { addNotification } = useNotifications();
+    const { shouldPlaySound, shouldShowToast, isTypeEnabled } = useNotificationSettings();
     const channelRef = useRef(null);
-    const userIdRef = useRef(null);
 
     useEffect(() => {
         let cancelled = false;
 
-        async function subscribe() {
+        const setupRealtimeSubscription = async () => {
             try {
-                // Obtener mi usuario ID
-                const { data: miIdData } = await supabase.rpc('obtener_usuario_actual_id');
+                const { data: { user } } = await supabase.auth.getUser();
+                if (!user || cancelled) return;
 
-                if (!miIdData || cancelled) {
-                    console.log('[Realtime] No hay usuario logueado');
-                    return;
+                const { data: usuarioData } = await supabase
+                    .from('usuario')
+                    .select('id_usuario')
+                    .eq('auth_id', user.id)
+                    .single();
+
+                if (!usuarioData || cancelled) return;
+
+                const miUsuarioId = usuarioData.id_usuario;
+
+                // Limpiar canal existente si hay uno
+                if (channelRef.current) {
+                    await supabase.removeChannel(channelRef.current);
                 }
 
-                userIdRef.current = miIdData;
-                console.log('🔴 [Realtime] Iniciando suscripción para usuario:', miIdData);
-
-                // Crear canal de Realtime
-                channelRef.current = supabase
-                    .channel(`notificaciones-realtime-${miIdData}`)
+                // Crear nuevo canal
+                const channel = supabase
+                    .channel('notificaciones-realtime')
                     .on(
                         'postgres_changes',
                         {
                             event: 'INSERT',
                             schema: 'public',
                             table: 'notificaciones',
-                            filter: `usuario_id=eq.${miIdData}` // Solo mis notificaciones
+                            filter: `usuario_id=eq.${miUsuarioId}`
                         },
                         async (payload) => {
+                            console.log('🔔 Nueva notificación recibida:', payload);
+
                             if (cancelled) return;
 
-                            console.log('🔔 [Realtime] Nueva notificación recibida:', payload);
-
-                            // Obtener datos completos con el emisor
+                            // Obtener la notificación completa con datos del emisor
                             const { data: notifCompleta } = await supabase
                                 .from('notificaciones')
                                 .select(`
-                  id,
-                  tipo,
-                  emisor_id,
-                  relacion_id,
-                  mensaje,
-                  leida,
-                  creado_en,
-                  emisor:usuario!notificaciones_emisor_id_fkey(
-                    id_usuario,
-                    nombre,
-                    username,
-                    foto
-                  )
-                `)
+                                    *,
+                                    emisor:usuario!notificaciones_emisor_id_fkey(
+                                        id_usuario,
+                                        nombre,
+                                        foto
+                                    )
+                                `)
                                 .eq('id', payload.new.id)
                                 .single();
 
                             if (notifCompleta && !cancelled) {
-                                // Recargar lista de notificaciones
-                                cargarNotificaciones();
-                                contarNoLeidas();
+                                // ✅ Verificar si el tipo está habilitado en settings
+                                if (!isTypeEnabled(notifCompleta.tipo)) {
+                                    console.log('⏭️ Notificación ignorada por settings:', notifCompleta.tipo);
+                                    return;
+                                }
 
-                                // Mostrar toast
-                                const emisorNombre = notifCompleta.emisor?.nombre || 'Alguien';
-                                const mensaje = notifCompleta.mensaje || 'Nueva notificación';
+                                // Recargar lista de notificaciones y contador
+                                await cargarNotificaciones();
+                                await contarNoLeidas();
 
-                                addNotification({
-                                    type: 'info',
-                                    title: `🔔 ${emisorNombre}`,
-                                    message: mensaje,
-                                    duration: 5000,
-                                });
+                                // ✅ Sonido solo si está habilitado en settings
+                                if (shouldPlaySound) {
+                                    playSound();
+                                }
 
-                                console.log('✅ [Realtime] Notificación procesada');
+                                // ✅ Toast solo si está habilitado en settings
+                                if (shouldShowToast) {
+                                    addNotification({
+                                        id: notifCompleta.id,
+                                        title: notifCompleta.emisor?.nombre || 'Nueva notificación',
+                                        message: notifCompleta.mensaje,
+                                        type: 'info',
+                                        duration: 5000,
+                                        avatar: notifCompleta.emisor?.foto,
+                                    });
+                                }
                             }
                         }
                     )
                     .subscribe((status) => {
-                        console.log('📡 [Realtime] Estado de suscripción:', status);
+                        console.log('📡 Estado de suscripción realtime:', status);
                     });
 
-            } catch (error) {
-                console.error('❌ [Realtime] Error en suscripción:', error);
-            }
-        }
+                channelRef.current = channel;
 
-        // Iniciar suscripción
-        subscribe();
+            } catch (error) {
+                console.error('❌ Error en suscripción realtime:', error);
+            }
+        };
+
+        setupRealtimeSubscription();
 
         // Cleanup
         return () => {
             cancelled = true;
             if (channelRef.current) {
-                console.log('🔴 [Realtime] Cerrando canal');
                 supabase.removeChannel(channelRef.current);
                 channelRef.current = null;
             }
         };
-    }, [cargarNotificaciones, contarNoLeidas, addNotification]);
+    }, [cargarNotificaciones, contarNoLeidas, addNotification, shouldPlaySound, shouldShowToast, isTypeEnabled]);
 
-    // Este componente no renderiza nada
     return null;
+}
+
+// Función para reproducir sonido de notificación
+function playSound() {
+    try {
+        // Opción 1: Usar un archivo local
+        const audio = new Audio('/notification-sound.mp3');
+
+        // Opción 2: Usar un sonido de CDN si no tienes archivo local
+        // const audio = new Audio('https://cdn.freesound.org/previews/316/316847_4939433-lq.mp3');
+
+        audio.volume = 0.5;
+        audio.play().catch(err => {
+            console.log('⚠️ No se pudo reproducir sonido:', err);
+        });
+    } catch (error) {
+        console.log('⚠️ Error al reproducir sonido:', error);
+    }
 }

@@ -11,7 +11,8 @@ export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
     auth: {
         autoRefreshToken: true,
         persistSession: true,
+        storageKey: 'kerana-auth',
         detectSessionInUrl: true,
-        storage: localStorage
+        storage: window.localStorage,
     }
 })
