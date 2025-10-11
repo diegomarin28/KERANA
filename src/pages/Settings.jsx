@@ -292,14 +292,6 @@ function NotificationsTab({ settings, toggleSetting, resetToDefault, notificatio
                         onChange={() => toggleSetting('badge')}
                         icon="🔔"
                     />
-                    <SettingToggle
-                        label="Email"
-                        description="Resumen diario (próximamente)"
-                        checked={settings.email}
-                        onChange={() => toggleSetting('email')}
-                        icon="📧"
-                        disabled={true}
-                    />
                 </div>
             </Card>
 
@@ -443,24 +435,141 @@ function PrivacyTab({ navigate }) {
             </Card>
 
             <Card title="Gestión de Datos">
-                <button
-                    onClick={() => alert('Función próximamente')}
-                    style={linkButtonStyle}
-                    onMouseEnter={(e) => e.target.style.background = '#fff5f5'}
-                    onMouseLeave={(e) => e.target.style.background = '#fff'}
-                >
-                    📥 Descargar mis datos →
-                </button>
-                <button
-                    onClick={() => alert('Contactá a soporte para eliminar tu cuenta')}
-                    style={{...linkButtonStyle, color: '#ef4444'}}
-                    onMouseEnter={(e) => e.target.style.background = '#fef2f2'}
-                    onMouseLeave={(e) => e.target.style.background = '#fff'}
-                >
-                    🗑️ Eliminar cuenta →
-                </button>
+                <DataManagementSection />
             </Card>
         </>
+    );
+}
+
+// ============================================
+// SECCIÓN: GESTIÓN DE DATOS
+// ============================================
+function DataManagementSection() {
+    const [summary, setSummary] = useState(null);
+    const [downloading, setDownloading] = useState(false);
+    const [message, setMessage] = useState('');
+
+    useEffect(() => {
+        loadSummary();
+    }, []);
+
+    const loadSummary = async () => {
+        const data = await getUserDataSummary();
+        setSummary(data);
+    };
+
+    const handleDownload = async () => {
+        setDownloading(true);
+        setMessage('');
+
+        try {
+            const success = await downloadUserData();
+
+            if (success) {
+                setMessage('✅ Datos descargados correctamente');
+                setTimeout(() => setMessage(''), 3000);
+            } else {
+                setMessage('❌ Error al descargar los datos');
+                setTimeout(() => setMessage(''), 3000);
+            }
+        } catch (error) {
+            setMessage('❌ Error al descargar los datos');
+            setTimeout(() => setMessage(''), 3000);
+        } finally {
+            setDownloading(false);
+        }
+    };
+
+    return (
+        <>
+            <p style={{ color: '#64748b', marginBottom: 16, fontSize: 13 }}>
+                Descargá una copia de todos tus datos en Kerana en formato JSON.
+            </p>
+
+            {/* Resumen de datos */}
+            {summary && (
+                <div style={{
+                    display: 'grid',
+                    gridTemplateColumns: 'repeat(2, 1fr)',
+                    gap: 10,
+                    marginBottom: 16,
+                    padding: 12,
+                    background: '#f8fafc',
+                    borderRadius: 8,
+                    border: '1px solid #e5e7eb',
+                }}>
+                    <DataStat label="Notificaciones" value={summary.notificaciones} />
+                    <DataStat label="Apuntes" value={summary.apuntes} />
+                    <DataStat label="Favoritos" value={summary.favoritos} />
+                    <DataStat label="Reseñas" value={summary.reseñas} />
+                </div>
+            )}
+
+            {message && (
+                <div style={{
+                    padding: '10px 14px',
+                    marginBottom: 12,
+                    borderRadius: 8,
+                    background: message.includes('✅') ? '#d1fae5' : '#fee2e2',
+                    color: message.includes('✅') ? '#065f46' : '#991b1b',
+                    fontSize: 12,
+                    fontWeight: 600,
+                    textAlign: 'center',
+                }}>
+                    {message}
+                </div>
+            )}
+
+            <button
+                onClick={handleDownload}
+                disabled={downloading}
+                style={{
+                    ...linkButtonStyle,
+                    opacity: downloading ? 0.6 : 1,
+                    cursor: downloading ? 'not-allowed' : 'pointer',
+                }}
+                onMouseEnter={(e) => !downloading && (e.target.style.background = '#eff6ff')}
+                onMouseLeave={(e) => e.target.style.background = '#fff'}
+            >
+                📥 {downloading ? 'Descargando...' : 'Descargar mis datos'} →
+            </button>
+
+            <button
+                onClick={() => alert('Contactá a soporte@kerana.com para eliminar tu cuenta')}
+                style={{...linkButtonStyle, color: '#ef4444', marginTop: 8}}
+                onMouseEnter={(e) => e.target.style.background = '#fef2f2'}
+                onMouseLeave={(e) => e.target.style.background = '#fff'}
+            >
+                🗑️ Eliminar cuenta →
+            </button>
+        </>
+    );
+}
+
+function DataStat({ label, value }) {
+    return (
+        <div style={{
+            padding: '8px 10px',
+            background: '#fff',
+            borderRadius: 6,
+            textAlign: 'center',
+        }}>
+            <div style={{
+                fontSize: 18,
+                fontWeight: 700,
+                color: '#2563eb',
+                marginBottom: 2,
+            }}>
+                {value}
+            </div>
+            <div style={{
+                fontSize: 11,
+                color: '#64748b',
+                fontWeight: 600,
+            }}>
+                {label}
+            </div>
+        </div>
     );
 }
 
