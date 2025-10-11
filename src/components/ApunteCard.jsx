@@ -6,12 +6,12 @@ import { Chip } from "../components/ui/Chip";
 
 export default function ApunteCard({
                                        apunte,
-                                       isOwner = false,          // true en MyPapers
-                                       hasPurchased = false,      // true si el usuario ya lo compró (en SearchResults)
-                                       onBuy,                     // (opcional) async () => {...} si querés habilitar compra
-                                       onEdit,                    // (opcional) () => {...}
-                                       onDelete,                  // (opcional) async () => {...}
-                                       onDownloaded,              // (opcional) callback luego de descargar
+                                       isOwner = false,
+                                       hasPurchased = false,
+                                       onBuy,
+                                       onEdit,
+                                       onDelete,
+                                       onDownloaded,
                                    }) {
     const [downloading, setDownloading] = useState(false);
     const [buying, setBuying] = useState(false);
@@ -26,7 +26,14 @@ export default function ApunteCard({
         file_path,
         file_size,
         mime_type,
+        portada_url,             // NUEVO: url pública si existe
+        rating_promedio,         // opcional (si viene de la RPC)
+        votos,                   // opcional (si viene de la RPC)
     } = apunte || {};
+
+    const displayRating = isFinite(Number(rating_promedio))
+        ? Number(rating_promedio)
+        : isFinite(Number(estrellas)) ? Number(estrellas) : 0;
 
     const canDownload = isOwner || hasPurchased || Number(creditos) === 0;
 
@@ -68,69 +75,144 @@ export default function ApunteCard({
     }
 
     return (
-        <Card>
-            <div style={{ display: "flex", justifyContent: "space-between", gap: 10, alignItems: "center" }}>
-                <h3 style={{ margin: 0, fontSize: 18, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                    {titulo}
-                </h3>
-                {materia_nombre && <Chip tone="blue">{materia_nombre}</Chip>}
+        <Card style={{ padding: 12 }}>
+            {/* PORTADA tipo primera página */}
+            <div style={{
+                position: "relative",
+                borderRadius: 12,
+                border: "1px solid #e5e7eb",
+                overflow: "hidden",
+                background: "#fff",
+                aspectRatio: "4 / 5",             // mantiene proporción hoja
+            }}>
+                {portada_url ? (
+                    <img
+                        src={portada_url}
+                        alt={titulo}
+                        loading="lazy"
+                        style={{ width: "100%", height: "100%", objectFit: "cover" }}
+                        onError={(e)=>{ e.currentTarget.style.display="none"; }}
+                    />
+                ) : (
+                    <PlaceholderPage />
+                )}
+
+                {/* Banda inferior con título */}
+                <div style={{
+                    position: "absolute",
+                    left: 0,
+                    right: 0,
+                    bottom: 0,
+                    background: "rgba(2,6,23,0.75)",
+                    color: "#fff",
+                    padding: "8px 10px",
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 8,
+                }}>
+                    <div style={{
+                        flex: 1,
+                        fontWeight: 700,
+                        fontSize: 14,
+                        whiteSpace: "nowrap",
+                        overflow: "hidden",
+                        textOverflow: "ellipsis",
+                    }}>
+                        {titulo}
+                    </div>
+                    <div title={`${displayRating ? displayRating.toFixed(1) : "—"}${votos ? ` (${votos})` : ""}`}>
+                        ⭐ {displayRating ? displayRating.toFixed(1) : "—"}
+                    </div>
+                </div>
             </div>
 
+            {/* Descripción y meta */}
             {descripcion && (
-                <p style={{ color: "var(--muted)", margin: "6px 0 0" }}>
+                <p style={{ color: "var(--muted)", margin: "10px 0 0" }}>
                     {descripcion.length > 140 ? descripcion.slice(0, 140) + "…" : descripcion}
                 </p>
             )}
 
-            <div style={{ display: "flex", gap: 14, alignItems: "center", color: "#374151", fontSize: 14, flexWrap: "wrap", marginTop: 8 }}>
-                <span title="Estrellas">⭐ {formatStars(estrellas)}</span>
-                <span title="Créditos">💰 {Number(creditos) || 0}</span>
-                {mime_type && <span title="Tipo">{iconForMime(mime_type)} {shortMime(mime_type)}</span>}
-                {file_size != null && <span title="Tamaño">📦 {formatBytes(file_size)}</span>}
-            </div>
+            <div style={{
+                display: "flex",
+                justifyContent: "space-between",
+                alignItems: "center",
+                gap: 10,
+                marginTop: 10,
+                flexWrap: "wrap",
+            }}>
+                <div style={{ display: "flex", gap: 10, alignItems: "center", color: "#374151", fontSize: 14, flexWrap: "wrap" }}>
+                    {materia_nombre && <Chip tone="blue">{materia_nombre}</Chip>}
+                    <span title="Créditos">💰 {Number(creditos) || 0}</span>
+                    {mime_type && <span title="Tipo">{iconForMime(mime_type)} {shortMime(mime_type)}</span>}
+                    {file_size != null && <span title="Tamaño">📦 {formatBytes(file_size)}</span>}
+                </div>
 
-            <div style={{ display: "flex", justifyContent: "flex-end", gap: 8, marginTop: 10 }}>
-                {isOwner ? (
-                    <>
-                        {onEdit && (
-                            <Button type="button" variant="ghost" onClick={() => onEdit(apunte)}>
-                                Editar
+                <div style={{ display: "flex", gap: 8 }}>
+                    {isOwner ? (
+                        <>
+                            {onEdit && (
+                                <Button type="button" variant="ghost" onClick={() => onEdit(apunte)}>
+                                    Editar
+                                </Button>
+                            )}
+                            {onDelete && (
+                                <Button type="button" variant="ghost" onClick={() => onDelete(apunte)}>
+                                    Eliminar
+                                </Button>
+                            )}
+                            <Button type="button" variant="secondary" onClick={handleDownload} disabled={downloading}>
+                                {downloading ? "Descargando…" : "Descargar"}
                             </Button>
-                        )}
-                        {onDelete && (
-                            <Button type="button" variant="ghost" onClick={() => onDelete(apunte)}>
-                                Eliminar
-                            </Button>
-                        )}
+                        </>
+                    ) : canDownload ? (
                         <Button type="button" variant="secondary" onClick={handleDownload} disabled={downloading}>
                             {downloading ? "Descargando…" : "Descargar"}
                         </Button>
-                    </>
-                ) : canDownload ? (
-                    <Button type="button" variant="secondary" onClick={handleDownload} disabled={downloading}>
-                        {downloading ? "Descargando…" : "Descargar"}
-                    </Button>
-                ) : onBuy ? (
-                    <Button type="button" variant="primary" onClick={handleBuy} disabled={buying}>
-                        {buying ? "Procesando…" : `Comprar · ${Number(creditos) || 0} créditos`}
-                    </Button>
-                ) : (
-                    <span style={{ color: "var(--muted)", fontSize: 13 }}>
-            Requiere compra ({Number(creditos) || 0} créditos)
-          </span>
-                )}
+                    ) : onBuy ? (
+                        <Button type="button" variant="primary" onClick={handleBuy} disabled={buying}>
+                            {buying ? "Procesando…" : `Comprar · ${Number(creditos) || 0} créditos`}
+                        </Button>
+                    ) : (
+                        <span style={{ color: "var(--muted)", fontSize: 13 }}>
+              Requiere compra ({Number(creditos) || 0} créditos)
+            </span>
+                    )}
+                </div>
             </div>
         </Card>
     );
 }
 
-/* ===== helpers ===== */
-
-function formatStars(value) {
-    const v = Number(value);
-    if (!isFinite(v) || v <= 0) return "—";
-    return v.toFixed(1);
+/* ===== placeholder portada ===== */
+function PlaceholderPage() {
+    return (
+        <div style={{
+            width: "100%",
+            height: "100%",
+            display: "grid",
+            placeItems: "center",
+            background: "linear-gradient(180deg, #f8fafc 0%, #f1f5f9 100%)",
+            position: "relative",
+        }}>
+            {/* líneas tipo hoja */}
+            <div style={{
+                position: "absolute",
+                top: 14,
+                left: 14,
+                right: 14,
+                bottom: 46,
+                background:
+                    "repeating-linear-gradient(#0000, #0000 18px, #e5e7eb 18px, #e5e7eb 19px)",
+                borderRadius: 6,
+            }} />
+            {/* ícono simple */}
+            <div style={{ fontSize: 36, opacity: .7 }}>📄</div>
+        </div>
+    );
 }
+
+/* ===== helpers (tus mismos) ===== */
 
 function shortMime(m) {
     if (!m) return "";

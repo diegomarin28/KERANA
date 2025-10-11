@@ -3,6 +3,9 @@ import { useEffect, useState } from "react";
 import { Card } from "../components/ui/Card";
 import ScrollDownHint from "../components/ScrollDownHint.jsx";
 import { Link } from "react-router-dom";
+import { supabase } from "../supabase";
+import ApunteCard from "../components/ApunteCard.jsx";
+
 
 const HERO_BG = "gradient"; // podés cambiar: "solid" | "gradient" | "radial"
 
@@ -20,6 +23,28 @@ export default function Home() {
         const t = setTimeout(() => setReveal(true), 50);
         return () => clearTimeout(t);
     }, []);
+
+    const [topNotes, setTopNotes] = useState([]);
+    const [loadingTop, setLoadingTop] = useState(true);
+
+    useEffect(() => {
+        let mounted = true;
+        (async () => {
+            try {
+                setLoadingTop(true);
+                const { data, error } = await supabase.rpc("top_apuntes_best", { limit_count: 6 });
+                if (error) throw error;
+                if (mounted) setTopNotes(data || []);
+            } catch (e) {
+                console.error(e);
+                if (mounted) setTopNotes([]);
+            } finally {
+                if (mounted) setLoadingTop(false);
+            }
+        })();
+        return () => { mounted = false; };
+    }, []);
+
 
     useEffect(() => {
         let raf = 0;
@@ -118,7 +143,81 @@ export default function Home() {
                     </div>
                 </section>
 
-                {/* Destacados */}
+                {/* Mejores apuntes (últimas 24h → 7d → rating) */}
+                <section style={{ padding: "56px 16px", background: "#fff" }}>
+                    <div style={{ width: "min(1080px, 92vw)", margin: "0 auto" }}>
+                        <h2>Mejores apuntes</h2>
+                        <p style={{ color: "#6b7280" }}>
+                            Top del momento (compras recientes y calificación).
+                        </p>
+
+                        {loadingTop ? (
+                            <div
+                                style={{
+                                    marginTop: 20,
+                                    display: "grid",
+                                    gridTemplateColumns: "repeat(3, 1fr)", // 3 por fila
+                                    gridAutoRows: "auto",
+                                    gap: 20,
+                                }}
+                            >
+                                {Array.from({ length: 6 }).map((_, i) => (
+                                    <div
+                                        key={i}
+                                        style={{
+                                            aspectRatio: "4 / 5",
+                                            borderRadius: 12,
+                                            background: "#f3f4f6",
+                                        }}
+                                    />
+                                ))}
+                            </div>
+                        ) : topNotes.length === 0 ? (
+                            <div style={{ marginTop: 16, color: "#6b7280" }}>
+                                No hay compras recientes todavía. ¡Sé el primero en descubrir nuevos apuntes!
+                            </div>
+                        ) : (
+                            <div
+                                style={{
+                                    marginTop: 20,
+                                    display: "grid",
+                                    gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", // tres columnas
+                                    gap: 20,
+                                    justifyItems: "center",
+                                }}
+                            >
+                                {topNotes.slice(0, 6).map((n) => (
+                                    <div
+                                        key={n.apunte_id}
+                                        style={{
+                                            width: "100%",        // ocupa toda la celda
+                                            maxWidth: 230,        // límite de ancho
+                                            aspectRatio: "4 / 5", // mantiene forma vertical
+                                        }}
+                                    >
+                                        <ApunteCard
+                                            apunte={{
+                                                id_apunte: n.apunte_id,
+                                                titulo: n.titulo,
+                                                portada_url: n.portada_url,
+                                                creditos: n.creditos,
+                                                rating_promedio: n.rating_promedio,
+                                                votos: n.votos,
+                                            }}
+                                            isOwner={false}
+                                            hasPurchased={false}
+                                            onBuy={null}
+                                        />
+                                    </div>
+                                ))}
+                            </div>
+                        )}
+                    </div>
+                </section>
+
+
+
+                {/* Destacados */} {/*
                 <section style={{ padding: "56px 16px" }}>
                     <div style={{ width: "min(1080px, 92vw)", margin: "0 auto" }}>
                         <h2>Material destacado</h2>
@@ -147,6 +246,7 @@ export default function Home() {
                         </div>
                     </div>
                 </section>
+                */}
 
                 {/* Footer */}
                 <section
