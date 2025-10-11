@@ -5,6 +5,7 @@ import { Card } from '../components/ui/Card';
 import { Button } from '../components/ui/Button';
 import emailjs from '@emailjs/browser';
 
+
 export default function MentorApply() {
     const navigate = useNavigate();
     const [loading, setLoading] = useState(false);
@@ -58,7 +59,7 @@ export default function MentorApply() {
     }, [searchTerm, materias]);
 
     const fetchMaterias = async () => {
-        const { data, error } = await supabase
+        const { data: materiasData, error } = await supabase
             .from('materia')
             .select('id_materia, nombre_materia, semestre')
             .order('nombre_materia');
@@ -67,7 +68,7 @@ export default function MentorApply() {
             console.error('Error cargando materias:', error);
             return;
         }
-        setMaterias(data || []);
+        setMaterias(materiasData || []);
     };
 
     const handleMateriaSelect = (materia) => {
@@ -100,7 +101,7 @@ export default function MentorApply() {
         const fileName = `${user.id}_${selectedMateria.id_materia}_${Date.now()}.${fileExt}`;
         const filePath = `${fileName}`;
 
-        const { data, error } = await supabase.storage
+        const { data: _uploadData, error } = await supabase.storage
             .from('mentor-comprobantes')
             .upload(filePath, file);
 
@@ -122,6 +123,11 @@ export default function MentorApply() {
             return;
         }
 
+        if (!Number.isInteger(Number(formData.calificacion))) {
+            setError('La calificación debe ser un número entero');
+            return;
+        }
+
         if (!formData.comprobante) {
             setError('Debes subir un comprobante de tu escolaridad');
             return;
@@ -139,7 +145,7 @@ export default function MentorApply() {
 
             const { data: usuarioData } = await supabase
                 .from('usuario')
-                .select('id_usuario')
+                .select('id_usuario, nombre, email')
                 .eq('auth_id', user.id)
                 .single();
 
@@ -165,7 +171,7 @@ export default function MentorApply() {
 
             if (insertError) throw insertError;
 
-// ✅ ENVIAR EMAIL DE NOTIFICACIÓN
+            // ✅ ENVIAR EMAIL DE NOTIFICACIÓN AL ADMIN
             try {
                 await emailjs.send(
                     "service_dan74a5",
@@ -181,7 +187,7 @@ export default function MentorApply() {
                             `Materia: ${selectedMateria.nombre_materia}\n` +
                             `Calificación: ${formData.calificacion}\n\n` +
                             `Revisa en Supabase: https://supabase.com/dashboard/project/cfmcvslstfryhapvsztu/editor`,
-                        to_email: "tu-email-admin@gmail.com", // 👈 TU EMAIL
+                        to_email: "tu-email-admin@gmail.com",
                         subject: "📚 Nueva aplicación de mentor - Kerana"
                     },
                     "DMO310micvFWXx-j4"
@@ -189,7 +195,6 @@ export default function MentorApply() {
                 console.log('✅ Notificación enviada por email');
             } catch (emailError) {
                 console.log('❌ Email falló pero aplicación se guardó:', emailError);
-                // No bloqueamos si el email falla
             }
 
             alert('¡Postulación enviada con éxito! Te notificaremos cuando sea revisada.');
@@ -203,6 +208,47 @@ export default function MentorApply() {
             setUploading(false);
         }
     };
+
+    // ------------------ Listener de aprobación ------------------
+    useEffect(() => {
+        const subscription = supabase
+            .from('mentor_aplicacion')
+            .on('UPDATE', async (payload) => {
+                const newRow = payload.new;
+                const oldRow = payload.old;
+
+                if (newRow.estado === 'aprobado' && oldRow.estado !== 'aprobado') {
+                    try {
+                        const { data: usuario } = await supabase
+                            .from('usuario')
+                            .select('nombre, email')
+                            .eq('id_usuario', newRow.id_usuario)
+                            .single();
+
+                        await emailjs.send(
+                            "service_dan74a5",
+                            "template_aprobacion_mentor",
+                            {
+                                user_email: usuario.email,
+                                user_name: usuario.nombre || usuario.email,
+                                materia_nombre: selectedMateria?.nombre_materia || '',
+                                message: `¡Felicidades! Tu postulación para ser mentor fue aprobada.`,
+                                subject: "✅ Tu aplicación fue aprobada - Kerana"
+                            },
+                            "DMO310micvFWXx-j4"
+                        );
+                        console.log('✅ Email de aprobación enviado al usuario');
+                    } catch (err) {
+                        console.error('Error enviando email de aprobación:', err);
+                    }
+                }
+            })
+            .subscribe();
+
+        return () => {
+            supabase.removeSubscription(subscription);
+        };
+    }, [selectedMateria]);
     return (
         <div style={{ maxWidth: 700, margin: '0 auto', padding: 20 }}>
             <h1 style={{ marginBottom: 12 }}>Postulate como Mentor</h1>
@@ -285,9 +331,9 @@ export default function MentorApply() {
                         </label>
                         <input
                             type="number"
-                            min="8"
+                               min="8"
                             max="12"
-                            step="0.1"
+                            step="any"
                             value={formData.calificacion}
                             onChange={(e) => setFormData({ ...formData, calificacion: e.target.value })}
                             placeholder="Ej: 10"
