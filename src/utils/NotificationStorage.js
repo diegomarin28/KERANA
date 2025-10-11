@@ -1,3 +1,5 @@
+// src/utils/notificationStorage.js
+
 const LAST_VISIT_KEY = 'kerana_last_notification_visit';
 const SEEN_NOTIFICATIONS_KEY = 'kerana_seen_notifications';
 
@@ -76,68 +78,3 @@ export const notificationStorage = {
         ).length;
     }
 };
-
-// ============================================
-// Uso en NotificationsContext.jsx:
-// ============================================
-
-import { notificationStorage } from '../utils/notificationStorage';
-
-export function NotificationsProvider({ children }) {
-    // ... código existente ...
-
-    // ✅ Guardar última visita al cargar
-    useEffect(() => {
-        notificationStorage.saveLastVisit();
-    }, []);
-
-    // ✅ Agregar función para obtener nuevas
-    const obtenerNuevasDesdeUltimaVisita = useCallback(() => {
-        return notificationStorage.countNewSinceLastVisit(notificaciones);
-    }, [notificaciones]);
-
-    const value = {
-        // ... valores existentes ...
-        obtenerNuevasDesdeUltimaVisita,
-    };
-
-    // ...
-}
-
-// ============================================
-// Uso en NotificationBadge.jsx:
-// ============================================
-
-export default function NotificationBadge() {
-    const {
-        notificaciones,
-        unreadCount,
-        obtenerNuevasDesdeUltimaVisita
-    } = useNotificationsContext();
-
-    const nuevasCount = obtenerNuevasDesdeUltimaVisita();
-
-    return (
-        <div>
-            {/* Badge existente */}
-
-            {/* ✅ Indicador de "nuevas desde última visita" */}
-            {nuevasCount > 0 && (
-                <div style={{
-                    position: 'absolute',
-                    bottom: -4,
-                    left: -4,
-                    background: '#10b981',
-                    color: '#fff',
-                    fontSize: 9,
-                    fontWeight: 700,
-                    padding: '2px 4px',
-                    borderRadius: 4,
-                    border: '1px solid #13346b',
-                }}>
-                    {nuevasCount} nuevas
-                </div>
-            )}
-        </div>
-    );
-}

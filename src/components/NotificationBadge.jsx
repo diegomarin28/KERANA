@@ -1,16 +1,15 @@
 import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useNotificationsContext } from '../contexts/NotificationsContext';
-import useTabBadge from '../hooks/useTabBadge';
+import { useTabBadge } from '../hooks/useTabBadge';
 import { getNotificationRoute, isNotificationClickable } from '../utils/notificationRouter';
 
 export default function NotificationBadge() {
     const [isOpen, setIsOpen] = useState(false);
+    const [shouldAnimate, setShouldAnimate] = useState(false);
     const dropdownRef = useRef(null);
     const navigate = useNavigate();
-
-
-
+    const prevUnreadCount = useRef(0);
 
     const {
         notificaciones,
@@ -18,10 +17,19 @@ export default function NotificationBadge() {
         loading,
         marcarComoLeida,
         marcarTodasLeidas,
-        cargarNotificaciones
-    } =useNotificationsContext();
+    } = useNotificationsContext();
 
+    // Tab badge para título del navegador
     useTabBadge(unreadCount);
+
+    // ✨ Animación cuando aumenta el contador
+    useEffect(() => {
+        if (unreadCount > prevUnreadCount.current && prevUnreadCount.current !== 0) {
+            setShouldAnimate(true);
+            setTimeout(() => setShouldAnimate(false), 600);
+        }
+        prevUnreadCount.current = unreadCount;
+    }, [unreadCount]);
 
     // Cerrar con ESC
     useEffect(() => {
@@ -52,8 +60,7 @@ export default function NotificationBadge() {
             await marcarComoLeida(notif.id);
         }
         setIsOpen(false);
-        // Aquí podrías navegar según el tipo de notificación
-        // Por ahora solo cierra el modal
+        // Aquí podrías navegar según el tipo usando notificationRouter
     };
 
     const handleVerTodas = () => {
@@ -65,14 +72,19 @@ export default function NotificationBadge() {
         await marcarTodasLeidas();
     };
 
-    // Últimas 5 notificaciones
+    const handleSettings = () => {
+        setIsOpen(false);
+        navigate('/settings');
+    };
+
     const recentNotifications = notificaciones.slice(0, 5);
 
     return (
         <div ref={dropdownRef} style={{ position: 'relative' }}>
-            {/* Botón Badge */}
+            {/* Botón Badge con animación */}
             <button
                 onClick={() => setIsOpen(!isOpen)}
+                className={shouldAnimate ? 'badge-bounce' : ''}
                 style={{
                     position: 'relative',
                     width: 40,
@@ -104,7 +116,7 @@ export default function NotificationBadge() {
                     />
                 </svg>
 
-                {/* Contador */}
+                {/* Contador con animación */}
                 {unreadCount > 0 && (
                     <span style={{
                         position: 'absolute',
@@ -122,8 +134,8 @@ export default function NotificationBadge() {
                         placeItems: 'center',
                         border: '2px solid #13346b',
                     }}>
-            {unreadCount > 99 ? '99+' : unreadCount}
-          </span>
+                        {unreadCount > 99 ? '99+' : unreadCount}
+                    </span>
                 )}
             </button>
 
@@ -142,7 +154,7 @@ export default function NotificationBadge() {
                     zIndex: 9999,
                     animation: 'slideDown 0.2s ease-out',
                 }}>
-                    {/* Header del dropdown */}
+                    {/* Header */}
                     <div style={{
                         padding: '16px 20px',
                         borderBottom: '1px solid #e5e7eb',
@@ -240,7 +252,7 @@ export default function NotificationBadge() {
                                         e.currentTarget.style.background = notif.leida ? '#fff' : '#f0f9ff';
                                     }}
                                 >
-                                    {/* Avatar del emisor */}
+                                    {/* Avatar */}
                                     {notif.emisor?.foto ? (
                                         <img
                                             src={notif.emisor.foto}
@@ -286,8 +298,8 @@ export default function NotificationBadge() {
                                             fontSize: 11,
                                             color: '#94a3b8',
                                         }}>
-                      {formatTimeAgo(notif.creado_en)}
-                    </span>
+                                            {formatTimeAgo(notif.creado_en)}
+                                        </span>
                                     </div>
 
                                     {/* Indicador no leída */}
@@ -306,37 +318,60 @@ export default function NotificationBadge() {
                         )}
                     </div>
 
-                    {/* Footer con botón "Ver todas" */}
+                    {/* Footer con botones */}
                     {recentNotifications.length > 0 && (
                         <div style={{
                             padding: '12px 20px',
                             borderTop: '1px solid #e5e7eb',
                             background: '#f9fafb',
-                            textAlign: 'center',
                         }}>
-                            <button
-                                onClick={handleVerTodas}
-                                style={{
-                                    width: '100%',
-                                    padding: '8px 16px',
-                                    fontSize: 14,
-                                    fontWeight: 600,
-                                    color: '#2563eb',
-                                    background: 'none',
-                                    border: 'none',
-                                    borderRadius: 6,
-                                    cursor: 'pointer',
-                                    transition: 'all 0.2s ease',
-                                }}
-                                onMouseEnter={(e) => {
-                                    e.target.style.background = '#eff6ff';
-                                }}
-                                onMouseLeave={(e) => {
-                                    e.target.style.background = 'none';
-                                }}
-                            >
-                                Ver todas las notificaciones →
-                            </button>
+                            <div style={{ display: 'flex', gap: 8 }}>
+                                <button
+                                    onClick={handleVerTodas}
+                                    style={{
+                                        flex: 1,
+                                        padding: '8px 16px',
+                                        fontSize: 14,
+                                        fontWeight: 600,
+                                        color: '#2563eb',
+                                        background: 'none',
+                                        border: 'none',
+                                        borderRadius: 6,
+                                        cursor: 'pointer',
+                                        transition: 'all 0.2s ease',
+                                    }}
+                                    onMouseEnter={(e) => {
+                                        e.target.style.background = '#eff6ff';
+                                    }}
+                                    onMouseLeave={(e) => {
+                                        e.target.style.background = 'none';
+                                    }}
+                                >
+                                    Ver todas →
+                                </button>
+                                <button
+                                    onClick={handleSettings}
+                                    style={{
+                                        padding: '8px 16px',
+                                        fontSize: 14,
+                                        fontWeight: 600,
+                                        color: '#64748b',
+                                        background: 'none',
+                                        border: 'none',
+                                        borderRadius: 6,
+                                        cursor: 'pointer',
+                                        transition: 'all 0.2s ease',
+                                    }}
+                                    onMouseEnter={(e) => {
+                                        e.target.style.background = '#f1f5f9';
+                                    }}
+                                    onMouseLeave={(e) => {
+                                        e.target.style.background = 'none';
+                                    }}
+                                >
+                                    ⚙️
+                                </button>
+                            </div>
                         </div>
                     )}
                 </div>
@@ -379,6 +414,14 @@ if (typeof document !== 'undefined' && !document.getElementById('notification-an
     @keyframes spin {
       from { transform: rotate(0deg); }
       to { transform: rotate(360deg); }
+    }
+    @keyframes badge-bounce {
+      0%, 100% { transform: scale(1); }
+      25% { transform: scale(1.15) rotate(-5deg); }
+      75% { transform: scale(1.05) rotate(5deg); }
+    }
+    .badge-bounce {
+      animation: badge-bounce 0.6s ease-out;
     }
   `;
     document.head.appendChild(style);

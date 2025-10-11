@@ -2,6 +2,8 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useNotificationSettings } from '../hooks/useNotificationSettings';
+import { usePrivacySettings } from '../hooks/usePrivacySettings';
+import { downloadUserData, getUserDataSummary } from '../utils/exportUserData';
 import { supabase } from '../supabase';
 
 const TAB_STORAGE_KEY = 'kerana_settings_active_tab';
@@ -290,12 +292,20 @@ function NotificationsTab({ settings, toggleSetting, resetToDefault, notificatio
                         onChange={() => toggleSetting('badge')}
                         icon="🔔"
                     />
+                    <SettingToggle
+                        label="Email"
+                        description="Resumen diario (próximamente)"
+                        checked={settings.email}
+                        onChange={() => toggleSetting('email')}
+                        icon="📧"
+                        disabled={true}
+                    />
                 </div>
             </Card>
 
             {/* Tipos de notificaciones */}
             <Card title="Tipos de Notificaciones">
-                <div style={{ display: 'grid', gap: 5 ,alignContent: "start", gridAutoRows: "minmax(20px, auto)",}}>
+                <div style={{ display: 'grid', gap: 10 }}>
                     {notificationTypes.map(type => (
                         <SettingToggle
                             key={type.key}
@@ -335,34 +345,80 @@ function NotificationsTab({ settings, toggleSetting, resetToDefault, notificatio
 // TAB: PRIVACIDAD
 // ============================================
 function PrivacyTab({ navigate }) {
-    const [perfilPublico, setPerfilPublico] = useState(true);
-    const [mostrarEmail, setMostrarEmail] = useState(false);
-    const [permitirMensajes, setPermitirMensajes] = useState(true);
+    const {
+        settings,
+        loading,
+        saving,
+        togglePerfilPublico,
+        toggleMostrarEmail,
+        togglePermitirMensajes
+    } = usePrivacySettings();
+
+    const [saveMessage, setSaveMessage] = useState('');
+
+    const handleToggle = async (toggleFunction, settingName) => {
+        const success = await toggleFunction();
+        if (success) {
+            setSaveMessage(`✅ ${settingName} actualizado`);
+            setTimeout(() => setSaveMessage(''), 2000);
+        } else {
+            setSaveMessage(`❌ Error actualizando ${settingName}`);
+            setTimeout(() => setSaveMessage(''), 3000);
+        }
+    };
+
+    if (loading) {
+        return (
+            <Card title="Privacidad del Perfil">
+                <p style={{ color: '#64748b', textAlign: 'center', padding: 20 }}>
+                    Cargando configuración...
+                </p>
+            </Card>
+        );
+    }
 
     return (
         <>
+            {saveMessage && (
+                <div style={{
+                    padding: '12px 16px',
+                    marginBottom: 16,
+                    borderRadius: 8,
+                    background: saveMessage.includes('✅') ? '#d1fae5' : '#fee2e2',
+                    color: saveMessage.includes('✅') ? '#065f46' : '#991b1b',
+                    fontSize: 13,
+                    fontWeight: 600,
+                    textAlign: 'center',
+                }}>
+                    {saveMessage}
+                </div>
+            )}
+
             <Card title="Privacidad del Perfil">
                 <div style={{ display: 'grid', gap: 10 }}>
                     <SettingToggle
                         label="Perfil público"
                         description="Otros usuarios pueden ver tu perfil"
-                        checked={perfilPublico}
-                        onChange={() => setPerfilPublico(!perfilPublico)}
+                        checked={settings.perfil_publico}
+                        onChange={() => handleToggle(togglePerfilPublico, 'Perfil público')}
                         icon="👁️"
+                        disabled={saving}
                     />
                     <SettingToggle
                         label="Mostrar email"
                         description="Email visible en tu perfil"
-                        checked={mostrarEmail}
-                        onChange={() => setMostrarEmail(!mostrarEmail)}
+                        checked={settings.mostrar_email}
+                        onChange={() => handleToggle(toggleMostrarEmail, 'Mostrar email')}
                         icon="📧"
+                        disabled={saving}
                     />
                     <SettingToggle
                         label="Mensajes directos"
                         description="Permitir que te contacten"
-                        checked={permitirMensajes}
-                        onChange={() => setPermitirMensajes(!permitirMensajes)}
+                        checked={settings.permitir_mensajes}
+                        onChange={() => handleToggle(togglePermitirMensajes, 'Mensajes directos')}
                         icon="💬"
+                        disabled={saving}
                     />
                 </div>
             </Card>

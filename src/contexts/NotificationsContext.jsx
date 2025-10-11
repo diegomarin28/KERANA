@@ -1,7 +1,9 @@
-import { createContext, useContext, useState, useCallback, useEffect } from 'react';
-import { notificationsAPI } from '../api/notifications';
 
-const NotificationsContext = createContext(null);
+import { createContext, useContext, useState, useEffect, useCallback } from 'react';
+import { notificationsAPI } from '../api/database';
+import { notificationStorage } from '../utils/notificationStorage';
+
+const NotificationsContext = createContext();
 
 export function useNotificationsContext() {
     const context = useContext(NotificationsContext);
@@ -13,133 +15,132 @@ export function useNotificationsContext() {
 
 export function NotificationsProvider({ children }) {
     const [notificaciones, setNotificaciones] = useState([]);
-    const [loading, setLoading] = useState(false);
-    const [error, setError] = useState(null);
     const [unreadCount, setUnreadCount] = useState(0);
+    const [newSinceLastVisit, setNewSinceLastVisit] = useState(0);
+    const [newSinceLastVisitMessage, setNewSinceLastVisitMessage] = useState('');
+    const [loading, setLoading] = useState(true);
 
-    // Cargar notificaciones
-    const cargarNotificaciones = useCallback(async (limit = 50) => {
+    const cargarNotificaciones = useCallback(async () => {
         try {
             setLoading(true);
-            setError(null);
+            const { data, error } = await notificationsAPI.getMyNotifications();
 
-            const result = await notificationsAPI.obtenerMisNotificaciones(limit);
-
-            if (result.error) {
-                setError(result.error);
-                return { data: [], error: result.error };
+            if (error) {
+                console.error('Error cargando notificaciones:', error);
+                return;
             }
 
-            setNotificaciones(result.data);
+            setNotificaciones(data || []);
 
-            // Calcular no leídas
-            const noLeidas = result.data.filter(n => !n.leida).length;
-            setUnreadCount(noLeidas);
+            // ✅ Calcular nuevas desde última visita usando TU storage
+            const count = notificationStorage.countNewSinceLastVisit(data || []);
+            setNewSinceLastVisit(count);
 
-            return { data: result.data, error: null };
-        } catch (e) {
-            const errorMsg = e.message || 'Error cargando notificaciones';
-            setError(errorMsg);
-            return { data: [], error: errorMsg };
+            // Generar mensaje
+            let message = '';
+            if (count === 1) {
+                message = '1 nueva desde tu última visita';
+            } else if (count > 1) {
+                message = `${count} nuevas desde tu última visita`;
+            }
+            setNewSinceLastVisitMessage(message);
+        } catch (error) {
+            console.error('Error en cargarNotificaciones:', error);
         } finally {
             setLoading(false);
         }
     }, []);
 
-    // Contar no leídas
     const contarNoLeidas = useCallback(async () => {
         try {
-            const result = await notificationsAPI.contarNoLeidas();
-            setUnreadCount(result.count);
-            return result.count;
-        } catch (e) {
-            console.error('[NotificationsContext] Error contando:', e);
-            return 0;
-        }
-    }, []);
-
-    // Marcar como leída
-    const marcarComoLeida = useCallback(async (notifId) => {
-        try {
-            const result = await notificationsAPI.marcarComoLeida(notifId);
-
-            if (result.success) {
-                // Actualizar estado local
-                setNotificaciones(prev =>
-                    prev.map(n => n.id === notifId ? { ...n, leida: true } : n)
-                );
-                setUnreadCount(prev => Math.max(0, prev - 1));
+            const { data, error } = await notificationsAPI.getUnreadCount();
+            if (!error) {
+                setUnreadCount(data || 0);
             }
-
-            return result;
-        } catch (e) {
-            console.error('[NotificationsContext] Error marcando:', e);
-            return { success: false, error: e.message };
+        } catch (error) {
+            console.error('Error contando no leídas:', error);
         }
     }, []);
 
-    // Marcar todas como leídas
+    const marcarComoLeida = useCallback(async (notificationId) => {
+        try {
+            const { error } = await notificationsAPI.markAsRead(notificationId);
+            if (!error) {
+                setNotificaciones(prev =>
+                    prev.map(n => n.id === notificationId ? { ...n, leida: true } : n)
+                );
+                await contarNoLeidas();
+
+                // ✅ Marcar como vista en storage
+                notificationStorage.markAsSeen(notificationId);
+            }
+        } catch (error) {
+            console.error('Error marcando como leída:', error);
+        }
+    }, [contarNoLeidas]);
+
     const marcarTodasLeidas = useCallback(async () => {
         try {
-            const result = await notificationsAPI.marcarTodasLeidas();
-
-            if (result.success) {
-                // Actualizar estado local
-                setNotificaciones(prev =>
-                    prev.map(n => ({ ...n, leida: true }))
-                );
+            const { error } = await notificationsAPI.markAllAsRead();
+            if (!error) {
+                setNotificaciones(prev => prev.map(n => ({ ...n, leida: true })));
                 setUnreadCount(0);
+                setNewSinceLastVisit(0);
+                setNewSinceLastVisitMessage('');
+
+                // ✅ Marcar todas como vistas en storage
+                notificaciones.forEach(n => notificationStorage.markAsSeen(n.id));
             }
-
-            return result;
-        } catch (e) {
-            console.error('[NotificationsContext] Error marcando todas:', e);
-            return { success: false, error: e.message };
-        }
-    }, []);
-
-    // Eliminar notificación
-    const eliminarNotificacion = useCallback(async (notifId) => {
-        try {
-            const result = await notificationsAPI.eliminarNotificacion(notifId);
-
-            if (result.success) {
-                // Si no estaba leída, restar del contador
-                const notif = notificaciones.find(n => n.id === notifId);
-                if (notif && !notif.leida) {
-                    setUnreadCount(prev => Math.max(0, prev - 1));
-                }
-
-                // Actualizar estado local
-                setNotificaciones(prev => prev.filter(n => n.id !== notifId));
-            }
-
-            return result;
-        } catch (e) {
-            console.error('[NotificationsContext] Error eliminando:', e);
-            return { success: false, error: e.message };
+        } catch (error) {
+            console.error('Error marcando todas como leídas:', error);
         }
     }, [notificaciones]);
 
-    // Auto-cargar al montar
+    const eliminarNotificacion = useCallback(async (notificationId) => {
+        try {
+            setNotificaciones(prev => prev.filter(n => n.id !== notificationId));
+            await contarNoLeidas();
+        } catch (error) {
+            console.error('Error eliminando notificación:', error);
+        }
+    }, [contarNoLeidas]);
+
+    // ✅ Marcar visita cuando se abre la página de notificaciones
+    const marcarVisita = useCallback(() => {
+        notificationStorage.saveLastVisit();
+        setNewSinceLastVisit(0);
+        setNewSinceLastVisitMessage('');
+    }, []);
+
+    // ✅ Incrementar contador cuando llega notificación nueva (llamar desde Realtime)
+    const onNuevaNotificacion = useCallback(() => {
+        setNewSinceLastVisit(prev => prev + 1);
+        // Actualizar mensaje
+        const newCount = newSinceLastVisit + 1;
+        const message = newCount === 1
+            ? '1 nueva desde tu última visita'
+            : `${newCount} nuevas desde tu última visita`;
+        setNewSinceLastVisitMessage(message);
+    }, [newSinceLastVisit]);
+
     useEffect(() => {
         cargarNotificaciones();
         contarNoLeidas();
     }, [cargarNotificaciones, contarNoLeidas]);
 
     const value = {
-        // Estado
         notificaciones,
-        loading,
-        error,
         unreadCount,
-
-        // Acciones
+        newSinceLastVisit,
+        newSinceLastVisitMessage,
+        loading,
         cargarNotificaciones,
         contarNoLeidas,
         marcarComoLeida,
         marcarTodasLeidas,
         eliminarNotificacion,
+        marcarVisita,
+        onNuevaNotificacion,
     };
 
     return (
