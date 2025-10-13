@@ -2,11 +2,13 @@ import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '../supabase';
 import { Card } from '../components/ui/Card';
+import PDFThumbnail from '../components/PDFThumbnail';
 
 export default function Notes() {
     const [notes, setNotes] = useState([]);
     const [loading, setLoading] = useState(true);
     const [searchTerm, setSearchTerm] = useState('');
+    const [signedUrls, setSignedUrls] = useState({}); // 🆕 Estado para signed URLs
     const navigate = useNavigate();
 
     useEffect(() => {
@@ -24,6 +26,7 @@ export default function Notes() {
                     creditos,
                     estrellas,
                     created_at,
+                    file_path,
                     usuario:id_usuario(nombre),
                     materia:id_materia(nombre_materia)
                 `)
@@ -32,6 +35,23 @@ export default function Notes() {
 
             if (error) throw error;
             setNotes(data || []);
+
+            // 🆕 Generar signed URLs para todos los apuntes
+            if (data && data.length > 0) {
+                const urls = {};
+                for (const note of data) {
+                    if (note.file_path) {
+                        const { data: signedData, error: signedError } = await supabase.storage
+                            .from('apuntes')
+                            .createSignedUrl(note.file_path, 3600); // Válida por 1 hora
+
+                        if (!signedError && signedData) {
+                            urls[note.id_apunte] = signedData.signedUrl;
+                        }
+                    }
+                }
+                setSignedUrls(urls);
+            }
         } catch (err) {
             console.error('Error cargando apuntes:', err);
         } finally {
@@ -90,16 +110,17 @@ export default function Notes() {
             ) : (
                 <div style={{
                     display: 'grid',
-                    gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))',
+                    gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))',
                     gap: 20
                 }}>
                     {filteredNotes.map(note => (
                         <Card
                             key={note.id_apunte}
                             style={{
-                                padding: 20,
+                                padding: 0,
                                 cursor: 'pointer',
-                                transition: 'transform 0.2s, box-shadow 0.2s'
+                                transition: 'transform 0.2s, box-shadow 0.2s',
+                                overflow: 'hidden'
                             }}
                             onClick={() => navigate(`/apuntes/${note.id_apunte}`)}
                             onMouseEnter={(e) => {
@@ -111,7 +132,15 @@ export default function Notes() {
                                 e.currentTarget.style.boxShadow = 'none';
                             }}
                         >
-                            <div style={{ marginBottom: 12 }}>
+                            {/* 🆕 Vista previa del PDF */}
+                            <PDFThumbnail
+                                url={signedUrls[note.id_apunte] || null}
+                                width={280}
+                                height={160}
+                            />
+
+                            {/* Contenido de la card */}
+                            <div style={{ padding: 16 }}>
                                 <h3 style={{ margin: '0 0 8px 0', fontSize: 16 }}>
                                     {note.titulo}
                                 </h3>
@@ -119,7 +148,8 @@ export default function Notes() {
                                     display: 'flex',
                                     alignItems: 'center',
                                     gap: 8,
-                                    marginBottom: 8
+                                    marginBottom: 8,
+                                    flexWrap: 'wrap'
                                 }}>
                                     <span style={{
                                         padding: '2px 8px',
@@ -137,41 +167,41 @@ export default function Notes() {
                                         </span>
                                     )}
                                 </div>
-                            </div>
 
-                            {note.descripcion && (
-                                <p style={{
-                                    color: '#6b7280',
-                                    fontSize: 14,
-                                    marginBottom: 12,
-                                    lineHeight: 1.4
-                                }}>
-                                    {note.descripcion.length > 100
-                                        ? note.descripcion.substring(0, 100) + '...'
-                                        : note.descripcion}
-                                </p>
-                            )}
+                                {note.descripcion && (
+                                    <p style={{
+                                        color: '#6b7280',
+                                        fontSize: 14,
+                                        marginBottom: 12,
+                                        lineHeight: 1.4
+                                    }}>
+                                        {note.descripcion.length > 80
+                                            ? note.descripcion.substring(0, 80) + '...'
+                                            : note.descripcion}
+                                    </p>
+                                )}
 
-                            <div style={{
-                                display: 'flex',
-                                justifyContent: 'space-between',
-                                alignItems: 'center',
-                                paddingTop: 12,
-                                borderTop: '1px solid #e5e7eb'
-                            }}>
-                                <span style={{ fontSize: 13, color: '#6b7280' }}>
-                                    Por {note.usuario?.nombre || 'Anónimo'}
-                                </span>
-                                <span style={{
-                                    padding: '4px 10px',
-                                    background: '#fef3c7',
-                                    color: '#92400e',
-                                    borderRadius: 12,
-                                    fontSize: 12,
-                                    fontWeight: 600
+                                <div style={{
+                                    display: 'flex',
+                                    justifyContent: 'space-between',
+                                    alignItems: 'center',
+                                    paddingTop: 12,
+                                    borderTop: '1px solid #e5e7eb'
                                 }}>
-                                    {note.creditos} créditos
-                                </span>
+                                    <span style={{ fontSize: 13, color: '#6b7280' }}>
+                                        Por {note.usuario?.nombre || 'Anónimo'}
+                                    </span>
+                                    <span style={{
+                                        padding: '4px 10px',
+                                        background: '#fef3c7',
+                                        color: '#92400e',
+                                        borderRadius: 12,
+                                        fontSize: 12,
+                                        fontWeight: 600
+                                    }}>
+                                        {note.creditos} 💰
+                                    </span>
+                                </div>
                             </div>
                         </Card>
                     ))}
