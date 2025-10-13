@@ -349,7 +349,7 @@
                                     }
                                 }}
                                 onBlur={() => {
-                                    // Validar el rango cuando el input pierde foco
+                                    // Validar el rango cuando el input se va del rango
                                     const num = Number(formData.calificacion);
                                     if (formData.calificacion !== '' && (num < 8 || num > 12)) {
                                         setError('Por favor ingrese un valor entre 8 y 12');
