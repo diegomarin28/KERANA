@@ -771,7 +771,7 @@ export default function Header() {
                         ? {
                             name: displayName,
                             email: user.email,
-                            avatarUrl: userProfile?.foto,
+                            avatarUrl: getAppAvatarSrc(userProfile?.foto) || null,  // ← CAMBIO AQUÍ
                             credits: userProfile?.creditos || 0,
                             followers: 0,
                             following: 0,
