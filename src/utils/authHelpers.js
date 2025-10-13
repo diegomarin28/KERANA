@@ -92,7 +92,7 @@ export async function createOrUpdateUserProfile(authUser, extras = {}) {
             correo: authUser.email,
             nombre,
             username,
-            foto: fotoFromMeta,
+            foto: extras.foto || fotoFromMeta || null,
             creditos: 10, // créditos iniciales
             fecha_creado: new Date().toISOString(),
         };

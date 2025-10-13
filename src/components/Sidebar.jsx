@@ -119,17 +119,37 @@ export default function Sidebar({ open, onClose, isAuthenticated, user, onLogout
                         tabIndex={0}
                         onKeyDown={(e) => e.key === 'Enter' && go("/profile")}
                     >
-                        {user?.avatarUrl ? (
-                            <img
-                                src={user.avatarUrl}
-                                alt={username}
-                                style={avatarImageStyle}
-                            />
-                        ) : (
-                            <div style={avatarFallbackStyle}>
-                                {letter}
-                            </div>
-                        )}
+                        {(() => {
+                            const avatarUrl = user?.avatarUrl;
+                            const hasValidUrl = avatarUrl && (
+                                avatarUrl.startsWith('http://') ||
+                                avatarUrl.startsWith('https://')
+                            );
+
+                            return (
+                                <>
+                                    {hasValidUrl ? (
+                                        <img
+                                            src={avatarUrl}
+                                            alt={username}
+                                            style={avatarImageStyle}
+                                            onError={(e) => {
+                                                e.target.style.display = 'none';
+                                                if (e.target.nextSibling) {
+                                                    e.target.nextSibling.style.display = 'grid';
+                                                }
+                                            }}
+                                        />
+                                    ) : null}
+                                    <div style={{
+                                        ...avatarFallbackStyle,
+                                        display: hasValidUrl ? 'none' : 'grid'
+                                    }}>
+                                        {letter}
+                                    </div>
+                                </>
+                            );
+                        })()}
 
                         <div style={{ overflow: "hidden" }}>
                             <div style={usernameStyle}>
@@ -470,7 +490,7 @@ const statLinkStyle = {
     padding: "4px 6px",
     borderRadius: 6,
     transition: "background 0.2s ease",
-    minWidth: 45
+    minWidth: 45,
 };
 
 function Badge({ children }) {
