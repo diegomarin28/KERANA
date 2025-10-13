@@ -14,3 +14,17 @@ body {
     margin: 0;
     padding: 0;
 }
+
+/* Quitar flechitas de los inputs numéricos */
+
+/* Chrome, Safari, Edge, Opera */
+input[type=number]::-webkit-outer-spin-button,
+input[type=number]::-webkit-inner-spin-button {
+    -webkit-appearance: none !important;
+    margin: 0 !important;
+}
+
+/* Firefox */
+input[type=number] {
+    -moz-appearance: textfield !important;
+}
