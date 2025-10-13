@@ -2,6 +2,7 @@
 import { supabase } from '../supabase'
 import emailjs from '@emailjs/browser';
 
+
 // ==========================================
 // 🧑‍🎓 USUARIOS
 // ==========================================
@@ -10,11 +11,10 @@ export const userAPI = {
         const { data: { user } } = await supabase.auth.getUser()
         if (!user) return { data: null, error: 'No hay usuario logueado' }
 
-        // CORREGIDO: buscar por auth_id en lugar de id
         const { data, error } = await supabase
             .from('usuario')
             .select('*')
-            .eq('auth_id', user.id)  // ← CAMBIAR A auth_id
+            .eq('auth_id', user.id)
             .single()
 
         return { data, error }
@@ -27,7 +27,7 @@ export const userAPI = {
         const { data, error } = await supabase
             .from('usuario')
             .insert([{
-                auth_id: user.id,  // ← CAMBIAR A auth_id
+                auth_id: user.id,
                 correo: user.email,
                 ...profileData
             }])
@@ -43,12 +43,13 @@ export const userAPI = {
         const { data, error } = await supabase
             .from('usuario')
             .update(profileData)
-            .eq('auth_id', user.id)  // ← CAMBIAR A auth_id
+            .eq('auth_id', user.id)
             .select()
 
         return { data, error }
     }
 }
+
 // ==========================================
 // 🎓 MATERIAS Y CONTENIDO
 // ==========================================
@@ -107,7 +108,6 @@ async function searchProfessors(term) {
     if (!q) return { data: [], error: null };
 
     try {
-        // ✅ USAR RPC CON SIMILITUD
         const { data: profesores, error } = await supabase
             .rpc('buscar_profesores_sin_tildes', { termino: q });
 
@@ -165,7 +165,6 @@ async function searchNotes(term) {
     if (!q) return { data: [], error: null };
 
     try {
-        // ✅ USAR RPC CON SIMILITUD
         const { data: apuntes, error } = await supabase
             .rpc('buscar_apuntes_sin_tildes', { termino: q });
 
@@ -221,7 +220,6 @@ async function searchUsers(term) {
     if (!q) return { data: [], error: null };
 
     try {
-        // ✅ OBTENER MI ID PRIMERO
         const { data: miIdData } = await supabase.rpc('obtener_usuario_actual_id');
         const miId = miIdData || null;
 
@@ -233,7 +231,6 @@ async function searchUsers(term) {
             return { data: [], error };
         }
 
-        // ✅ FILTRAR MI PROPIO USUARIO
         const usuariosFiltrados = (data || []).filter(usuario => {
             return miId ? usuario.id_usuario !== miId : true;
         });
@@ -271,7 +268,6 @@ export const searchAPI = {
             searchUsers(term),
         ]);
 
-        // ✅ AGREGAR ESTOS LOGS
         console.log('🔍 Resultados individuales:', {
             profesores: { data: prof.data, error: prof.error },
             materias: { data: mat.data, error: mat.error },
@@ -292,6 +288,7 @@ export const searchAPI = {
         };
     },
 };
+
 // ==========================================
 // 🎯 MENTORES Y POSTULACIONES
 // ==========================================
@@ -299,7 +296,6 @@ export const mentorAPI = {
     async applyMentor(applicationData) {
         const { data: { user } } = await supabase.auth.getUser()
         if (!user) return { data: null, error: 'No hay usuario logueado' }
-
 
         const { data, error } = await supabase
             .from('mentor_aplicacion')
@@ -321,7 +317,6 @@ export const mentorAPI = {
 
     async notifyNewApplication(applicationId, userEmail, materiaNombre) {
         try {
-            // Usar EmailJS igual que en Contact.jsx
             await emailjs.send(
                 "service_dan74a5",
                 "template_e9obnfd",
@@ -366,15 +361,6 @@ export const mentorAPI = {
             .maybeSingle()
 
         if (data) {
-            const { data: materias } = await supabase
-                .from('mentor_materia')
-                .select(`
-            id_materia,
-            materia(nombre_materia, semestre)
-        `)
-                .eq('id_mentor', data.id_mentor)
-
-        }if (data) {
             const { data: materias } = await supabase
                 .from('mentor_materia')
                 .select(`
@@ -533,423 +519,8 @@ export const favoritesAPI = {
     }
 }
 
-export const ratingsAPI = {
-    async createRating(courseId, estrellas, comentario, extra = {}) {
-        const { data: authData, error: authErr } = await supabase.auth.getUser();
-        const user = authData?.user;
-        if (authErr || !user) {
-            return { data: null, error: { message: "Debes iniciar sesión para reseñar." } };
-        }
-
-        const payload = {
-            tipo: 'materia',
-            ref_id: courseId,
-            estrellas,
-            comentario: comentario?.trim() || null,
-            titulo: extra.titulo?.trim() || null,
-            workload: extra.workload || null,
-            metodologia: extra.metodologia || null,
-            user_id: user.id
-        };
-
-        const { data, error } = await supabase
-            .from('rating')
-            .insert(payload)
-            .select()
-            .single();
-
-        return { data, error };
-    },
-
-    async listByMateria(materiaId) {
-        return await supabase
-            .from('rating')
-            .select('id, estrellas, comentario, titulo, workload, metodologia, user_id, created_at')
-            .eq('tipo','materia')
-            .eq('ref_id', materiaId)
-            .order('created_at', { ascending: false });
-    },
-
-    async getAverageForMateria(materiaId) {
-        const { data, error } = await supabase
-            .from('rating')
-            .select('estrellas', { count: 'exact' })
-            .eq('tipo','materia')
-            .eq('ref_id', materiaId);
-
-        if (error) return { data: null, error };
-        const count = data?.length || 0;
-        const sum = (data || []).reduce((a, r) => a + (r.estrellas || 0), 0);
-        return { data: { count, avg: count ? +(sum / count).toFixed(2) : 0 }, error: null };
-    }
-};
-
 // ==========================================
-// 👨‍🏫 PROFESORES
-// ==========================================
-export const professorAPI = {
-    async getAllProfessors() {
-        const {data, error} = await supabase
-            .from('profesor_curso')
-            .select(`
-                *,
-                imparte(materia(id_materia, nombre_materia))
-            `)
-        return {data, error}
-    },
-
-    async getProfessorsBySubject(materiaId) {
-        const {data, error} = await supabase
-            .from('imparte')
-            .select(`
-                *,
-                profesor_curso(id_profesor, nombre_profesor, foto)
-            `)
-            .eq('id_materia', materiaId)
-
-        return {data, error}
-    }
-}
-
-
-// ==========================================
-// 📅 MENTORÍAS Y CALENDARIO
-// ==========================================
-    export const mentorshipAPI = {
-        // Disponibilidad del mentor
-        async getMyDisponibilidad() {
-            const { data: { user } } = await supabase.auth.getUser()
-            if (!user) return { data: null, error: 'No hay usuario logueado' }
-
-            const { data: usuarioData } = await supabase
-                .from('usuario')
-                .select('id_usuario')
-                .eq('auth_id', user.id)
-                .single()
-
-            if (!usuarioData) return { data: null, error: 'Usuario no encontrado' }
-
-            const { data: mentorData } = await supabase
-                .from('mentor')
-                .select('id_mentor')
-                .eq('id_usuario', usuarioData.id_usuario)
-                .single()
-
-            if (!mentorData) return { data: null, error: 'No eres mentor' }
-
-            const { data, error } = await supabase
-                .from('mentor_disponibilidad')
-                .select('*')
-                .eq('id_mentor', mentorData.id_mentor)
-                .order('dia_semana, hora_inicio')
-
-            return { data, error }
-        },
-
-        async addDisponibilidad(diaSemana, horaInicio, horaFin) {
-            const { data: { user } } = await supabase.auth.getUser()
-            if (!user) return { data: null, error: 'No hay usuario logueado' }
-
-            const { data: usuarioData } = await supabase
-                .from('usuario')
-                .select('id_usuario')
-                .eq('auth_id', user.id)
-                .single()
-
-            const { data: mentorData } = await supabase
-                .from('mentor')
-                .select('id_mentor')
-                .eq('id_usuario', usuarioData.id_usuario)
-                .single()
-
-            const { data, error } = await supabase
-                .from('mentor_disponibilidad')
-                .insert([{
-                    id_mentor: mentorData.id_mentor,
-                    dia_semana: diaSemana,
-                    hora_inicio: horaInicio,
-                    hora_fin: horaFin,
-                    activo: true
-                }])
-                .select()
-
-            return { data, error }
-        },
-
-        async deleteDisponibilidad(idDisponibilidad) {
-            const { data, error } = await supabase
-                .from('mentor_disponibilidad')
-                .delete()
-                .eq('id_disponibilidad', idDisponibilidad)
-
-            return { data, error }
-        },
-
-        async toggleDisponibilidad(idDisponibilidad, activo) {
-            const { data, error } = await supabase
-                .from('mentor_disponibilidad')
-                .update({ activo })
-                .eq('id_disponibilidad', idDisponibilidad)
-                .select()
-
-            return { data, error }
-        },
-
-        // Sesiones
-        async getMySesiones() {
-            const { data: { user } } = await supabase.auth.getUser()
-            if (!user) return { data: null, error: 'No hay usuario logueado' }
-
-            const { data: usuarioData } = await supabase
-                .from('usuario')
-                .select('id_usuario')
-                .eq('auth_id', user.id)
-                .single()
-
-            const { data: mentorData } = await supabase
-                .from('mentor')
-                .select('id_mentor')
-                .eq('id_usuario', usuarioData.id_usuario)
-                .maybeSingle()
-
-            if (mentorData) {
-                // Es mentor, ver sus sesiones como mentor
-                const { data, error } = await supabase
-                    .from('mentor_sesion')
-                    .select(`
-                    *,
-                    alumno:usuario!mentor_sesion_id_alumno_fkey(nombre, correo),
-                    materia(nombre_materia)
-                `)
-                    .eq('id_mentor', mentorData.id_mentor)
-                    .order('fecha_hora', { ascending: false })
-
-                return { data, error }
-            } else {
-                // Es alumno, ver sus sesiones como alumno
-                const { data, error } = await supabase
-                    .from('mentor_sesion')
-                    .select(`
-                    *,
-                    mentor!inner(*, usuario(nombre, correo)),
-                    materia(nombre_materia)
-                `)
-                    .eq('id_alumno', usuarioData.id_usuario)
-                    .order('fecha_hora', { ascending: false })
-
-                return { data, error }
-            }
-        },
-
-        async confirmarSesion(idSesion) {
-            const { data, error } = await supabase
-                .from('mentor_sesion')
-                .update({ estado: 'confirmada' })
-                .eq('id_sesion', idSesion)
-                .select()
-
-            return { data, error }
-        },
-
-        async cancelarSesion(idSesion) {
-            const { data, error } = await supabase
-                .from('mentor_sesion')
-                .update({ estado: 'cancelada' })
-                .eq('id_sesion', idSesion)
-                .select()
-
-            return { data, error }
-        }
-    }
-// ==========================================
-// 👥 SEGUIDORES (Versión Kerana)
-// ==========================================
-export const followersAPI = {
-    async followProfessor(profesorId) {
-        const { data: { user } } = await supabase.auth.getUser()
-        if (!user) return { data: null, error: 'No hay usuario logueado' }
-
-        const { data: currentUser } = await supabase
-            .from('usuario')
-            .select('id_usuario')
-            .eq('auth_id', user.id)
-            .single()
-
-        if (!currentUser) return { data: null, error: 'Usuario no encontrado' }
-
-        const { data, error } = await supabase
-            .from('seguidores')
-            .insert([{
-                seguidor_id: currentUser.id_usuario,
-                seguido_id: profesorId,
-                estado: 'activo',
-                tipo: 'profesor'
-            }])
-            .select()
-
-        return { data, error }
-    },
-
-    async followMentor(mentorId) {
-        const { data: { user } } = await supabase.auth.getUser()
-        if (!user) return { data: null, error: 'No hay usuario logueado' }
-
-        const { data: currentUser } = await supabase
-            .from('usuario')
-            .select('id_usuario')
-            .eq('auth_id', user.id)
-            .single()
-
-        if (!currentUser) return { data: null, error: 'Usuario no encontrado' }
-
-        const { data, error } = await supabase
-            .from('seguidores')
-            .insert([{
-                seguidor_id: currentUser.id_usuario,
-                seguido_id: mentorId,
-                estado: 'activo',
-                tipo: 'mentor'
-            }])
-            .select()
-
-        // Notificar al mentor
-        if (data && !error) {
-            await notificationsAPI.createNotification(
-                mentorId,
-                'nuevo_seguidor_mentor',
-                currentUser.id_usuario,
-                data[0].id,
-                `Un estudiante empezó a seguirte como mentor`
-            )
-        }
-
-        return { data, error }
-    },
-
-    async unfollowUser(userIdToUnfollow) {
-        const { data: { user } } = await supabase.auth.getUser()
-        if (!user) return { data: null, error: 'No hay usuario logueado' }
-
-        const { data: currentUser } = await supabase
-            .from('usuario')
-            .select('id_usuario')
-            .eq('auth_id', user.id)
-            .single()
-
-        if (!currentUser) return { data: null, error: 'Usuario no encontrado' }
-
-        const { data, error } = await supabase
-            .from('seguidores')
-            .delete()
-            .eq('seguidor_id', currentUser.id_usuario)
-            .eq('seguido_id', userIdToUnfollow)
-
-        return { data, error }
-    },
-
-    async getMyFollowedProfessors() {
-        const { data: { user } } = await supabase.auth.getUser()
-        if (!user) return { data: null, error: 'No hay usuario logueado' }
-
-        const { data: currentUser } = await supabase
-            .from('usuario')
-            .select('id_usuario')
-            .eq('auth_id', user.id)
-            .single()
-
-        const { data, error } = await supabase
-            .from('seguidores')
-            .select(`
-                *,
-                profesor:usuario!seguidores_seguido_id_fkey(
-                    id_usuario,
-                    nombre,
-                    correo,
-                    profesor_curso(*)
-                )
-            `)
-            .eq('seguidor_id', currentUser.id_usuario)
-            .eq('tipo', 'profesor')
-            .eq('estado', 'activo')
-
-        return { data, error }
-    },
-
-    async getMyFollowedMentors() {
-        const { data: { user } } = await supabase.auth.getUser()
-        if (!user) return { data: null, error: 'No hay usuario logueado' }
-
-        const { data: currentUser } = await supabase
-            .from('usuario')
-            .select('id_usuario')
-            .eq('auth_id', user.id)
-            .single()
-
-        const { data, error } = await supabase
-            .from('seguidores')
-            .select(`
-                *,
-                mentor:usuario!seguidores_seguido_id_fkey(
-                    id_usuario,
-                    nombre,
-                    correo,
-                    mentor(*)
-                )
-            `)
-            .eq('seguidor_id', currentUser.id_usuario)
-            .eq('tipo', 'mentor')
-            .eq('estado', 'activo')
-
-        return { data, error }
-    },
-
-    async isFollowingProfessor(profesorId) {
-        const { data: { user } } = await supabase.auth.getUser()
-        if (!user) return { data: null, error: 'No hay usuario logueado' }
-
-        const { data: currentUser } = await supabase
-            .from('usuario')
-            .select('id_usuario')
-            .eq('auth_id', user.id)
-            .single()
-
-        const { data, error } = await supabase
-            .from('seguidores')
-            .select('id')
-            .eq('seguidor_id', currentUser.id_usuario)
-            .eq('seguido_id', profesorId)
-            .eq('tipo', 'profesor')
-            .eq('estado', 'activo')
-            .maybeSingle()
-
-        return { data: !!data, error }
-    },
-
-    async isFollowingMentor(mentorId) {
-        const { data: { user } } = await supabase.auth.getUser()
-        if (!user) return { data: null, error: 'No hay usuario logueado' }
-
-        const { data: currentUser } = await supabase
-            .from('usuario')
-            .select('id_usuario')
-            .eq('auth_id', user.id)
-            .single()
-
-        const { data, error } = await supabase
-            .from('seguidores')
-            .select('id')
-            .eq('seguidor_id', currentUser.id_usuario)
-            .eq('seguido_id', mentorId)
-            .eq('tipo', 'mentor')
-            .eq('estado', 'activo')
-            .maybeSingle()
-
-        return { data: !!data, error }
-    }
-}
-
-// ==========================================
-// 🔔 NOTIFICACIONES (Versión Kerana)
+// 🔔 NOTIFICACIONES (DEFINIDO ANTES QUE FOLLOWERS)
 // ==========================================
 export const notificationsAPI = {
     async getMyNotifications() {
@@ -1096,5 +667,487 @@ export const notificationsAPI = {
             .eq('leida', false)
 
         return { data: count || 0, error }
+    }
+}
+
+// ==========================================
+// ⭐ RATINGS (MODIFICADO PARA SOPORTAR PROFESOR/MENTOR/MATERIA)
+// ==========================================
+export const ratingsAPI = {
+    async createRating(tipo, refId, estrellas, comentario, extra = {}) {
+        const { data: authData, error: authErr } = await supabase.auth.getUser();
+        const user = authData?.user;
+        if (authErr || !user) {
+            return { data: null, error: { message: "Debes iniciar sesión para reseñar." } };
+        }
+
+        const { data: usuarioData, error: usuarioError } = await supabase
+            .from('usuario')
+            .select('id_usuario')
+            .eq('auth_id', user.id)
+            .single();
+
+        if (usuarioError || !usuarioData) {
+            return { data: null, error: { message: "Usuario no encontrado en la base de datos." } };
+        }
+
+        const refIdAsInt = parseInt(refId, 10);
+
+        if (isNaN(refIdAsInt)) {
+            return { data: null, error: { message: "ID inválido para la entidad calificada." } };
+        }
+
+        const payload = {
+            tipo: tipo,
+            ref_id: refIdAsInt,
+            estrellas: estrellas,
+            comentario: comentario?.trim() || null,
+            titulo: extra.titulo?.trim() || null,
+            workload: extra.workload || null,
+            metodologia: extra.metodologia || null,
+            materia_id: extra.materia_id ? parseInt(extra.materia_id, 10) : null,
+            user_id: usuarioData.id_usuario
+        };
+
+        console.log('📝 Payload de rating:', payload);
+
+        const { data, error } = await supabase
+            .from('rating')
+            .insert(payload)
+            .select()
+            .single();
+
+        if (error) {
+            console.error('❌ Error al crear rating:', error);
+        } else {
+            console.log('✅ Rating creado:', data);
+        }
+
+        return { data, error };
+    },
+
+    async listByMateria(materiaId) {
+        return await supabase
+            .from('rating')
+            .select('id, estrellas, comentario, titulo, workload, metodologia, user_id, created_at')
+            .eq('tipo','materia')
+            .eq('ref_id', materiaId)
+            .order('created_at', { ascending: false });
+    },
+
+    async listByProfesor(profesorId) {
+        return await supabase
+            .from('rating')
+            .select('id, estrellas, comentario, titulo, workload, metodologia, materia_id, user_id, created_at')
+            .eq('tipo', 'profesor')
+            .eq('ref_id', profesorId)
+            .order('created_at', { ascending: false });
+    },
+
+    async listByMentor(mentorId) {
+        return await supabase
+            .from('rating')
+            .select('id, estrellas, comentario, titulo, workload, metodologia, materia_id, user_id, created_at')
+            .eq('tipo', 'mentor')
+            .eq('ref_id', mentorId)
+            .order('created_at', { ascending: false });
+    },
+
+    async getAverageForMateria(materiaId) {
+        const { data, error } = await supabase
+            .from('rating')
+            .select('estrellas', { count: 'exact' })
+            .eq('tipo','materia')
+            .eq('ref_id', materiaId);
+
+        if (error) return { data: null, error };
+        const count = data?.length || 0;
+        const sum = (data || []).reduce((a, r) => a + (r.estrellas || 0), 0);
+        return { data: { count, avg: count ? +(sum / count).toFixed(2) : 0 }, error: null };
+    },
+
+    async getAverageForProfesor(profesorId) {
+        const { data, error } = await supabase
+            .from('rating')
+            .select('estrellas', { count: 'exact' })
+            .eq('tipo', 'profesor')
+            .eq('ref_id', profesorId);
+
+        if (error) return { data: null, error };
+        const count = data?.length || 0;
+        const sum = (data || []).reduce((a, r) => a + (r.estrellas || 0), 0);
+        return { data: { count, avg: count ? +(sum / count).toFixed(2) : 0 }, error: null };
+    },
+
+    async getAverageForMentor(mentorId) {
+        const { data, error } = await supabase
+            .from('rating')
+            .select('estrellas', { count: 'exact' })
+            .eq('tipo', 'mentor')
+            .eq('ref_id', mentorId);
+
+        if (error) return { data: null, error };
+        const count = data?.length || 0;
+        const sum = (data || []).reduce((a, r) => a + (r.estrellas || 0), 0);
+        return { data: { count, avg: count ? +(sum / count).toFixed(2) : 0 }, error: null };
+    }
+}
+
+// ==========================================
+// 👨‍🏫 PROFESORES
+// ==========================================
+export const professorAPI = {
+    async getAllProfessors() {
+        const {data, error} = await supabase
+            .from('profesor_curso')
+            .select(`
+                *,
+                imparte(materia(id_materia, nombre_materia))
+            `)
+        return {data, error}
+    },
+
+    async getProfessorsBySubject(materiaId) {
+        const {data, error} = await supabase
+            .from('imparte')
+            .select(`
+                *,
+                profesor_curso(id_profesor, nombre_profesor, foto)
+            `)
+            .eq('id_materia', materiaId)
+
+        return {data, error}
+    }
+}
+
+// ==========================================
+// 📅 MENTORÍAS Y CALENDARIO
+// ==========================================
+export const mentorshipAPI = {
+    async getMyDisponibilidad() {
+        const { data: { user } } = await supabase.auth.getUser()
+        if (!user) return { data: null, error: 'No hay usuario logueado' }
+
+        const { data: usuarioData } = await supabase
+            .from('usuario')
+            .select('id_usuario')
+            .eq('auth_id', user.id)
+            .single()
+
+        if (!usuarioData) return { data: null, error: 'Usuario no encontrado' }
+
+        const { data: mentorData } = await supabase
+            .from('mentor')
+            .select('id_mentor')
+            .eq('id_usuario', usuarioData.id_usuario)
+            .single()
+
+        if (!mentorData) return { data: null, error: 'No eres mentor' }
+
+        const { data, error } = await supabase
+            .from('mentor_disponibilidad')
+            .select('*')
+            .eq('id_mentor', mentorData.id_mentor)
+            .order('dia_semana, hora_inicio')
+
+        return { data, error }
+    },
+
+    async addDisponibilidad(diaSemana, horaInicio, horaFin) {
+        const { data: { user } } = await supabase.auth.getUser()
+        if (!user) return { data: null, error: 'No hay usuario logueado' }
+
+        const { data: usuarioData } = await supabase
+            .from('usuario')
+            .select('id_usuario')
+            .eq('auth_id', user.id)
+            .single()
+
+        const { data: mentorData } = await supabase
+            .from('mentor')
+            .select('id_mentor')
+            .eq('id_usuario', usuarioData.id_usuario)
+            .single()
+
+        const { data, error } = await supabase
+            .from('mentor_disponibilidad')
+            .insert([{
+                id_mentor: mentorData.id_mentor,
+                dia_semana: diaSemana,
+                hora_inicio: horaInicio,
+                hora_fin: horaFin,
+                activo: true
+            }])
+            .select()
+
+        return { data, error }
+    },
+
+    async deleteDisponibilidad(idDisponibilidad) {
+        const { data, error } = await supabase
+            .from('mentor_disponibilidad')
+            .delete()
+            .eq('id_disponibilidad', idDisponibilidad)
+
+        return { data, error }
+    },
+
+    async toggleDisponibilidad(idDisponibilidad, activo) {
+        const { data, error } = await supabase
+            .from('mentor_disponibilidad')
+            .update({ activo })
+            .eq('id_disponibilidad', idDisponibilidad)
+            .select()
+
+        return { data, error }
+    },
+
+    async getMySesiones() {
+        const { data: { user } } = await supabase.auth.getUser()
+        if (!user) return { data: null, error: 'No hay usuario logueado' }
+
+        const { data: usuarioData } = await supabase
+            .from('usuario')
+            .select('id_usuario')
+            .eq('auth_id', user.id)
+            .single()
+
+        const { data: mentorData } = await supabase
+            .from('mentor')
+            .select('id_mentor')
+            .eq('id_usuario', usuarioData.id_usuario)
+            .maybeSingle()
+
+        if (mentorData) {
+            const { data, error } = await supabase
+                .from('mentor_sesion')
+                .select(`
+                    *,
+                    alumno:usuario!mentor_sesion_id_alumno_fkey(nombre, correo),
+                    materia(nombre_materia)
+                `)
+                .eq('id_mentor', mentorData.id_mentor)
+                .order('fecha_hora', { ascending: false })
+
+            return { data, error }
+        } else {
+            const { data, error } = await supabase
+                .from('mentor_sesion')
+                .select(`
+                    *,
+                    mentor!inner(*, usuario(nombre, correo)),
+                    materia(nombre_materia)
+                `)
+                .eq('id_alumno', usuarioData.id_usuario)
+                .order('fecha_hora', { ascending: false })
+
+            return { data, error }
+        }
+    },
+
+    async confirmarSesion(idSesion) {
+        const { data, error } = await supabase
+            .from('mentor_sesion')
+            .update({ estado: 'confirmada' })
+            .eq('id_sesion', idSesion)
+            .select()
+
+        return { data, error }
+    },
+
+    async cancelarSesion(idSesion) {
+        const { data, error } = await supabase
+            .from('mentor_sesion')
+            .update({ estado: 'cancelada' })
+            .eq('id_sesion', idSesion)
+            .select()
+
+        return { data, error }
+    }
+}
+
+// ==========================================
+// 👥 SEGUIDORES (Versión Kerana)
+// ==========================================
+export const followersAPI = {
+    async followProfessor(profesorId) {
+        const { data: { user } } = await supabase.auth.getUser()
+        if (!user) return { data: null, error: 'No hay usuario logueado' }
+
+        const { data: currentUser } = await supabase
+            .from('usuario')
+            .select('id_usuario')
+            .eq('auth_id', user.id)
+            .single()
+
+        if (!currentUser) return { data: null, error: 'Usuario no encontrado' }
+
+        const { data, error } = await supabase
+            .from('seguidores')
+            .insert([{
+                seguidor_id: currentUser.id_usuario,
+                seguido_id: profesorId,
+                estado: 'activo',
+                tipo: 'profesor'
+            }])
+            .select()
+
+        return { data, error }
+    },
+
+    async followMentor(mentorId) {
+        const { data: { user } } = await supabase.auth.getUser()
+        if (!user) return { data: null, error: 'No hay usuario logueado' }
+
+        const { data: currentUser } = await supabase
+            .from('usuario')
+            .select('id_usuario')
+            .eq('auth_id', user.id)
+            .single()
+
+        if (!currentUser) return { data: null, error: 'Usuario no encontrado' }
+
+        const { data, error } = await supabase
+            .from('seguidores')
+            .insert([{
+                seguidor_id: currentUser.id_usuario,
+                seguido_id: mentorId,
+                estado: 'activo',
+                tipo: 'mentor'
+            }])
+            .select()
+
+        if (data && !error) {
+            await notificationsAPI.createNotification(
+                mentorId,
+                'nuevo_seguidor_mentor',
+                currentUser.id_usuario,
+                data[0].id,
+                `Un estudiante empezó a seguirte como mentor`
+            )
+        }
+
+        return { data, error }
+    },
+
+    async unfollowUser(userIdToUnfollow) {
+        const { data: { user } } = await supabase.auth.getUser()
+        if (!user) return { data: null, error: 'No hay usuario logueado' }
+
+        const { data: currentUser } = await supabase
+            .from('usuario')
+            .select('id_usuario')
+            .eq('auth_id', user.id)
+            .single()
+
+        if (!currentUser) return { data: null, error: 'Usuario no encontrado' }
+
+        const { data, error } = await supabase
+            .from('seguidores')
+            .delete()
+            .eq('seguidor_id', currentUser.id_usuario)
+            .eq('seguido_id', userIdToUnfollow)
+
+        return { data, error }
+    },
+
+    async getMyFollowedProfessors() {
+        const { data: { user } } = await supabase.auth.getUser()
+        if (!user) return { data: null, error: 'No hay usuario logueado' }
+
+        const { data: currentUser } = await supabase
+            .from('usuario')
+            .select('id_usuario')
+            .eq('auth_id', user.id)
+            .single()
+
+        const { data, error } = await supabase
+            .from('seguidores')
+            .select(`
+                *,
+                profesor:usuario!seguidores_seguido_id_fkey(
+                    id_usuario,
+                    nombre,
+                    correo,
+                    profesor_curso(*)
+                )
+            `)
+            .eq('seguidor_id', currentUser.id_usuario)
+            .eq('tipo', 'profesor')
+            .eq('estado', 'activo')
+
+        return { data, error }
+    },
+
+    async getMyFollowedMentors() {
+        const { data: { user } } = await supabase.auth.getUser()
+        if (!user) return { data: null, error: 'No hay usuario logueado' }
+
+        const { data: currentUser } = await supabase
+            .from('usuario')
+            .select('id_usuario')
+            .eq('auth_id', user.id)
+            .single()
+
+        const { data, error } = await supabase
+            .from('seguidores')
+            .select(`
+                *,
+                mentor:usuario!seguidores_seguido_id_fkey(
+                    id_usuario,
+                    nombre,
+                    correo,
+                    mentor(*)
+                )
+            `)
+            .eq('seguidor_id', currentUser.id_usuario)
+            .eq('tipo', 'mentor')
+            .eq('estado', 'activo')
+
+        return { data, error }
+    },
+
+    async isFollowingProfessor(profesorId) {
+        const { data: { user } } = await supabase.auth.getUser()
+        if (!user) return { data: null, error: 'No hay usuario logueado' }
+
+        const { data: currentUser } = await supabase
+            .from('usuario')
+            .select('id_usuario')
+            .eq('auth_id', user.id)
+            .single()
+
+        const { data, error } = await supabase
+            .from('seguidores')
+            .select('id')
+            .eq('seguidor_id', currentUser.id_usuario)
+            .eq('seguido_id', profesorId)
+            .eq('tipo', 'profesor')
+            .eq('estado', 'activo')
+            .maybeSingle()
+
+        return { data: !!data, error }
+    },
+
+    async isFollowingMentor(mentorId) {
+        const { data: { user } } = await supabase.auth.getUser()
+        if (!user) return { data: null, error: 'No hay usuario logueado' }
+
+        const { data: currentUser } = await supabase
+            .from('usuario')
+            .select('id_usuario')
+            .eq('auth_id', user.id)
+            .single()
+
+        const { data, error } = await supabase
+            .from('seguidores')
+            .select('id')
+            .eq('seguidor_id', currentUser.id_usuario)
+            .eq('seguido_id', mentorId)
+            .eq('tipo', 'mentor')
+            .eq('estado', 'activo')
+            .maybeSingle()
+
+        return { data: !!data, error }
     }
 }

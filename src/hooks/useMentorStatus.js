@@ -36,7 +36,7 @@ export const useMentorStatus = (autoCheck = true) => {
             const { data: mentor, error: mentorErr } = await supabase
                 .from('mentor')
                 .select('id_mentor, estrellas_mentor, contacto, descripcion')
-                .eq('id_mentor', usuarioData.id_usuario)
+                .eq('id_usuario', usuarioData.id_usuario)
                 .maybeSingle()
             if (mentorErr || !mentor) {
                 setIsMentor(false)
