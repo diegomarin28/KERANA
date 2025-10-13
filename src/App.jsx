@@ -40,6 +40,7 @@ const Notifications = lazy(() => import("./pages/Notifications"));
 const Settings = lazy(() => import("./pages/Settings"));
 const NotificationBadge = lazy(() => import("./components/NotificationBadge"));
 const UserCard = lazy(() => import("./components/UserCard"));
+const ApunteView = lazy(() => import("./pages/ApunteView"));
 
 // Componentes cargados inmediatamente
 import AuthConfirm from './pages/AuthConfirm';
@@ -163,6 +164,7 @@ function AppRoutes() {
                     <Route path="/professors" element={<Professors />} />
                     <Route path="/mentors" element={<Mentors />} />
                     <Route path="/notes" element={<Notes />} />
+                    <Route path="/apuntes/:id" element={<ApunteView />} />
 
                     {/* Autenticación */}
                     <Route path="/signin" element={<Navigate to="/?auth=signin" replace />} />

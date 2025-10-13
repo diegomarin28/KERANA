@@ -34,7 +34,48 @@ export default function Home() {
                 setLoadingTop(true);
                 const { data, error } = await supabase.rpc("top_apuntes_best", { limit_count: 6 });
                 if (error) throw error;
-                if (mounted) setTopNotes(data || []);
+
+                // Obtener file_path de cada apunte
+                const apIds = data.map(d => d.apunte_id);
+                const { data: apuntes, error: apError } = await supabase
+                    .from('apunte')
+                    .select(`
+                                     id_apunte, 
+                                     file_path,
+                                     usuario:id_usuario(nombre)
+                                     `)
+                    .in('id_apunte', apIds);
+
+
+                if (apError) throw apError;
+
+                const filePathMap = new Map(apuntes.map(a => [a.id_apunte, a.file_path]));
+
+                // Generar signed URLs
+                const urls = {};
+                for (const note of data) {
+                    const filePath = filePathMap.get(note.apunte_id);
+                    if (filePath) {
+                        const { data: signedData, error: signedError } = await supabase.storage
+                            .from('apuntes')
+                            .createSignedUrl(filePath, 3600);
+
+                        if (!signedError && signedData) {
+                            urls[note.apunte_id] = signedData.signedUrl;
+                        }
+                    }
+                }
+
+                const notesWithUrls = data.map(note => {
+                    const apunte = apuntes.find(a => a.id_apunte === note.apunte_id);
+                    return {
+                        ...note,
+                        usuario: apunte?.usuario || { nombre: 'Anónimo' },
+                        signedUrl: urls[note.apunte_id] || null
+                    };
+                });
+
+                if (mounted) setTopNotes(notesWithUrls || []);
             } catch (e) {
                 console.error(e);
                 if (mounted) setTopNotes([]);
@@ -44,7 +85,6 @@ export default function Home() {
         })();
         return () => { mounted = false; };
     }, []);
-
 
     useEffect(() => {
         let raf = 0;
@@ -196,17 +236,16 @@ export default function Home() {
                                         }}
                                     >
                                         <ApunteCard
-                                            apunte={{
+                                            note={{
                                                 id_apunte: n.apunte_id,
                                                 titulo: n.titulo,
-                                                portada_url: n.portada_url,
+                                                descripcion: n.descripcion || '',
                                                 creditos: n.creditos,
-                                                rating_promedio: n.rating_promedio,
-                                                votos: n.votos,
+                                                estrellas: n.rating_promedio || 0,
+                                                usuario: n.usuario,
+                                                materia: { nombre_materia: n.materia_nombre || 'Sin materia' },
+                                                signedUrl: n.signedUrl
                                             }}
-                                            isOwner={false}
-                                            hasPurchased={false}
-                                            onBuy={null}
                                         />
                                     </div>
                                 ))}

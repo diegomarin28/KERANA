@@ -1,6 +1,9 @@
-export function Card({ children, style }) {
+export function Card({ children, style,onClick,onMouseEnter,onMouseLeave,...props}) {
     return (
         <div
+            onClick={onClick}
+            onMouseEnter={onMouseEnter}
+            onMouseLeave={onMouseLeave}
             style={{
                 background: "var(--surface)",
                 border: "1px solid var(--border)",
@@ -9,6 +12,7 @@ export function Card({ children, style }) {
                 padding: 16,
                 ...style
             }}
+            {...props}
         >
             {children}
         </div>

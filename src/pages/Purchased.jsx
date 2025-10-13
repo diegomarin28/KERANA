@@ -1,15 +1,16 @@
-// src/pages/Purchased.jsx
 import { useEffect, useState } from "react";
 import { supabase } from "../supabase";
 import { getOrCreateUserProfile } from "../api/userService";
 import { Button } from "../components/ui/Button";
 import { Card } from "../components/ui/Card";
-import { Chip } from "../components/ui/Chip";
+import { useNavigate } from "react-router-dom";
+import ApunteCard from "../components/ApunteCard";
 
 export default function Purchased() {
     const [purchases, setPurchases] = useState([]);
     const [loading, setLoading] = useState(true);
     const [errorMsg, setErrorMsg] = useState("");
+    const navigate = useNavigate();
 
     useEffect(() => { loadPurchases(); }, []);
 
@@ -24,65 +25,95 @@ export default function Purchased() {
                 return;
             }
 
-            // ⚠️ No conocemos nombres exactos de columnas: usamos '*'
+            // Consultar compra_apunte
             const { data: compras, error: comprasError } = await supabase
-                .from("comprar")
-                .select("*")
-                .eq("id_usuario", profile.id_usuario)
-                .order("fecha_compra", { ascending: false });
+                .from("compra_apunte")
+                .select(`
+                    id,
+                    apunte_id,
+                    comprador_id,
+                    creado_en
+                `)
+                .eq("comprador_id", profile.id_usuario)
+                .order("creado_en", { ascending: false });
+
             if (comprasError) throw comprasError;
 
-            if (!compras?.length) { setPurchases([]); return; }
+            if (!compras?.length) {
+                setPurchases([]);
+                return;
+            }
 
-            // Adivinamos nombres comunes
-            const safe = (c) => ({
-                id_compra: c.id_compra ?? c.id ?? null,
-                id_apunte: c.id_apunte ?? c.apunte_id ?? null,
-                cantidad_creditos: c.cantidad_creditos ?? c.creditos ?? c.monto ?? null,
-                fecha_compra: c.fecha_compra ?? c.fecha ?? c.created_at ?? null,
-            });
-
-            const norm = compras.map(safe);
-            const apIds = [...new Set(norm.map(c => c.id_apunte).filter(Boolean))];
+            // Obtener los IDs de apuntes
+            const apIds = compras.map(c => c.apunte_id).filter(Boolean);
 
             let apuntes = [];
             if (apIds.length) {
                 const { data: apData, error: apErr } = await supabase
                     .from("apunte")
                     .select(`
-            id_apunte,
-            titulo,
-            creditos,
-            estrellas,
-            id_materia,
-            file_path,
-            file_name,
-            mime_type,
-            file_size,
-            materia:id_materia!Apunte_id_materia_fkey (
-              id_materia,
-              nombre_materia
-            )
-          `)
+                        id_apunte,
+                        titulo,
+                        descripcion,
+                        creditos,
+                        estrellas,
+                        file_path,
+                        file_name,
+                        materia:id_materia(
+                            id_materia,
+                            nombre_materia
+                        ),
+                        usuario:id_usuario(nombre)
+                    `)
                     .in("id_apunte", apIds);
+
                 if (apErr) throw apErr;
                 apuntes = apData || [];
             }
 
+            // Generar signed URLs para todos los apuntes
+            const urls = {};
+            if (apuntes.length > 0) {
+                for (const apunte of apuntes) {
+                    if (apunte.file_path) {
+                        const { data: signedData, error: signedError } = await supabase.storage
+                            .from('apuntes')
+                            .createSignedUrl(apunte.file_path, 3600);
+
+                        if (!signedError && signedData) {
+                            urls[apunte.id_apunte] = signedData.signedUrl;
+                        }
+                    }
+                }
+            }
+
+            // Mapear apuntes por ID
             const mapApunte = new Map(apuntes.map(a => [a.id_apunte, a]));
-            const enriched = norm.map(c => ({ ...c, apunte: mapApunte.get(c.id_apunte) || null }));
+
+            // Enriquecer con datos de apuntes y signed URLs
+            const enriched = compras.map(c => {
+                const apunte = mapApunte.get(c.apunte_id);
+                return {
+                    ...c,
+                    id_apunte: c.apunte_id,
+                    titulo: apunte?.titulo || "Apunte adquirido",
+                    descripcion: apunte?.descripcion || "",
+                    creditos: apunte?.creditos || 0,
+                    estrellas: apunte?.estrellas || 0,
+                    usuario: apunte?.usuario || { nombre: "Anónimo" },
+                    materia: apunte?.materia || { nombre_materia: "Sin materia" },
+                    signedUrl: urls[c.apunte_id] || null,
+                    file_path: apunte?.file_path
+                };
+            });
 
             setPurchases(enriched);
         } catch (err) {
+            console.error('Error cargando compras:', err);
             setErrorMsg(err?.message || "Error cargando tus compras.");
         } finally {
             setLoading(false);
         }
-    };
-
-    const handleDownload = (purchase) => {
-        const url = purchase?.apunte?.file_path;
-        if (url) window.open(url, "_blank");
     };
 
     if (loading) {
@@ -102,7 +133,7 @@ export default function Purchased() {
     }
 
     return (
-        <div style={{ width: "min(900px, 92vw)", margin: "0 auto", padding: "32px 0" }}>
+        <div style={{ width: "min(1200px, 92vw)", margin: "0 auto", padding: "32px 0" }}>
             <header style={{ marginBottom: 24 }}>
                 <h1 style={{ margin: "0 0 8px 0" }}>Mis compras</h1>
                 <p style={{ color: "#6b7280", margin: 0 }}>
@@ -126,47 +157,20 @@ export default function Purchased() {
                     <p style={{ color: "#6b7280", margin: "0 0 24px 0" }}>
                         Explorá apuntes y materiales creados por otros estudiantes.
                     </p>
-                    <Button variant="primary" onClick={() => (window.location.href = "/")}>Ir a explorar</Button>
+                    <Button variant="primary" onClick={() => navigate('/notes')}>Ir a explorar apuntes</Button>
                 </Card>
             ) : (
-                <div style={{ display: "grid", gap: 16 }}>
-                    {purchases.map((p) => {
-                        const a = p.apunte;
-                        return (
-                            <Card key={p.id_compra ?? `${p.id_apunte}-${p.fecha_compra}`} style={{
-                                padding: 20, border: "1px solid #e5e7eb", borderRadius: 12, background: "#fff"
-                            }}>
-                                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 16 }}>
-                                    <div style={{ flex: 1 }}>
-                                        <h3 style={{ margin: "0 0 8px 0", color: "#111827", fontSize: 18 }}>
-                                            {a?.titulo || "Apunte adquirido"}
-                                        </h3>
-
-                                        <div style={{ display: "flex", gap: 8, alignItems: "center", marginBottom: 12, flexWrap: "wrap" }}>
-                                            {a?.materia?.nombre_materia && <Chip tone="blue">{a.materia.nombre_materia}</Chip>}
-                                            <Chip tone="green">{a?.creditos ?? p.cantidad_creditos ?? 0} créditos</Chip>
-                                            {a?.mime_type && <Chip tone="gray">{a.mime_type}</Chip>}
-                                        </div>
-
-                                        <div style={{ display: "flex", gap: 12, fontSize: 12, color: "#9ca3af" }}>
-                                            {p.fecha_compra && <span>Fecha: {new Date(p.fecha_compra).toLocaleDateString()}</span>}
-                                            {a?.file_size && <span>• {Math.round(a.file_size / 1024)} KB</span>}
-                                            {typeof a?.estrellas === "number" && <span>• ⭐ {a.estrellas}</span>}
-                                        </div>
-                                    </div>
-
-                                    <div style={{ display: "flex", gap: 8 }}>
-                                        <Button variant="primary" onClick={() => handleDownload(p)} disabled={!a?.file_path}>
-                                            Descargar
-                                        </Button>
-                                        <Button variant="secondary" onClick={() => (window.location.href = `/apuntes/${p.id_apunte}`)}>
-                                            Ver detalle
-                                        </Button>
-                                    </div>
-                                </div>
-                            </Card>
-                        );
-                    })}
+                <div style={{
+                    display: 'grid',
+                    gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))',
+                    gap: 20
+                }}>
+                    {purchases.map((purchase) => (
+                        <ApunteCard
+                            key={purchase.id}
+                            note={purchase}
+                        />
+                    ))}
                 </div>
             )}
         </div>
