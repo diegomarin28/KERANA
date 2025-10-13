@@ -127,7 +127,7 @@ const StarRating = ({ rating, onRatingChange }) => {
     );
 };
 
-export default function AuthModal_HacerReseña({ open, onClose, onSave, courseId }) {
+export default function AuthModal_HacerResenia({ open, onClose, onSave, courseId }) {
     const [form, setForm] = useState({
         rating: 5,
         titulo: "",

@@ -1,4 +1,3 @@
-// SearchResults.jsx (modificado)
 import { useLocation } from "react-router-dom";
 import { useMemo, useState, useEffect } from "react";
 import SearchBar from "../components/SearchBar";
@@ -6,7 +5,8 @@ import { searchAPI } from "../api/Database";
 import SubjectCard from "../components/SubjectCard";
 import ProfessorCard from "../components/ProfessorCard";
 import NoteCard from "../components/NoteCard";
-import { UserCard } from "../components/UserCard"; // Nuevo componente
+import { UserCard } from "../components/UserCard";
+import { MentorCard } from "../components/MentorCard";
 
 export default function SearchResults() {
     const { search } = useLocation();
@@ -29,17 +29,29 @@ export default function SearchResults() {
 
     const fetchAll = async (query) => {
         setLoading(true);
+        console.log('🔍 Buscando:', query);
         try {
             const { data, error } = await searchAPI.searchAll(query);
+            console.log('📦 Resultado searchAPI:', { data, error });
+
             if (error) throw new Error(error.message || JSON.stringify(error));
+
+            console.log('📊 Datos parseados:', {
+                materias: data?.materias?.length || 0,
+                profesores: data?.profesores?.length || 0,
+                mentores: data?.mentores?.length || 0,
+                apuntes: data?.apuntes?.length || 0,
+                usuarios: data?.usuarios?.length || 0
+            });
 
             setSubjects(data?.materias ?? []);
             setNotes(data?.apuntes ?? []);
             setProfessors(data?.profesores ?? []);
             setMentors(data?.mentores ?? []);
-            setUsers(data?.usuarios ?? []); // Nuevo
+            setUsers(data?.usuarios ?? []);
 
         } catch (e) {
+            console.error('❌ Error en fetchAll:', e);
             setSubjects([]);
             setNotes([]);
             setProfessors([]);
@@ -84,6 +96,8 @@ export default function SearchResults() {
         usuarios: filtered.users.length // Nuevo
     };
 
+
+
     return (
         <div style={{
             minHeight: "100vh",
@@ -126,7 +140,7 @@ export default function SearchResults() {
                     flexWrap: "wrap",
                     justifyContent: "center"
                 }}>
-                    {["todo", "materias", "profesores", "apuntes", "usuarios"].map((t) => (
+                    {["todo", "materias", "profesores", "mentores", "apuntes", "usuarios"].map((t) => (
                         <button
                             key={t}
                             onClick={() => setTab(t)}
@@ -150,6 +164,7 @@ export default function SearchResults() {
                             {t === "profesores" && "👨‍🏫 Profesores"}
                             {t === "apuntes" && "📄 Apuntes"}
                             {t === "usuarios" && "👤 Usuarios"}
+                            {t === "mentores" && "🎓 Mentores"}
 
                             {counts[t] > 0 && (
                                 <span style={{
@@ -229,49 +244,9 @@ export default function SearchResults() {
                             <UserCard key={`usuario-${user.id_usuario}-${index}`} usuario={user} />
                         ))}
 
-                        {/* Mentores (versión simple) */}
+                        {/* Mentores */}
                         {show("mentores") && filtered.mentors.map((m, index) => (
-                            <div key={`mentor-${m.id_mentor}-${index}`} style={{
-                                background: "white",
-                                borderRadius: 12,
-                                padding: 20,
-                                border: "1px solid #E5E7EB",
-                                boxShadow: "0 2px 8px rgba(0,0,0,0.04)"
-                            }}>
-                                <div style={{ display: "flex", alignItems: "flex-start", gap: 16 }}>
-                                    <div style={{
-                                        width: 48,
-                                        height: 48,
-                                        background: "#2563EB",
-                                        borderRadius: 8,
-                                        display: "flex",
-                                        alignItems: "center",
-                                        justifyContent: "center",
-                                        fontSize: 20,
-                                        color: "white"
-                                    }}>
-                                        💼
-                                    </div>
-                                    <div style={{ flex: 1 }}>
-                                        <h3 style={{ margin: "0 0 4px 0", fontSize: 18, fontWeight: 600 }}>
-                                            Mentor {m.mentor_nombre}
-                                        </h3>
-                                        <p style={{ margin: "0 0 8px 0", color: "#6B7280", fontSize: 14 }}>
-                                            {m.especialidad || "Mentor académico"}
-                                        </p>
-                                    </div>
-                                    <div style={{
-                                        background: "#2563EB",
-                                        color: "white",
-                                        padding: "6px 12px",
-                                        borderRadius: 6,
-                                        fontSize: 12,
-                                        fontWeight: 600
-                                    }}>
-                                        Mentor
-                                    </div>
-                                </div>
-                            </div>
+                            <MentorCard key={`mentor-${m.id_mentor}-${index}`} mentor={m} />
                         ))}
                     </div>
                 )}

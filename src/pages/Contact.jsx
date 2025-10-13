@@ -116,7 +116,7 @@ export default function Contact() {
                 </h1>
 
                 <p style={{ margin: 0, color: "#475569" }}>
-                    Escribinos y te respondemos a la brevedad. Cualquier consulta o sugerencia es bienvenida!
+                    Escribinos y te respondemos a la brevedad. Cualquier consulta o sugerencia es bienvenida.
                 </p>
             </div>
 
@@ -282,11 +282,11 @@ export default function Contact() {
                         />
                         <Feature
                             title="No está tu profesor"
-                            desc="Lo ingresamos de inmediato asi podes realizar tu reseña"
+                            desc="Lo ingresamos de inmediato así podes realizar tu reseña."
                         />
                         <Feature
                             title="No tenemos una materia que cursas"
-                            desc="Contactaté y lo cambiamos a la brevedad."
+                            desc="Contactate y lo cambiamos a la brevedad."
                         />
 
                         <div

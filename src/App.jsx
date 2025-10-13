@@ -169,7 +169,7 @@ function AppRoutes() {
                     <Route path="/auth/confirm" element={<AuthConfirm />} />
                     <Route path="/auth/callback" element={<AuthCallback />} />
 
-                    <Route path="/help" element={<HelpCenter />} />
+                    <Route path="/help-center" element={<HelpCenter />} />
                     <Route path="/terms" element={<Terms />} />
                     <Route path="/privacy" element={<Privacy />} />
 

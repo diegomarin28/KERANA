@@ -98,13 +98,25 @@ export default function SearchBar() {
                         });
                     });
                 }
-                console.log('🔍 Búsqueda usuarios:', {
-                    termino: term,
-                    error: usuariosError,
-                    resultados: usuarios
-                });
 
                 setSuggestions(results);
+
+                // Buscar mentores (prioridad 5)
+                const { data: mentores, error: mentoresError } = await supabase
+                    .rpc('buscar_mentores_sin_tildes', { termino: term });
+
+                if (!mentoresError && mentores) {
+                    mentores.forEach(m => {
+                        results.push({
+                            type: 'mentor',
+                            id: m.id_mentor,
+                            text: m.nombre,
+                            username: m.username,
+                            foto: m.foto,
+                            icon: '🎓'
+                        });
+                    });
+                }
 
             } catch (err) {
                 console.error('Error general en búsqueda:', err);
@@ -155,6 +167,9 @@ export default function SearchBar() {
             navigate(`/search?q=${encodeURIComponent(suggestion.text)}&type=apunte`);
         } else if (suggestion.type === 'usuario') {
             navigate(`/search?q=${encodeURIComponent(suggestion.text)}&type=usuario`);
+        }
+        else if (suggestion.type === 'mentor') {
+            navigate(`/search?q=${encodeURIComponent(suggestion.text)}&type=mentor`);
         }
     };
 

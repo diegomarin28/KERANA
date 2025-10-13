@@ -107,59 +107,20 @@ async function searchProfessors(term) {
     if (!q) return { data: [], error: null };
 
     try {
-        // Buscar por nombre de profesor
-        const { data: profesoresDirectos, error: errorDirecto } = await supabase
-            .from('profesor_curso')
-            .select('id_profesor, profesor_nombre')
-            .ilike('profesor_nombre', `%${q}%`);
+        // ✅ USAR RPC CON SIMILITUD
+        const { data: profesores, error } = await supabase
+            .rpc('buscar_profesores_sin_tildes', { termino: q });
 
-        // Buscar por materia
-        const { data: materiasEncontradas, error: errorMaterias } = await supabase
-            .rpc('buscar_materias_sin_tildes', { termino: q });
-
-        let profesoresPorMateria = [];
-
-        if (materiasEncontradas && materiasEncontradas.length > 0) {
-            const materiaIds = materiasEncontradas.map(m => m.id_materia);
-
-            const { data: relacionesImparte, error: errorImparte } = await supabase
-                .from('imparte')
-                .select(`
-                    id_profesor,
-                    profesor_curso!inner(id_profesor, profesor_nombre),
-                    materia!inner(id_materia, nombre_materia)
-                `)
-                .in('id_materia', materiaIds);
-
-            if (relacionesImparte) {
-                profesoresPorMateria = relacionesImparte.map(item => ({
-                    id_profesor: item.id_profesor,
-                    profesor_nombre: item.profesor_curso.profesor_nombre,
-                    materia_nombre: item.materia.nombre_materia,
-                    source: 'materia'
-                }));
-            }
+        if (error) {
+            console.error('Error buscando profesores:', error);
+            return { data: [], error };
         }
 
-        // Combinar y eliminar duplicados
-        const todosProfesores = [
-            ...(profesoresDirectos || []).map(p => ({
-                ...p,
-                materia_nombre: '',
-                source: 'nombre'
-            })),
-            ...profesoresPorMateria
-        ];
-
-        const profesoresUnicos = todosProfesores.filter((profesor, index, array) =>
-            array.findIndex(p => p.id_profesor === profesor.id_profesor) === index
-        );
-
-        const transformed = profesoresUnicos.map(prof => ({
+        const transformed = (profesores || []).map(prof => ({
             id: prof.id_profesor,
             id_profesor: prof.id_profesor,
             profesor_nombre: prof.profesor_nombre,
-            materia_nombre: prof.materia_nombre || '',
+            materia_nombre: '',
             rating_promedio: 0,
             estrellas: 0
         }));
@@ -167,9 +128,11 @@ async function searchProfessors(term) {
         return { data: transformed, error: null };
 
     } catch (error) {
+        console.error('Error en searchProfessors:', error);
         return { data: [], error };
     }
 }
+
 
 async function searchSubjects(term) {
     const q = (term || "").trim();
@@ -201,22 +164,31 @@ async function searchNotes(term) {
     const q = (term || "").trim();
     if (!q) return { data: [], error: null };
 
-    const { data, error } = await supabase
-        .from('apunte')
-        .select('id_apunte, titulo, id_materia')
-        .ilike('titulo', `%${q}%`)
-        .limit(50);
+    try {
+        // ✅ USAR RPC CON SIMILITUD
+        const { data: apuntes, error } = await supabase
+            .rpc('buscar_apuntes_sin_tildes', { termino: q });
 
-    const transformed = (data || []).map(a => ({
-        id: a.id_apunte,
-        id_apunte: a.id_apunte,
-        titulo: a.titulo,
-        estrellas: 4.0,
-        materia_nombre: '',
-        autor_nombre: ''
-    }));
+        if (error) {
+            console.error('Error buscando apuntes:', error);
+            return { data: [], error };
+        }
 
-    return { data: transformed, error };
+        const transformed = (apuntes || []).map(a => ({
+            id: a.id_apunte,
+            id_apunte: a.id_apunte,
+            titulo: a.titulo,
+            estrellas: 4.0,
+            materia_nombre: '',
+            autor_nombre: ''
+        }));
+
+        return { data: transformed, error: null };
+
+    } catch (error) {
+        console.error('Error en searchNotes:', error);
+        return { data: [], error };
+    }
 }
 
 async function searchMentors(term) {
@@ -224,30 +196,25 @@ async function searchMentors(term) {
     if (!q) return { data: [], error: null };
 
     const { data, error } = await supabase
-        .from('mentor')
-        .select(`
-            id_mentor,
-            estrellas_mentor,
-            contacto,
-            usuario!inner(nombre, correo)
-        `)
-        .ilike('usuario.nombre', `%${q}%`)
-        .limit(50);
+        .rpc('buscar_mentores_sin_tildes', { termino: q });
+
+    if (error) return { data: [], error };
 
     const transformed = (data || []).map(m => ({
         id: m.id_mentor,
         id_mentor: m.id_mentor,
-        mentor_nombre: m.usuario?.nombre || 'Mentor',
-        mentor_correo: m.usuario?.correo,
+        mentor_nombre: m.nombre || 'Mentor',
+        mentor_correo: '',
+        username: m.username,
+        foto: m.foto,
         estrellas_mentor: m.estrellas_mentor,
         rating_promedio: m.estrellas_mentor,
-        contacto: m.contacto
+        contacto: ''
     }));
 
-    return { data: transformed, error };
+    return { data: transformed, error: null };
 }
 
-// En tu archivo database.js o donde tengas searchUsers
 
 async function searchUsers(term) {
     const q = (term || "").trim();
@@ -303,6 +270,16 @@ export const searchAPI = {
             searchMentors(term),
             searchUsers(term),
         ]);
+
+        // ✅ AGREGAR ESTOS LOGS
+        console.log('🔍 Resultados individuales:', {
+            profesores: { data: prof.data, error: prof.error },
+            materias: { data: mat.data, error: mat.error },
+            apuntes: { data: ap.data, error: ap.error },
+            mentores: { data: men.data, error: men.error },
+            usuarios: { data: users.data, error: users.error }
+        });
+
         return {
             data: {
                 profesores: prof.data ?? [],
@@ -994,7 +971,7 @@ export const notificationsAPI = {
                 emisor:usuario!notificaciones_emisor_id_fkey(
                     id_usuario,
                     nombre,
-                    avatar_url
+                    foto
                 )
             `)
             .eq('usuario_id', usuarioData.id_usuario)

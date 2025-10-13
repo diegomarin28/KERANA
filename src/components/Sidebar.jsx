@@ -2,12 +2,14 @@ import { useEffect, useRef, useState } from "react";
 import { supabase } from "../supabase";
 import { useMentorStatus } from '../hooks/useMentorStatus';
 import AuthModal_SignIn from "../components/AuthModal_SignIn";
+import { useSidebarStats } from '../hooks/useSidebarStats';
 
 export default function Sidebar({ open, onClose, isAuthenticated, user, onLogout, onGo, onOpenAuth }) {
     const panelRef = useRef(null);
     const [authOpen, setAuthOpen] = useState(false);
 
     const { isMentor, loading: checkingMentor, refetch } = useMentorStatus(false);
+    const { credits, seguidores, siguiendo, apuntes, loading: loadingStats } = useSidebarStats();
 
     useEffect(() => {
         if (open) {
@@ -38,9 +40,6 @@ export default function Sidebar({ open, onClose, isAuthenticated, user, onLogout
 
     const username = user?.name || user?.username || "Invitado";
     const letter = (username[0] || "U").toUpperCase();
-    const credits = user?.credits ?? 0;
-    const followers = user?.followers ?? 0;
-    const following = user?.following ?? 0;
 
     const go = (path) => {
         onGo?.(path);
@@ -151,10 +150,11 @@ export default function Sidebar({ open, onClose, isAuthenticated, user, onLogout
                                     ✓ MENTOR
                                 </div>
                             )}
-                            <div style={statsContainerStyle}>
-                                <StatLink onClick={() => go("/profile/credits")} label="Créditos" value={credits} />
-                                <StatLink onClick={() => go("/profile/followers")} label="Seguidores" value={followers} />
-                                <StatLink onClick={() => go("/profile/following")} label="Seguidos" value={following} />
+                            <div style={{ display: "flex", gap: 6, fontSize: 12, opacity: .9 }}>
+                                <StatLink onClick={() => go("/credits")} label="Créditos" value={credits} />
+                                <StatLink onClick={() => go("/profile/followers")} label="Seguidores" value={seguidores} />
+                                <StatLink onClick={() => go("/profile/following")} label="Siguiendo" value={siguiendo} />
+                                <StatLink onClick={() => go("/my_papers")} label="Apuntes" value={apuntes} />
                             </div>
                         </div>
                     </div>
@@ -194,9 +194,9 @@ export default function Sidebar({ open, onClose, isAuthenticated, user, onLogout
 
                     <Group title="Ayuda" />
                     <MenuLink icon="📞" label="Contacto" onClick={() => go("/contact")} />
-                    <MenuLink icon="❓" label="Centro de ayuda" onClick={() => go("/help")} />
+                    <MenuLink icon="❓" label="Centro de ayuda" onClick={() => go("/help-center")} />
                     <MenuLink icon="📄" label="Términos y condiciones" onClick={() => go("/terms")} />
-                    <MenuLink icon="🔐" label="Política de privacidad" onClick={() => go("/privacy")} />
+                    <MenuLink icon="🔒" label="Política de privacidad" onClick={() => go("/privacy")} />
 
                     {/* SESIÓN */}
                     {!isAuthenticated ? (
@@ -293,7 +293,7 @@ const usernameStyle = {
 
 const statsContainerStyle = {
     display: "flex",
-    gap: 12,
+    gap: 6,
     fontSize: 12,
     opacity: .9
 };
@@ -467,10 +467,10 @@ const statLinkStyle = {
     alignItems: "center",
     gap: 2,
     cursor: "pointer",
-    padding: "6px 8px",
+    padding: "4px 6px",
     borderRadius: 6,
     transition: "background 0.2s ease",
-    minWidth: 50,
+    minWidth: 45
 };
 
 function Badge({ children }) {
