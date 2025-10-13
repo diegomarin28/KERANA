@@ -336,22 +336,85 @@
                                 Calificación obtenida * (mínimo 8)
                             </label>
                             <input
-                                type="number"
-                                   min="8"
-                                max="12"
-                                step="any"
+                                type="text"
                                 value={formData.calificacion}
-                                onChange={(e) => setFormData({ ...formData, calificacion: e.target.value })}
+                                onChange={(e) => {
+                                    const val = e.target.value;
+                                    // Limpiar error al escribir
+                                    if (error) setError('');
+
+                                    // Permitir solo dígitos
+                                    if (/^\d*$/.test(val)) {
+                                        setFormData({ ...formData, calificacion: val });
+                                    }
+                                }}
+                                onBlur={() => {
+                                    // Validar el rango cuando el input pierde foco
+                                    const num = Number(formData.calificacion);
+                                    if (formData.calificacion !== '' && (num < 8 || num > 12)) {
+                                        setError('Por favor ingrese un valor entre 8 y 12');
+                                        setFormData({ ...formData, calificacion: '' });
+                                    }
+                                }}
                                 placeholder="Ej: 10"
                                 style={{
                                     width: '100%',
                                     padding: 12,
-                                    border: '1px solid #d1d5db',
+                                    border: error && !formData.calificacion ? '2px solid #ef4444' : '1px solid #d1d5db',
                                     borderRadius: 8,
-                                    fontSize: 14
+                                    fontSize: 14,
+                                    outline: 'none'
                                 }}
                                 disabled={loading}
                             />
+
+                            {/* Mensaje de error */}
+                            {error && !formData.calificacion && (
+                                <div style={{
+                                    marginTop: 8,
+                                    display: 'flex',
+                                    alignItems: 'flex-start',
+                                    gap: 8,
+                                    color: '#dc2626'
+                                }}>
+                                    <svg
+                                        style={{ width: 20, height: 20, flexShrink: 0, marginTop: 2 }}
+                                        fill="currentColor"
+                                        viewBox="0 0 20 20"
+                                    >
+                                        <path
+                                            fillRule="evenodd"
+                                            d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z"
+                                            clipRule="evenodd"
+                                        />
+                                    </svg>
+                                    <span style={{ fontSize: 14 }}>{error}</span>
+                                </div>
+                            )}
+
+                            {/* Indicador de éxito */}
+                            {formData.calificacion && Number(formData.calificacion) >= 8 && Number(formData.calificacion) <= 12 && (
+                                <div style={{
+                                    marginTop: 8,
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    gap: 8,
+                                    color: '#16a34a'
+                                }}>
+                                    <svg
+                                        style={{ width: 20, height: 20 }}
+                                        fill="currentColor"
+                                        viewBox="0 0 20 20"
+                                    >
+                                        <path
+                                            fillRule="evenodd"
+                                            d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z"
+                                            clipRule="evenodd"
+                                        />
+                                    </svg>
+                                    <span style={{ fontSize: 14 }}>Valor válido: {formData.calificacion}</span>
+                                </div>
+                            )}
                         </div>
 
                         <div style={{ marginBottom: 24 }}>
