@@ -3,12 +3,13 @@ import { useNavigate } from 'react-router-dom';
 import { supabase } from '../supabase';
 import { Card } from '../components/ui/Card';
 import PDFThumbnail from '../components/PDFThumbnail';
+import ApunteCard from "../components/ApunteCard";
 
 export default function Notes() {
     const [notes, setNotes] = useState([]);
     const [loading, setLoading] = useState(true);
     const [searchTerm, setSearchTerm] = useState('');
-    const [signedUrls, setSignedUrls] = useState({}); // 🆕 Estado para signed URLs
+    const [signedUrls, setSignedUrls] = useState({});
     const navigate = useNavigate();
 
     useEffect(() => {
@@ -114,96 +115,13 @@ export default function Notes() {
                     gap: 20
                 }}>
                     {filteredNotes.map(note => (
-                        <Card
+                        <ApunteCard
                             key={note.id_apunte}
-                            style={{
-                                padding: 0,
-                                cursor: 'pointer',
-                                transition: 'transform 0.2s, box-shadow 0.2s',
-                                overflow: 'hidden'
+                            note={{
+                                ...note,
+                                signedUrl: signedUrls[note.id_apunte] || null
                             }}
-                            onClick={() => navigate(`/apuntes/${note.id_apunte}`)}
-                            onMouseEnter={(e) => {
-                                e.currentTarget.style.transform = 'translateY(-4px)';
-                                e.currentTarget.style.boxShadow = '0 8px 16px rgba(0,0,0,0.1)';
-                            }}
-                            onMouseLeave={(e) => {
-                                e.currentTarget.style.transform = 'translateY(0)';
-                                e.currentTarget.style.boxShadow = 'none';
-                            }}
-                        >
-                            {/* 🆕 Vista previa del PDF */}
-                            <PDFThumbnail
-                                url={signedUrls[note.id_apunte] || null}
-                                width={280}
-                                height={160}
-                            />
-
-                            {/* Contenido de la card */}
-                            <div style={{ padding: 16 }}>
-                                <h3 style={{ margin: '0 0 8px 0', fontSize: 16 }}>
-                                    {note.titulo}
-                                </h3>
-                                <div style={{
-                                    display: 'flex',
-                                    alignItems: 'center',
-                                    gap: 8,
-                                    marginBottom: 8,
-                                    flexWrap: 'wrap'
-                                }}>
-                                    <span style={{
-                                        padding: '2px 8px',
-                                        background: '#dbeafe',
-                                        color: '#1e40af',
-                                        borderRadius: 12,
-                                        fontSize: 12,
-                                        fontWeight: 500
-                                    }}>
-                                        {note.materia?.nombre_materia || 'Sin materia'}
-                                    </span>
-                                    {note.estrellas > 0 && (
-                                        <span style={{ color: '#f59e0b', fontSize: 14 }}>
-                                            {'★'.repeat(note.estrellas)}
-                                        </span>
-                                    )}
-                                </div>
-
-                                {note.descripcion && (
-                                    <p style={{
-                                        color: '#6b7280',
-                                        fontSize: 14,
-                                        marginBottom: 12,
-                                        lineHeight: 1.4
-                                    }}>
-                                        {note.descripcion.length > 80
-                                            ? note.descripcion.substring(0, 80) + '...'
-                                            : note.descripcion}
-                                    </p>
-                                )}
-
-                                <div style={{
-                                    display: 'flex',
-                                    justifyContent: 'space-between',
-                                    alignItems: 'center',
-                                    paddingTop: 12,
-                                    borderTop: '1px solid #e5e7eb'
-                                }}>
-                                    <span style={{ fontSize: 13, color: '#6b7280' }}>
-                                        Por {note.usuario?.nombre || 'Anónimo'}
-                                    </span>
-                                    <span style={{
-                                        padding: '4px 10px',
-                                        background: '#fef3c7',
-                                        color: '#92400e',
-                                        borderRadius: 12,
-                                        fontSize: 12,
-                                        fontWeight: 600
-                                    }}>
-                                        {note.creditos} 💰
-                                    </span>
-                                </div>
-                            </div>
-                        </Card>
+                        />
                     ))}
                 </div>
             )}
