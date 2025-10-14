@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { ratingsAPI } from "../api/database";
+import { ratingsAPI } from "../api/Database";
 import { supabase } from "../supabase";
 
 // Componente de estrellas interactivo
@@ -212,11 +212,18 @@ const WorkloadSlider = ({ value, onChange }) => {
     );
 };
 
-export default function AuthModal_HacerResenia({ open, onClose, onSave, courseId }) {
+export default function AuthModal_HacerResenia({
+                                                   open,
+                                                   onClose,
+                                                   onSave,
+                                                   preSelectedEntity = null // {id, nombre, tipo}
+                                               }) {
+    const isPreSelected = !!preSelectedEntity;
+
     const [form, setForm] = useState({
-        tipo: "profesor", // "profesor" o "mentor"
-        selectedEntity: null, // {id, nombre}
-        selectedMateria: null, // {id, nombre}
+        tipo: preSelectedEntity?.tipo || "profesor",
+        selectedEntity: preSelectedEntity || null,
+        selectedMateria: null,
         rating: 5,
         titulo: "",
         texto: "",
@@ -227,7 +234,7 @@ export default function AuthModal_HacerResenia({ open, onClose, onSave, courseId
     const [errors, setErrors] = useState({});
     const [isSubmitting, setIsSubmitting] = useState(false);
 
-    // Estados para búsqueda
+    // Estados para búsqueda (solo si NO está preseleccionado)
     const [searchTerm, setSearchTerm] = useState("");
     const [searchResults, setSearchResults] = useState([]);
     const [searchLoading, setSearchLoading] = useState(false);
@@ -237,16 +244,9 @@ export default function AuthModal_HacerResenia({ open, onClose, onSave, courseId
     const [materias, setMaterias] = useState([]);
     const [loadingMaterias, setLoadingMaterias] = useState(false);
 
-    // Función para normalizar texto (sin tildes)
-    const normalizeText = (text) => {
-        return text
-            .normalize("NFD")
-            .replace(/[\u0300-\u036f]/g, "")
-            .toLowerCase();
-    };
-
-    // Búsqueda de profesores/mentores
+    // Búsqueda de profesores/mentores (solo si no está preseleccionado)
     useEffect(() => {
+        if (isPreSelected) return;
         if (!searchTerm.trim()) {
             setSearchResults([]);
             return;
@@ -291,7 +291,7 @@ export default function AuthModal_HacerResenia({ open, onClose, onSave, courseId
         }, 300);
 
         return () => clearTimeout(debounce);
-    }, [searchTerm, form.tipo]);
+    }, [searchTerm, form.tipo, isPreSelected]);
 
     // Cargar materias cuando se selecciona una entidad
     useEffect(() => {
@@ -388,8 +388,8 @@ export default function AuthModal_HacerResenia({ open, onClose, onSave, courseId
 
                 // Limpiar formulario
                 setForm({
-                    tipo: "profesor",
-                    selectedEntity: null,
+                    tipo: isPreSelected ? preSelectedEntity.tipo : "profesor",
+                    selectedEntity: isPreSelected ? preSelectedEntity : null,
                     selectedMateria: null,
                     rating: 5,
                     titulo: "",
@@ -456,7 +456,12 @@ export default function AuthModal_HacerResenia({ open, onClose, onSave, courseId
                         paddingBottom: 12,
                         borderBottom: "1px solid #e5e7eb"
                     }}>
-                        <h3 style={{ margin: 0 }}>Hacer reseña</h3>
+                        <h3 style={{ margin: 0 }}>
+                            {isPreSelected
+                                ? `Hacer reseña a ${form.selectedEntity.nombre}`
+                                : "Hacer reseña"
+                            }
+                        </h3>
                         <button
                             onClick={onClose}
                             style={{
@@ -474,200 +479,204 @@ export default function AuthModal_HacerResenia({ open, onClose, onSave, courseId
                         </button>
                     </div>
 
-                    {/* Selector de tipo (Profesor o Mentor) */}
-                    <label style={{ display: "grid", gap: 8 }}>
-                        <span style={{ fontWeight: 600 }}>
-                            Tipo de reseña <span style={{color: "#ef4444"}}>*</span>
-                        </span>
-                        <div style={{ display: "flex", gap: 12 }}>
-                            <button
-                                type="button"
-                                onClick={() => {
-                                    setForm({
-                                        ...form,
-                                        tipo: "profesor",
-                                        selectedEntity: null,
-                                        selectedMateria: null
-                                    });
-                                    setSearchTerm("");
-                                    setErrors({});
-                                }}
-                                style={{
-                                    flex: 1,
-                                    height: 48,
-                                    borderRadius: 10,
-                                    border: form.tipo === "profesor" ? "2px solid #2563eb" : "1px solid #d1d5db",
-                                    background: form.tipo === "profesor" ? "#eff6ff" : "#fff",
-                                    color: form.tipo === "profesor" ? "#2563eb" : "#6b7280",
-                                    cursor: "pointer",
-                                    fontWeight: 600,
-                                    display: "flex",
-                                    alignItems: "center",
-                                    justifyContent: "center",
-                                    gap: 8,
-                                    transition: "all 0.2s ease"
-                                }}
-                            >
-                                <span style={{ fontSize: 20 }}>👨‍🏫</span>
-                                Profesor
-                            </button>
-                            <button
-                                type="button"
-                                onClick={() => {
-                                    setForm({
-                                        ...form,
-                                        tipo: "mentor",
-                                        selectedEntity: null,
-                                        selectedMateria: null
-                                    });
-                                    setSearchTerm("");
-                                    setErrors({});
-                                }}
-                                style={{
-                                    flex: 1,
-                                    height: 48,
-                                    borderRadius: 10,
-                                    border: form.tipo === "mentor" ? "2px solid #2563eb" : "1px solid #d1d5db",
-                                    background: form.tipo === "mentor" ? "#eff6ff" : "#fff",
-                                    color: form.tipo === "mentor" ? "#2563eb" : "#6b7280",
-                                    cursor: "pointer",
-                                    fontWeight: 600,
-                                    display: "flex",
-                                    alignItems: "center",
-                                    justifyContent: "center",
-                                    gap: 8,
-                                    transition: "all 0.2s ease"
-                                }}
-                            >
-                                <span style={{ fontSize: 20 }}>🎓</span>
-                                Mentor
-                            </button>
-                        </div>
-                    </label>
-
-                    {/* Buscador de profesor/mentor */}
-                    <label style={{ display: "grid", gap: 8, position: "relative" }}>
-                        <span style={{ fontWeight: 600 }}>
-                            Buscar {form.tipo} <span style={{color: "#ef4444"}}>*</span>
-                        </span>
-
-                        {!form.selectedEntity ? (
-                            <>
-                                <input
-                                    type="text"
-                                    value={searchTerm}
-                                    onChange={(e) => {
-                                        setSearchTerm(e.target.value);
-                                        setShowSuggestions(true);
-                                        if (errors.selectedEntity) setErrors({...errors, selectedEntity: ""});
-                                    }}
-                                    onFocus={() => setShowSuggestions(true)}
-                                    placeholder={`Escribí el nombre del ${form.tipo}...`}
-                                    style={{
-                                        height: 44,
-                                        border: errors.selectedEntity ? "2px solid #ef4444" : "1px solid #d1d5db",
-                                        borderRadius: 10,
-                                        padding: "0 12px",
-                                        outline: "none",
-                                        transition: "border-color 0.2s ease"
-                                    }}
-                                />
-
-                                {/* Sugerencias */}
-                                {showSuggestions && searchTerm.trim() && (
-                                    <div style={{
-                                        position: "absolute",
-                                        top: "100%",
-                                        left: 0,
-                                        right: 0,
-                                        marginTop: 4,
-                                        background: "#fff",
-                                        border: "1px solid #d1d5db",
-                                        borderRadius: 10,
-                                        boxShadow: "0 8px 16px rgba(0,0,0,0.1)",
-                                        maxHeight: 200,
-                                        overflowY: "auto",
-                                        zIndex: 10
-                                    }}>
-                                        {searchLoading ? (
-                                            <div style={{ padding: 16, textAlign: "center", color: "#6b7280" }}>
-                                                Buscando...
-                                            </div>
-                                        ) : searchResults.length > 0 ? (
-                                            searchResults.map(result => (
-                                                <div
-                                                    key={result.id}
-                                                    onClick={(e) => {
-                                                        e.preventDefault();
-                                                        e.stopPropagation();
-                                                        setForm({...form, selectedEntity: result, selectedMateria: null});
-                                                        setSearchTerm("");
-                                                        setShowSuggestions(false);
-                                                        if (errors.selectedEntity) setErrors({...errors, selectedEntity: ""});
-                                                    }}
-                                                    style={{
-                                                        width: "100%",
-                                                        padding: "12px 16px",
-                                                        textAlign: "left",
-                                                        cursor: "pointer",
-                                                        transition: "background 0.2s ease",
-                                                        borderBottom: "1px solid #f3f4f6"
-                                                    }}
-                                                    onMouseEnter={(e) => e.currentTarget.style.background = "#f9fafb"}
-                                                    onMouseLeave={(e) => e.currentTarget.style.background = "transparent"}
-                                                >
-                                                    {result.nombre}
-                                                </div>
-                                            ))
-                                        ) : (
-                                            <div style={{ padding: 16, textAlign: "center", color: "#6b7280" }}>
-                                                No se encontraron resultados
-                                            </div>
-                                        )}
-                                    </div>
-                                )}
-                            </>
-                        ) : (
-                            <div style={{
-                                display: "flex",
-                                alignItems: "center",
-                                justifyContent: "space-between",
-                                padding: "12px 16px",
-                                background: "#f0f9ff",
-                                border: "2px solid #3b82f6",
-                                borderRadius: 10
-                            }}>
-                                <span style={{ fontWeight: 600, color: "#1e40af" }}>
-                                    {form.selectedEntity.nombre}
-                                </span>
+                    {/* Selector de tipo (Profesor o Mentor) - Solo si NO está preseleccionado */}
+                    {!isPreSelected && (
+                        <label style={{ display: "grid", gap: 8 }}>
+                            <span style={{ fontWeight: 600 }}>
+                                Tipo de reseña <span style={{color: "#ef4444"}}>*</span>
+                            </span>
+                            <div style={{ display: "flex", gap: 12 }}>
                                 <button
                                     type="button"
                                     onClick={() => {
-                                        setForm({...form, selectedEntity: null, selectedMateria: null});
+                                        setForm({
+                                            ...form,
+                                            tipo: "profesor",
+                                            selectedEntity: null,
+                                            selectedMateria: null
+                                        });
                                         setSearchTerm("");
+                                        setErrors({});
                                     }}
                                     style={{
-                                        border: "none",
-                                        background: "#3b82f6",
-                                        color: "#fff",
-                                        borderRadius: 6,
-                                        padding: "4px 12px",
+                                        flex: 1,
+                                        height: 48,
+                                        borderRadius: 10,
+                                        border: form.tipo === "profesor" ? "2px solid #2563eb" : "1px solid #d1d5db",
+                                        background: form.tipo === "profesor" ? "#eff6ff" : "#fff",
+                                        color: form.tipo === "profesor" ? "#2563eb" : "#6b7280",
                                         cursor: "pointer",
-                                        fontSize: 12,
-                                        fontWeight: 600
+                                        fontWeight: 600,
+                                        display: "flex",
+                                        alignItems: "center",
+                                        justifyContent: "center",
+                                        gap: 8,
+                                        transition: "all 0.2s ease"
                                     }}
                                 >
-                                    Cambiar
+                                    <span style={{ fontSize: 20 }}>👨‍🏫</span>
+                                    Profesor
+                                </button>
+                                <button
+                                    type="button"
+                                    onClick={() => {
+                                        setForm({
+                                            ...form,
+                                            tipo: "mentor",
+                                            selectedEntity: null,
+                                            selectedMateria: null
+                                        });
+                                        setSearchTerm("");
+                                        setErrors({});
+                                    }}
+                                    style={{
+                                        flex: 1,
+                                        height: 48,
+                                        borderRadius: 10,
+                                        border: form.tipo === "mentor" ? "2px solid #2563eb" : "1px solid #d1d5db",
+                                        background: form.tipo === "mentor" ? "#eff6ff" : "#fff",
+                                        color: form.tipo === "mentor" ? "#2563eb" : "#6b7280",
+                                        cursor: "pointer",
+                                        fontWeight: 600,
+                                        display: "flex",
+                                        alignItems: "center",
+                                        justifyContent: "center",
+                                        gap: 8,
+                                        transition: "all 0.2s ease"
+                                    }}
+                                >
+                                    <span style={{ fontSize: 20 }}>🎓</span>
+                                    Mentor
                                 </button>
                             </div>
-                        )}
+                        </label>
+                    )}
 
-                        {errors.selectedEntity && (
-                            <span style={{ color: "#ef4444", fontSize: 12 }}>
-                                {errors.selectedEntity}
+                    {/* Buscador de profesor/mentor - Solo si NO está preseleccionado */}
+                    {!isPreSelected && (
+                        <label style={{ display: "grid", gap: 8, position: "relative" }}>
+                            <span style={{ fontWeight: 600 }}>
+                                Buscar {form.tipo} <span style={{color: "#ef4444"}}>*</span>
                             </span>
-                        )}
-                    </label>
+
+                            {!form.selectedEntity ? (
+                                <>
+                                    <input
+                                        type="text"
+                                        value={searchTerm}
+                                        onChange={(e) => {
+                                            setSearchTerm(e.target.value);
+                                            setShowSuggestions(true);
+                                            if (errors.selectedEntity) setErrors({...errors, selectedEntity: ""});
+                                        }}
+                                        onFocus={() => setShowSuggestions(true)}
+                                        placeholder={`Escribí el nombre del ${form.tipo}...`}
+                                        style={{
+                                            height: 44,
+                                            border: errors.selectedEntity ? "2px solid #ef4444" : "1px solid #d1d5db",
+                                            borderRadius: 10,
+                                            padding: "0 12px",
+                                            outline: "none",
+                                            transition: "border-color 0.2s ease"
+                                        }}
+                                    />
+
+                                    {/* Sugerencias */}
+                                    {showSuggestions && searchTerm.trim() && (
+                                        <div style={{
+                                            position: "absolute",
+                                            top: "100%",
+                                            left: 0,
+                                            right: 0,
+                                            marginTop: 4,
+                                            background: "#fff",
+                                            border: "1px solid #d1d5db",
+                                            borderRadius: 10,
+                                            boxShadow: "0 8px 16px rgba(0,0,0,0.1)",
+                                            maxHeight: 200,
+                                            overflowY: "auto",
+                                            zIndex: 10
+                                        }}>
+                                            {searchLoading ? (
+                                                <div style={{ padding: 16, textAlign: "center", color: "#6b7280" }}>
+                                                    Buscando...
+                                                </div>
+                                            ) : searchResults.length > 0 ? (
+                                                searchResults.map(result => (
+                                                    <div
+                                                        key={result.id}
+                                                        onClick={(e) => {
+                                                            e.preventDefault();
+                                                            e.stopPropagation();
+                                                            setForm({...form, selectedEntity: result, selectedMateria: null});
+                                                            setSearchTerm("");
+                                                            setShowSuggestions(false);
+                                                            if (errors.selectedEntity) setErrors({...errors, selectedEntity: ""});
+                                                        }}
+                                                        style={{
+                                                            width: "100%",
+                                                            padding: "12px 16px",
+                                                            textAlign: "left",
+                                                            cursor: "pointer",
+                                                            transition: "background 0.2s ease",
+                                                            borderBottom: "1px solid #f3f4f6"
+                                                        }}
+                                                        onMouseEnter={(e) => e.currentTarget.style.background = "#f9fafb"}
+                                                        onMouseLeave={(e) => e.currentTarget.style.background = "transparent"}
+                                                    >
+                                                        {result.nombre}
+                                                    </div>
+                                                ))
+                                            ) : (
+                                                <div style={{ padding: 16, textAlign: "center", color: "#6b7280" }}>
+                                                    No se encontraron resultados
+                                                </div>
+                                            )}
+                                        </div>
+                                    )}
+                                </>
+                            ) : (
+                                <div style={{
+                                    display: "flex",
+                                    alignItems: "center",
+                                    justifyContent: "space-between",
+                                    padding: "12px 16px",
+                                    background: "#f0f9ff",
+                                    border: "2px solid #3b82f6",
+                                    borderRadius: 10
+                                }}>
+                                    <span style={{ fontWeight: 600, color: "#1e40af" }}>
+                                        {form.selectedEntity.nombre}
+                                    </span>
+                                    <button
+                                        type="button"
+                                        onClick={() => {
+                                            setForm({...form, selectedEntity: null, selectedMateria: null});
+                                            setSearchTerm("");
+                                        }}
+                                        style={{
+                                            border: "none",
+                                            background: "#3b82f6",
+                                            color: "#fff",
+                                            borderRadius: 6,
+                                            padding: "4px 12px",
+                                            cursor: "pointer",
+                                            fontSize: 12,
+                                            fontWeight: 600
+                                        }}
+                                    >
+                                        Cambiar
+                                    </button>
+                                </div>
+                            )}
+
+                            {errors.selectedEntity && (
+                                <span style={{ color: "#ef4444", fontSize: 12 }}>
+                                    {errors.selectedEntity}
+                                </span>
+                            )}
+                        </label>
+                    )}
 
                     {/* Selector de materia */}
                     {form.selectedEntity && (
