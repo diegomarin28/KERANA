@@ -4,11 +4,13 @@ import { useMentorStatus } from '../hooks/useMentorStatus';
 import AuthModal_SignIn from "../components/AuthModal_SignIn";
 import { useSidebarStats } from '../hooks/useSidebarStats';
 import { useAvatar } from '../contexts/AvatarContext';
+import { useNavigate } from 'react-router-dom';
 
 export default function Sidebar({ open, onClose, isAuthenticated, user, onLogout, onGo, onOpenAuth }) {
     const panelRef = useRef(null);
     const [authOpen, setAuthOpen] = useState(false);
     const { updateTrigger } = useAvatar();
+    const navigate = useNavigate();
 
     const { isMentor, loading: checkingMentor, refetch } = useMentorStatus(false);
     const { credits, seguidores, siguiendo, apuntes, loading: loadingStats } = useSidebarStats();
@@ -174,8 +176,8 @@ export default function Sidebar({ open, onClose, isAuthenticated, user, onLogout
                             )}
                             <div style={{ display: "flex", gap: 6, fontSize: 12, opacity: .9 }}>
                                 <StatLink onClick={() => go("/credits")} label="Créditos" value={credits} />
-                                <StatLink onClick={() => go("/profile/followers")} label="Seguidores" value={seguidores} />
-                                <StatLink onClick={() => go("/profile/following")} label="Siguiendo" value={siguiendo} />
+                                <StatLink onClick={() => navigate("/followers")} label="Seguidores" value={seguidores} />
+                                <StatLink onClick={() => navigate("/followers")} label="Siguiendo" value={siguiendo} />
                                 <StatLink onClick={() => go("/my_papers")} label="Apuntes" value={apuntes} />
                             </div>
                         </div>

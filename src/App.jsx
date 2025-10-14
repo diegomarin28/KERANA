@@ -33,7 +33,6 @@ const Suggestions = lazy(() => import("./pages/Suggestions"));
 const AmbientalImpact = lazy(() => import("./pages/AmbientalImpact"));
 const Subjects = lazy(() => import("./pages/Subjects"));
 const Purchased = lazy(() => import("./pages/Purchased"));
-const Profile = lazy(() => import("./pages/Profile"));
 const EditProfile = lazy(() => import("./pages/EditProfile"));
 const Favorites = lazy(() => import("./pages/Favorites"));
 const MyPapers = lazy(() => import("./pages/MyPapers"));
@@ -41,6 +40,8 @@ const Notifications = lazy(() => import("./pages/Notifications"));
 const Settings = lazy(() => import("./pages/Settings"));
 const NotificationBadge = lazy(() => import("./components/NotificationBadge"));
 const UserCard = lazy(() => import("./components/UserCard"));
+const Profile = lazy(() => import('./pages/Profile.jsx'));
+const FollowersPage = lazy(() => import('./pages/FollowersPage.jsx'));
 
 // Componentes cargados inmediatamente
 import AuthConfirm from './pages/AuthConfirm';
@@ -50,6 +51,8 @@ import { NotificationProvider } from "./components/NotificationProvider";
 import FollowersTest from "./pages/FollowersTest";
 import { NotificationsProvider } from './contexts/NotificationsContext';
 import NotificationsRealtimeSubscriber from "./components/NotificationsRealtimeSubscriber";
+
+
 
 const LoadingSpinner = () => (
     <div style={{ display: "flex", justifyContent: "center", alignItems: "center", height: "50vh", flexDirection: "column", gap: 16 }}>
@@ -148,6 +151,7 @@ function AppRoutes() {
                     <Route path="/edit-profile" element={<EditProfile />} />
                     <Route path="/panel" element={<AuthGuard requireAuth={true}><UserDashboard /></AuthGuard>} />
                     <Route path="/user-card" element={<UserCard />} />
+                    <Route path="/followers" element={<FollowersPage />} />
 
                     {/* Footer home */}
                     <Route path="/mision-vision" element={<MisionVision />} />

@@ -1,14 +1,14 @@
 // src/components/UserCard.jsx
 import { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom'; // ← Agregado
-import { supabase } from '../supabase'; // ← Agregado
+import { useNavigate } from 'react-router-dom';
+import { supabase } from '../supabase';
 import { useSeguidores } from '../hooks/useSeguidores';
 
 export const UserCard = ({ usuario }) => {
     const [siguiendo, setSiguiendo] = useState(false);
     const [cargando, setCargando] = useState(false);
-    const navigate = useNavigate(); // ← Agregado
-    const { seguirUsuario, dejarSeguir, obtenerMiUsuarioId } = useSeguidores();
+    const navigate = useNavigate();
+    const { seguirUsuario, dejarDeSeguir, obtenerMiUsuarioId } = useSeguidores();
 
     useEffect(() => {
         verificarSiSigo();
@@ -25,7 +25,7 @@ export const UserCard = ({ usuario }) => {
                 .eq('seguidor_id', miId)
                 .eq('seguido_id', usuario.id_usuario)
                 .eq('estado', 'activo')
-                .maybeSingle(); // ← Cambiar .single() por .maybeSingle()
+                .maybeSingle();
 
             setSiguiendo(!!data);
         } catch (error) {
@@ -37,13 +37,28 @@ export const UserCard = ({ usuario }) => {
         e.stopPropagation();
         try {
             setCargando(true);
+            console.log('[UserCard] Clickeaste seguir/dejar de seguir');
 
             if (siguiendo) {
-                await dejarSeguir(usuario.id_usuario);
-                setSiguiendo(false);
+                console.log('[UserCard] Dejando de seguir a:', usuario.id_usuario);
+                const resultado = await dejarDeSeguir(usuario.id_usuario);
+                console.log('[UserCard] Resultado dejarDeSeguir:', resultado);
+
+                if (resultado.success) {
+                    setSiguiendo(false);
+                } else {
+                    console.error('[UserCard] Error al dejar de seguir:', resultado.error);
+                }
             } else {
+                console.log('[UserCard] Siguiendo a:', usuario.id_usuario);
                 const resultado = await seguirUsuario(usuario.id_usuario);
-                setSiguiendo(resultado.estado); // 'pendiente' o 'activo'
+                console.log('[UserCard] Resultado seguirUsuario:', resultado);
+
+                if (resultado.success) {
+                    setSiguiendo(true);
+                } else {
+                    console.error('[UserCard] Error al seguir:', resultado.error);
+                }
             }
         } catch (error) {
             console.error('Error al seguir:', error);
@@ -58,7 +73,7 @@ export const UserCard = ({ usuario }) => {
 
     return (
         <div
-            onClick={irAlPerfil} // ← Click en la card navega al perfil
+            onClick={irAlPerfil}
             style={{
                 background: "white",
                 borderRadius: 12,
@@ -66,7 +81,7 @@ export const UserCard = ({ usuario }) => {
                 border: "1px solid #E5E7EB",
                 boxShadow: "0 2px 8px rgba(0,0,0,0.04)",
                 transition: "all 0.2s ease",
-                cursor: "pointer" // ← Agregar cursor pointer
+                cursor: "pointer"
             }}
             onMouseEnter={(e) => {
                 e.currentTarget.style.boxShadow = "0 8px 16px rgba(0,0,0,0.1)";
@@ -154,10 +169,8 @@ export const UserCard = ({ usuario }) => {
                     padding: '8px 16px',
                     borderRadius: '6px',
                     border: '1px solid #2563EB',
-                    background: siguiendo === 'activo' ? 'white' :
-                        siguiendo === 'pendiente' ? '#FCD34D' : '#2563EB',
-                    color: siguiendo === 'activo' ? '#2563EB' :
-                        siguiendo === 'pendiente' ? '#78350F' : 'white',
+                    background: siguiendo ? 'white' : '#2563EB',
+                    color: siguiendo ? '#2563EB' : 'white',
                     fontWeight: 600,
                     fontSize: 14,
                     cursor: cargando ? 'not-allowed' : 'pointer',
@@ -165,9 +178,7 @@ export const UserCard = ({ usuario }) => {
                     transition: 'all 0.2s ease'
                 }}
             >
-                {cargando ? 'Procesando...' :
-                    siguiendo === 'activo' ? 'Siguiendo' :
-                        siguiendo === 'pendiente' ? 'Pendiente' : 'Seguir'}
+                {cargando ? 'Procesando...' : siguiendo ? 'Siguiendo' : 'Seguir'}
             </button>
         </div>
     );
