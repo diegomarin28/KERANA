@@ -8,6 +8,7 @@ import { supabase } from "../supabase";
 import { fetchUserProfile, cleanLogout } from "../utils/authHelpers";
 import NotificationBadge from "../components/NotificationBadge";
 import { useSeguidores } from "../hooks/useSeguidores";
+import { useAvatar } from '../contexts/AvatarContext';
 
 export default function Header() {
     const [menuOpen, setMenuOpen] = useState(false);
@@ -28,13 +29,12 @@ export default function Header() {
     const avatarMenuRef = useRef(null);
     const [followStats, setFollowStats] = useState({ seguidores: 0, siguiendo: 0 });
     const { obtenerContadores } = useSeguidores();
+    const { updateTrigger } = useAvatar();
 
     const openAuthModal = () => setAuthOpen(true);
     const closeAuthModal = () => setAuthOpen(false);
 
-    useEffect(() => {
-        if (user?.id) loadUserProfile();
-    }, [location.pathname]);
+
 
     useEffect(() => {
         const onStorage = (e) => {
@@ -47,8 +47,8 @@ export default function Header() {
     }, [user?.id]);
 
     useEffect(() => {
-        setAvatarOk(true);
-    }, [userProfile?.foto]);
+        if (user?.id) loadUserProfile();
+    }, [location.pathname, updateTrigger]);
 
     useEffect(() => {
         const computeDisplayName = () => {
@@ -151,6 +151,9 @@ export default function Header() {
             return;
         }
         if (!data) return;
+
+        console.log('📸 Header: userProfile.foto =', data.foto); // ← AGREGAR
+        console.log('📸 Header: getAppAvatarSrc =', getAppAvatarSrc(data.foto)); // ← AGREGAR
 
         setUserProfile(data);
 
@@ -359,9 +362,14 @@ export default function Header() {
 
     function getAppAvatarSrc(raw) {
         const url = (raw || "").trim();
-        const isHttp = /^https?:\/\//.test(url);
-        const isSupabasePublic = isHttp && url.includes("/storage/v1/object/public/");
-        return isSupabasePublic ? url : "";
+        if (!url) return "";
+
+        // Aceptar cualquier URL HTTP/HTTPS válida
+        const isValidUrl = /^https?:\/\/.+/.test(url);
+
+        console.log('📸 getAppAvatarSrc:', { raw, url, isValidUrl }); // DEBUG
+
+        return isValidUrl ? url : "";
     }
 
     const iconButtonStyle = {
@@ -378,6 +386,12 @@ export default function Header() {
         outline: "none",
         transition: "all 0.2s ease",
     };
+
+    // ANTES del return del Sidebar (línea ~685)
+    console.log('🔍 Header preparando Sidebar, userProfile:', userProfile);
+    console.log('🔍 Header userProfile.foto:', userProfile?.foto);
+    console.log('🔍 Header getAppAvatarSrc resultado:', getAppAvatarSrc(userProfile?.foto));
+
 
     return (
         <>
@@ -761,6 +775,8 @@ export default function Header() {
             </header>
 
             <div style={{ height: 64 }} />
+
+
 
             <Sidebar
                 open={menuOpen}

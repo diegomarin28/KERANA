@@ -81,7 +81,7 @@ export default function SearchBar() {
                     });
                 }
 
-                // Buscar usuarios (prioridad 4) - NUEVO
+                // Buscar usuarios (prioridad 4)
                 const { data: usuarios, error: usuariosError } = await supabase
                     .rpc('buscar_usuarios_sin_tildes', { termino: term });
 
@@ -100,23 +100,6 @@ export default function SearchBar() {
                 }
 
                 setSuggestions(results);
-
-                // Buscar mentores (prioridad 5)
-                const { data: mentores, error: mentoresError } = await supabase
-                    .rpc('buscar_mentores_sin_tildes', { termino: term });
-
-                if (!mentoresError && mentores) {
-                    mentores.forEach(m => {
-                        results.push({
-                            type: 'mentor',
-                            id: m.id_mentor,
-                            text: m.nombre,
-                            username: m.username,
-                            foto: m.foto,
-                            icon: '🎓'
-                        });
-                    });
-                }
 
             } catch (err) {
                 console.error('Error general en búsqueda:', err);
@@ -159,18 +142,8 @@ export default function SearchBar() {
         saveRecent(suggestion.text);
         setOpen(false);
 
-        if (suggestion.type === 'materia') {
-            navigate(`/search?q=${encodeURIComponent(suggestion.text)}&type=materia`);
-        } else if (suggestion.type === 'profesor') {
-            navigate(`/search?q=${encodeURIComponent(suggestion.text)}&type=profesor`);
-        } else if (suggestion.type === 'apunte') {
-            navigate(`/search?q=${encodeURIComponent(suggestion.text)}&type=apunte`);
-        } else if (suggestion.type === 'usuario') {
-            navigate(`/search?q=${encodeURIComponent(suggestion.text)}&type=usuario`);
-        }
-        else if (suggestion.type === 'mentor') {
-            navigate(`/search?q=${encodeURIComponent(suggestion.text)}&type=mentor`);
-        }
+        // CAMBIO: Manda singular (materia, profesor, apunte, usuario, mentor)
+        navigate(`/search?q=${encodeURIComponent(suggestion.text)}&type=${suggestion.type}`);
     };
 
     const handleRecentSearch = (term) => {
@@ -183,7 +156,6 @@ export default function SearchBar() {
     const showSuggestions = q.trim() && suggestions.length > 0;
     const showNoResults = q.trim() && !loading && suggestions.length === 0;
 
-    // Función para renderizar el contenido de cada sugerencia
     const renderSuggestionContent = (suggestion) => {
         if (suggestion.type === 'usuario') {
             return (
@@ -344,7 +316,7 @@ export default function SearchBar() {
                                         textTransform: "uppercase",
                                         fontWeight: 600,
                                         position: 'absolute',
-                                        right: '35px', //com esto traemos mas a la derecha lo de apunte, profesor y usuario en las sugerencias del search bar, creo q esta bien asi igual.
+                                        right: '35px',
                                         textAlign: 'right',
                                         flexShrink: 0,
                                         whiteSpace: 'nowrap'

@@ -6,6 +6,36 @@ export function useSeguidores() {
     const [error, setError] = useState(null);
 
     /**
+     * Obtener mi ID de usuario desde auth
+     */
+    const obtenerMiUsuarioId = useCallback(async () => {
+        try {
+            const { data: { user }, error: authError } = await (await import('../supabase')).supabase.auth.getUser();
+
+            if (authError || !user) {
+                console.error('[useSeguidores] Error obteniendo user auth:', authError);
+                return null;
+            }
+
+            const { data, error: dbError } = await (await import('../supabase')).supabase
+                .from('usuario')
+                .select('id_usuario')
+                .eq('auth_id', user.id)
+                .maybeSingle();
+
+            if (dbError || !data) {
+                console.error('[useSeguidores] Error obteniendo id_usuario:', dbError);
+                return null;
+            }
+
+            return data.id_usuario;
+        } catch (e) {
+            console.error('[useSeguidores] Exception en obtenerMiUsuarioId:', e);
+            return null;
+        }
+    }, []);
+
+    /**
      * Seguir a un usuario
      */
     const seguirUsuario = useCallback(async (usuarioId) => {
@@ -157,6 +187,7 @@ export function useSeguidores() {
         obtenerSeguidores,
         obtenerSiguiendo,
         obtenerContadores,
+        obtenerMiUsuarioId,
     };
 }
 

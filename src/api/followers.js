@@ -2,22 +2,59 @@ import { supabase } from '../supabase';
 
 export const followersAPI = {
     /**
-     * Seguir a un usuario
+     * Obtener mi ID de usuario actual
+     */
+    async obtenerMiId() {
+        try {
+            const { data: miId } = await supabase.rpc('obtener_usuario_actual_id');
+            return miId;
+        } catch (e) {
+            console.error('[followersAPI] Error obteniendo mi ID:', e);
+            return null;
+        }
+    },
+
+    /**
+     * Seguir a un usuario (directo, sin pendientes)
      * @param {number} usuarioId - ID del usuario a seguir
-     * @returns {Promise<{success: boolean, estado?: string, error?: string}>}
+     * @returns {Promise<{success: boolean, error?: string}>}
      */
     async seguirUsuario(usuarioId) {
         try {
-            const { data, error } = await supabase.rpc('seguir_usuario', {
-                usuario_a_seguir_id: Number(usuarioId)
-            });
+            const miId = await this.obtenerMiId();
+            if (!miId) {
+                return { success: false, error: 'Usuario no autenticado' };
+            }
+
+            // Primero verificar si ya lo sigo
+            const { data: existente } = await supabase
+                .from('seguidores')
+                .select('id')
+                .eq('seguidor_id', miId)
+                .eq('seguido_id', Number(usuarioId))
+                .maybeSingle();
+
+            if (existente) {
+                // Ya lo sigo
+                return { success: true, alreadyFollowing: true };
+            }
+
+            // Insertar relación directamente con estado 'activo'
+            const { data, error } = await supabase
+                .from('seguidores')
+                .insert({
+                    seguidor_id: miId,
+                    seguido_id: Number(usuarioId),
+                    estado: 'activo'
+                })
+                .select();
 
             if (error) {
-                console.error('[followersAPI] Error en seguir_usuario:', error);
+                console.error('[followersAPI] Error en seguirUsuario:', error);
                 return { success: false, error: error.message };
             }
 
-            return data;
+            return { success: true };
         } catch (e) {
             console.error('[followersAPI] Exception en seguirUsuario:', e);
             return { success: false, error: e.message };
@@ -30,13 +67,11 @@ export const followersAPI = {
      */
     async dejarDeSeguir(usuarioId) {
         try {
-            // Obtener mi ID
-            const { data: miId } = await supabase.rpc('obtener_usuario_actual_id');
+            const miId = await this.obtenerMiId();
             if (!miId) {
-                return { success: false, error: 'No autenticado' };
+                return { success: false, error: 'Usuario no autenticado' };
             }
 
-            // Eliminar relación
             const { error } = await supabase
                 .from('seguidores')
                 .delete()
@@ -61,7 +96,7 @@ export const followersAPI = {
      */
     async verificarSiSigue(usuarioId) {
         try {
-            const { data: miId } = await supabase.rpc('obtener_usuario_actual_id');
+            const miId = await this.obtenerMiId();
             if (!miId) return { sigue: false };
 
             const { data, error } = await supabase
@@ -179,30 +214,6 @@ export const followersAPI = {
         } catch (e) {
             console.error('[followersAPI] Exception en obtenerContadores:', e);
             return { seguidores: 0, siguiendo: 0 };
-        }
-    },
-
-    /**
-     * Responder a solicitud de seguidor (aceptar/rechazar)
-     * @param {number} seguidorId - ID del seguidor
-     * @param {boolean} aceptar - true para aceptar, false para rechazar
-     */
-    async responderSolicitud(seguidorId, aceptar) {
-        try {
-            const { data, error } = await supabase.rpc('responder_solicitud_seguidor', {
-                seguidor_id: Number(seguidorId),
-                aceptar: Boolean(aceptar)
-            });
-
-            if (error) {
-                console.error('[followersAPI] Error respondiendo solicitud:', error);
-                return { ok: false, error: error.message };
-            }
-
-            return data;
-        } catch (e) {
-            console.error('[followersAPI] Exception en responderSolicitud:', e);
-            return { ok: false, error: e.message };
         }
     }
 };
