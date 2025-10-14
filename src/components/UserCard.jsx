@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { supabase } from '../supabase';
 import { useSeguidores } from '../hooks/useSeguidores';
 
+
 export const UserCard = ({ usuario }) => {
     const [siguiendo, setSiguiendo] = useState(false);
     const [cargando, setCargando] = useState(false);

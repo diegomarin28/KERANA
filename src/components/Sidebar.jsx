@@ -265,16 +265,17 @@ export default function Sidebar({ open, onClose, isAuthenticated, user, onLogout
                 onClose={closeAuthModal}
                 onSignedIn={handleSignedIn}
             />
+
             <style>{`
-    @keyframes shimmer {
-        0% {
-            background-position: -200% 0;
-        }
-        100% {
-            background-position: 200% 0;
-        }
-    }
-`}</style>
+                @keyframes shimmer {
+                    0% {
+                        background-position: -200% 0;
+                    }
+                    100% {
+                        background-position: 200% 0;
+                    }
+                }
+            `}</style>
         </>
     );
 }
