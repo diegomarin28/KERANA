@@ -40,12 +40,13 @@ const Notifications = lazy(() => import("./pages/Notifications"));
 const Settings = lazy(() => import("./pages/Settings"));
 const NotificationBadge = lazy(() => import("./components/NotificationBadge"));
 const UserCard = lazy(() => import("./components/UserCard"));
-const ApunteView = lazy(() => import("./pages/ApunteView"));
+const PublicProfile = lazy(() => import("./pages/PublicProfile"));
 const Profile = lazy(() => import('./pages/Profile.jsx'));
 const FollowersPage = lazy(() => import('./pages/FollowersPage.jsx'));
 
 
 // Componentes cargados inmediatamente
+import ApunteView from './pages/ApunteView';
 import AuthConfirm from './pages/AuthConfirm';
 import AuthModal_SignIn from "./components/AuthModal_SignIn";
 import PrivacyBanner from './components/PrivacyBanner';
@@ -172,6 +173,7 @@ function AppRoutes() {
                     <Route path="/mentors" element={<Mentors />} />
                     <Route path="/notes" element={<Notes />} />
                     <Route path="/apuntes/:id" element={<ApunteView />} />
+                    <Route path="/user/:username" element={<PublicProfile />} />
 
                     {/* Autenticación */}
                     <Route path="/signin" element={<Navigate to="/?auth=signin" replace />} />

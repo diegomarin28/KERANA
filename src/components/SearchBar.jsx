@@ -7,12 +7,26 @@ export default function SearchBar() {
     const [open, setOpen] = useState(false);
     const [suggestions, setSuggestions] = useState([]);
     const [loading, setLoading] = useState(false);
+    const [currentUserId, setCurrentUserId] = useState(null);
     const [recent, setRecent] = useState(() => {
         try { return JSON.parse(localStorage.getItem("kerana_recent") || "[]"); }
         catch { return []; }
     });
     const wrapRef = useRef(null);
     const navigate = useNavigate();
+
+    // Obtener el ID del usuario actual al montar
+    useEffect(() => {
+        const fetchCurrentUserId = async () => {
+            try {
+                const { data } = await supabase.rpc('obtener_usuario_actual_id');
+                setCurrentUserId(data);
+            } catch (error) {
+                console.error('Error obteniendo usuario actual:', error);
+            }
+        };
+        fetchCurrentUserId();
+    }, []);
 
     useEffect(() => {
         const onDocDown = (e) => {
@@ -81,9 +95,12 @@ export default function SearchBar() {
                     });
                 }
 
-                // Buscar usuarios (prioridad 4)
+                // Buscar usuarios (prioridad 4) - FILTRADO POR USUARIO ACTUAL
                 const { data: usuarios, error: usuariosError } = await supabase
-                    .rpc('buscar_usuarios_sin_tildes', { termino: term });
+                    .rpc('buscar_usuarios_sin_tildes', {
+                        termino: term,
+                        usuario_actual_id: currentUserId
+                    });
 
                 if (!usuariosError && usuarios) {
                     usuarios.forEach(u => {
@@ -95,6 +112,26 @@ export default function SearchBar() {
                             icon: '👤',
                             correo: u.correo,
                             foto: u.foto
+                        });
+                    });
+                }
+
+                // Buscar mentores (prioridad 5) - FILTRADO POR USUARIO ACTUAL
+                const { data: mentores, error: mentoresError } = await supabase
+                    .rpc('buscar_mentores_sin_tildes', {
+                        termino: term,
+                        usuario_actual_id: currentUserId
+                    });
+
+                if (!mentoresError && mentores) {
+                    mentores.forEach(m => {
+                        results.push({
+                            type: 'mentor',
+                            id: m.id_mentor,
+                            text: m.nombre,
+                            username: m.username,
+                            icon: '🎓',
+                            foto: m.foto
                         });
                     });
                 }
@@ -114,7 +151,7 @@ export default function SearchBar() {
         }, 300);
 
         return () => clearTimeout(debounce);
-    }, [q]);
+    }, [q, currentUserId]);
 
     const saveRecent = (term) => {
         const t = term.trim();
@@ -142,8 +179,12 @@ export default function SearchBar() {
         saveRecent(suggestion.text);
         setOpen(false);
 
-        // CAMBIO: Manda singular (materia, profesor, apunte, usuario, mentor)
-        navigate(`/search?q=${encodeURIComponent(suggestion.text)}&type=${suggestion.type}`);
+        // Si es usuario, ir a su perfil público
+        if (suggestion.type === 'usuario') {
+            navigate(`/user/${suggestion.username}`);
+        } else {
+            navigate(`/search?q=${encodeURIComponent(suggestion.text)}&type=${suggestion.type}`);
+        }
     };
 
     const handleRecentSearch = (term) => {
@@ -157,7 +198,7 @@ export default function SearchBar() {
     const showNoResults = q.trim() && !loading && suggestions.length === 0;
 
     const renderSuggestionContent = (suggestion) => {
-        if (suggestion.type === 'usuario') {
+        if (suggestion.type === 'usuario' || suggestion.type === 'mentor') {
             return (
                 <div style={{ display: 'flex', alignItems: 'center', gap: 10, width: '100%' }}>
                     {suggestion.foto ? (

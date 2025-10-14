@@ -30,6 +30,7 @@ export default function Header() {
     const [followStats, setFollowStats] = useState({ seguidores: 0, siguiendo: 0 });
     const { obtenerContadores } = useSeguidores();
     const { updateTrigger } = useAvatar();
+    const [avatarLoading, setAvatarLoading] = useState(true);
 
     const openAuthModal = () => setAuthOpen(true);
     const closeAuthModal = () => setAuthOpen(false);
@@ -96,19 +97,26 @@ export default function Header() {
         setAvatarMenuOpen(false);
     };
 
+// Mantené el useEffect principal de initializeAuth como está (sin comentar nada)
+
     useEffect(() => {
         let mounted = true;
 
         const initializeAuth = async () => {
+
             try {
                 const { data: { session }, error } = await supabase.auth.getSession();
+
+
                 if (error) {
                     console.warn("[auth] getSession error:", error);
                     return;
                 }
-                if (mounted && session?.user) {
+
+                if (session?.user && mounted) {
                     setUser(session.user);
-                    await loadUserProfile();
+                    // Traer perfil en paralelo
+                    await loadUserProfile(session.user);
                 }
             } catch (err) {
                 console.warn("[auth] initializeAuth error:", err);
@@ -118,10 +126,12 @@ export default function Header() {
         initializeAuth();
 
         const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, session) => {
+
+
             if (!mounted) return;
+
             if (session?.user) {
                 setUser(session.user);
-                await loadUserProfile();
                 closeAuthModal();
                 setMenuOpen(false);
             } else {
@@ -138,24 +148,56 @@ export default function Header() {
         };
     }, []);
 
-    const loadUserProfile = async () => {
-        if (!user) {
+// AHORA AGREGÁ ESTE useEffect SEPARADO para cuando el usuario cambia
+// (para recargar el avatar cuando cambias de cuenta o después de editar perfil)
+    useEffect(() => {
+        if (user && userProfile === null) {
+            // Solo carga si no tenemos perfil aún
+            loadUserProfile();
+        }
+    }, [user]);
+
+// Y mantené este para detectar actualizaciones externas de perfil
+    useEffect(() => {
+        const onStorage = (e) => {
+            if (e.key === 'kerana_profile_updated' && user?.id) {
+                loadUserProfile();
+            }
+        };
+        window.addEventListener('storage', onStorage);
+        return () => window.removeEventListener('storage', onStorage);
+    }, [user?.id]);
+
+// Y este que ya tenías:
+    useEffect(() => {
+        if (user?.id) {
+            loadUserProfile();
+        }
+    }, [location.pathname, updateTrigger]);
+
+// Modifica loadUserProfile para manejar ambos casos:
+    const loadUserProfile = async (authUser = null) => {
+
+        const userToUse = authUser || user;
+        if (!userToUse) {
             setUserProfile(null);
             setDisplayName('');
             return;
         }
 
         const { data, error } = await fetchUserProfile();
+
+
         if (error) {
             console.warn("[Header] Error cargando perfil:", error);
             return;
         }
-        if (!data) return;
-
-        console.log('📸 Header: userProfile.foto =', data.foto); // ← AGREGAR
-        console.log('📸 Header: getAppAvatarSrc =', getAppAvatarSrc(data.foto)); // ← AGREGAR
+        if (!data) {
+            return;
+        }
 
         setUserProfile(data);
+        setAvatarLoading(false);
 
         if (data.username && data.username !== usernameCache) {
             localStorage.setItem("kerana_username_cache", data.username);
@@ -367,7 +409,6 @@ export default function Header() {
         // Aceptar cualquier URL HTTP/HTTPS válida
         const isValidUrl = /^https?:\/\/.+/.test(url);
 
-        console.log('📸 getAppAvatarSrc:', { raw, url, isValidUrl }); // DEBUG
 
         return isValidUrl ? url : "";
     }
@@ -386,11 +427,6 @@ export default function Header() {
         outline: "none",
         transition: "all 0.2s ease",
     };
-
-    // ANTES del return del Sidebar (línea ~685)
-    console.log('🔍 Header preparando Sidebar, userProfile:', userProfile);
-    console.log('🔍 Header userProfile.foto:', userProfile?.foto);
-    console.log('🔍 Header getAppAvatarSrc resultado:', getAppAvatarSrc(userProfile?.foto));
 
 
     return (
@@ -514,7 +550,17 @@ export default function Header() {
                                         aria-expanded={avatarMenuOpen ? "true" : "false"}
                                         aria-label="Abrir menú de usuario"
                                     >
-                                        {(() => {
+                                        {avatarLoading ? (
+                                            <div
+                                                style={{
+                                                    width: "100%",
+                                                    height: "100%",
+                                                    background: "linear-gradient(90deg, rgba(255,255,255,0.1) 0%, rgba(255,255,255,0.2) 50%, rgba(255,255,255,0.1) 100%)",
+                                                    backgroundSize: "200% 100%",
+                                                    animation: "shimmer 1.5s infinite",
+                                                }}
+                                            />
+                                        ) : (() => {
                                             const avatarSrc = getAppAvatarSrc(userProfile?.foto);
                                             return avatarSrc && avatarOk ? (
                                                 <img
@@ -806,17 +852,26 @@ export default function Header() {
             />
 
             <style>{`
-                @keyframes dropdownSlide {
-                    from {
-                        opacity: 0;
-                        transform: translateY(-12px) scale(0.96);
-                    }
-                    to {
-                        opacity: 1;
-                        transform: translateY(0) scale(1);
-                    }
-                }
-            `}</style>
+    @keyframes dropdownSlide {
+        from {
+            opacity: 0;
+            transform: translateY(-12px) scale(0.96);
+        }
+        to {
+            opacity: 1;
+            transform: translateY(0) scale(1);
+        }
+    }
+    
+    @keyframes shimmer {
+        0% {
+            background-position: -200% 0;
+        }
+        100% {
+            background-position: 200% 0;
+        }
+    }
+`}</style>
         </>
     );
 }
@@ -935,4 +990,5 @@ function SettingsIcon() {
         </svg>
     );
 }
+
 

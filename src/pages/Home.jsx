@@ -196,20 +196,13 @@ export default function Home() {
                                 style={{
                                     marginTop: 20,
                                     display: "grid",
-                                    gridTemplateColumns: "repeat(3, 1fr)", // 3 por fila
-                                    gridAutoRows: "auto",
+                                    gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))",
                                     gap: 20,
+                                    justifyItems: "center",
                                 }}
                             >
                                 {Array.from({ length: 6 }).map((_, i) => (
-                                    <div
-                                        key={i}
-                                        style={{
-                                            aspectRatio: "4 / 5",
-                                            borderRadius: 12,
-                                            background: "#f3f4f6",
-                                        }}
-                                    />
+                                    <SkeletonCard key={i} />
                                 ))}
                             </div>
                         ) : topNotes.length === 0 ? (
@@ -325,8 +318,19 @@ export default function Home() {
                         />
                     </div>
                 </section>
+                <style>{`
+    @keyframes shimmer {
+        0% {
+            background-position: -200% 0;
+        }
+        100% {
+            background-position: 200% 0;
+        }
+    }
+`}</style>
             </main>
         </div>
+
     );
 }
 
@@ -463,5 +467,20 @@ function FooterCol({ title, items }) {
                 ))}
             </ul>
         </div>
+    );
+}
+function SkeletonCard() {
+    return (
+        <div
+            style={{
+                width: "100%",
+                maxWidth: 230,
+                aspectRatio: "4 / 5",
+                borderRadius: 12,
+                background: "linear-gradient(90deg, #f3f4f6 0%, #e5e7eb 50%, #f3f4f6 100%)",
+                backgroundSize: "200% 100%",
+                animation: "shimmer 1.5s infinite",
+            }}
+        />
     );
 }

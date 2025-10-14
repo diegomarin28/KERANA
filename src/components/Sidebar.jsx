@@ -11,9 +11,16 @@ export default function Sidebar({ open, onClose, isAuthenticated, user, onLogout
     const [authOpen, setAuthOpen] = useState(false);
     const { updateTrigger } = useAvatar();
     const navigate = useNavigate();
-
+    const [avatarLoading, setAvatarLoading] = useState(true);
     const { isMentor, loading: checkingMentor, refetch } = useMentorStatus(false);
     const { credits, seguidores, siguiendo, apuntes, loading: loadingStats } = useSidebarStats();
+
+
+    useEffect(() => {
+        if (user) {
+            setAvatarLoading(false);
+        }
+    }, [user]);
 
     useEffect(() => {
         if (open) {
@@ -26,6 +33,8 @@ export default function Sidebar({ open, onClose, isAuthenticated, user, onLogout
             document.body.style.overflow = "unset";
         };
     }, [open, refetch, updateTrigger]);
+
+
 
     useEffect(() => {
         if (!open) return;
@@ -125,16 +134,25 @@ export default function Sidebar({ open, onClose, isAuthenticated, user, onLogout
                     >
                         {(() => {
                             const avatarUrl = user?.avatarUrl;
-                            console.log('👤 Sidebar avatarUrl recibido:', avatarUrl); // DEBUG
 
-                            return avatarUrl ? (
+                            return avatarLoading ? (
+                                <div
+                                    style={{
+                                        width: 48,
+                                        height: 48,
+                                        borderRadius: "50%",
+                                        background: "linear-gradient(90deg, rgba(255,255,255,0.1) 0%, rgba(255,255,255,0.2) 50%, rgba(255,255,255,0.1) 100%)",
+                                        backgroundSize: "200% 100%",
+                                        animation: "shimmer 1.5s infinite",
+                                    }}
+                                />
+                            ) : avatarUrl ? (
                                 <>
                                     <img
                                         src={avatarUrl}
                                         alt={username}
                                         style={avatarImageStyle}
                                         onError={(e) => {
-                                            console.log('❌ Sidebar: Error cargando imagen');
                                             e.target.style.display = 'none';
                                             if (e.target.nextSibling) {
                                                 e.target.nextSibling.style.display = 'grid';
@@ -247,6 +265,16 @@ export default function Sidebar({ open, onClose, isAuthenticated, user, onLogout
                 onClose={closeAuthModal}
                 onSignedIn={handleSignedIn}
             />
+            <style>{`
+    @keyframes shimmer {
+        0% {
+            background-position: -200% 0;
+        }
+        100% {
+            background-position: 200% 0;
+        }
+    }
+`}</style>
         </>
     );
 }

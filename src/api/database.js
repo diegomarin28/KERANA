@@ -1151,3 +1151,252 @@ export const followersAPI = {
         return { data: !!data, error }
     }
 }
+// AGREGAR AL FINAL DE database.js (después de followersAPI)
+
+// ==========================================
+// 👤 PERFIL PÚBLICO
+// ==========================================
+export const publicProfileAPI = {
+    // Obtener perfil público por username
+    async getPublicProfile(username) {
+        const { data, error } = await supabase
+            .from('usuario')
+            .select(`
+                id_usuario,
+                nombre,
+                username,
+                foto,
+                correo,
+                perfil_publico,
+                mostrar_email,
+                fecha_creado
+            `)
+            .eq('username', username.toLowerCase())
+            .maybeSingle();
+
+        if (error) return { data: null, error };
+        if (!data) return { data: null, error: { message: 'Usuario no encontrado' } };
+
+        // Si el perfil no es público, retornar error
+        if (!data.perfil_publico) {
+            return { data: null, error: { message: 'Este perfil es privado' } };
+        }
+
+        return { data, error: null };
+    },
+
+    // Obtener estadísticas del usuario
+    async getPublicStats(userId) {
+        try {
+            // Apuntes subidos
+            const { count: apuntesCount } = await supabase
+                .from('apunte')
+                .select('*', { count: 'exact', head: true })
+                .eq('id_usuario', userId);
+
+            // Reseñas escritas
+            const { count: resenasCount } = await supabase
+                .from('rating')
+                .select('*', { count: 'exact', head: true })
+                .eq('user_id', userId);
+
+            // Seguidores
+            const { count: seguidoresCount } = await supabase
+                .from('seguidores')
+                .select('*', { count: 'exact', head: true })
+                .eq('seguido_id', userId)
+                .eq('estado', 'activo');
+
+            // Siguiendo
+            const { count: siguiendoCount } = await supabase
+                .from('seguidores')
+                .select('*', { count: 'exact', head: true })
+                .eq('seguidor_id', userId)
+                .eq('estado', 'activo');
+
+            return {
+                data: {
+                    apuntes: apuntesCount || 0,
+                    resenas: resenasCount || 0,
+                    seguidores: seguidoresCount || 0,
+                    siguiendo: siguiendoCount || 0
+                },
+                error: null
+            };
+        } catch (error) {
+            console.error('Error obteniendo stats:', error);
+            return { data: null, error };
+        }
+    },
+
+    // Verificar si el usuario es mentor
+    async checkIfMentor(userId) {
+        const { data, error } = await supabase
+            .from('mentor')
+            .select(`
+                id_mentor,
+                estrellas_mentor,
+                contacto,
+                descripcion
+            `)
+            .eq('id_usuario', userId)
+            .maybeSingle();
+
+        if (error) return { data: null, error };
+
+        // Si es mentor, obtener sus materias
+        if (data) {
+            const { data: materias } = await supabase
+                .from('mentor_materia')
+                .select(`
+                    id_materia,
+                    materia(nombre_materia, semestre)
+                `)
+                .eq('id_mentor', data.id_mentor);
+
+            data.materias = materias || [];
+        }
+
+        return { data, error: null };
+    },
+
+    // Obtener últimos apuntes del usuario (para el carrusel)
+    async getRecentNotes(userId, limit = 4) {
+        const { data, error } = await supabase
+            .from('apunte')
+            .select(`
+                id_apunte,
+                titulo,
+                descripcion,
+                created_at,
+                id_materia,
+                materia(nombre_materia),
+                estrellas,
+                portada_url
+            `)
+            .eq('id_usuario', userId)
+            .order('created_at', { ascending: false })
+            .limit(limit);
+
+        // Transformar para que funcione con NoteCard
+        const transformed = (data || []).map(note => ({
+            id_apunte: note.id_apunte,
+            titulo: note.titulo,
+            descripcion: note.descripcion,
+            materia_nombre: note.materia?.nombre_materia,
+            estrellas: note.estrellas,
+            portada_url: note.portada_url,
+            created_at: note.created_at
+        }));
+
+        return { data: transformed, error };
+    },
+
+    // Obtener TODOS los apuntes con filtro opcional por materia
+    async getAllNotes(userId, materiaId = null) {
+        let query = supabase
+            .from('apunte')
+            .select(`
+                id_apunte,
+                titulo,
+                descripcion,
+                created_at,
+                id_materia,
+                materia(nombre_materia),
+                estrellas,
+                portada_url
+            `)
+            .eq('id_usuario', userId)
+            .order('created_at', { ascending: false });
+
+        if (materiaId) {
+            query = query.eq('id_materia', materiaId);
+        }
+
+        const { data, error } = await query;
+
+        // Transformar para que funcione con NoteCard
+        const transformed = (data || []).map(note => ({
+            id_apunte: note.id_apunte,
+            titulo: note.titulo,
+            descripcion: note.descripcion,
+            materia_nombre: note.materia?.nombre_materia,
+            estrellas: note.estrellas,
+            portada_url: note.portada_url,
+            created_at: note.created_at
+        }));
+
+        return { data: transformed, error };
+    },
+
+    // Obtener materias únicas del usuario (para el filtro)
+    async getUserSubjects(userId) {
+        const { data, error } = await supabase
+            .from('apunte')
+            .select(`
+                id_materia,
+                materia(id_materia, nombre_materia)
+            `)
+            .eq('id_usuario', userId);
+
+        if (error) return { data: [], error };
+
+        // Obtener materias únicas
+        const uniqueSubjects = [];
+        const seenIds = new Set();
+
+        (data || []).forEach(item => {
+            if (item.materia && !seenIds.has(item.materia.id_materia)) {
+                seenIds.add(item.materia.id_materia);
+                uniqueSubjects.push(item.materia);
+            }
+        });
+
+        return { data: uniqueSubjects, error: null };
+    },
+
+    // Obtener reseñas escritas por el usuario
+    async getUserReviews(userId, limit = 10) {
+        const { data, error } = await supabase
+            .from('rating')
+            .select(`
+                id,
+                tipo,
+                ref_id,
+                estrellas,
+                comentario,
+                titulo,
+                created_at,
+                materia_id
+            `)
+            .eq('user_id', userId)
+            .order('created_at', { ascending: false })
+            .limit(limit);
+
+        return { data, error };
+    },
+
+    // Verificar si el usuario actual sigue a este usuario
+    async isFollowing(targetUserId) {
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user) return { data: false, error: null };
+
+        const { data: currentUser } = await supabase
+            .from('usuario')
+            .select('id_usuario')
+            .eq('auth_id', user.id)
+            .single();
+
+        if (!currentUser) return { data: false, error: null };
+
+        const { data, error } = await supabase
+            .from('seguidores')
+            .select('id')
+            .eq('seguidor_id', currentUser.id_usuario)
+            .eq('seguido_id', targetUserId)
+            .eq('estado', 'activo')
+            .maybeSingle();
+
+        return { data: !!data, error };
+    }
+};
