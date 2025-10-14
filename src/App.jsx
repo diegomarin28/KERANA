@@ -5,6 +5,7 @@ import Header from "./components/Header.jsx";
 import Home from "./pages/Home.jsx";
 import AuthGuard from "./components/AuthGuard";
 import Equipo from "./pages/Equipo";
+import { AvatarProvider } from './contexts/AvatarContext';
 
 // Componentes lazy
 const HelpCenter = lazy(() => import("./pages/HelpCenter"));
@@ -113,6 +114,7 @@ function AppRoutes() {
         <>
             <Header />
             <RouteDebugger />
+
             <Suspense fallback={<LoadingSpinner />}>
                 <Routes>
                     {/* Principal */}
@@ -201,6 +203,7 @@ function AppRoutes() {
 export default function App() {
     return (
         <BrowserRouter>
+            <AvatarProvider>
             <NotificationProvider>
                 <NotificationsProvider>
                     <NotificationsRealtimeSubscriber />
@@ -208,6 +211,7 @@ export default function App() {
                     <AppRoutes />
                 </NotificationsProvider>
             </NotificationProvider>
+            </AvatarProvider>
         </BrowserRouter>
     );
 }
