@@ -21,6 +21,7 @@
         });
         const [error, setError] = useState('');
         const [uploading, setUploading] = useState(false);
+        const [successMessage, setSuccessMessage] = useState('');
         const dropdownRef = useRef(null);
 
         useEffect(() => {
@@ -143,14 +144,26 @@
                     return;
                 }
 
-                const { data: usuarioData } = await supabase
+                // Buscar usuario por auth_id
+                console.log('🔍 Buscando usuario con auth_id:', user.id);
+
+                const { data: usuarioData, error: userError } = await supabase
                     .from('usuario')
-                    .select('id_usuario, nombre, email')
+                    .select('id_usuario, nombre, correo')
                     .eq('auth_id', user.id)
                     .single();
 
+                // Log detallado para debugging
+                console.log('📊 Resultado de búsqueda:', { usuarioData, userError });
+
+                if (userError) {
+                    console.error('❌ Error buscando usuario:', userError);
+                    setError(`Error al buscar usuario: ${userError.message}. Verifica que tu cuenta esté registrada.`);
+                    return;
+                }
+
                 if (!usuarioData) {
-                    setError('No se encontró tu perfil de usuario');
+                    setError('No se encontró tu perfil de usuario en la base de datos.');
                     return;
                 }
 
@@ -197,8 +210,12 @@
                     console.log('❌ Email falló pero aplicación se guardó:', emailError);
                 }
 
-                alert('¡Postulación enviada con éxito! Te notificaremos cuando sea revisada.');
-                navigate('/');
+                setSuccessMessage('¡Tu postulación ha sido enviada con éxito! Te notificaremos por correo cuando sea revisada.');
+
+                // Esperar 2 segundos antes de redirigir para que el usuario vea el mensaje
+                setTimeout(() => {
+                    navigate('/');
+                }, 3000);
 
             } catch (err) {
                 console.error('Error al postular:', err);
@@ -225,7 +242,7 @@
                             try {
                                 const { data: usuario } = await supabase
                                     .from('usuario')
-                                    .select('nombre, email')
+                                    .select('nombre, correo')
                                     .eq('id_usuario', newRow.id_usuario)
                                     .single();
 
@@ -261,6 +278,27 @@
                 <p style={{ color: '#6b7280', marginBottom: 32 }}>
                     Compartí tu conocimiento ayudando a otros estudiantes en materias donde te fue bien.
                 </p>
+
+                {successMessage && (
+                    <Card style={{
+                        background: '#f0fdf4',
+                        border: '1px solid #86efac',
+                        color: '#166534',
+                        padding: 20,
+                        marginBottom: 20,
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: 12
+                    }}>
+                        <svg style={{ width: 24, height: 24, flexShrink: 0 }} fill="currentColor" viewBox="0 0 20 20">
+                            <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+                        </svg>
+                        <div>
+                            <div style={{ fontWeight: 600, marginBottom: 4 }}>¡Postulación enviada!</div>
+                            <div style={{ fontSize: 14 }}>{successMessage}</div>
+                        </div>
+                    </Card>
+                )}
 
                 {error && (
                     <Card style={{
@@ -341,7 +379,7 @@
                                 onChange={(e) => {
                                     const val = e.target.value;
                                     // Limpiar error al escribir
-                                    if (error) setError('');
+                                      if (error) setError('');
 
                                     // Permitir solo dígitos
                                     if (/^\d*$/.test(val)) {
