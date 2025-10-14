@@ -50,7 +50,7 @@ export async function exportUserData() {
         const { data: ratings } = await supabase
             .from('rating')
             .select('*')
-            .eq('user_id', user.id);
+            .eq('user_id', perfil.id_usuario);
 
         // Obtener datos de mentor (si aplica)
         const { data: mentor } = await supabase
@@ -187,7 +187,7 @@ export async function getUserDataSummary() {
             supabase.from('notificaciones').select('*', { count: 'exact', head: true }).eq('usuario_id', perfil.id_usuario),
             supabase.from('apunte').select('*', { count: 'exact', head: true }).eq('id_usuario', perfil.id_usuario),
             supabase.from('apunte_fav').select('*', { count: 'exact', head: true }).eq('id_usuario', perfil.id_usuario),
-            supabase.from('rating').select('*', { count: 'exact', head: true }).eq('user_id', user.id),
+            supabase.from('rating').select('*', { count: 'exact', head: true }).eq('user_id', perfil.id_usuario),
         ]);
 
         return {

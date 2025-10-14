@@ -5,6 +5,7 @@ import Header from "./components/Header.jsx";
 import Home from "./pages/Home.jsx";
 import AuthGuard from "./components/AuthGuard";
 import Equipo from "./pages/Equipo";
+import { AvatarProvider } from './contexts/AvatarContext';
 
 // Componentes lazy
 const HelpCenter = lazy(() => import("./pages/HelpCenter"));
@@ -32,7 +33,6 @@ const Suggestions = lazy(() => import("./pages/Suggestions"));
 const AmbientalImpact = lazy(() => import("./pages/AmbientalImpact"));
 const Subjects = lazy(() => import("./pages/Subjects"));
 const Purchased = lazy(() => import("./pages/Purchased"));
-const Profile = lazy(() => import("./pages/Profile"));
 const EditProfile = lazy(() => import("./pages/EditProfile"));
 const Favorites = lazy(() => import("./pages/Favorites"));
 const MyPapers = lazy(() => import("./pages/MyPapers"));
@@ -41,6 +41,9 @@ const Settings = lazy(() => import("./pages/Settings"));
 const NotificationBadge = lazy(() => import("./components/NotificationBadge"));
 const UserCard = lazy(() => import("./components/UserCard"));
 const ApunteView = lazy(() => import("./pages/ApunteView"));
+const Profile = lazy(() => import('./pages/Profile.jsx'));
+const FollowersPage = lazy(() => import('./pages/FollowersPage.jsx'));
+
 
 // Componentes cargados inmediatamente
 import AuthConfirm from './pages/AuthConfirm';
@@ -50,6 +53,8 @@ import { NotificationProvider } from "./components/NotificationProvider";
 import FollowersTest from "./pages/FollowersTest";
 import { NotificationsProvider } from './contexts/NotificationsContext';
 import NotificationsRealtimeSubscriber from "./components/NotificationsRealtimeSubscriber";
+
+
 
 const LoadingSpinner = () => (
     <div style={{ display: "flex", justifyContent: "center", alignItems: "center", height: "50vh", flexDirection: "column", gap: 16 }}>
@@ -114,6 +119,7 @@ function AppRoutes() {
         <>
             <Header />
             <RouteDebugger />
+
             <Suspense fallback={<LoadingSpinner />}>
                 <Routes>
                     {/* Principal */}
@@ -130,7 +136,7 @@ function AppRoutes() {
                     {/* Búsqueda y exploración */}
                     <Route path="/search" element={<SearchResults />} />
                     <Route path="/cursos/buscar" element={<CourseSearch />} />
-                    <Route path="/test/followers" element={<FollowersTest />} />
+                    <Route path="/test/followers" element={<FollowersPage />} />
 
                     {/* Mentoría */}
                     <Route path="/mentor/calendar" element={<MyCalendar />} />
@@ -147,6 +153,7 @@ function AppRoutes() {
                     <Route path="/edit-profile" element={<EditProfile />} />
                     <Route path="/panel" element={<AuthGuard requireAuth={true}><UserDashboard /></AuthGuard>} />
                     <Route path="/user-card" element={<UserCard />} />
+                    <Route path="/followers" element={<FollowersPage />} />
 
                     {/* Footer home */}
                     <Route path="/mision-vision" element={<MisionVision />} />
@@ -203,6 +210,7 @@ function AppRoutes() {
 export default function App() {
     return (
         <BrowserRouter>
+            <AvatarProvider>
             <NotificationProvider>
                 <NotificationsProvider>
                     <NotificationsRealtimeSubscriber />
@@ -210,6 +218,7 @@ export default function App() {
                     <AppRoutes />
                 </NotificationsProvider>
             </NotificationProvider>
+            </AvatarProvider>
         </BrowserRouter>
     );
 }
