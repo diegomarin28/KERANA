@@ -233,6 +233,7 @@ export default function AuthModal_HacerResenia({
 
     const [errors, setErrors] = useState({});
     const [isSubmitting, setIsSubmitting] = useState(false);
+    const [toast, setToast] = useState(null);
 
     // Estados para búsqueda (solo si NO está preseleccionado)
     const [searchTerm, setSearchTerm] = useState("");
@@ -268,14 +269,69 @@ export default function AuthModal_HacerResenia({
                         })));
                     }
                 } else {
-                    const { data, error } = await supabase
-                        .rpc('buscar_mentores_sin_tildes', { termino: term });
+                    // Para mentores: obtener primero los mentores, luego los usuarios
+                    const { data: mentorData, error: mentorError } = await supabase
+                        .from('mentor')
+                        .select('id_mentor, id_usuario');
 
-                    if (!error && data) {
-                        setSearchResults(data.map(m => ({
-                            id: m.id_mentor,
-                            nombre: m.nombre
-                        })));
+                    if (mentorError) {
+                        console.error('❌ Error cargando mentores:', mentorError);
+                        setSearchResults([]);
+                        return;
+                    }
+
+                    if (mentorData && mentorData.length > 0) {
+                        // Obtener los ids de usuario únicos
+                        const userIds = [...new Set(mentorData.map(m => m.id_usuario))];
+
+                        // Obtener los datos de usuarios
+                        const { data: usuariosData, error: usuariosError } = await supabase
+                            .from('usuario')
+                            .select('id_usuario, nombre')
+                            .in('id_usuario', userIds);
+
+                        if (usuariosError) {
+                            console.error('❌ Error cargando usuarios:', usuariosError);
+                            setSearchResults([]);
+                            return;
+                        }
+
+                        // Combinar datos
+                        const normalizeText = (text) =>
+                            text.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+
+                        const termNormalized = normalizeText(term);
+
+                        // Crear un Map para eliminar duplicados por id_usuario
+                        const mentoresMap = new Map();
+
+                        mentorData.forEach(m => {
+                            const usuario = usuariosData.find(u => u.id_usuario === m.id_usuario);
+
+                            if (usuario) {
+                                const nombreCompleto = usuario.nombre;
+                                const nombreNormalized = normalizeText(nombreCompleto);
+
+                                // Si coincide con la búsqueda
+                                if (nombreNormalized.includes(termNormalized)) {
+                                    const usuarioKey = `${m.id_usuario}`;
+
+                                    // Solo agregar si no existe o reemplazar con id_mentor más alto
+                                    const existing = mentoresMap.get(usuarioKey);
+                                    if (!existing || m.id_mentor > existing.id) {
+                                        mentoresMap.set(usuarioKey, {
+                                            id: m.id_mentor,
+                                            nombre: nombreCompleto
+                                        });
+                                    }
+                                }
+                            }
+                        });
+
+                        console.log('✅ Mentores filtrados:', Array.from(mentoresMap.values()));
+                        setSearchResults(Array.from(mentoresMap.values()));
+                    } else {
+                        setSearchResults([]);
                     }
                 }
             } catch (error) {
@@ -316,16 +372,64 @@ export default function AuthModal_HacerResenia({
                         })));
                     }
                 } else {
+                    // Para mentores: obtener TODAS las materias de TODOS los id_mentor del usuario
+                    console.log('🔍 Buscando materias para id_mentor:', form.selectedEntity.id);
+
+                    // Primero obtener el id_usuario del mentor seleccionado
+                    const { data: mentorData, error: mentorError } = await supabase
+                        .from('mentor')
+                        .select('id_usuario')
+                        .eq('id_mentor', form.selectedEntity.id)
+                        .single();
+
+                    if (mentorError || !mentorData) {
+                        console.error('❌ Error obteniendo mentor:', mentorError);
+                        setMaterias([]);
+                        setLoadingMaterias(false);
+                        return;
+                    }
+
+                    console.log('👤 ID Usuario del mentor:', mentorData.id_usuario);
+
+                    // Obtener TODOS los id_mentor de ese usuario
+                    const { data: todosMentores, error: todosMentoresError } = await supabase
+                        .from('mentor')
+                        .select('id_mentor')
+                        .eq('id_usuario', mentorData.id_usuario);
+
+                    if (todosMentoresError || !todosMentores) {
+                        console.error('❌ Error obteniendo todos los mentores:', todosMentoresError);
+                        setMaterias([]);
+                        setLoadingMaterias(false);
+                        return;
+                    }
+
+                    const mentorIds = todosMentores.map(m => m.id_mentor);
+                    console.log('🎓 Todos los id_mentor del usuario:', mentorIds);
+
+                    // Obtener materias de TODOS los id_mentor
                     const { data, error } = await supabase
                         .from('mentor_materia')
                         .select('materia(id_materia, nombre_materia)')
-                        .eq('id_mentor', form.selectedEntity.id);
+                        .in('id_mentor', mentorIds);
+
+                    console.log('📚 Materias encontradas:', data);
+                    console.log('📚 Cantidad:', data?.length);
 
                     if (!error && data) {
-                        setMaterias(data.map(m => ({
-                            id: m.materia.id_materia,
-                            nombre: m.materia.nombre_materia
-                        })));
+                        // Eliminar materias duplicadas
+                        const materiasUnicas = data.reduce((acc, m) => {
+                            if (!acc.find(mat => mat.id === m.materia.id_materia)) {
+                                acc.push({
+                                    id: m.materia.id_materia,
+                                    nombre: m.materia.nombre_materia
+                                });
+                            }
+                            return acc;
+                        }, []);
+
+                        console.log('✅ Materias únicas:', materiasUnicas);
+                        setMaterias(materiasUnicas);
                     }
                 }
             } catch (error) {
@@ -340,6 +444,119 @@ export default function AuthModal_HacerResenia({
     }, [form.selectedEntity, form.tipo]);
 
     if (!open) return null;
+
+    // Componente de Notificación Toast
+    const Toast = ({ message, type, onClose }) => {
+        useEffect(() => {
+            const timer = setTimeout(() => {
+                onClose();
+            }, 4000);
+
+            return () => clearTimeout(timer);
+        }, [onClose]);
+
+        const colors = {
+            success: {
+                bg: "linear-gradient(135deg, #dcfce7 0%, #bbf7d0 100%)",
+                border: "#86efac",
+                text: "#166534",
+                icon: "✓"
+            },
+            error: {
+                bg: "linear-gradient(135deg, #fee2e2 0%, #fecaca 100%)",
+                border: "#fca5a5",
+                text: "#991b1b",
+                icon: "✕"
+            }
+        };
+
+        const style = colors[type] || colors.success;
+
+        return (
+            <div style={{
+                position: "fixed",
+                top: 24,
+                right: 24,
+                zIndex: 9999,
+                background: style.bg,
+                border: `2px solid ${style.border}`,
+                borderRadius: 12,
+                padding: "16px 20px",
+                minWidth: 320,
+                maxWidth: 480,
+                boxShadow: "0 10px 40px rgba(0,0,0,0.15)",
+                display: "flex",
+                alignItems: "center",
+                gap: 12,
+                animation: "slideIn 0.3s ease-out"
+            }}>
+                <div style={{
+                    width: 32,
+                    height: 32,
+                    borderRadius: "50%",
+                    background: "#fff",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    fontSize: 18,
+                    fontWeight: 700,
+                    color: style.text,
+                    flexShrink: 0
+                }}>
+                    {style.icon}
+                </div>
+                <p style={{
+                    margin: 0,
+                    color: style.text,
+                    fontSize: 14,
+                    fontWeight: 600,
+                    flex: 1,
+                    lineHeight: 1.4
+                }}>
+                    {message}
+                </p>
+                <button
+                    onClick={onClose}
+                    style={{
+                        border: "none",
+                        background: "transparent",
+                        color: style.text,
+                        cursor: "pointer",
+                        fontSize: 18,
+                        padding: 4,
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        opacity: 0.7,
+                        transition: "opacity 0.2s ease"
+                    }}
+                    onMouseEnter={(e) => e.currentTarget.style.opacity = 1}
+                    onMouseLeave={(e) => e.currentTarget.style.opacity = 0.7}
+                >
+                    ✕
+                </button>
+
+                <style>
+                    {`
+                    @keyframes slideIn {
+                        from {
+                            transform: translateX(400px);
+                            opacity: 0;
+                        }
+                        to {
+                            transform: translateX(0);
+                            opacity: 1;
+                        }
+                    }
+                `}
+                </style>
+            </div>
+        );
+    };
+
+    const showToast = (message, type) => {
+        setToast({ message, type });
+    };
 
     const validateForm = () => {
         const newErrors = {};
@@ -374,9 +591,9 @@ export default function AuthModal_HacerResenia({
             );
 
             if (error) {
-                alert('Error al enviar reseña: ' + error.message);
+                showToast('Error al enviar reseña: ' + error.message, 'error');
             } else {
-                alert('¡Reseña enviada correctamente!');
+                showToast('¡Reseña publicada exitosamente! 🎉', 'success');
 
                 if (onSave) {
                     onSave({
@@ -386,25 +603,27 @@ export default function AuthModal_HacerResenia({
                     });
                 }
 
-                // Limpiar formulario
-                setForm({
-                    tipo: isPreSelected ? preSelectedEntity.tipo : "profesor",
-                    selectedEntity: isPreSelected ? preSelectedEntity : null,
-                    selectedMateria: null,
-                    rating: 5,
-                    titulo: "",
-                    texto: "",
-                    workload: "Medio",
-                    metodologia: "Clases prácticas"
-                });
-                setSearchTerm("");
-                setErrors({});
-                onClose();
+                // Limpiar formulario después de 1 segundo
+                setTimeout(() => {
+                    setForm({
+                        tipo: isPreSelected ? preSelectedEntity.tipo : "profesor",
+                        selectedEntity: isPreSelected ? preSelectedEntity : null,
+                        selectedMateria: null,
+                        rating: 5,
+                        titulo: "",
+                        texto: "",
+                        workload: "Medio",
+                        metodologia: "Clases prácticas"
+                    });
+                    setSearchTerm("");
+                    setErrors({});
+                    onClose();
+                }, 1000);
             }
 
         } catch (error) {
             console.error("Error al enviar reseña:", error);
-            alert('Error inesperado al enviar la reseña');
+            showToast('Error inesperado al enviar la reseña', 'error');
         } finally {
             setIsSubmitting(false);
         }
@@ -412,6 +631,15 @@ export default function AuthModal_HacerResenia({
 
     return (
         <>
+            {/* Toast Notification */}
+            {toast && (
+                <Toast
+                    message={toast.message}
+                    type={toast.type}
+                    onClose={() => setToast(null)}
+                />
+            )}
+
             {/* Backdrop */}
             <div
                 onClick={onClose}

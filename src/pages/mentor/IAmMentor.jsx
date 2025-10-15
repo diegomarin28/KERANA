@@ -49,36 +49,78 @@ export default function IAmMentor() {
     const fetchData = async () => {
         try {
             setLoading(true);
-            const { data: { user } } = await supabase.auth.getUser();
-            if (!user) { setError('Debes iniciar sesión'); return; }
+            setError(''); // Limpiar errores previos
 
+            const { data: { user } } = await supabase.auth.getUser();
+            if (!user) {
+                setError('Debes iniciar sesión');
+                return;
+            }
+
+            // 1. Obtener id_usuario
             const { data: usuarioData, error: usuarioErr } = await supabase
                 .from('usuario')
                 .select('id_usuario')
                 .eq('auth_id', user.id)
                 .single();
-            if (usuarioErr || !usuarioData) { setError('No se encontró tu perfil'); return; }
 
-            // Materias donde soy mentor (FK desambiguada por si acaso)
-            const { data: misMaterias, error: fetchError } = await supabase
-                .from('mentor_materia')
-                .select(`
-          id,
-          id_materia,
-          materia:id_materia!mentor_materia_id_materia_fkey (id_materia, nombre_materia, semestre)
-        `)
-                .eq('id_mentor', usuarioData.id_usuario);
-            if (fetchError) throw fetchError;
-            setMaterias(misMaterias || []);
+            if (usuarioErr || !usuarioData) {
+                console.error('❌ Error usuario:', usuarioErr);
+                setError('No se encontró tu perfil');
+                return;
+            }
 
-            // Todas las materias
-            const { data: allMaterias } = await supabase
-                .from('materia')
-                .select('id_materia, nombre_materia, semestre')
-                .order('nombre_materia');
-            setTodasMaterias(allMaterias || []);
-        } catch {
-            setError('Error al cargar información');
+            console.log('👤 ID Usuario:', usuarioData.id_usuario);
+
+            // 2️⃣ Obtener todos los mentores del usuario
+            const { data: mentores, error: mentorErr } = await supabase
+                .from('mentor')
+                .select('id_mentor')
+                .eq('id_usuario', usuarioData.id_usuario);
+
+            if (mentorErr) {
+                console.error('❌ Error al buscar mentores:', mentorErr);
+                setError('Error al verificar tu estado de mentor');
+                return;
+            }
+
+            if (!mentores || mentores.length === 0) {
+                console.log('⚠️ No estás registrado como mentor');
+                setMaterias([]);
+                setError('');
+                setLoading(false);
+                return;
+            }
+
+            console.log('🎓 Mentores encontrados:', mentores);
+
+            // 3️⃣ Obtener materias para *todos* los mentores
+            let todasMisMaterias = [];
+
+            for (const mentor of mentores) {
+                const { data: materiasDeEsteMentor, error: fetchError } = await supabase
+                    .from('mentor_materia')
+                    .select(`
+            id,
+            id_materia,
+            materia (id_materia, nombre_materia, semestre)`)
+                    .eq('id_mentor', mentor.id_mentor);
+
+                if (fetchError) {
+                    console.error(`❌ Error obteniendo materias del mentor ${mentor.id_mentor}:`, fetchError);
+                    continue; // seguimos con el resto
+                }
+
+                if (materiasDeEsteMentor) {
+                    todasMisMaterias = [...todasMisMaterias, ...materiasDeEsteMentor];
+                }
+            }
+
+            console.log('📚 Total materias encontradas:', todasMisMaterias?.length);
+            setMaterias(todasMisMaterias);
+        } catch (err) {
+            console.error('❌ Error general en fetchData:', err);
+            setError('Error inesperado al cargar información');
         } finally {
             setLoading(false);
         }
@@ -89,15 +131,36 @@ export default function IAmMentor() {
         try {
             setError(''); setSuccess('');
             const { data: { user } } = await supabase.auth.getUser();
+
+            // 1. Obtener id_usuario
             const { data: usuarioData } = await supabase
                 .from('usuario')
                 .select('id_usuario')
                 .eq('auth_id', user.id)
                 .single();
 
+            // 2️⃣ Obtener todos los mentores del usuario
+            const { data: mentores } = await supabase
+                .from('mentor')
+                .select('id_mentor')
+                .eq('id_usuario', usuarioData.id_usuario);
+
+            if (!mentores || mentores.length === 0) {
+                setError('No estás registrado como mentor');
+                return;
+            }
+
+            // 🧩 Tomamos el primero por simplicidad
+            const idMentor = mentores[0].id_mentor;
+
+            // 3️⃣ Insertar en mentor_materia
             const { error: insertError } = await supabase
                 .from('mentor_materia')
-                .insert([{ id_mentor: usuarioData.id_usuario, id_materia: selectedMateria.id_materia }]);
+                .insert([{
+                    id_mentor: idMentor,
+                    id_materia: selectedMateria.id_materia
+                }]);
+
             if (insertError) throw insertError;
 
             setSuccess('Materia agregada exitosamente');
@@ -160,14 +223,25 @@ export default function IAmMentor() {
                             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                                 <div>
                                     <h3 style={{ margin: '0 0 8px 0', fontSize: 18 }}>{m.materia.nombre_materia}</h3>
-                                    <p style={{ color: '#6b7280', margin: 0, fontSize: 14 }}>{m.materia.semestre}</p>
+                                    <p style={{ color: '#6b7280', margin: 0, fontSize: 14 }}>Semestre {m.materia.semestre}</p>
                                 </div>
-                                <Button
+                                <button //Personalizado para esta parte
                                     onClick={() => handleRemoveMateria(m.id, m.materia.nombre_materia)}
-                                    style={{ padding: '8px 16px', background: '#dc2626', color: '#fff', border: 'none', borderRadius: 6, fontWeight: 600, cursor: 'pointer' }}
+                                    onMouseEnter={(e) => e.currentTarget.style.background = '#b91c1c'}
+                                    onMouseLeave={(e) => e.currentTarget.style.background = '#dc2626'}
+                                    style={{
+                                        padding: '8px 16px',
+                                        background: '#dc2626',
+                                        color: '#fff',
+                                        border: 'none',
+                                        borderRadius: 6,
+                                        fontWeight: 600,
+                                        cursor: 'pointer',
+                                        transition: 'background 0.2s ease'
+                                    }}
                                 >
                                     Darme de baja
-                                </Button>
+                                </button>
                             </div>
                         </Card>
                     ))}

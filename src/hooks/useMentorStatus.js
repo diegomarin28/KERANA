@@ -4,69 +4,80 @@ import { supabase } from '../supabase'
 
 export const useMentorStatus = (autoCheck = true) => {
     const [isMentor, setIsMentor] = useState(false)
-    const [mentorData, setMentorData] = useState(null)
+    const [mentorData, setMentorData] = useState([])
     const [loading, setLoading] = useState(autoCheck)
 
     const checkMentorStatus = useCallback(async () => {
         try {
             setLoading(true)
 
-            // 1) Usuario auth
+            // 1️⃣ Usuario auth
             const { data: auth } = await supabase.auth.getUser()
             const user = auth?.user
             if (!user) {
                 setIsMentor(false)
-                setMentorData(null)
+                setMentorData([])
                 return
             }
 
-            // 2) Perfil por auth_id (RLS lo exige)
+            // 2️⃣ Buscar usuario
             const { data: usuarioData, error: usuarioErr } = await supabase
                 .from('usuario')
                 .select('id_usuario')
                 .eq('auth_id', user.id)
                 .maybeSingle()
+
             if (usuarioErr || !usuarioData) {
                 setIsMentor(false)
-                setMentorData(null)
+                setMentorData([])
                 return
             }
 
-            // 3) Mentor (consulta simple, sin embeds)
-            const { data: mentor, error: mentorErr } = await supabase
+            // 3️⃣ Buscar todos los mentores asociados al usuario
+            const { data: mentores, error: mentorErr } = await supabase
                 .from('mentor')
-                .select('id_mentor, estrellas_mentor, contacto, descripcion')
+                .select('id_mentor, estrellas_mentor, contacto, descripcion, fecha_inicio')
                 .eq('id_usuario', usuarioData.id_usuario)
-                .maybeSingle()
-            if (mentorErr || !mentor) {
+
+            console.log('🎓 Mentores del usuario:', mentores)
+
+            if (mentorErr || !mentores || mentores.length === 0) {
                 setIsMentor(false)
-                setMentorData(null)
+                setMentorData([])
                 return
             }
 
-            // 4) Materias del mentor (join simple a materia)
-            const { data: mm, error: mmErr } = await supabase
-                .from('mentor_materia')
-                .select(`
-          id,
-          id_materia,
-          materia:id_materia!mentor_materia_id_materia_fkey (
-            id_materia,
-            nombre_materia
-          )
-        `)
-                .eq('id_mentor', mentor.id_mentor)
-            if (mmErr) {
-                setIsMentor(true)
-                setMentorData({ ...mentor, mentor_materia: [] })
-                return
-            }
+            // 4️⃣ Para cada mentor, obtener sus materias
+            const allMentores = await Promise.all(
+                mentores.map(async (mentor) => {
+                    const { data: mm, error: mmErr } = await supabase
+                        .from('mentor_materia')
+                        .select(`
+                            id,
+                            id_materia,
+                            materia (
+                                id_materia,
+                                nombre_materia
+                            )
+                        `)
+                        .eq('id_mentor', mentor.id_mentor)
 
+                    if (mmErr) {
+                        console.error('❌ Error materias de mentor', mentor.id_mentor, mmErr)
+                        return { ...mentor, mentor_materia: [] }
+                    }
+
+                    return { ...mentor, mentor_materia: mm || [] }
+                })
+            )
+
+            // 5️⃣ Actualizar estado
             setIsMentor(true)
-            setMentorData({ ...mentor, mentor_materia: mm || [] })
-        } catch {
+            setMentorData(allMentores)
+        } catch (err) {
+            console.error('❌ Error general en useMentorStatus:', err)
             setIsMentor(false)
-            setMentorData(null)
+            setMentorData([])
         } finally {
             setLoading(false)
         }
