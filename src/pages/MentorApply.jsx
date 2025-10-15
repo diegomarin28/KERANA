@@ -225,7 +225,7 @@
 
                 setSuccessMessage('¡Tu postulación ha sido enviada con éxito! Te notificaremos por correo cuando sea revisada.');
 
-                // Esperar 2 segundos antes de redirigir para que el usuario vea el mensaje
+                // Esperar 3 segundos antes de redirigir para que el usuario vea el mensaje
                 setTimeout(() => {
                     navigate('/');
                 }, 3000);
