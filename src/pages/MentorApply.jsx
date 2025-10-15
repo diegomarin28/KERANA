@@ -100,15 +100,26 @@
 
             const fileExt = file.name.split('.').pop();
             const fileName = `${user.id}_${selectedMateria.id_materia}_${Date.now()}.${fileExt}`;
-            const filePath = `${fileName}`;
+            const filePath = fileName;
 
-            const { data: _uploadData, error } = await supabase.storage
+            // ✅ bucket correcto (public): mentor-comprobante
+            const { error: upErr } = await supabase.storage
                 .from('mentor-comprobantes')
-                .upload(filePath, file);
+                .upload(filePath, file, { upsert: false });
 
-            if (error) throw error;
-            return filePath;
+            if (upErr) throw upErr;
+
+            // URL pública
+            const { data: pub } = supabase.storage
+                .from('mentor-comprobantes')
+                .getPublicUrl(filePath);
+
+            const publicUrl = pub?.publicUrl || "";
+
+            // devolvemos ambos
+            return { filePath, publicUrl };
         };
+
 
         const handleSubmit = async (e) => {
             e.preventDefault();
@@ -167,20 +178,21 @@
                     return;
                 }
 
-                const comprobanteUrl = await uploadComprobante(formData.comprobante);
+                const { filePath, publicUrl } = await uploadComprobante(formData.comprobante);
 
                 const { data: applicationData, error: insertError } = await supabase
                     .from('mentor_aplicacion')
                     .insert([{
                         id_usuario: usuarioData.id_usuario,
                         id_materia: selectedMateria.id_materia,
-                        motivo: formData.motivo.trim() || null,
-                        calificacion_materia: parseFloat(formData.calificacion),
-                        comprobante_archivo: comprobanteUrl,
+                        motivo: formData.motivo?.trim() || null,
+                        calificacion_materia: parseInt(formData.calificacion, 10),
+                        comprobante_path: filePath,   // ✅ guardamos el path (no bytea)
                         estado: 'pendiente'
                     }])
                     .select()
                     .single();
+
 
                 if (insertError) throw insertError;
 
@@ -195,11 +207,11 @@
                             user_name: usuarioData.nombre || user.email,
                             materia_nombre: selectedMateria.nombre_materia,
                             calificacion: formData.calificacion,
-                            message: `Nueva aplicación de mentor:\n\n` +
-                                `Usuario: ${user.email}\n` +
-                                `Materia: ${selectedMateria.nombre_materia}\n` +
-                                `Calificación: ${formData.calificacion}\n\n` +
-                                `Revisa en Supabase: https://supabase.com/dashboard/project/cfmcvslstfryhapvsztu/editor`,
+                            // ✅ mensaje = el motivo del postulante (sin bloque prefabricado)
+                            message: formData.motivo?.trim() || "",
+                            // ✅ foto pública para el mail
+                            comprobante_url: publicUrl,
+                            // destinatario del admin (ajustalo a tu correo real)
                             to_email: "tu-email-admin@gmail.com",
                             subject: "📚 Nueva aplicación de mentor - Kerana"
                         },
@@ -209,6 +221,7 @@
                 } catch (emailError) {
                     console.log('❌ Email falló pero aplicación se guardó:', emailError);
                 }
+
 
                 setSuccessMessage('¡Tu postulación ha sido enviada con éxito! Te notificaremos por correo cuando sea revisada.');
 

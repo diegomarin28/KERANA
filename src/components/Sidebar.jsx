@@ -141,9 +141,9 @@ export default function Sidebar({ open, onClose, isAuthenticated, user, onLogout
                                         width: 48,
                                         height: 48,
                                         borderRadius: "50%",
-                                        background: "linear-gradient(90deg, rgba(255,255,255,0.1) 0%, rgba(255,255,255,0.2) 50%, rgba(255,255,255,0.1) 100%)",
-                                        backgroundSize: "200% 100%",
-                                        animation: "shimmer 1.5s infinite",
+                                        background: "#fff",
+                                        opacity: 0.3,
+                                        animation: "pulse 1.5s ease-in-out infinite",
                                     }}
                                 />
                             ) : avatarUrl ? (
@@ -267,15 +267,15 @@ export default function Sidebar({ open, onClose, isAuthenticated, user, onLogout
             />
 
             <style>{`
-                @keyframes shimmer {
-                    0% {
-                        background-position: -200% 0;
-                    }
-                    100% {
-                        background-position: 200% 0;
-                    }
-                }
-            `}</style>
+    @keyframes pulse {
+        0%, 100% {
+            opacity: 0.3;
+        }
+        50% {
+            opacity: 0.6;
+        }
+    }
+`}</style>
         </>
     );
 }

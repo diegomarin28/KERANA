@@ -7,6 +7,7 @@ import ProfessorCard from "../components/ProfessorCard";
 import NoteCard from "../components/NoteCard";
 import { UserCard } from "../components/UserCard";
 import { MentorCard } from "../components/MentorCard";
+import { supabase } from "../supabase";
 
 export default function SearchResults() {
     const { search } = useLocation();
@@ -49,6 +50,8 @@ export default function SearchResults() {
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [q]);
 
+
+
     const fetchAll = async (query) => {
         setLoading(true);
         console.log("🔍 Buscando:", query);
@@ -83,6 +86,36 @@ export default function SearchResults() {
         }
     };
 
+    const [currentUserId, setCurrentUserId] = useState(null);
+
+    useEffect(() => {
+        const getCurrentUserId = async () => {
+            try {
+                const { data: { user } } = await supabase.auth.getUser();
+                if (!user) {
+                    console.log('No hay usuario autenticado');
+                    return;
+                }
+
+                const { data, error } = await supabase
+                    .from('usuario')
+                    .select('id_usuario')
+                    .eq('auth_id', user.id)
+                    .maybeSingle(); // ← Cambiar .single() por .maybeSingle()
+
+                if (error) {
+                    console.error('Error en query:', error);
+                    return;
+                }
+
+                if (data) setCurrentUserId(data.id_usuario);
+            } catch (err) {
+                console.error('Error obteniendo usuario actual:', err);
+            }
+        };
+        getCurrentUserId();
+    }, []);
+
     const filtered = useMemo(() => {
         const removeDuplicates = (items, getId) => {
             const seen = new Set();
@@ -97,11 +130,22 @@ export default function SearchResults() {
         return {
             subjects: removeDuplicates(subjects, (s) => s.id_materia ?? s.id),
             professors: removeDuplicates(professors, (p) => p.id_profesor ?? p.id),
-            mentors: removeDuplicates(mentors, (m) => m.id_mentor ?? m.id),
+            mentors: removeDuplicates(mentors, (m) => m.id_mentor ?? m.id).filter(
+                (m) => m.id_usuario !== currentUserId
+            ),
             notes: removeDuplicates(notes, (n) => n.id_apunte ?? n.id),
-            users: removeDuplicates(users, (u) => u.id_usuario ?? u.id),
+            users: removeDuplicates(users, (u) => u.id_usuario ?? u.id).filter(
+                (u) => u.id_usuario !== currentUserId
+            ),
         };
-    }, [subjects, professors, mentors, notes, users]);
+    }, [subjects, professors, mentors, notes, users, currentUserId]);
+
+    useEffect(() => {
+        if (filtered.mentors.length > 0) {
+            console.log('Mentores:', filtered.mentors[0]);
+            console.log('currentUserId:', currentUserId);
+        }
+    }, [filtered.mentors, currentUserId]);
 
     // Usamos plural para los tabs y la lógica de show
     const show = (k) => tab === "todos" || tab === k;

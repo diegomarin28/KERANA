@@ -199,9 +199,20 @@ async function searchMentors(term) {
 
     if (error) return { data: [], error };
 
+    // Obtener los id_usuario de cada mentor
+    const mentorIds = (data || []).map(m => m.id_mentor);
+
+    const { data: mentorUsers } = await supabase
+        .from('mentor')
+        .select('id_mentor, id_usuario')
+        .in('id_mentor', mentorIds);
+
+    const userMap = new Map(mentorUsers?.map(m => [m.id_mentor, m.id_usuario]) || []);
+
     const transformed = (data || []).map(m => ({
         id: m.id_mentor,
         id_mentor: m.id_mentor,
+        id_usuario: userMap.get(m.id_mentor) || null,  // ← Obtener del map
         mentor_nombre: m.nombre || 'Mentor',
         mentor_correo: '',
         username: m.username,
@@ -352,24 +363,38 @@ export const mentorAPI = {
         const { data, error } = await supabase
             .from('mentor')
             .select(`
-        id_mentor,
-        estrellas_mentor,
-        contacto,
-        descripcion
-    `)
+            id_mentor,
+            estrellas_mentor,
+            contacto,
+            descripcion
+        `)
             .eq('id_mentor', usuarioData.id_usuario)
             .maybeSingle()
 
         if (data) {
-            const { data: materias } = await supabase
+            // Obtener mentor_materia sin el JOIN
+            const { data: mentorMaterias } = await supabase
                 .from('mentor_materia')
-                .select(`
-            id_materia,
-            materia(nombre_materia, semestre)
-        `)
+                .select('id, id_materia')
                 .eq('id_mentor', data.id_mentor)
 
-            data.mentor_materias = materias
+            // Obtener los datos de las materias por separado
+            if (mentorMaterias && mentorMaterias.length > 0) {
+                const materiaIds = mentorMaterias.map(mm => mm.id_materia)
+
+                const { data: materias } = await supabase
+                    .from('materia')
+                    .select('id_materia, nombre_materia, semestre')
+                    .in('id_materia', materiaIds)
+
+                // Combinar los datos
+                data.mentor_materia = mentorMaterias.map(mm => ({
+                    ...mm,
+                    materia: materias?.find(m => m.id_materia === mm.id_materia) || null
+                }))
+            } else {
+                data.mentor_materia = []
+            }
         }
 
         return { data, error }

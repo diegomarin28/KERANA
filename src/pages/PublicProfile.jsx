@@ -1,9 +1,8 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { publicProfileAPI } from '../api/database';
 import { useSeguidores } from '../hooks/useSeguidores';
 import NoteCard from '../components/NoteCard';
-import { Card } from '../components/ui/Card';
 
 export default function PublicProfile() {
     const { username } = useParams();
@@ -16,18 +15,18 @@ export default function PublicProfile() {
     const [tab, setTab] = useState('apuntes');
     const [avatarOk, setAvatarOk] = useState(true);
 
-    // Estado para "Ver todos los apuntes"
     const [showAllNotes, setShowAllNotes] = useState(false);
     const [allNotes, setAllNotes] = useState([]);
     const [userSubjects, setUserSubjects] = useState([]);
     const [selectedSubject, setSelectedSubject] = useState(null);
     const [loadingAllNotes, setLoadingAllNotes] = useState(false);
 
-    // Estado para seguir
     const [siguiendo, setSiguiendo] = useState(false);
     const [loadingFollow, setLoadingFollow] = useState(false);
     const [showUnfollowModal, setShowUnfollowModal] = useState(false);
     const { seguirUsuario, dejarDeSeguir } = useSeguidores();
+
+    const carouselRef = useRef(null);
 
     useEffect(() => {
         fetchProfileData();
@@ -37,7 +36,6 @@ export default function PublicProfile() {
         try {
             setLoading(true);
 
-            // 1. Obtener perfil
             const { data: profileData, error: profileError } = await publicProfileAPI.getPublicProfile(username);
             if (profileError) {
                 console.error('Error cargando perfil:', profileError);
@@ -48,19 +46,15 @@ export default function PublicProfile() {
 
             const userId = profileData.id_usuario;
 
-            // 2. Obtener estadísticas
             const { data: statsData } = await publicProfileAPI.getPublicStats(userId);
             setStats(statsData);
 
-            // 3. Verificar si es mentor
             const { data: mentorData } = await publicProfileAPI.checkIfMentor(userId);
             setMentorInfo(mentorData);
 
-            // 4. Obtener últimos 4 apuntes para el carrusel
             const { data: notesData } = await publicProfileAPI.getRecentNotes(userId, 4);
             setRecentNotes(notesData || []);
 
-            // 5. Verificar si ya lo estoy siguiendo
             const { data: isFollowingData } = await publicProfileAPI.isFollowing(userId);
             setSiguiendo(isFollowingData);
 
@@ -76,11 +70,9 @@ export default function PublicProfile() {
         setLoadingAllNotes(true);
 
         try {
-            // Obtener todos los apuntes
             const { data: allNotesData } = await publicProfileAPI.getAllNotes(profile.id_usuario);
             setAllNotes(allNotesData || []);
 
-            // Obtener materias únicas del usuario
             const { data: subjectsData } = await publicProfileAPI.getUserSubjects(profile.id_usuario);
             setUserSubjects(subjectsData || []);
         } catch (error) {
@@ -107,13 +99,11 @@ export default function PublicProfile() {
     const handleSeguir = async () => {
         if (!profile) return;
 
-        // Si ya está siguiendo, mostrar modal de confirmación
         if (siguiendo) {
             setShowUnfollowModal(true);
             return;
         }
 
-        // Si no está siguiendo, seguir directamente
         setLoadingFollow(true);
         try {
             const result = await seguirUsuario(profile.id_usuario);
@@ -144,12 +134,22 @@ export default function PublicProfile() {
         }
     };
 
+    const scrollCarousel = (direction) => {
+        if (carouselRef.current) {
+            const scrollAmount = 380;
+            carouselRef.current.scrollBy({
+                left: direction === 'left' ? -scrollAmount : scrollAmount,
+                behavior: 'smooth'
+            });
+        }
+    };
+
     if (loading) {
         return (
             <div style={pageStyle}>
                 <div style={centerStyle}>
                     <div style={spinnerStyle}></div>
-                    <p style={{ marginTop: 16, color: '#64748b' }}>Cargando perfil...</p>
+                    <p style={{ marginTop: 16, color: '#64748b', fontSize: 15 }}>Cargando perfil...</p>
                 </div>
             </div>
         );
@@ -159,9 +159,11 @@ export default function PublicProfile() {
         return (
             <div style={pageStyle}>
                 <div style={centerStyle}>
-                    <h2>Usuario no encontrado</h2>
+                    <div style={{ fontSize: '4rem', marginBottom: 20 }}>😕</div>
+                    <h2 style={{ margin: '0 0 12px 0', fontSize: 24, color: '#111827' }}>Usuario no encontrado</h2>
+                    <p style={{ margin: '0 0 20px 0', color: '#6B7280' }}>Este perfil no existe o es privado</p>
                     <button onClick={() => navigate(-1)} style={backButtonStyle}>
-                        Volver
+                        ← Volver
                     </button>
                 </div>
             </div>
@@ -179,13 +181,15 @@ export default function PublicProfile() {
 
     return (
         <div style={pageStyle}>
-            <div style={{ maxWidth: 1200, margin: '0 auto', padding: '0 20px' }}>
+            <div style={containerStyle}>
 
-                {/* Header del perfil */}
-                <Card style={profileHeaderStyle}>
-                    <div style={headerContentStyle}>
+                {/* Cover + Avatar Header */}
+                <div style={coverContainerStyle}>
+                    <div style={coverPhotoStyle}></div>
+
+                    <div style={profileHeaderWrapperStyle}>
                         {/* Avatar */}
-                        <div style={avatarContainerStyle}>
+                        <div style={avatarWrapperStyle}>
                             {avatarSrc && avatarOk ? (
                                 <img
                                     src={avatarSrc}
@@ -200,55 +204,80 @@ export default function PublicProfile() {
                             )}
                         </div>
 
-                        {/* Info del usuario */}
-                        <div style={{ flex: 1 }}>
-                            <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 8 }}>
-                                <h1 style={nameStyle}>{profile.nombre}</h1>
-                                {mentorInfo && (
-                                    <span style={mentorBadgeStyle}>
-                                        🎓 Mentor
-                                    </span>
+                        {/* Info y acciones */}
+                        <div style={profileInfoContainerStyle}>
+                            <div style={profileInfoLeftStyle}>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+                                    <h1 style={nameStyle}>{profile.nombre}</h1>
+                                    {mentorInfo && (
+                                        <span style={mentorBadgeStyle}>
+                                            <span style={{ fontSize: 14 }}>🎓</span> Mentor Verificado
+                                        </span>
+                                    )}
+                                </div>
+
+                                <p style={usernameStyle}>@{profile.username}</p>
+
+                                {profile.mostrar_email && (
+                                    <p style={emailStyle}>
+                                        <svg style={{ width: 14, height: 14, marginRight: 6 }} fill="currentColor" viewBox="0 0 20 20">
+                                            <path d="M2.003 5.884L10 9.882l7.997-3.998A2 2 0 0016 4H4a2 2 0 00-1.997 1.884z"></path>
+                                            <path d="M18 8.118l-8 4-8-4V14a2 2 0 002 2h12a2 2 0 002-2V8.118z"></path>
+                                        </svg>
+                                        {profile.correo}
+                                    </p>
                                 )}
-                            </div>
 
-                            <p style={usernameStyle}>@{profile.username}</p>
-
-                            {profile.mostrar_email && (
-                                <p style={emailStyle}>{profile.correo}</p>
-                            )}
-
-                            {/* Stats */}
-                            <div style={statsContainerStyle}>
-                                <div style={statItemStyle}>
-                                    <span style={statNumberStyle}>{stats?.seguidores || 0}</span>
-                                    <span style={statLabelStyle}>Seguidores</span>
-                                </div>
-                                <div style={statItemStyle}>
-                                    <span style={statNumberStyle}>{stats?.siguiendo || 0}</span>
-                                    <span style={statLabelStyle}>Siguiendo</span>
-                                </div>
-                                <div style={statItemStyle}>
-                                    <span style={statNumberStyle}>{stats?.apuntes || 0}</span>
-                                    <span style={statLabelStyle}>Apuntes</span>
+                                {/* Stats inline */}
+                                <div style={statsInlineStyle}>
+                                    <StatInline number={stats?.seguidores || 0} label="seguidores" />
+                                    <StatInline number={stats?.siguiendo || 0} label="siguiendo" />
+                                    <StatInline number={stats?.apuntes || 0} label="apuntes" />
                                 </div>
                             </div>
 
-                            {/* Botón Seguir */}
+                            {/* Botón seguir */}
                             <button
                                 onClick={handleSeguir}
                                 disabled={loadingFollow}
                                 style={{
                                     ...followButtonStyle,
-                                    background: siguiendo ? 'white' : '#2563EB',
-                                    color: siguiendo ? '#2563EB' : 'white',
-                                    border: '2px solid #2563EB'
+                                    background: siguiendo ? '#F3F4F6' : '#0A66C2',
+                                    color: siguiendo ? '#111827' : 'white',
+                                    border: siguiendo ? '2px solid #D1D5DB' : '2px solid #0A66C2'
                                 }}
                             >
-                                {loadingFollow ? 'Procesando...' : siguiendo ? 'Siguiendo' : 'Seguir'}
+                                {loadingFollow ? (
+                                    <div style={buttonSpinnerStyle}></div>
+                                ) : siguiendo ? (
+                                    <>
+                                        <svg style={{ width: 16, height: 16, marginRight: 6 }} fill="currentColor" viewBox="0 0 20 20">
+                                            <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd"></path>
+                                        </svg>
+                                        Siguiendo
+                                    </>
+                                ) : (
+                                    <>
+                                        <svg style={{ width: 16, height: 16, marginRight: 6 }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+                                        </svg>
+                                        Seguir
+                                    </>
+                                )}
                             </button>
                         </div>
                     </div>
-                </Card>
+                </div>
+
+                {/* Stats Desktop */}
+                <div style={statsCardStyle}>
+                    <StatCard icon="👥" number={stats?.seguidores || 0} label="Seguidores" />
+                    <StatCard icon="✨" number={stats?.siguiendo || 0} label="Siguiendo" />
+                    <StatCard icon="📚" number={stats?.apuntes || 0} label="Apuntes" />
+                    {mentorInfo && (
+                        <StatCard icon="🎓" number={mentorInfo.materias?.length || 0} label="Materias como Mentor" />
+                    )}
+                </div>
 
                 {/* Tabs */}
                 <div style={tabsContainerStyle}>
@@ -258,70 +287,107 @@ export default function PublicProfile() {
                             onClick={() => setTab(t)}
                             style={{
                                 ...tabButtonStyle,
-                                background: tab === t ? '#2563EB' : 'white',
-                                color: tab === t ? 'white' : '#374151',
-                                border: tab === t ? '1px solid #2563EB' : '1px solid #D1D5DB'
+                                background: tab === t ? '#0A66C2' : 'transparent',
+                                color: tab === t ? 'white' : '#666',
+                                borderBottom: tab === t ? '3px solid #0A66C2' : '3px solid transparent'
                             }}
                         >
-                            {t === 'apuntes' && `📚 Apuntes (${stats?.apuntes || 0})`}
+                            {t === 'apuntes' && `📚 Apuntes`}
                             {t === 'mentorias' && `🎓 Mentorías`}
                         </button>
                     ))}
                 </div>
 
-                {/* Contenido según tab */}
+                {/* Contenido */}
                 {tab === 'apuntes' && (
                     <div>
                         {!showAllNotes ? (
-                            // Carrusel de últimos apuntes
                             <>
                                 <div style={sectionHeaderStyle}>
-                                    <h2 style={sectionTitleStyle}>Últimos Apuntes</h2>
+                                    <div>
+                                        <h2 style={sectionTitleStyle}>Últimos Apuntes</h2>
+                                        <p style={sectionSubtitleStyle}>Los recursos más recientes compartidos</p>
+                                    </div>
                                     {stats?.apuntes > 4 && (
                                         <button onClick={handleVerTodos} style={verMasButtonStyle}>
-                                            Ver todos →
+                                            Ver todos los apuntes
+                                            <svg style={{ width: 16, height: 16, marginLeft: 6 }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                                            </svg>
                                         </button>
                                     )}
                                 </div>
 
                                 {recentNotes.length > 0 ? (
-                                    <div style={notesGridStyle}>
-                                        {recentNotes.map(note => (
-                                            <NoteCard key={note.id_apunte} note={note} />
-                                        ))}
+                                    <div style={carouselWrapperStyle}>
+                                        {recentNotes.length > 3 && (
+                                            <button
+                                                onClick={() => scrollCarousel('left')}
+                                                style={{ ...carouselArrowStyle, left: -20 }}
+                                            >
+                                                ‹
+                                            </button>
+                                        )}
+
+                                        <div ref={carouselRef} style={carouselContainerStyle}>
+                                            {recentNotes.map(note => (
+                                                <div key={note.id_apunte} style={carouselItemStyle}>
+                                                    <NoteCard note={note} />
+                                                </div>
+                                            ))}
+                                        </div>
+
+                                        {recentNotes.length > 3 && (
+                                            <button
+                                                onClick={() => scrollCarousel('right')}
+                                                style={{ ...carouselArrowStyle, right: -20 }}
+                                            >
+                                                ›
+                                            </button>
+                                        )}
                                     </div>
                                 ) : (
-                                    <Card style={emptyStateStyle}>
-                                        <div style={{ fontSize: '3rem', marginBottom: 16 }}>📚</div>
-                                        <h3 style={{ margin: '0 0 8px 0', color: '#111827' }}>
-                                            Sin apuntes aún
-                                        </h3>
-                                        <p style={{ margin: 0, color: '#6B7280' }}>
-                                            Este usuario aún no ha subido apuntes.
+                                    <div style={emptyStateStyle}>
+                                        <div style={emptyIconStyle}>📚</div>
+                                        <h3 style={emptyTitleStyle}>Sin apuntes aún</h3>
+                                        <p style={emptyDescStyle}>
+                                            {profile.nombre.split(' ')[0]} aún no ha compartido apuntes.
                                         </p>
-                                    </Card>
+                                    </div>
                                 )}
                             </>
                         ) : (
-                            // Vista de "Todos los apuntes" con filtros
                             <>
                                 <div style={sectionHeaderStyle}>
-                                    <h2 style={sectionTitleStyle}>Todos los Apuntes</h2>
+                                    <div>
+                                        <h2 style={sectionTitleStyle}>Todos los Apuntes</h2>
+                                        <p style={sectionSubtitleStyle}>
+                                            {allNotes.length} {allNotes.length === 1 ? 'apunte' : 'apuntes'} en total
+                                        </p>
+                                    </div>
                                     <button onClick={() => setShowAllNotes(false)} style={backToRecentButtonStyle}>
-                                        ← Volver a destacados
+                                        <svg style={{ width: 16, height: 16, marginRight: 6 }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+                                        </svg>
+                                        Volver a destacados
                                     </button>
                                 </div>
 
-                                {/* Filtros por materia */}
                                 {userSubjects.length > 0 && (
                                     <div style={filtersContainerStyle}>
-                                        <span style={filterLabelStyle}>Filtrar por materia:</span>
+                                        <span style={filterLabelStyle}>
+                                            <svg style={{ width: 16, height: 16, marginRight: 6 }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z" />
+                                            </svg>
+                                            Filtrar por materia:
+                                        </span>
                                         <button
                                             onClick={() => handleFilterBySubject(null)}
                                             style={{
-                                                ...filterButtonStyle,
-                                                background: selectedSubject === null ? '#2563EB' : 'white',
-                                                color: selectedSubject === null ? 'white' : '#374151'
+                                                ...filterChipStyle,
+                                                background: selectedSubject === null ? '#0A66C2' : 'white',
+                                                color: selectedSubject === null ? 'white' : '#666',
+                                                border: selectedSubject === null ? '2px solid #0A66C2' : '2px solid #E5E7EB'
                                             }}
                                         >
                                             Todas
@@ -331,9 +397,10 @@ export default function PublicProfile() {
                                                 key={materia.id_materia}
                                                 onClick={() => handleFilterBySubject(materia.id_materia)}
                                                 style={{
-                                                    ...filterButtonStyle,
-                                                    background: selectedSubject === materia.id_materia ? '#2563EB' : 'white',
-                                                    color: selectedSubject === materia.id_materia ? 'white' : '#374151'
+                                                    ...filterChipStyle,
+                                                    background: selectedSubject === materia.id_materia ? '#0A66C2' : 'white',
+                                                    color: selectedSubject === materia.id_materia ? 'white' : '#666',
+                                                    border: selectedSubject === materia.id_materia ? '2px solid #0A66C2' : '2px solid #E5E7EB'
                                                 }}
                                             >
                                                 {materia.nombre_materia}
@@ -342,7 +409,6 @@ export default function PublicProfile() {
                                     </div>
                                 )}
 
-                                {/* Grid de todos los apuntes */}
                                 {loadingAllNotes ? (
                                     <div style={centerStyle}>
                                         <div style={spinnerStyle}></div>
@@ -354,17 +420,15 @@ export default function PublicProfile() {
                                         ))}
                                     </div>
                                 ) : (
-                                    <Card style={emptyStateStyle}>
-                                        <div style={{ fontSize: '3rem', marginBottom: 16 }}>🔍</div>
-                                        <h3 style={{ margin: '0 0 8px 0', color: '#111827' }}>
-                                            No se encontraron apuntes
-                                        </h3>
-                                        <p style={{ margin: 0, color: '#6B7280' }}>
+                                    <div style={emptyStateStyle}>
+                                        <div style={emptyIconStyle}>🔍</div>
+                                        <h3 style={emptyTitleStyle}>No se encontraron apuntes</h3>
+                                        <p style={emptyDescStyle}>
                                             {selectedSubject
                                                 ? 'No hay apuntes para esta materia.'
                                                 : 'Este usuario no tiene apuntes.'}
                                         </p>
-                                    </Card>
+                                    </div>
                                 )}
                             </>
                         )}
@@ -372,27 +436,46 @@ export default function PublicProfile() {
                 )}
 
                 {tab === 'mentorias' && mentorInfo && (
-                    <Card style={{ padding: 24, background: 'white', borderRadius: 12 }}>
-                        <h3 style={{ margin: '0 0 16px 0', fontSize: 20, fontWeight: 700 }}>
-                            Mentor en:
-                        </h3>
-                        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 12 }}>
-                            {mentorInfo.materias?.map(m => (
-                                <div key={m.id_materia} style={mentorSubjectBadgeStyle}>
-                                    📚 {m.materia.nombre_materia}
-                                </div>
-                            ))}
-                        </div>
-                        {mentorInfo.estrellas_mentor && (
-                            <div style={{ marginTop: 16, fontSize: 16, color: '#6B7280' }}>
-                                ⭐ {mentorInfo.estrellas_mentor.toFixed(1)} estrellas
+                    <div>
+                        <div style={sectionHeaderStyle}>
+                            <div>
+                                <h2 style={sectionTitleStyle}>Mentorías</h2>
+                                <p style={sectionSubtitleStyle}>Materias en las que ofrece apoyo</p>
                             </div>
-                        )}
-                    </Card>
+                        </div>
+
+                        <div style={mentorCardStyle}>
+                            {mentorInfo.estrellas_mentor && (
+                                <div style={mentorRatingStyle}>
+                                    <span style={{ fontSize: 24 }}>⭐</span>
+                                    <div>
+                                        <div style={{ fontSize: 28, fontWeight: 700, color: '#0A66C2' }}>
+                                            {mentorInfo.estrellas_mentor.toFixed(1)}
+                                        </div>
+                                        <div style={{ fontSize: 13, color: '#666' }}>Calificación</div>
+                                    </div>
+                                </div>
+                            )}
+
+                            <div style={mentorMateriasGridStyle}>
+                                {mentorInfo.materias?.map(m => (
+                                    <div key={m.id_materia} style={mentorMateriaCardStyle}>
+                                        <div style={mentorMateriaIconStyle}>📚</div>
+                                        <div>
+                                            <div style={mentorMateriaTitleStyle}>{m.materia.nombre_materia}</div>
+                                            {m.materia.semestre && (
+                                                <div style={mentorMateriaSemestreStyle}>Semestre {m.materia.semestre}</div>
+                                            )}
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+                    </div>
                 )}
             </div>
 
-            {/* Modal de confirmación para dejar de seguir */}
+            {/* Modal */}
             {showUnfollowModal && (
                 <div style={modalOverlayStyle} onClick={() => setShowUnfollowModal(false)}>
                     <div style={modalContentStyle} onClick={(e) => e.stopPropagation()}>
@@ -433,13 +516,50 @@ export default function PublicProfile() {
     );
 }
 
+// Componentes auxiliares
+function StatItem({ number, label }) {
+    return (
+        <div style={{ textAlign: 'center' }}>
+            <div style={{ fontSize: 20, fontWeight: 700, color: '#111827' }}>{number}</div>
+            <div style={{ fontSize: 12, color: '#666' }}>{label}</div>
+        </div>
+    );
+}
+
+function StatInline({ number, label }) {
+    return (
+        <div style={{ display: 'flex', alignItems: 'baseline', gap: 4 }}>
+            <span style={{ fontSize: 15, fontWeight: 700, color: '#111827' }}>{number}</span>
+            <span style={{ fontSize: 14, color: '#666' }}>{label}</span>
+        </div>
+    );
+}
+
+function StatCard({ icon, number, label }) {
+    return (
+        <div style={statCardItemStyle}>
+            <div style={statCardIconStyle}>{icon}</div>
+            <div>
+                <div style={statCardNumberStyle}>{number}</div>
+                <div style={statCardLabelStyle}>{label}</div>
+            </div>
+        </div>
+    );
+}
+
 // ==========================================
 // ESTILOS
 // ==========================================
 const pageStyle = {
     minHeight: '100vh',
-    background: 'linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%)',
-    padding: '40px 0',
+    background: '#F3F2EF',
+    paddingBottom: 40,
+};
+
+const containerStyle = {
+    maxWidth: 1128,
+    margin: '0 auto',
+    padding: '0 16px',
 };
 
 const centerStyle = {
@@ -447,41 +567,56 @@ const centerStyle = {
     flexDirection: 'column',
     justifyContent: 'center',
     alignItems: 'center',
-    minHeight: '50vh',
+    minHeight: '60vh',
 };
 
 const spinnerStyle = {
     width: 40,
     height: 40,
     border: '3px solid #f3f4f6',
-    borderTop: '3px solid #2563eb',
+    borderTop: '3px solid #0A66C2',
     borderRadius: '50%',
-    animation: 'spin 1s linear infinite',
+    animation: 'spin 0.8s linear infinite',
 };
 
-const profileHeaderStyle = {
-    padding: 32,
-    marginBottom: 24,
-    background: 'linear-gradient(135deg, #1e40af 0%, #2563eb 100%)',
-    color: 'white',
-    borderRadius: 16,
-    boxShadow: '0 10px 40px rgba(37, 99, 235, 0.3)',
+const buttonSpinnerStyle = {
+    width: 16,
+    height: 16,
+    border: '2px solid #f3f4f6',
+    borderTop: '2px solid currentColor',
+    borderRadius: '50%',
+    animation: 'spin 0.6s linear infinite',
 };
 
-const headerContentStyle = {
-    display: 'flex',
-    alignItems: 'flex-start',
-    gap: 24,
+const coverContainerStyle = {
+    background: 'white',
+    borderRadius: '8px 8px 0 0',
+    overflow: 'hidden',
+    marginTop: 16,
+    boxShadow: '0 0 0 1px rgba(0,0,0,0.08), 0 2px 4px rgba(0,0,0,0.08)',
 };
 
-const avatarContainerStyle = {
-    width: 120,
-    height: 120,
+const coverPhotoStyle = {
+    height: 200,
+    background: 'linear-gradient(135deg, #0A66C2 0%, #004182 50%, #00325B 100%)',
+    position: 'relative',
+};
+
+const profileHeaderWrapperStyle = {
+    padding: '0 24px 24px 24px',
+    position: 'relative',
+};
+
+const avatarWrapperStyle = {
+    width: 152,
+    height: 152,
     borderRadius: '50%',
     overflow: 'hidden',
-    border: '4px solid rgba(255,255,255,0.3)',
-    flexShrink: 0,
-    boxShadow: '0 8px 20px rgba(0,0,0,0.2)',
+    border: '5px solid white',
+    boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
+    marginTop: -76,
+    marginBottom: 16,
+    background: 'white',
 };
 
 const avatarImageStyle = {
@@ -493,130 +628,260 @@ const avatarImageStyle = {
 const avatarPlaceholderStyle = {
     width: '100%',
     height: '100%',
-    background: 'rgba(255,255,255,0.2)',
+    background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
-    fontSize: 48,
+    fontSize: 64,
     fontWeight: 'bold',
     color: 'white',
 };
 
+const profileInfoContainerStyle = {
+    display: 'flex',
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
+    gap: 20,
+    flexWrap: 'wrap',
+};
+
+const profileInfoLeftStyle = {
+    flex: 1,
+    minWidth: 280,
+};
+
 const nameStyle = {
     margin: 0,
-    fontSize: 32,
-    fontWeight: 800,
+    fontSize: 28,
+    fontWeight: 700,
+    color: '#000000E6',
+    letterSpacing: '-0.5px',
 };
 
 const usernameStyle = {
-    margin: '4px 0 8px 0',
-    fontSize: 18,
-    opacity: 0.9,
+    margin: '4px 0 0 0',
+    fontSize: 16,
+    color: '#666',
+    fontWeight: 500,
 };
 
 const emailStyle = {
-    margin: '0 0 16px 0',
+    margin: '8px 0 16px 0',
     fontSize: 14,
-    opacity: 0.8,
-};
-
-const mentorBadgeStyle = {
-    background: '#10B981',
-    color: 'white',
-    padding: '6px 14px',
-    borderRadius: 20,
-    fontSize: 14,
-    fontWeight: 600,
-};
-
-const statsContainerStyle = {
+    color: '#666',
     display: 'flex',
-    gap: 32,
-    marginTop: 16,
-    marginBottom: 20,
-};
-
-const statItemStyle = {
-    display: 'flex',
-    flexDirection: 'column',
     alignItems: 'center',
 };
 
-const statNumberStyle = {
-    fontSize: 24,
-    fontWeight: 800,
+const mentorBadgeStyle = {
+    background: 'linear-gradient(135deg, #10B981 0%, #059669 100%)',
+    color: 'white',
+    padding: '6px 14px',
+    borderRadius: 20,
+    fontSize: 13,
+    fontWeight: 600,
+    display: 'inline-flex',
+    alignItems: 'center',
+    gap: 4,
+    boxShadow: '0 2px 8px rgba(16, 185, 129, 0.3)',
 };
 
-const statLabelStyle = {
-    fontSize: 13,
-    opacity: 0.9,
-    marginTop: 2,
+const statsContainerMobileStyle = {
+    display: 'flex',
+    gap: 32,
+    marginTop: 16,
+    '@media (min-width: 768px)': {
+        display: 'none',
+    },
+};
+
+const statsInlineStyle = {
+    display: 'flex',
+    gap: 20,
+    marginTop: 12,
+    flexWrap: 'wrap',
+};
+
+const verTodosHeaderStyle = {
+    display: 'flex',
+    justifyContent: 'flex-end',
+    marginBottom: 16,
+    marginTop: 16,
 };
 
 const followButtonStyle = {
-    padding: '12px 32px',
-    borderRadius: 8,
+    padding: '10px 24px',
+    borderRadius: 24,
     fontWeight: 700,
     fontSize: 15,
     cursor: 'pointer',
     transition: 'all 0.2s ease',
     border: '2px solid',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    minWidth: 140,
+    height: 40,
+    boxShadow: '0 1px 4px rgba(0,0,0,0.1)',
+};
+
+const statsCardStyle = {
+    background: 'white',
+    borderRadius: 8,
+    padding: 20,
+    marginTop: 8,
+    marginBottom: 8,
+    display: 'grid',
+    gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
+    gap: 16,
+    boxShadow: '0 0 0 1px rgba(0,0,0,0.08), 0 2px 4px rgba(0,0,0,0.08)',
+};
+
+const statCardItemStyle = {
+    display: 'flex',
+    alignItems: 'center',
+    gap: 16,
+    padding: 16,
+    borderRadius: 8,
+    background: '#F9FAFB',
+    border: '1px solid #E5E7EB',
+    transition: 'all 0.2s ease',
+};
+
+const statCardIconStyle = {
+    fontSize: 32,
+    lineHeight: 1,
+};
+
+const statCardNumberStyle = {
+    fontSize: 24,
+    fontWeight: 800,
+    color: '#0A66C2',
+    lineHeight: 1.2,
+};
+
+const statCardLabelStyle = {
+    fontSize: 13,
+    color: '#666',
+    fontWeight: 500,
+    marginTop: 2,
 };
 
 const tabsContainerStyle = {
+    background: 'white',
+    borderRadius: '0 0 8px 8px',
     display: 'flex',
-    gap: 12,
-    marginBottom: 24,
-    justifyContent: 'center',
-    flexWrap: 'wrap',
+    gap: 4,
+    padding: '0 24px',
+    borderTop: '1px solid #E5E7EB',
+    boxShadow: '0 0 0 1px rgba(0,0,0,0.08), 0 2px 4px rgba(0,0,0,0.08)',
 };
 
 const tabButtonStyle = {
-    padding: '12px 24px',
-    borderRadius: 8,
+    padding: '16px 20px',
     fontWeight: 600,
-    fontSize: 14,
+    fontSize: 15,
     cursor: 'pointer',
     transition: 'all 0.2s ease',
-    border: '1px solid',
+    border: 'none',
+    borderRadius: 0,
+    display: 'flex',
+    alignItems: 'center',
+    gap: 6,
 };
 
 const sectionHeaderStyle = {
     display: 'flex',
     justifyContent: 'space-between',
     alignItems: 'center',
+    marginTop: 24,
     marginBottom: 20,
+    flexWrap: 'wrap',
+    gap: 16,
 };
 
 const sectionTitleStyle = {
     margin: 0,
-    fontSize: 24,
+    fontSize: 22,
     fontWeight: 700,
-    color: '#111827',
+    color: '#000000E6',
+    letterSpacing: '-0.3px',
+};
+
+const sectionSubtitleStyle = {
+    margin: '4px 0 0 0',
+    fontSize: 14,
+    color: '#666',
 };
 
 const verMasButtonStyle = {
     padding: '10px 20px',
-    background: '#2563EB',
-    color: 'white',
-    border: 'none',
-    borderRadius: 8,
+    background: 'white',
+    color: '#0A66C2',
+    border: '2px solid #0A66C2',
+    borderRadius: 24,
     fontWeight: 600,
     fontSize: 14,
     cursor: 'pointer',
     transition: 'all 0.2s ease',
+    display: 'flex',
+    alignItems: 'center',
+    boxShadow: '0 1px 4px rgba(0,0,0,0.1)',
 };
 
 const backToRecentButtonStyle = {
     padding: '10px 20px',
     background: 'white',
-    color: '#2563EB',
-    border: '1px solid #2563EB',
-    borderRadius: 8,
+    color: '#666',
+    border: '2px solid #E5E7EB',
+    borderRadius: 24,
     fontWeight: 600,
     fontSize: 14,
     cursor: 'pointer',
     transition: 'all 0.2s ease',
+    display: 'flex',
+    alignItems: 'center',
+};
+
+const carouselWrapperStyle = {
+    position: 'relative',
+    paddingBottom: 20,
+};
+
+const carouselContainerStyle = {
+    display: 'flex',
+    gap: 16,
+    overflowX: 'auto',
+    scrollBehavior: 'smooth',
+    paddingBottom: 8,
+    scrollbarWidth: 'thin',
+    scrollbarColor: '#CBD5E1 transparent',
+};
+
+const carouselItemStyle = {
+    minWidth: 360,
+    flexShrink: 0,
+};
+
+const carouselArrowStyle = {
+    position: 'absolute',
+    top: '50%',
+    transform: 'translateY(-50%)',
+    width: 44,
+    height: 44,
+    borderRadius: '50%',
+    background: 'white',
+    border: '2px solid #E5E7EB',
+    color: '#0A66C2',
+    fontSize: 28,
+    fontWeight: 'bold',
+    cursor: 'pointer',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
+    transition: 'all 0.2s ease',
+    zIndex: 10,
 };
 
 const filtersContainerStyle = {
@@ -625,56 +890,134 @@ const filtersContainerStyle = {
     marginBottom: 24,
     flexWrap: 'wrap',
     alignItems: 'center',
+    background: 'white',
+    padding: 16,
+    borderRadius: 8,
+    boxShadow: '0 0 0 1px rgba(0,0,0,0.08)',
 };
 
 const filterLabelStyle = {
     fontSize: 14,
     fontWeight: 600,
-    color: '#6B7280',
+    color: '#666',
+    display: 'flex',
+    alignItems: 'center',
 };
 
-const filterButtonStyle = {
+const filterChipStyle = {
     padding: '8px 16px',
-    borderRadius: 6,
+    borderRadius: 20,
     fontWeight: 600,
     fontSize: 13,
     cursor: 'pointer',
     transition: 'all 0.2s ease',
-    border: '1px solid #D1D5DB',
+    border: '2px solid',
 };
 
 const notesGridStyle = {
     display: 'grid',
     gap: 16,
-    gridTemplateColumns: 'repeat(auto-fill, minmax(350px, 1fr))',
+    gridTemplateColumns: 'repeat(auto-fill, minmax(360px, 1fr))',
 };
 
 const emptyStateStyle = {
     textAlign: 'center',
-    padding: 60,
+    padding: '80px 20px',
     background: 'white',
-    borderRadius: 12,
+    borderRadius: 8,
+    boxShadow: '0 0 0 1px rgba(0,0,0,0.08)',
 };
 
-const mentorSubjectBadgeStyle = {
-    background: '#EEF2FF',
-    color: '#2563EB',
-    padding: '10px 16px',
+const emptyIconStyle = {
+    fontSize: '4rem',
+    marginBottom: 16,
+    opacity: 0.5,
+};
+
+const emptyTitleStyle = {
+    margin: '0 0 8px 0',
+    fontSize: 20,
+    fontWeight: 700,
+    color: '#111827',
+};
+
+const emptyDescStyle = {
+    margin: 0,
+    color: '#666',
+    fontSize: 15,
+};
+
+const mentorCardStyle = {
+    background: 'white',
     borderRadius: 8,
-    fontSize: 14,
-    fontWeight: 600,
-    border: '1px solid #BFDBFE',
+    padding: 24,
+    boxShadow: '0 0 0 1px rgba(0,0,0,0.08), 0 2px 4px rgba(0,0,0,0.08)',
+};
+
+const mentorRatingStyle = {
+    display: 'flex',
+    alignItems: 'center',
+    gap: 16,
+    padding: 20,
+    background: 'linear-gradient(135deg, #FEF3C7 0%, #FDE68A 100%)',
+    borderRadius: 8,
+    marginBottom: 24,
+    border: '2px solid #FCD34D',
+};
+
+const mentorMateriasGridStyle = {
+    display: 'grid',
+    gap: 12,
+    gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))',
+};
+
+const mentorMateriaCardStyle = {
+    display: 'flex',
+    alignItems: 'center',
+    gap: 12,
+    padding: 16,
+    background: '#F9FAFB',
+    border: '2px solid #E5E7EB',
+    borderRadius: 8,
+    transition: 'all 0.2s ease',
+};
+
+const mentorMateriaIconStyle = {
+    fontSize: 28,
+    width: 48,
+    height: 48,
+    background: 'white',
+    borderRadius: 8,
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    border: '2px solid #E5E7EB',
+};
+
+const mentorMateriaTitleStyle = {
+    fontSize: 15,
+    fontWeight: 700,
+    color: '#111827',
+    lineHeight: 1.3,
+};
+
+const mentorMateriaSemestreStyle = {
+    fontSize: 13,
+    color: '#666',
+    marginTop: 2,
 };
 
 const backButtonStyle = {
-    padding: '10px 20px',
-    background: '#2563EB',
+    padding: '12px 24px',
+    background: '#0A66C2',
     color: 'white',
     border: 'none',
-    borderRadius: 8,
+    borderRadius: 24,
     fontWeight: 600,
     cursor: 'pointer',
-    marginTop: 16,
+    fontSize: 15,
+    boxShadow: '0 2px 8px rgba(10, 102, 194, 0.3)',
+    transition: 'all 0.2s ease',
 };
 
 // Modal styles
@@ -684,7 +1027,7 @@ const modalOverlayStyle = {
     left: 0,
     right: 0,
     bottom: 0,
-    background: 'rgba(0, 0, 0, 0.5)',
+    background: 'rgba(0, 0, 0, 0.6)',
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
