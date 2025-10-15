@@ -300,11 +300,13 @@ export default function Favorites() {
                     </Button>
                 </Card>
             ) : (
-                <div style={{
-                    display: 'grid',
-                    gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))',
-                    gap: 16
-                }}>
+                <div
+                    style={{
+                        display: 'grid',
+                        gridTemplateColumns: 'repeat(auto-fill, minmax(230px, 1fr))',
+                        gap: 16
+                    }}
+                >
                     {filteredItems.map(item => (
                         item.type === 'note' ? (
                             <ApunteCard
@@ -312,15 +314,20 @@ export default function Favorites() {
                                 note={item.note}
                             />
                         ) : (
-                            <Card key={`${item.type}-${item.favId}`} style={{
-                                padding: 20,
-                                transition: 'transform 0.2s ease, box-shadow 0.2s ease',
-                                border: '1px solid #e5e7eb'
-                            }}>
+                            <Card
+                                key={`${item.type}-${item.favId}`}
+                                style={{
+                                    padding: 20,
+                                    transition: 'transform 0.2s ease, box-shadow 0.2s ease',
+                                    border: '1px solid #e5e7eb'
+                                }}
+                            >
+                                {/* contenido del card de curso o mentor */}
                             </Card>
                         )
                     ))}
                 </div>
+
             )}
         </div>
     );

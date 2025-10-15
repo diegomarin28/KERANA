@@ -4,7 +4,8 @@ import SearchBar from "../components/SearchBar";
 import { searchAPI } from "../api/database";
 import SubjectCard from "../components/SubjectCard";
 import ProfessorCard from "../components/ProfessorCard";
-import NoteCard from "../components/NoteCard";
+
+import ApunteCard from "../components/ApunteCard.jsx";
 import { UserCard } from "../components/UserCard";
 import { MentorCard } from "../components/MentorCard";
 import { supabase } from "../supabase";
@@ -257,7 +258,7 @@ export default function SearchResults() {
                         style={{
                             display: "grid",
                             gap: 16,
-                            gridTemplateColumns: "repeat(auto-fill, minmax(350px, 1fr))",
+                            gridTemplateColumns: "repeat(auto-fill, minmax(280px, 1fr))",
                         }}
                     >
                         {Array.from({ length: 6 }).map((_, i) => (
@@ -298,7 +299,7 @@ export default function SearchResults() {
                         style={{
                             display: "grid",
                             gap: 16,
-                            gridTemplateColumns: "repeat(auto-fill, minmax(350px, 1fr))",
+                            gridTemplateColumns: "repeat(auto-fill, minmax(280px, 1fr))",
                         }}
                     >
                         {/* Materias */}
@@ -319,7 +320,7 @@ export default function SearchResults() {
                         {/* Apuntes */}
                         {show("apuntes") &&
                             filtered.notes.map((a, index) => (
-                                <NoteCard key={`apunte-${a.id_apunte}-${index}`} note={a} />
+                                <ApunteCard key={`apunte-${a.id_apunte}-${index}`} note={a} />
                             ))}
 
                         {/* Usuarios */}

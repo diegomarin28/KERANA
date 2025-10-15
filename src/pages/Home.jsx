@@ -223,9 +223,9 @@ export default function Home() {
                                     <div
                                         key={n.apunte_id}
                                         style={{
-                                            width: "100%",        // ocupa toda la celda
-                                            maxWidth: 230,        // límite de ancho
-                                            aspectRatio: "4 / 5", // mantiene forma vertical
+                                            width: "100%",
+                                            maxWidth: 230,
+                                            aspectRatio: "4 / 5",
                                         }}
                                     >
                                         <ApunteCard
@@ -235,8 +235,8 @@ export default function Home() {
                                                 descripcion: n.descripcion || '',
                                                 creditos: n.creditos,
                                                 estrellas: n.rating_promedio || 0,
-                                                usuario: n.usuario,
-                                                materia: { nombre_materia: n.materia_nombre || 'Sin materia' },
+                                                usuario: { nombre: n.usuario_nombre },  // ← CAMBIO
+                                                materia: { nombre_materia: n.nombre_materia },  // ← CAMBIO
                                                 signedUrl: n.signedUrl
                                             }}
                                         />
