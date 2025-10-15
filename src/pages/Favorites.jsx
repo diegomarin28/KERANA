@@ -4,6 +4,7 @@ import { Card } from '../components/ui/Card';
 import { Button } from '../components/ui/Button';
 import { supabase } from '../supabase';
 import { getOrCreateUserProfile } from '../api/userService';
+import ApunteCard from '../components/ApunteCard';
 
 export default function Favorites() {
     const [items, setItems] = useState([]);
@@ -26,30 +27,39 @@ export default function Favorites() {
             let allFavorites = [];
 
             // === APUNTES FAVORITOS ===
-            const { data: notesFav } = await supabase
+            // === APUNTES FAVORITOS ===
+            const { data: notesFav, error: notesFavError } = await supabase
                 .from('apunte_fav')
                 .select('id_usuario, id_apunte')
                 .eq('id_usuario', userId);
 
+            console.log('Favoritos encontrados:', notesFav);
+            console.log('Error favoritos:', notesFavError);
+
             let noteItems = [];
             if (notesFav?.length) {
+
                 const apIds = notesFav.map(r => r.id_apunte);
-                const { data: apuntes } = await supabase
+                const { data: apuntes, error: apuntesError } = await supabase
                     .from('apunte')
                     .select(`
-            id_apunte,
-            titulo,
-            creditos,
-            estrellas,
-            id_materia,
-            id_usuario,
-            materia:id_materia!Apunte_id_materia_fkey(
-              id_materia,
-              nombre_materia
-            )
-          `)
+                                id_apunte,
+                                titulo,
+                                descripcion,
+                                creditos,
+                                estrellas,
+                                id_materia,
+                                id_usuario,
+                                file_path,
+                                materia:id_materia(nombre_materia)
+                            `)
                     .in('id_apunte', apIds);
 
+                if (apuntesError) {
+                    console.error('Error cargando apuntes:', apuntesError);
+                    throw apuntesError;
+                }
+                console.log('Apuntes cargados:', apuntes);
                 // autor (opcional)
                 let userMap = {};
                 const uIds = [...new Set((apuntes || []).map(a => a.id_usuario).filter(Boolean))];
@@ -64,19 +74,33 @@ export default function Favorites() {
                     }, {});
                 }
 
+                const apuntesWithSignedUrls = await Promise.all((apuntes || []).map(async (apunte) => {
+                    if (apunte.file_path) {
+                        const { data: signedData } = await supabase.storage
+                            .from('apuntes')
+                            .createSignedUrl(apunte.file_path, 3600);
+                        return { ...apunte, signedUrl: signedData?.signedUrl || null };
+                    }
+                    return apunte;
+                }));
+
                 noteItems = (notesFav || [])
                     .map(r => {
-                        const a = (apuntes || []).find(x => x.id_apunte === r.id_apunte);
+                        const a = apuntesWithSignedUrls.find(x => x.id_apunte === r.id_apunte);
                         return a ? {
                             favId: `${userId}-${a.id_apunte}`,
-                            id: a.id_apunte,
                             type: 'note',
-                            title: a.titulo || 'Apunte',
-                            subtitle: userMap[a.id_usuario] || 'Autor',
-                            details: a.materia?.nombre_materia || 'Materia',
-                            price: a.creditos ?? 0,
-                            rating: a.estrellas || '0.0',
-                            link: `/apuntes/${a.id_apunte}`
+                            note: {
+                                id_apunte: a.id_apunte,
+                                titulo: a.titulo,
+                                descripcion: a.descripcion,
+                                creditos: a.creditos,
+                                estrellas: a.estrellas,
+                                signedUrl: a.signedUrl,
+                                materia: a.materia,
+                                usuario: { nombre: userMap[a.id_usuario] || 'Anónimo' },
+                                id_usuario: a.id_usuario
+                            }
                         } : null;
                     })
                     .filter(Boolean);
@@ -276,70 +300,25 @@ export default function Favorites() {
                     </Button>
                 </Card>
             ) : (
-                <div style={{ display: 'grid', gap: 16 }}>
+                <div style={{
+                    display: 'grid',
+                    gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))',
+                    gap: 16
+                }}>
                     {filteredItems.map(item => (
-                        <Card key={`${item.type}-${item.favId}`} style={{
-                            padding: 20,
-                            transition: 'transform 0.2s ease, box-shadow 0.2s ease',
-                            border: '1px solid #e5e7eb'
-                        }}>
-                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 20 }}>
-                                <div style={{ flex: 1 }}>
-                                    <Link to={item.link} style={{ textDecoration: 'none', color: 'inherit' }}>
-                                        <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
-                                            <span style={{ fontSize: 18 }}>{getTypeIcon(item.type)}</span>
-                                            <span style={{
-                                                background: "#dbeafe",
-                                                color: "#2563eb",
-                                                padding: "4px 8px",
-                                                borderRadius: "6px",
-                                                fontSize: "12px",
-                                                fontWeight: "600"
-                                            }}>
-                        {getTypeLabel(item.type)}
-                      </span>
-                                        </div>
-                                        <h3 style={{ margin: '0 0 8px 0', fontSize: 18, fontWeight: 600, color: '#0b1e3a' }}>
-                                            {item.title}
-                                        </h3>
-                                        <p style={{ margin: '0 0 8px 0', color: '#64748b', fontSize: 14 }}>
-                                            {item.subtitle} {item.details && `· ${item.details}`}
-                                        </p>
-                                    </Link>
-
-                                    <div style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
-                    <span style={{
-                        background: "#fef3c7",
-                        color: "#d97706",
-                        padding: "4px 8px",
-                        borderRadius: "6px",
-                        fontSize: "12px",
-                        fontWeight: "600"
-                    }}>
-                      ⭐ {item.rating}
-                    </span>
-                                        {item.price > 0 && (
-                                            <div style={{ fontWeight: 700, color: '#059669', fontSize: 14 }}>
-                                                {item.type === 'note' ? `${item.price} créditos` : `$${item.price}`}
-                                            </div>
-                                        )}
-                                    </div>
-                                </div>
-
-                                <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-                                    <Button variant="primary" onClick={() => (window.location.href = item.link)}>
-                                        Ver
-                                    </Button>
-                                    <Button
-                                        variant="ghost"
-                                        onClick={() => removeFavorite(item.favId, item.type)}
-                                        style={{ color: '#ef4444' }}
-                                    >
-                                        Quitar
-                                    </Button>
-                                </div>
-                            </div>
-                        </Card>
+                        item.type === 'note' ? (
+                            <ApunteCard
+                                key={`${item.type}-${item.favId}`}
+                                note={item.note}
+                            />
+                        ) : (
+                            <Card key={`${item.type}-${item.favId}`} style={{
+                                padding: 20,
+                                transition: 'transform 0.2s ease, box-shadow 0.2s ease',
+                                border: '1px solid #e5e7eb'
+                            }}>
+                            </Card>
+                        )
                     ))}
                 </div>
             )}

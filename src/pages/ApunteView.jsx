@@ -1,13 +1,15 @@
 import { useState, useEffect } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import { supabase } from '../supabase';
 import { Card } from '../components/ui/Card';
 import { Button } from '../components/ui/Button';
 import PDFThumbnail from '../components/PDFThumbnail';
 
-export default function ApunteView() {
+
+export const ApunteView = () => {
     const { id } = useParams();
     const navigate = useNavigate();
+    const location = useLocation();
 
     const [apunte, setApunte] = useState(null);
     const [loading, setLoading] = useState(true);
@@ -25,6 +27,9 @@ export default function ApunteView() {
     const [deleteConfirm, setDeleteConfirm] = useState(false);
     const [deleting, setDeleting] = useState(false);
     const [showDeleteSuccessModal, setShowDeleteSuccessModal] = useState(false);
+    const [isFavorite, setIsFavorite] = useState(false);
+    const [showFavoriteModal, setShowFavoriteModal] = useState(false);
+    const [showUnfavoriteModal, setShowUnfavoriteModal] = useState(false);
 
     useEffect(() => {
         loadApunteData();
@@ -106,6 +111,15 @@ export default function ApunteView() {
                     setHasPurchased(true);
                 }
             }
+
+            // Verificar si el apunte está en favoritos
+            const { data: favoriteData, error: favoriteError } = await supabase
+                .from('apunte_fav')
+                .select('id_apunte')
+                .eq('id_usuario', usuarioData.id_usuario)
+                .eq('id_apunte', id);
+            if (favoriteError) throw favoriteError;
+            setIsFavorite(favoriteData.length > 0);
 
             await calculateAverageStars(id);
 
@@ -300,6 +314,34 @@ export default function ApunteView() {
             alert("Error eliminando apunte: " + (err.message || err));
         } finally {
             setDeleting(false);
+        }
+    };
+
+    const handleFavoriteToggle = async () => {
+        if (!apunte || !currentUserId) return;
+
+        try {
+            if (isFavorite) {
+                const { error } = await supabase
+                    .from('apunte_fav')
+                    .delete()
+                    .match({ id_usuario: currentUserId, id_apunte: apunte.id_apunte });
+                if (error) throw error;
+                setIsFavorite(false);
+                setShowUnfavoriteModal(true);
+                setTimeout(() => setShowUnfavoriteModal(false), 2000);
+            } else {
+                const { error } = await supabase
+                    .from('apunte_fav')
+                    .insert({ id_usuario: currentUserId, id_apunte: apunte.id_apunte });
+                if (error) throw error;
+                setIsFavorite(true);
+                setShowFavoriteModal(true);
+                setTimeout(() => setShowFavoriteModal(false), 2000);
+            }
+        } catch (error) {
+            console.error('Error al manejar favorito:', error);
+            alert("Error al guardar/quitar favorito: " + (error.message || ""));
         }
     };
 
@@ -510,6 +552,162 @@ export default function ApunteView() {
                 </div>
             )}
 
+            {/* Modal de éxito - Favorito */}
+            {showFavoriteModal && (
+                <div style={{
+                    position: 'fixed',
+                    top: 0,
+                    left: 0,
+                    right: 0,
+                    bottom: 0,
+                    background: 'rgba(0, 0, 0, 0.5)',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    zIndex: 1000,
+                    backdropFilter: 'blur(4px)'
+                }}>
+                    <Card style={{
+                        maxWidth: 450,
+                        padding: 40,
+                        textAlign: 'center',
+                        background: '#fff',
+                        boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)',
+                        animation: 'fadeIn 0.3s ease-out'
+                    }}>
+                        <div style={{
+                            width: 80,
+                            height: 80,
+                            background: 'linear-gradient(135deg, #2563eb 0%, #1e40af 100%)',
+                            borderRadius: '50%',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            margin: '0 auto 24px',
+                            fontSize: 40
+                        }}>
+                            🔖
+                        </div>
+                        <h2 style={{
+                            margin: '0 0 12px 0',
+                            fontSize: 28,
+                            fontWeight: 700,
+                            background: 'linear-gradient(135deg, #2563eb 0%, #1e40af 100%)',
+                            WebkitBackgroundClip: 'text',
+                            WebkitTextFillColor: 'transparent',
+                            backgroundClip: 'text'
+                        }}>
+                            Apunte guardado en favoritos
+                        </h2>
+                        <p style={{
+                            color: '#6b7280',
+                            fontSize: 16,
+                            lineHeight: 1.6,
+                            marginBottom: 32
+                        }}>
+                            Encontrarás este apunte en tu sección de <strong style={{ color: '#374151' }}>Favoritos</strong>.
+                        </p>
+                        <Button
+                            onClick={() => setShowFavoriteModal(false)}
+                            style={{
+                                padding: '14px 32px',
+                                background: 'linear-gradient(135deg, #2563eb 0%, #1e40af 100%)',
+                                color: '#fff',
+                                border: 'none',
+                                borderRadius: 8,
+                                fontWeight: 600,
+                                cursor: 'pointer',
+                                fontSize: 16,
+                                width: '100%',
+                                transition: 'transform 0.2s'
+                            }}
+                            onMouseEnter={(e) => e.currentTarget.style.transform = 'scale(1.02)'}
+                            onMouseLeave={(e) => e.currentTarget.style.transform = 'scale(1)'}
+                        >
+                            Continuar
+                        </Button>
+                    </Card>
+                </div>
+            )}
+
+            {/* Modal de éxito - Quitar favorito */}
+            {showUnfavoriteModal && (
+                <div style={{
+                    position: 'fixed',
+                    top: 0,
+                    left: 0,
+                    right: 0,
+                    bottom: 0,
+                    background: 'rgba(0, 0, 0, 0.5)',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    zIndex: 1000,
+                    backdropFilter: 'blur(4px)'
+                }}>
+                    <Card style={{
+                        maxWidth: 450,
+                        padding: 40,
+                        textAlign: 'center',
+                        background: '#fff',
+                        boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)',
+                        animation: 'fadeIn 0.3s ease-out'
+                    }}>
+                        <div style={{
+                            width: 80,
+                            height: 80,
+                            background: 'linear-gradient(135deg, #2563eb 0%, #1e40af 100%)',
+                            borderRadius: '50%',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            margin: '0 auto 24px',
+                            fontSize: 40
+                        }}>
+                            📌
+                        </div>
+                        <h2 style={{
+                            margin: '0 0 12px 0',
+                            fontSize: 28,
+                            fontWeight: 700,
+                            background: 'linear-gradient(135deg, #2563eb 0%, #1e40af 100%)',
+                            WebkitBackgroundClip: 'text',
+                            WebkitTextFillColor: 'transparent',
+                            backgroundClip: 'text'
+                        }}>
+                            Se ha quitado este apunte de favoritos
+                        </h2>
+                        <p style={{
+                            color: '#6b7280',
+                            fontSize: 16,
+                            lineHeight: 1.6,
+                            marginBottom: 32
+                        }}>
+                            Este apunte ya no está en tu sección de <strong style={{ color: '#374151' }}>Favoritos</strong>.
+                        </p>
+                        <Button
+                            onClick={() => setShowUnfavoriteModal(false)}
+                            style={{
+                                padding: '14px 32px',
+                                background: 'linear-gradient(135deg, #2563eb 0%, #1e40af 100%)',
+                                color: '#fff',
+                                border: 'none',
+                                borderRadius: 8,
+                                fontWeight: 600,
+                                cursor: 'pointer',
+                                fontSize: 16,
+                                width: '100%',
+                                transition: 'transform 0.2s'
+                            }}
+                            onMouseEnter={(e) => e.currentTarget.style.transform = 'scale(1.02)'}
+                            onMouseLeave={(e) => e.currentTarget.style.transform = 'scale(1)'}
+                        >
+                            Continuar
+                        </Button>
+                    </Card>
+                </div>
+            )}
+
             <h1 style={{ textAlign: 'center', margin: '0 0 32px 0', fontSize: 32, fontWeight: 700 }}>
                 {apunte.titulo}
             </h1>
@@ -539,7 +737,11 @@ export default function ApunteView() {
                                 </span>
                             )}
                             <span style={{ fontSize: 14, color: '#6b7280' }}>
-                                Por <strong>{apunte.usuario?.nombre || 'Anónimo'}</strong>
+                                {isOwner ? (
+                                    <strong>Por Ti</strong>
+                                ) : (
+                                    <>Por <strong>{apunte.usuario?.nombre || 'Anónimo'}</strong></>
+                                )}
                             </span>
                         </div>
 
@@ -621,21 +823,42 @@ export default function ApunteView() {
                                     >
                                         📥 Descargar apunte
                                     </Button>
-                                    <Button
-                                        variant="ghost"
-                                        onClick={() => alert('Función de calificación próximamente...')}
-                                        style={{
-                                            padding: '14px 28px',
-                                            fontSize: 16,
-                                            fontWeight: 600,
-                                            width: '100%',
-                                            border: '2px solid #f59e0b',
-                                            color: '#f59e0b'
-                                        }}
-                                    >
-                                        ⭐ Calificá este apunte
-                                    </Button>
+                                    {!isOwner && (
+                                        <Button
+                                            variant="ghost"
+                                            onClick={() => alert('Función de calificación próximamente...')}
+                                            style={{
+                                                padding: '14px 28px',
+                                                fontSize: 16,
+                                                fontWeight: 600,
+                                                width: '100%',
+                                                border: '2px solid #f59e0b',
+                                                color: '#f59e0b'
+                                            }}
+                                        >
+                                            ⭐ Calificá este apunte
+                                        </Button>
+                                    )}
                                 </>
+                            )}
+                            {!isOwner && !hasPurchased && (
+                                <Button
+                                    variant="ghost"
+                                    onClick={handleFavoriteToggle}
+                                    style={{
+                                        padding: '14px 28px',
+                                        fontSize: 16,
+                                        fontWeight: 600,
+                                        width: '100%',
+                                        border: `2px solid ${isFavorite ? '#2563eb' : '#6b7280'}`,
+                                        color: isFavorite ? '#2563eb' : '#6b7280',
+                                        transition: 'transform 0.2s'
+                                    }}
+                                    onMouseEnter={(e) => e.currentTarget.style.transform = 'scale(1.02)'}
+                                    onMouseLeave={(e) => e.currentTarget.style.transform = 'scale(1)'}
+                                >
+                                    {isFavorite ? '🔖 Quitar de favoritos' : '📌 Agregar a favoritos'}
+                                </Button>
                             )}
                         </div>
 
@@ -675,8 +898,11 @@ export default function ApunteView() {
             </Card>
 
             <div style={{ marginTop: 24, textAlign: 'center' }}>
-                <Button variant="ghost" onClick={() => navigate('/apuntes')}>
-                    ← Volver a Apuntes
+                <Button
+                    variant="ghost"
+                    onClick={() => navigate(-1)}
+                >
+                    ← Volver
                 </Button>
             </div>
 
@@ -837,4 +1063,4 @@ export default function ApunteView() {
             )}
         </div>
     );
-}
+};

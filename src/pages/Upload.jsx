@@ -527,23 +527,33 @@ export default function Upload() {
                         >
                             {uploading ? 'Subiendo archivo...' : loading ? 'Guardando...' : 'Publicar apunte'}
                         </Button>
-                        <Button
+                        <button
                             type="button"
                             onClick={() => navigate(-1)}
                             disabled={loading}
                             style={{
-                                padding: 14,
+                                padding: '8px 14px',
                                 background: '#fff',
                                 color: '#374151',
-                                border: '1px solid #d1d5db',
-                                borderRadius: 8,
-                                fontWeight: 600,
+                                border: '1px solid #2563eb', // azul
+                                borderRadius: 6,
+                                fontWeight: 500,
                                 cursor: loading ? 'not-allowed' : 'pointer',
-                                fontSize: 16
+                                fontSize: 14,
+                                transition: 'all 0.2s ease',
+                            }}
+                            onMouseEnter={(e) => {
+                                e.currentTarget.style.background = '#2563eb'; // azul
+                                e.currentTarget.style.color = '#fff'; // texto blanco
+                            }}
+                            onMouseLeave={(e) => {
+                                e.currentTarget.style.background = '#fff'; // vuelve blanco
+                                e.currentTarget.style.color = '#374151'; // texto gris oscuro
                             }}
                         >
                             Cancelar
-                        </Button>
+                        </button>
+
                     </div>
                 </form>
             </Card>

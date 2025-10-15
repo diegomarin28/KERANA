@@ -46,7 +46,7 @@ const FollowersPage = lazy(() => import('./pages/FollowersPage.jsx'));
 
 
 // Componentes cargados inmediatamente
-import ApunteView from './pages/ApunteView';
+import {ApunteView} from './pages/ApunteView';
 import AuthConfirm from './pages/AuthConfirm';
 import AuthModal_SignIn from "./components/AuthModal_SignIn";
 import PrivacyBanner from './components/PrivacyBanner';
