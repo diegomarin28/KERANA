@@ -99,13 +99,19 @@ function AppRoutes() {
 
     useEffect(() => {
         const checkRememberMe = () => {
-            const rememberMe = JSON.parse(localStorage.getItem("kerana_remember") || "false");
-            if (!rememberMe) {
-                const handleBeforeUnload = () => {
-                    supabase.auth.signOut();
-                };
-                window.addEventListener('beforeunload', handleBeforeUnload);
-                return () => window.removeEventListener('beforeunload', handleBeforeUnload);
+            try {
+                const rememberMe = JSON.parse(localStorage.getItem("kerana_remember") || "false");
+                if (!rememberMe) {
+                    const handleBeforeUnload = () => {
+                        // ✅ Solo limpiar localStorage, no async signOut
+                        localStorage.removeItem('sb-cfmcvslstfryhapvsztu-auth-token');
+                    };
+                    window.addEventListener('beforeunload', handleBeforeUnload);
+                    return () => window.removeEventListener('beforeunload', handleBeforeUnload);
+                }
+            } catch (error) {
+                console.error('🔴 Error en checkRememberMe:', error);
+                localStorage.removeItem("kerana_remember");
             }
         };
         checkRememberMe();

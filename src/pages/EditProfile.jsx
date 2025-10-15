@@ -374,8 +374,13 @@ export default function EditProfile() {
                     )}
 
                     {activeTab === 'profile' && (
+                        <>
+                        <div style={{ marginBottom: 24 }}>
+                            <AvatarChangeInline />
+                        </div>
                         <form onSubmit={handleProfileSubmit} style={formStyle}>
-                            <div style={inputGroupStyle}>
+
+                        <div style={inputGroupStyle}>
                                 <label style={labelStyle}>Nombre completo</label>
                                 <input
                                     type="text"
@@ -436,6 +441,7 @@ export default function EditProfile() {
                                 </Button>
                             </div>
                         </form>
+                        </>
                     )}
 
                     {activeTab === 'password' && (
@@ -583,6 +589,537 @@ export default function EditProfile() {
                     )}
                 </Card>
             </div>
+        </div>
+    );
+}
+
+function AvatarChangeInline() {
+    const [currentAvatar, setCurrentAvatar] = useState(null);
+    const [preview, setPreview] = useState(null);
+    const [openConfirm, setOpenConfirm] = useState(false);
+    const [uploading, setUploading] = useState(false);
+    const [message, setMessage] = useState("");
+    const [canChange, setCanChange] = useState(true);
+    const [changesLeft, setChangesLeft] = useState(2);
+    const [nextChangeDate, setNextChangeDate] = useState(null);
+    const [showFullImage, setShowFullImage] = useState(false);
+    const { updateAvatar } = useAvatar();
+
+    useEffect(() => {
+        checkAvatarStatus();
+    }, []);
+
+    const checkAvatarStatus = async () => {
+        try {
+            const { data: { user } } = await supabase.auth.getUser();
+            if (!user) return;
+
+            const { data: profile } = await supabase
+                .from('usuario')
+                .select('id_usuario, foto')
+                .eq('auth_id', user.id)
+                .single();
+
+            if (!profile) return;
+
+            setCurrentAvatar(profile.foto);
+
+            // Obtener cambios en los últimos 7 días
+            const sevenDaysAgo = new Date();
+            sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
+
+            const { data: recentChanges } = await supabase
+                .from('avatar_changes')
+                .select('changed_at')
+                .eq('user_id', profile.id_usuario)
+                .gte('changed_at', sevenDaysAgo.toISOString())
+                .order('changed_at', { ascending: false });
+
+            const changesCount = recentChanges?.length || 0;
+            const remaining = Math.max(0, 2 - changesCount);
+
+            setChangesLeft(remaining);
+
+            if (remaining === 0 && recentChanges && recentChanges.length > 0) {
+                const oldestChange = new Date(recentChanges[recentChanges.length - 1].changed_at);
+                const nextDate = new Date(oldestChange);
+                nextDate.setDate(nextDate.getDate() + 7);
+
+                setNextChangeDate(nextDate);
+                setCanChange(new Date() >= nextDate);
+            } else {
+                setCanChange(true);
+            }
+        } catch (e) {
+            console.error("Error checking avatar status:", e);
+        }
+    };
+
+    const onFile = (e) => {
+        const file = e.target.files?.[0];
+        if (!file) return;
+        if (!file.type.startsWith("image/")) {
+            setMessage("❌ Debe ser una imagen");
+            return;
+        }
+        if (file.size > 5 * 1024 * 1024) {
+            setMessage("❌ Máximo 5MB");
+            return;
+        }
+        const fr = new FileReader();
+        fr.onload = (ev) => setPreview(ev.target.result);
+        fr.readAsDataURL(file);
+        setMessage("");
+    };
+
+    const onClickSubir = () => {
+        if (!canChange) {
+            setMessage("❌ Debes esperar para cambiar tu foto");
+            return;
+        }
+        if (!preview) {
+            setMessage("❌ Elegí una imagen primero");
+            return;
+        }
+        setOpenConfirm(true);
+    };
+
+    const onConfirm = async () => {
+        setUploading(true);
+        setMessage("");
+        try {
+            const fileInput = document.getElementById("avatar-upload-inline");
+            const file = fileInput?.files?.[0];
+            if (!file) throw new Error("No hay archivo");
+
+            const { data: { user } } = await supabase.auth.getUser();
+            if (!user) throw new Error("No autenticado");
+
+            const { data: perfil, error: perErr } = await supabase
+                .from("usuario")
+                .select("id_usuario, foto")
+                .eq("auth_id", user.id)
+                .maybeSingle();
+            if (perErr || !perfil) throw new Error("Perfil no encontrado");
+
+            // Subir al bucket 'avatars'
+            const ext = file.name.split(".").pop();
+            const fileName = `${user.id}/avatar-${Date.now()}.${ext}`;
+            const { error: upErr } = await supabase.storage
+                .from("avatars")
+                .upload(fileName, file, { cacheControl: "3600", upsert: false });
+            if (upErr) throw upErr;
+
+            // URL pública
+            const { data: pub } = supabase.storage.from("avatars").getPublicUrl(fileName);
+            const publicUrl = pub?.publicUrl || "";
+
+            // Update BD
+            const { error: updErr } = await supabase
+                .from("usuario")
+                .update({ foto: publicUrl })
+                .eq("id_usuario", perfil.id_usuario);
+            if (updErr) throw updErr;
+
+            // Registrar cambio
+            await supabase
+                .from('avatar_changes')
+                .insert({
+                    user_id: perfil.id_usuario,
+                    old_photo: perfil.foto,
+                    new_photo: publicUrl
+                });
+
+            // Eliminar anterior (si era del mismo bucket)
+            if (perfil.foto && perfil.foto.includes("/storage/v1/object/public/avatars/")) {
+                const oldPath = perfil.foto.split("/avatars/")[1];
+                if (oldPath) {
+                    await supabase.storage.from("avatars").remove([oldPath]);
+                }
+            }
+
+            setCurrentAvatar(publicUrl);
+            setPreview(null);
+            setOpenConfirm(false);
+            setMessage("✅ Avatar actualizado");
+
+            // Actualizar contexto
+            updateAvatar(publicUrl);
+
+            // Recargar status
+            setTimeout(() => {
+                checkAvatarStatus();
+                setMessage("");
+                // Limpiar input
+                const el = document.getElementById("avatar-upload-inline");
+                if (el) el.value = "";
+            }, 1500);
+        } catch (e) {
+            console.error(e);
+            setMessage(`❌ ${e.message}`);
+        } finally {
+            setUploading(false);
+        }
+    };
+
+    const formatDate = (date) => {
+        return new Intl.DateTimeFormat('es-UY', {
+            day: 'numeric',
+            month: 'long',
+            year: 'numeric',
+            hour: '2-digit',
+            minute: '2-digit'
+        }).format(date);
+    };
+
+    return (
+        <div style={{ marginBottom: 28 }}>
+            <label style={{ fontWeight: 700, color: "#0f172a", fontSize: 15, display: "block", marginBottom: 12 }}>
+                📸 Foto de perfil
+            </label>
+
+            {/* Avatar actual + info */}
+            <div style={{
+                display: "flex",
+                alignItems: "center",
+                gap: 16,
+                marginBottom: 16,
+                padding: 16,
+                background: "#f8fafc",
+                borderRadius: 12,
+                border: "2px solid #e5e7eb",
+            }}>
+                <div
+                    onClick={() => (currentAvatar || preview) && setShowFullImage(true)}
+                    style={{
+                        width: 80,
+                        height: 80,
+                        borderRadius: "50%",
+                        overflow: "hidden",
+                        border: "4px solid #e5e7eb",
+                        flexShrink: 0,
+                        cursor: (currentAvatar || preview) ? 'pointer' : 'default',
+                        transition: 'all 0.2s ease',
+                        boxShadow: '0 4px 12px rgba(0, 0, 0, 0.1)',
+                    }}
+                    onMouseEnter={(e) => {
+                        if (currentAvatar || preview) {
+                            e.currentTarget.style.transform = 'scale(1.05)';
+                            e.currentTarget.style.boxShadow = '0 6px 16px rgba(0, 0, 0, 0.15)';
+                        }
+                    }}
+                    onMouseLeave={(e) => {
+                        e.currentTarget.style.transform = 'scale(1)';
+                        e.currentTarget.style.boxShadow = '0 4px 12px rgba(0, 0, 0, 0.1)';
+                    }}
+                >
+                    {preview ? (
+                        <img src={preview} alt="preview" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+                    ) : currentAvatar ? (
+                        <img src={currentAvatar} alt="avatar" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+                    ) : (
+                        <div style={{
+                            width: "100%",
+                            height: "100%",
+                            background: "linear-gradient(135deg, #3b82f6 0%, #1e40af 100%)",
+                            display: "grid",
+                            placeItems: "center",
+                            color: "#fff",
+                            fontWeight: 700,
+                            fontSize: 32,
+                        }}>
+                            ?
+                        </div>
+                    )}
+                </div>
+
+                <div style={{ flex: 1 }}>
+                    <div style={{ fontSize: 14, fontWeight: 600, color: "#0f172a", marginBottom: 6 }}>
+                        {preview ? '🔍 Vista previa' : '📷 Foto actual'}
+                    </div>
+                    <div style={{ fontSize: 12, color: "#64748b", marginBottom: 4 }}>
+                        {canChange ? (
+                            <span style={{ color: '#10b981', fontWeight: 600 }}>
+                                ✅ {changesLeft} {changesLeft === 1 ? 'cambio disponible' : 'cambios disponibles'}
+                            </span>
+                        ) : (
+                            <span style={{ color: '#ef4444', fontWeight: 600 }}>
+                                ⏳ Próximo cambio: {nextChangeDate ? formatDate(nextChangeDate) : 'Calculando...'}
+                            </span>
+                        )}
+                    </div>
+                    {preview && (
+                        <div style={{ fontSize: 11, color: '#6b7280', fontStyle: 'italic' }}>
+                            👆 Hacé click en la imagen para verla en grande
+                        </div>
+                    )}
+                </div>
+            </div>
+
+            {/* Información de límites */}
+            <div style={{
+                padding: '12px 14px',
+                background: '#eff6ff',
+                border: '2px solid #bfdbfe',
+                borderRadius: 10,
+                marginBottom: 16,
+                fontSize: 12,
+                color: '#1e40af',
+                lineHeight: 1.6,
+            }}>
+                <div style={{ fontWeight: 700, marginBottom: 6, display: 'flex', alignItems: 'center', gap: 6 }}>
+                    ℹ️ Límites de cambio
+                </div>
+                <div style={{ paddingLeft: 8 }}>
+                    • Podés cambiar tu foto <strong>2 veces</strong><br />
+                    • Para el tercer cambio, debes esperar <strong>7 días</strong> desde el primer cambio<br />
+                    • Tamaño máximo: <strong>5MB</strong> (JPG, PNG, WEBP)
+                </div>
+            </div>
+
+            {message && (
+                <div style={{
+                    padding: '10px 14px',
+                    marginBottom: 14,
+                    borderRadius: 8,
+                    background: message.includes("✅") ? "#d1fae5" : "#fee2e2",
+                    color: message.includes("✅") ? "#065f46" : "#991b1b",
+                    fontSize: 13,
+                    fontWeight: 600,
+                    textAlign: "center",
+                    border: `2px solid ${message.includes("✅") ? "#6ee7b7" : "#fecaca"}`,
+                }}>
+                    {message}
+                </div>
+            )}
+
+            {/* Input + Botones */}
+            <div style={{ display: "flex", gap: 10, alignItems: "stretch" }}>
+                <input
+                    id="avatar-upload-inline"
+                    type="file"
+                    accept="image/*"
+                    onChange={onFile}
+                    disabled={!canChange || uploading}
+                    style={{
+                        flex: 1,
+                        padding: "10px 12px",
+                        fontSize: 13,
+                        border: "2px solid #d1d5db",
+                        borderRadius: 8,
+                        background: canChange && !uploading ? "#fff" : "#f3f4f6",
+                        cursor: canChange && !uploading ? "pointer" : "not-allowed",
+                        opacity: canChange && !uploading ? 1 : 0.6,
+                    }}
+                />
+                {preview && (
+                    <button
+                        type="button"
+                        onClick={() => {
+                            setPreview(null);
+                            const el = document.getElementById("avatar-upload-inline");
+                            if (el) el.value = "";
+                            setMessage("");
+                        }}
+                        style={{
+                            padding: "10px 16px",
+                            fontSize: 13,
+                            fontWeight: 600,
+                            color: "#374151",
+                            background: "#fff",
+                            border: "2px solid #e5e7eb",
+                            borderRadius: 8,
+                            cursor: "pointer",
+                            transition: "all 0.2s ease",
+                        }}
+                        onMouseEnter={(e) => e.target.style.background = "#f9fafb"}
+                        onMouseLeave={(e) => e.target.style.background = "#fff"}
+                    >
+                        ✕ Cancelar
+                    </button>
+                )}
+                <button
+                    type="button"
+                    onClick={onClickSubir}
+                    disabled={!preview || uploading || !canChange}
+                    style={{
+                        padding: "10px 20px",
+                        fontSize: 13,
+                        fontWeight: 600,
+                        color: "#fff",
+                        background: (!preview || uploading || !canChange) ? "#9ca3af" : "#2563eb",
+                        border: "none",
+                        borderRadius: 8,
+                        cursor: (!preview || uploading || !canChange) ? "not-allowed" : "pointer",
+                        transition: "all 0.2s ease",
+                    }}
+                    onMouseEnter={(e) => {
+                        if (preview && !uploading && canChange) {
+                            e.target.style.background = "#1d4ed8";
+                        }
+                    }}
+                    onMouseLeave={(e) => {
+                        if (preview && !uploading && canChange) {
+                            e.target.style.background = "#2563eb";
+                        }
+                    }}
+                >
+                    {uploading ? "⏳ Subiendo..." : "📤 Subir"}
+                </button>
+            </div>
+
+            {/* Modal de confirmación */}
+            {openConfirm && preview && (
+                <div
+                    onClick={() => !uploading && setOpenConfirm(false)}
+                    style={{
+                        position: "fixed",
+                        inset: 0,
+                        background: "rgba(0,0,0,0.6)",
+                        backdropFilter: "blur(4px)",
+                        display: "grid",
+                        placeItems: "center",
+                        zIndex: 9999,
+                        padding: 20,
+                        cursor: uploading ? "default" : "pointer",
+                    }}
+                >
+                    <div
+                        onClick={(e) => e.stopPropagation()}
+                        style={{
+                            background: "#fff",
+                            borderRadius: 16,
+                            padding: 24,
+                            width: "min(90vw, 400px)",
+                            textAlign: "center",
+                            boxShadow: "0 20px 60px rgba(0,0,0,0.3)",
+                            cursor: "default",
+                        }}
+                    >
+                        <div style={{ fontSize: 18, fontWeight: 700, marginBottom: 16, color: "#0f172a" }}>
+                            ⚠️ Confirmar nuevo avatar
+                        </div>
+                        <div style={{
+                            width: 120,
+                            height: 120,
+                            borderRadius: "50%",
+                            overflow: "hidden",
+                            border: "4px solid #e5e7eb",
+                            margin: "0 auto 16px",
+                            boxShadow: "0 8px 24px rgba(0,0,0,0.15)",
+                        }}>
+                            <img src={preview} alt="preview" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+                        </div>
+                        <p style={{ fontSize: 13, color: "#64748b", marginBottom: 20, lineHeight: 1.5 }}>
+                            ¿Estás seguro que querés cambiar tu foto de perfil?
+                            {changesLeft <= 1 && (
+                                <span style={{ display: "block", marginTop: 8, color: "#ef4444", fontWeight: 600 }}>
+                                    ⚠️ Te {changesLeft === 1 ? "queda 1 cambio" : "quedan 0 cambios"} disponible{changesLeft !== 1 ? "s" : ""}
+                                </span>
+                            )}
+                        </p>
+                        <div style={{ display: "flex", gap: 10 }}>
+                            <button
+                                type="button"
+                                onClick={() => setOpenConfirm(false)}
+                                disabled={uploading}
+                                style={{
+                                    flex: 1,
+                                    padding: "10px 16px",
+                                    fontWeight: 600,
+                                    color: "#374151",
+                                    background: "#fff",
+                                    border: "2px solid #e5e7eb",
+                                    borderRadius: 8,
+                                    cursor: uploading ? "not-allowed" : "pointer",
+                                    opacity: uploading ? 0.5 : 1,
+                                }}
+                            >
+                                Cancelar
+                            </button>
+                            <button
+                                type="button"
+                                onClick={onConfirm}
+                                disabled={uploading}
+                                style={{
+                                    flex: 1,
+                                    padding: "10px 16px",
+                                    fontWeight: 600,
+                                    color: "#fff",
+                                    background: uploading ? "#9ca3af" : "#2563eb",
+                                    border: "none",
+                                    borderRadius: 8,
+                                    cursor: uploading ? "not-allowed" : "pointer",
+                                }}
+                            >
+                                {uploading ? "⏳ Subiendo..." : "✅ Confirmar"}
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* Modal para ver imagen grande */}
+            {showFullImage && (currentAvatar || preview) && (
+                <div
+                    onClick={() => setShowFullImage(false)}
+                    style={{
+                        position: "fixed",
+                        inset: 0,
+                        background: "rgba(0, 0, 0, 0.9)",
+                        backdropFilter: "blur(8px)",
+                        zIndex: 9999,
+                        display: "grid",
+                        placeItems: "center",
+                        padding: 20,
+                        cursor: "pointer",
+                    }}
+                >
+                    <div
+                        onClick={(e) => e.stopPropagation()}
+                        style={{
+                            position: "relative",
+                            maxWidth: "90vw",
+                            maxHeight: "90vh",
+                            cursor: "default",
+                        }}
+                    >
+                        <button
+                            onClick={() => setShowFullImage(false)}
+                            style={{
+                                position: "absolute",
+                                top: -50,
+                                right: 0,
+                                background: "rgba(255, 255, 255, 0.2)",
+                                border: "none",
+                                borderRadius: "50%",
+                                width: 40,
+                                height: 40,
+                                color: "#fff",
+                                fontSize: 20,
+                                cursor: "pointer",
+                                display: "grid",
+                                placeItems: "center",
+                                transition: "all 0.2s ease",
+                            }}
+                            onMouseEnter={(e) => e.target.style.background = "rgba(255, 255, 255, 0.3)"}
+                            onMouseLeave={(e) => e.target.style.background = "rgba(255, 255, 255, 0.2)"}
+                        >
+                            ✕
+                        </button>
+                        <img
+                            src={preview || currentAvatar}
+                            alt="Avatar"
+                            style={{
+                                maxWidth: "100%",
+                                maxHeight: "90vh",
+                                borderRadius: 16,
+                                boxShadow: "0 20px 60px rgba(0, 0, 0, 0.5)",
+                            }}
+                        />
+                    </div>
+                </div>
+            )}
         </div>
     );
 }
