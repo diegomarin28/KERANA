@@ -700,26 +700,26 @@ export const notificationsAPI = {
 // ==========================================
 export const ratingsAPI = {
     async createRating(tipo, refId, estrellas, comentario, extra = {}) {
-        const { data: authData, error: authErr } = await supabase.auth.getUser();
+        const {data: authData, error: authErr} = await supabase.auth.getUser();
         const user = authData?.user;
         if (authErr || !user) {
-            return { data: null, error: { message: "Debes iniciar sesión para reseñar." } };
+            return {data: null, error: {message: "Debes iniciar sesión para reseñar."}};
         }
 
-        const { data: usuarioData, error: usuarioError } = await supabase
+        const {data: usuarioData, error: usuarioError} = await supabase
             .from('usuario')
             .select('id_usuario')
             .eq('auth_id', user.id)
             .single();
 
         if (usuarioError || !usuarioData) {
-            return { data: null, error: { message: "Usuario no encontrado en la base de datos." } };
+            return {data: null, error: {message: "Usuario no encontrado en la base de datos."}};
         }
 
         const refIdAsInt = parseInt(refId, 10);
 
         if (isNaN(refIdAsInt)) {
-            return { data: null, error: { message: "ID inválido para la entidad calificada." } };
+            return {data: null, error: {message: "ID inválido para la entidad calificada."}};
         }
 
         const payload = {
@@ -727,16 +727,15 @@ export const ratingsAPI = {
             ref_id: refIdAsInt,
             estrellas: estrellas,
             comentario: comentario?.trim() || null,
-            titulo: extra.titulo?.trim() || null,
             workload: extra.workload || null,
-            metodologia: extra.metodologia || null,
             materia_id: extra.materia_id ? parseInt(extra.materia_id, 10) : null,
-            user_id: usuarioData.id_usuario
+            user_id: usuarioData.id_usuario,
+            tags: extra.tags || []
         };
 
         console.log('📝 Payload de rating:', payload);
 
-        const { data, error } = await supabase
+        const {data, error} = await supabase
             .from('rating')
             .insert(payload)
             .select()
@@ -748,13 +747,13 @@ export const ratingsAPI = {
             console.log('✅ Rating creado:', data);
         }
 
-        return { data, error };
+        return {data, error};
     },
 
     async listByMateria(materiaId) {
         return await supabase
             .from('rating')
-            .select('id, estrellas, comentario, titulo, workload, metodologia, user_id, created_at')
+            .select('id, estrellas, comentario, workload, user_id, created_at, tags')
             .eq('tipo','materia')
             .eq('ref_id', materiaId)
             .order('created_at', { ascending: false });
@@ -763,7 +762,7 @@ export const ratingsAPI = {
     async listByProfesor(profesorId) {
         return await supabase
             .from('rating')
-            .select('id, estrellas, comentario, titulo, workload, metodologia, materia_id, user_id, created_at')
+            .select('id, estrellas, comentario, workload, materia_id, user_id, created_at, tags')
             .eq('tipo', 'profesor')
             .eq('ref_id', profesorId)
             .order('created_at', { ascending: false });
@@ -772,7 +771,7 @@ export const ratingsAPI = {
     async listByMentor(mentorId) {
         return await supabase
             .from('rating')
-            .select('id, estrellas, comentario, titulo, workload, metodologia, materia_id, user_id, created_at')
+            .select('id, estrellas, comentario, workload, materia_id, user_id, created_at, tags')
             .eq('tipo', 'mentor')
             .eq('ref_id', mentorId)
             .order('created_at', { ascending: false });
@@ -817,7 +816,6 @@ export const ratingsAPI = {
         return { data: { count, avg: count ? +(sum / count).toFixed(2) : 0 }, error: null };
     }
 }
-
 // ==========================================
 // 👨‍🏫 PROFESORES
 // ==========================================

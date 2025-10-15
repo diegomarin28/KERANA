@@ -6,9 +6,22 @@ import AuthModal_HacerResenia from '../components/AuthModal_HacerResenia';
 import SubjectCarousel from '../components/SubjectCarousel';
 import ReviewsSection from '../components/ReviewsSection';
 
-// Este archivo va en: src/pages/ProfessorDetail.jsx
-// SubjectCarousel.jsx va en: src/components/SubjectCarousel.jsx
-// ReviewsSection.jsx va en: src/components/ReviewsSection.jsx
+// Tags disponibles (mismo array)
+const AVAILABLE_TAGS = [
+    { id: 'muy-claro', label: '✨ Muy claro' },
+    { id: 'querido', label: '🎓 Querido por los estudiantes' },
+    { id: 'apasionado', label: '🔥 Apasionado' },
+    { id: 'disponible', label: '💬 Siempre disponible' },
+    { id: 'ordenado', label: '📋 Muy ordenado' },
+    { id: 'dinamico', label: '⚡ Clases dinámicas' },
+    { id: 'cercano', label: '🤝 Cercano a los alumnos' },
+    { id: 'califica-duro', label: '📊 Califica duro' },
+    { id: 'mucha-tarea', label: '📖 Mucha tarea' },
+    { id: 'participacion', label: '🎤 La participación importa' },
+    { id: 'confuso', label: '🤔 Confuso' },
+    { id: 'lejano', label: '🚪 Lejano a los alumnos' },
+    { id: 'examenes-dificiles', label: '📝 Exámenes difíciles' }
+];
 
 export default function ProfessorDetail() {
     const { id } = useParams();
@@ -18,6 +31,7 @@ export default function ProfessorDetail() {
     const [filteredReviews, setFilteredReviews] = useState([]);
     const [averageRating, setAverageRating] = useState(0);
     const [totalReviews, setTotalReviews] = useState(0);
+    const [topTags, setTopTags] = useState([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState('');
     const [showReviewModal, setShowReviewModal] = useState(false);
@@ -74,6 +88,9 @@ export default function ProfessorDetail() {
             if (reviewsData) {
                 setReviews(reviewsData);
                 setTotalReviews(reviewsData.length);
+
+                // Calcular top tags
+                calculateTopTags(reviewsData);
             }
 
             // Cargar promedio global
@@ -88,6 +105,30 @@ export default function ProfessorDetail() {
         } finally {
             setLoading(false);
         }
+    };
+
+    const calculateTopTags = (reviewsData) => {
+        const tagCounts = {};
+
+        reviewsData.forEach(review => {
+            if (review.tags && Array.isArray(review.tags)) {
+                review.tags.forEach(tagId => {
+                    tagCounts[tagId] = (tagCounts[tagId] || 0) + 1;
+                });
+            }
+        });
+
+        // Convertir a array y ordenar por cantidad
+        const sortedTags = Object.entries(tagCounts)
+            .sort((a, b) => b[1] - a[1])
+            .slice(0, 3)
+            .map(([tagId, count]) => ({
+                id: tagId,
+                label: AVAILABLE_TAGS.find(t => t.id === tagId)?.label || tagId,
+                count
+            }));
+
+        setTopTags(sortedTags);
     };
 
     const loadMateriaRatings = async (profesorId, materiasList) => {
@@ -237,13 +278,15 @@ export default function ProfessorDetail() {
                         {professor.profesor_nombre}
                     </h1>
 
-                    {/* Calificación global */}
+                    {/* Calificación global y Top Tags */}
                     <div style={{
                         display: 'flex',
-                        alignItems: 'center',
-                        gap: 12,
-                        marginBottom: 20
+                        alignItems: 'flex-start',
+                        gap: 20,
+                        marginBottom: 20,
+                        flexWrap: 'wrap'
                     }}>
+                        {/* Calificación */}
                         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                             <div style={{
                                 display: 'flex',
@@ -265,6 +308,43 @@ export default function ProfessorDetail() {
                                 ({totalReviews} evaluaciones)
                             </span>
                         </div>
+
+                        {/* Top 3 Tags */}
+                        {topTags.length > 0 && (
+                            <div style={{
+                                display: 'flex',
+                                gap: 8,
+                                alignItems: 'center',
+                                flexWrap: 'wrap'
+                            }}>
+                                {topTags.map((tag, idx) => (
+                                    <div
+                                        key={tag.id}
+                                        style={{
+                                            padding: '6px 12px',
+                                            background: '#f3f4f6',
+                                            color: '#374151',
+                                            borderRadius: 16,
+                                            fontSize: 13,
+                                            fontWeight: 500,
+                                            border: '1px solid #e5e7eb',
+                                            display: 'flex',
+                                            alignItems: 'center',
+                                            gap: 4
+                                        }}
+                                    >
+                                        <span>{tag.label}</span>
+                                        <span style={{
+                                            color: '#6b7280',
+                                            fontSize: 12,
+                                            fontWeight: 400
+                                        }}>
+                                            ({tag.count})
+                                        </span>
+                                    </div>
+                                ))}
+                            </div>
+                        )}
                     </div>
 
                     {materias.length > 0 && (
