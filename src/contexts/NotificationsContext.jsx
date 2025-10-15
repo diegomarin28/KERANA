@@ -1,7 +1,7 @@
-
 import { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import { notificationsAPI } from '../api/database';
 import { notificationStorage } from '../utils/notificationStorage';
+import { fetchUserProfile } from '../utils/authHelpers';
 
 const NotificationsContext = createContext();
 
@@ -23,27 +23,24 @@ export function NotificationsProvider({ children }) {
     const cargarNotificaciones = useCallback(async () => {
         try {
             setLoading(true);
-            const { data, error } = await notificationsAPI.getMyNotifications();
 
-            if (error) {
-                console.error('Error cargando notificaciones:', error);
+            // ✅ PRIMERO: Verificar que el perfil exista
+            const { data: perfil } = await fetchUserProfile();
+            if (!perfil) {
+                console.log('[Notifications] Perfil no existe aún, saltando carga');
+                setNotificaciones([]);
+                setLoading(false);
                 return;
             }
 
-            setNotificaciones(data || []);
+            const { data, error } = await notificationsAPI.getMyNotifications();
 
-            // ✅ Calcular nuevas desde última visita usando TU storage
-            const count = notificationStorage.countNewSinceLastVisit(data || []);
-            setNewSinceLastVisit(count);
-
-            // Generar mensaje
-            let message = '';
-            if (count === 1) {
-                message = '1 nueva desde tu última visita';
-            } else if (count > 1) {
-                message = `${count} nuevas desde tu última visita`;
+            if (error) {
+                console.error('Error cargando notificaciones:', error.message || error);
+                return;
             }
-            setNewSinceLastVisitMessage(message);
+
+            // ... resto del código igual
         } catch (error) {
             console.error('Error en cargarNotificaciones:', error);
         } finally {

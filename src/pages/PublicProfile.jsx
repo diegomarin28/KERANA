@@ -14,6 +14,7 @@ export default function PublicProfile() {
     const [recentNotes, setRecentNotes] = useState([]);
     const [tab, setTab] = useState('apuntes');
     const [avatarOk, setAvatarOk] = useState(true);
+    const [showShareTooltip, setShowShareTooltip] = useState(false);
 
     const [showAllNotes, setShowAllNotes] = useState(false);
     const [allNotes, setAllNotes] = useState([]);
@@ -134,6 +135,32 @@ export default function PublicProfile() {
         }
     };
 
+    const handleShare = async () => {
+        const shareData = {
+            title: `Perfil de ${profile.nombre} en Kerana`,
+            text: `Mirá el perfil de @${profile.username} en Kerana`,
+            url: window.location.href
+        };
+
+        if (navigator.share) {
+            try {
+                await navigator.share(shareData);
+            } catch (err) {
+                if (err.name !== 'AbortError') {
+                    handleCopyLink();
+                }
+            }
+        } else {
+            handleCopyLink();
+        }
+    };
+
+    const handleCopyLink = () => {
+        navigator.clipboard.writeText(window.location.href);
+        setShowShareTooltip(true);
+        setTimeout(() => setShowShareTooltip(false), 2000);
+    };
+
     const scrollCarousel = (direction) => {
         if (carouselRef.current) {
             const scrollAmount = 380;
@@ -142,6 +169,39 @@ export default function PublicProfile() {
                 behavior: 'smooth'
             });
         }
+    };
+
+    const getBadges = () => {
+        if (!profile || !stats) return [];
+
+        const badges = [];
+        const memberDate = new Date(profile.fecha_creado);
+        const monthsAgo = (new Date() - memberDate) / (1000 * 60 * 60 * 24 * 30);
+
+        if (monthsAgo >= 6) {
+            badges.push({ icon: '🚀', label: 'Early Adopter', color: '#8B5CF6' });
+        }
+
+        if (stats.apuntes >= 10) {
+            badges.push({ icon: '📚', label: 'Bookworm', color: '#10B981' });
+        }
+
+        if (stats.apuntes >= 20) {
+            badges.push({ icon: '🥇', label: 'Top Contributor', color: '#F59E0B' });
+        }
+
+        if (mentorInfo) {
+            badges.push({ icon: '🎓', label: 'Mentor Verificado', color: '#0A66C2' });
+        }
+
+        return badges;
+    };
+
+    const formatMemberSince = (dateString) => {
+        const date = new Date(dateString);
+        const months = ['enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio',
+            'julio', 'agosto', 'septiembre', 'octubre', 'noviembre', 'diciembre'];
+        return `${months[date.getMonth()]} ${date.getFullYear()}`;
     };
 
     if (loading) {
@@ -178,6 +238,7 @@ export default function PublicProfile() {
     };
 
     const avatarSrc = getAvatarSrc(profile.foto);
+    const badges = getBadges();
 
     return (
         <div style={pageStyle}>
@@ -207,25 +268,49 @@ export default function PublicProfile() {
                         {/* Info y acciones */}
                         <div style={profileInfoContainerStyle}>
                             <div style={profileInfoLeftStyle}>
-                                <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
-                                    <h1 style={nameStyle}>{profile.nombre}</h1>
-                                    {mentorInfo && (
-                                        <span style={mentorBadgeStyle}>
-                                            <span style={{ fontSize: 14 }}>🎓</span> Mentor Verificado
-                                        </span>
-                                    )}
-                                </div>
+                                <h1 style={nameStyle}>{profile.nombre}</h1>
 
                                 <p style={usernameStyle}>@{profile.username}</p>
 
+                                {/* Badges */}
+                                {badges.length > 0 && (
+                                    <div style={badgesContainerStyle}>
+                                        {badges.map((badge, idx) => (
+                                            <div key={idx} style={{ ...badgeStyle, borderColor: badge.color }}>
+                                                <span style={{ fontSize: 14 }}>{badge.icon}</span>
+                                                <span style={{ color: badge.color }}>{badge.label}</span>
+                                            </div>
+                                        ))}
+                                    </div>
+                                )}
+
+                                {/* Meta info */}
+                                <div style={metaInfoStyle}>
+                                    <div style={metaItemStyle}>
+                                        <svg style={{ width: 16, height: 16 }} fill="currentColor" viewBox="0 0 20 20">
+                                            <path fillRule="evenodd" d="M6 2a1 1 0 00-1 1v1H4a2 2 0 00-2 2v10a2 2 0 002 2h12a2 2 0 002-2V6a2 2 0 00-2-2h-1V3a1 1 0 10-2 0v1H7V3a1 1 0 00-1-1zm0 5a1 1 0 000 2h8a1 1 0 100-2H6z" clipRule="evenodd" />
+                                        </svg>
+                                        Miembro desde {formatMemberSince(profile.fecha_creado)}
+                                    </div>
+
+                                    {/* LinkedIn placeholder */}
+                                    <div style={metaItemStyle}>
+                                        <svg style={{ width: 16, height: 16 }} fill="currentColor" viewBox="0 0 20 20">
+                                            <path d="M11 3a1 1 0 100 2h2.586l-6.293 6.293a1 1 0 101.414 1.414L15 6.414V9a1 1 0 102 0V4a1 1 0 00-1-1h-5z" />
+                                            <path d="M5 5a2 2 0 00-2 2v8a2 2 0 002 2h8a2 2 0 002-2v-3a1 1 0 10-2 0v3H5V7h3a1 1 0 000-2H5z" />
+                                        </svg>
+                                        LinkedIn (próximamente)
+                                    </div>
+                                </div>
+
                                 {profile.mostrar_email && (
-                                    <p style={emailStyle}>
-                                        <svg style={{ width: 14, height: 14, marginRight: 6 }} fill="currentColor" viewBox="0 0 20 20">
+                                    <div style={emailContainerStyle}>
+                                        <svg style={{ width: 14, height: 14 }} fill="currentColor" viewBox="0 0 20 20">
                                             <path d="M2.003 5.884L10 9.882l7.997-3.998A2 2 0 0016 4H4a2 2 0 00-1.997 1.884z"></path>
                                             <path d="M18 8.118l-8 4-8-4V14a2 2 0 002 2h12a2 2 0 002-2V8.118z"></path>
                                         </svg>
                                         {profile.correo}
-                                    </p>
+                                    </div>
                                 )}
 
                                 {/* Stats inline */}
@@ -236,47 +321,57 @@ export default function PublicProfile() {
                                 </div>
                             </div>
 
-                            {/* Botón seguir */}
-                            <button
-                                onClick={handleSeguir}
-                                disabled={loadingFollow}
-                                style={{
-                                    ...followButtonStyle,
-                                    background: siguiendo ? '#F3F4F6' : '#0A66C2',
-                                    color: siguiendo ? '#111827' : 'white',
-                                    border: siguiendo ? '2px solid #D1D5DB' : '2px solid #0A66C2'
-                                }}
-                            >
-                                {loadingFollow ? (
-                                    <div style={buttonSpinnerStyle}></div>
-                                ) : siguiendo ? (
-                                    <>
-                                        <svg style={{ width: 16, height: 16, marginRight: 6 }} fill="currentColor" viewBox="0 0 20 20">
-                                            <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd"></path>
+                            {/* Botones de acción */}
+                            <div style={actionButtonsStyle}>
+                                <button
+                                    onClick={handleSeguir}
+                                    disabled={loadingFollow}
+                                    style={{
+                                        ...followButtonStyle,
+                                        background: siguiendo ? '#F3F4F6' : '#0A66C2',
+                                        color: siguiendo ? '#111827' : 'white',
+                                        border: siguiendo ? '2px solid #D1D5DB' : '2px solid #0A66C2'
+                                    }}
+                                >
+                                    {loadingFollow ? (
+                                        <div style={buttonSpinnerStyle}></div>
+                                    ) : siguiendo ? (
+                                        <>
+                                            <svg style={{ width: 16, height: 16, marginRight: 6 }} fill="currentColor" viewBox="0 0 20 20">
+                                                <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd"></path>
+                                            </svg>
+                                            Siguiendo
+                                        </>
+                                    ) : (
+                                        <>
+                                            <svg style={{ width: 16, height: 16, marginRight: 6 }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+                                            </svg>
+                                            Seguir
+                                        </>
+                                    )}
+                                </button>
+
+                                {/* Share button */}
+                                <div style={{ position: 'relative' }}>
+                                    <button
+                                        onClick={handleShare}
+                                        style={shareButtonStyle}
+                                        title="Compartir perfil"
+                                    >
+                                        <svg style={{ width: 18, height: 18 }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.368 2.684 3 3 0 00-5.368-2.684z" />
                                         </svg>
-                                        Siguiendo
-                                    </>
-                                ) : (
-                                    <>
-                                        <svg style={{ width: 16, height: 16, marginRight: 6 }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-                                        </svg>
-                                        Seguir
-                                    </>
-                                )}
-                            </button>
+                                    </button>
+                                    {showShareTooltip && (
+                                        <div style={tooltipStyle}>
+                                            ¡Link copiado!
+                                        </div>
+                                    )}
+                                </div>
+                            </div>
                         </div>
                     </div>
-                </div>
-
-                {/* Stats Desktop */}
-                <div style={statsCardStyle}>
-                    <StatCard icon="👥" number={stats?.seguidores || 0} label="Seguidores" />
-                    <StatCard icon="✨" number={stats?.siguiendo || 0} label="Siguiendo" />
-                    <StatCard icon="📚" number={stats?.apuntes || 0} label="Apuntes" />
-                    {mentorInfo && (
-                        <StatCard icon="🎓" number={mentorInfo.materias?.length || 0} label="Materias como Mentor" />
-                    )}
                 </div>
 
                 {/* Tabs */}
@@ -300,52 +395,53 @@ export default function PublicProfile() {
 
                 {/* Contenido */}
                 {tab === 'apuntes' && (
-                    <div>
+                    <div style={{ marginTop: 24 }}>
                         {!showAllNotes ? (
                             <>
-                                <div style={sectionHeaderStyle}>
-                                    <div>
-                                        <h2 style={sectionTitleStyle}>Últimos Apuntes</h2>
-                                        <p style={sectionSubtitleStyle}>Los recursos más recientes compartidos</p>
-                                    </div>
-                                    {stats?.apuntes > 4 && (
-                                        <button onClick={handleVerTodos} style={verMasButtonStyle}>
-                                            Ver todos los apuntes
-                                            <svg style={{ width: 16, height: 16, marginLeft: 6 }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-                                            </svg>
-                                        </button>
-                                    )}
-                                </div>
-
                                 {recentNotes.length > 0 ? (
-                                    <div style={carouselWrapperStyle}>
-                                        {recentNotes.length > 3 && (
-                                            <button
-                                                onClick={() => scrollCarousel('left')}
-                                                style={{ ...carouselArrowStyle, left: -20 }}
-                                            >
-                                                ‹
-                                            </button>
+                                    <>
+                                        {stats?.apuntes > 4 && (
+                                            <div style={verTodosHeaderStyle}>
+                                                <button onClick={handleVerTodos} style={verMasButtonStyle}>
+                                                    Ver todos los apuntes ({stats.apuntes})
+                                                    <svg style={{ width: 16, height: 16, marginLeft: 6 }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                                                    </svg>
+                                                </button>
+                                            </div>
                                         )}
+                                        <div style={carouselWrapperStyle}>
+                                            {recentNotes.length > 3 && (
+                                                <button
+                                                    onClick={() => scrollCarousel('left')}
+                                                    style={{ ...carouselArrowStyle, left: -20 }}
+                                                    onMouseEnter={(e) => e.target.style.transform = 'translateY(-50%) scale(1.1)'}
+                                                    onMouseLeave={(e) => e.target.style.transform = 'translateY(-50%) scale(1)'}
+                                                >
+                                                    ‹
+                                                </button>
+                                            )}
 
-                                        <div ref={carouselRef} style={carouselContainerStyle}>
-                                            {recentNotes.map(note => (
-                                                <div key={note.id_apunte} style={carouselItemStyle}>
-                                                    <NoteCard note={note} />
-                                                </div>
-                                            ))}
+                                            <div ref={carouselRef} style={carouselContainerStyle}>
+                                                {recentNotes.map(note => (
+                                                    <div key={note.id_apunte} style={carouselItemStyle}>
+                                                        <NoteCard note={note} />
+                                                    </div>
+                                                ))}
+                                            </div>
+
+                                            {recentNotes.length > 3 && (
+                                                <button
+                                                    onClick={() => scrollCarousel('right')}
+                                                    style={{ ...carouselArrowStyle, right: -20 }}
+                                                    onMouseEnter={(e) => e.target.style.transform = 'translateY(-50%) scale(1.1)'}
+                                                    onMouseLeave={(e) => e.target.style.transform = 'translateY(-50%) scale(1)'}
+                                                >
+                                                    ›
+                                                </button>
+                                            )}
                                         </div>
-
-                                        {recentNotes.length > 3 && (
-                                            <button
-                                                onClick={() => scrollCarousel('right')}
-                                                style={{ ...carouselArrowStyle, right: -20 }}
-                                            >
-                                                ›
-                                            </button>
-                                        )}
-                                    </div>
+                                    </>
                                 ) : (
                                     <div style={emptyStateStyle}>
                                         <div style={emptyIconStyle}>📚</div>
@@ -369,7 +465,7 @@ export default function PublicProfile() {
                                         <svg style={{ width: 16, height: 16, marginRight: 6 }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
                                         </svg>
-                                        Volver a destacados
+                                        Volver
                                     </button>
                                 </div>
 
@@ -436,7 +532,7 @@ export default function PublicProfile() {
                 )}
 
                 {tab === 'mentorias' && mentorInfo && (
-                    <div>
+                    <div style={{ marginTop: 24 }}>
                         <div style={sectionHeaderStyle}>
                             <div>
                                 <h2 style={sectionTitleStyle}>Mentorías</h2>
@@ -517,32 +613,11 @@ export default function PublicProfile() {
 }
 
 // Componentes auxiliares
-function StatItem({ number, label }) {
-    return (
-        <div style={{ textAlign: 'center' }}>
-            <div style={{ fontSize: 20, fontWeight: 700, color: '#111827' }}>{number}</div>
-            <div style={{ fontSize: 12, color: '#666' }}>{label}</div>
-        </div>
-    );
-}
-
 function StatInline({ number, label }) {
     return (
         <div style={{ display: 'flex', alignItems: 'baseline', gap: 4 }}>
             <span style={{ fontSize: 15, fontWeight: 700, color: '#111827' }}>{number}</span>
             <span style={{ fontSize: 14, color: '#666' }}>{label}</span>
-        </div>
-    );
-}
-
-function StatCard({ icon, number, label }) {
-    return (
-        <div style={statCardItemStyle}>
-            <div style={statCardIconStyle}>{icon}</div>
-            <div>
-                <div style={statCardNumberStyle}>{number}</div>
-                <div style={statCardLabelStyle}>{label}</div>
-            </div>
         </div>
     );
 }
@@ -597,7 +672,7 @@ const coverContainerStyle = {
 };
 
 const coverPhotoStyle = {
-    height: 200,
+    height: 120,
     background: 'linear-gradient(135deg, #0A66C2 0%, #004182 50%, #00325B 100%)',
     position: 'relative',
 };
@@ -608,13 +683,13 @@ const profileHeaderWrapperStyle = {
 };
 
 const avatarWrapperStyle = {
-    width: 152,
-    height: 152,
+    width: 120,
+    height: 120,
     borderRadius: '50%',
     overflow: 'hidden',
-    border: '5px solid white',
+    border: '4px solid white',
     boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
-    marginTop: -76,
+    marginTop: -60,
     marginBottom: 16,
     background: 'white',
 };
@@ -632,7 +707,7 @@ const avatarPlaceholderStyle = {
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
-    fontSize: 64,
+    fontSize: 48,
     fontWeight: 'bold',
     color: 'white',
 };
@@ -659,54 +734,67 @@ const nameStyle = {
 };
 
 const usernameStyle = {
-    margin: '4px 0 0 0',
+    margin: '4px 0 12px 0',
     fontSize: 16,
     color: '#666',
     fontWeight: 500,
 };
 
-const emailStyle = {
-    margin: '8px 0 16px 0',
-    fontSize: 14,
-    color: '#666',
+const badgesContainerStyle = {
     display: 'flex',
-    alignItems: 'center',
+    gap: 8,
+    flexWrap: 'wrap',
+    marginBottom: 12,
 };
 
-const mentorBadgeStyle = {
-    background: 'linear-gradient(135deg, #10B981 0%, #059669 100%)',
-    color: 'white',
-    padding: '6px 14px',
+const badgeStyle = {
+    display: 'inline-flex',
+    alignItems: 'center',
+    gap: 6,
+    padding: '6px 12px',
     borderRadius: 20,
     fontSize: 13,
     fontWeight: 600,
-    display: 'inline-flex',
-    alignItems: 'center',
-    gap: 4,
-    boxShadow: '0 2px 8px rgba(16, 185, 129, 0.3)',
+    background: 'white',
+    border: '2px solid',
+    transition: 'all 0.2s ease',
 };
 
-const statsContainerMobileStyle = {
+const metaInfoStyle = {
     display: 'flex',
-    gap: 32,
-    marginTop: 16,
-    '@media (min-width: 768px)': {
-        display: 'none',
-    },
+    flexDirection: 'column',
+    gap: 8,
+    marginBottom: 12,
+};
+
+const metaItemStyle = {
+    display: 'flex',
+    alignItems: 'center',
+    gap: 8,
+    fontSize: 14,
+    color: '#666',
+};
+
+const emailContainerStyle = {
+    display: 'flex',
+    alignItems: 'center',
+    gap: 6,
+    fontSize: 14,
+    color: '#666',
+    marginBottom: 12,
 };
 
 const statsInlineStyle = {
     display: 'flex',
     gap: 20,
-    marginTop: 12,
+    marginTop: 8,
     flexWrap: 'wrap',
 };
 
-const verTodosHeaderStyle = {
+const actionButtonsStyle = {
     display: 'flex',
-    justifyContent: 'flex-end',
-    marginBottom: 16,
-    marginTop: 16,
+    gap: 10,
+    alignItems: 'flex-start',
 };
 
 const followButtonStyle = {
@@ -725,46 +813,35 @@ const followButtonStyle = {
     boxShadow: '0 1px 4px rgba(0,0,0,0.1)',
 };
 
-const statsCardStyle = {
+const shareButtonStyle = {
+    width: 40,
+    height: 40,
+    borderRadius: '50%',
+    border: '2px solid #D1D5DB',
     background: 'white',
-    borderRadius: 8,
-    padding: 20,
-    marginTop: 8,
-    marginBottom: 8,
-    display: 'grid',
-    gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
-    gap: 16,
-    boxShadow: '0 0 0 1px rgba(0,0,0,0.08), 0 2px 4px rgba(0,0,0,0.08)',
-};
-
-const statCardItemStyle = {
+    color: '#666',
+    cursor: 'pointer',
     display: 'flex',
     alignItems: 'center',
-    gap: 16,
-    padding: 16,
-    borderRadius: 8,
-    background: '#F9FAFB',
-    border: '1px solid #E5E7EB',
+    justifyContent: 'center',
     transition: 'all 0.2s ease',
+    boxShadow: '0 1px 4px rgba(0,0,0,0.1)',
 };
 
-const statCardIconStyle = {
-    fontSize: 32,
-    lineHeight: 1,
-};
-
-const statCardNumberStyle = {
-    fontSize: 24,
-    fontWeight: 800,
-    color: '#0A66C2',
-    lineHeight: 1.2,
-};
-
-const statCardLabelStyle = {
+const tooltipStyle = {
+    position: 'absolute',
+    top: '100%',
+    right: 0,
+    marginTop: 8,
+    padding: '8px 12px',
+    background: '#111827',
+    color: 'white',
+    borderRadius: 6,
     fontSize: 13,
-    color: '#666',
-    fontWeight: 500,
-    marginTop: 2,
+    fontWeight: 600,
+    whiteSpace: 'nowrap',
+    boxShadow: '0 4px 12px rgba(0,0,0,0.2)',
+    zIndex: 100,
 };
 
 const tabsContainerStyle = {
@@ -790,6 +867,27 @@ const tabButtonStyle = {
     gap: 6,
 };
 
+const verTodosHeaderStyle = {
+    display: 'flex',
+    justifyContent: 'flex-end',
+    marginBottom: 16,
+};
+
+const verMasButtonStyle = {
+    padding: '10px 20px',
+    background: 'white',
+    color: '#0A66C2',
+    border: '2px solid #0A66C2',
+    borderRadius: 24,
+    fontWeight: 600,
+    fontSize: 14,
+    cursor: 'pointer',
+    transition: 'all 0.2s ease',
+    display: 'flex',
+    alignItems: 'center',
+    boxShadow: '0 1px 4px rgba(0,0,0,0.1)',
+};
+
 const sectionHeaderStyle = {
     display: 'flex',
     justifyContent: 'space-between',
@@ -812,21 +910,6 @@ const sectionSubtitleStyle = {
     margin: '4px 0 0 0',
     fontSize: 14,
     color: '#666',
-};
-
-const verMasButtonStyle = {
-    padding: '10px 20px',
-    background: 'white',
-    color: '#0A66C2',
-    border: '2px solid #0A66C2',
-    borderRadius: 24,
-    fontWeight: 600,
-    fontSize: 14,
-    cursor: 'pointer',
-    transition: 'all 0.2s ease',
-    display: 'flex',
-    alignItems: 'center',
-    boxShadow: '0 1px 4px rgba(0,0,0,0.1)',
 };
 
 const backToRecentButtonStyle = {
@@ -1020,7 +1103,6 @@ const backButtonStyle = {
     transition: 'all 0.2s ease',
 };
 
-// Modal styles
 const modalOverlayStyle = {
     position: 'fixed',
     top: 0,
