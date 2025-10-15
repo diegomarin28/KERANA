@@ -1,6 +1,23 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '../supabase';
 
+// Tags disponibles (mismo array que en AuthModal)
+const AVAILABLE_TAGS = [
+    { id: 'muy-claro', label: '✨ Muy claro', type: 'positive' },
+    { id: 'querido', label: '🎓 Querido por los estudiantes', type: 'positive' },
+    { id: 'apasionado', label: '🔥 Apasionado', type: 'positive' },
+    { id: 'disponible', label: '💬 Siempre disponible', type: 'positive' },
+    { id: 'ordenado', label: '📋 Muy ordenado', type: 'positive' },
+    { id: 'dinamico', label: '⚡ Clases dinámicas', type: 'positive' },
+    { id: 'cercano', label: '🤝 Cercano a los alumnos', type: 'positive' },
+    { id: 'califica-duro', label: '📊 Califica duro', type: 'negative' },
+    { id: 'mucha-tarea', label: '📖 Mucha tarea', type: 'negative' },
+    { id: 'participacion', label: '🎤 La participación importa', type: 'negative' },
+    { id: 'confuso', label: '🤔 Confuso', type: 'negative' },
+    { id: 'lejano', label: '🚪 Lejano a los alumnos', type: 'negative' },
+    { id: 'examenes-dificiles', label: '📝 Exámenes difíciles', type: 'negative' }
+];
+
 export default function ReviewsSection({
                                            reviews,
                                            materias,
@@ -35,12 +52,17 @@ export default function ReviewsSection({
         loadMateriasNames();
     }, [reviews]);
 
+    const getTagLabel = (tagId) => {
+        const tag = AVAILABLE_TAGS.find(t => t.id === tagId);
+        return tag ? tag.label : tagId;
+    };
+
     const renderStars = (rating) => {
         return (
             <div style={{ display: 'flex', gap: 2 }}>
                 {[...Array(5)].map((_, i) => (
                     <span key={i} style={{
-                        fontSize: 16,
+                        fontSize: 20,
                         color: i < Math.floor(rating) ? '#f59e0b' : i < rating ? '#f59e0b' : '#e5e7eb'
                     }}>
                         {i < Math.floor(rating) ? '★' : i < rating ? '⭐' : '☆'}
@@ -219,7 +241,23 @@ export default function ReviewsSection({
                                 e.currentTarget.style.transform = 'translateY(0)';
                             }}
                         >
-                            {/* Header de la reseña */}
+                            {/* Materia (primero) */}
+                            {review.materia_id && (
+                                <div style={{
+                                    display: 'inline-block',
+                                    padding: '6px 12px',
+                                    background: '#dbeafe',
+                                    color: '#1e40af',
+                                    borderRadius: 8,
+                                    fontSize: 13,
+                                    fontWeight: 600,
+                                    marginBottom: 12
+                                }}>
+                                    {materiasNames[review.materia_id] || 'Materia'}
+                                </div>
+                            )}
+
+                            {/* Header de la reseña con estrellas más grandes */}
                             <div style={{
                                 display: 'flex',
                                 justifyContent: 'space-between',
@@ -237,32 +275,31 @@ export default function ReviewsSection({
                                 </div>
                             </div>
 
-                            {/* Materia */}
-                            {review.materia_id && (
+                            {/* Tags (debajo de las estrellas) */}
+                            {review.tags && review.tags.length > 0 && (
                                 <div style={{
-                                    display: 'inline-block',
-                                    padding: '4px 10px',
-                                    background: '#dbeafe',
-                                    color: '#1e40af',
-                                    borderRadius: 6,
-                                    fontSize: 12,
-                                    fontWeight: 500,
+                                    display: 'flex',
+                                    flexWrap: 'wrap',
+                                    gap: 6,
                                     marginBottom: 12
                                 }}>
-                                    {materiasNames[review.materia_id] || 'Materia'}
+                                    {review.tags.map((tagId, idx) => (
+                                        <span
+                                            key={idx}
+                                            style={{
+                                                padding: '4px 10px',
+                                                background: '#f3f4f6',
+                                                color: '#374151',
+                                                borderRadius: 16,
+                                                fontSize: 12,
+                                                fontWeight: 500,
+                                                border: '1px solid #e5e7eb'
+                                            }}
+                                        >
+                                            {getTagLabel(tagId)}
+                                        </span>
+                                    ))}
                                 </div>
-                            )}
-
-                            {/* Título */}
-                            {review.titulo && (
-                                <h4 style={{
-                                    margin: '12px 0 8px 0',
-                                    fontSize: 15,
-                                    fontWeight: 700,
-                                    color: '#1f2937'
-                                }}>
-                                    {review.titulo}
-                                </h4>
                             )}
 
                             {/* Comentario */}
@@ -277,28 +314,18 @@ export default function ReviewsSection({
                                 </p>
                             )}
 
-                            {/* Información adicional */}
-                            <div style={{
-                                display: 'flex',
-                                gap: 16,
-                                flexWrap: 'wrap',
-                                fontSize: 12,
-                                color: '#6b7280',
-                                borderTop: '1px solid rgba(0,0,0,0.05)',
-                                paddingTop: 12,
-                                marginTop: 12
-                            }}>
-                                {review.workload && (
-                                    <div>
-                                        <strong>Carga:</strong> {review.workload}
-                                    </div>
-                                )}
-                                {review.metodologia && (
-                                    <div>
-                                        <strong>Metodología:</strong> {review.metodologia}
-                                    </div>
-                                )}
-                            </div>
+                            {/* Información adicional - SOLO WORKLOAD */}
+                            {review.workload && (
+                                <div style={{
+                                    fontSize: 12,
+                                    color: '#6b7280',
+                                    borderTop: '1px solid rgba(0,0,0,0.05)',
+                                    paddingTop: 12,
+                                    marginTop: 12
+                                }}>
+                                    <strong>Carga:</strong> {review.workload}
+                                </div>
+                            )}
                         </div>
                     ))
                 )}

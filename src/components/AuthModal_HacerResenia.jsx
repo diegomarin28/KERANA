@@ -2,6 +2,25 @@ import { useState, useEffect } from "react";
 import { ratingsAPI } from "../api/Database";
 import { supabase } from "../supabase";
 
+// Tags disponibles (13)
+const AVAILABLE_TAGS = [
+    // Positivos
+    { id: 'muy-claro', label: '✨ Muy claro', type: 'positive' },
+    { id: 'querido', label: '🎓 Querido por los estudiantes', type: 'positive' },
+    { id: 'apasionado', label: '🔥 Apasionado', type: 'positive' },
+    { id: 'disponible', label: '💬 Siempre disponible', type: 'positive' },
+    { id: 'ordenado', label: '📋 Muy ordenado', type: 'positive' },
+    { id: 'dinamico', label: '⚡ Clases dinámicas', type: 'positive' },
+    { id: 'cercano', label: '🤝 Cercano a los alumnos', type: 'positive' },
+    // Negativos/Desafiantes
+    { id: 'califica-duro', label: '📊 Califica duro', type: 'negative' },
+    { id: 'mucha-tarea', label: '📖 Mucha tarea', type: 'negative' },
+    { id: 'participacion', label: '🎤 La participación importa', type: 'negative' },
+    { id: 'confuso', label: '🤔 Confuso', type: 'negative' },
+    { id: 'lejano', label: '🚪 Lejano a los alumnos', type: 'negative' },
+    { id: 'examenes-dificiles', label: '📝 Exámenes difíciles', type: 'negative' }
+];
+
 // Componente de estrellas interactivo
 const StarRating = ({ rating, onRatingChange }) => {
     const [hoverRating, setHoverRating] = useState(0);
@@ -135,7 +154,6 @@ const WorkloadSlider = ({ value, onChange }) => {
     return (
         <div style={{ display: "grid", gap: 8 }}>
             <div style={{ position: "relative", padding: "20px 0" }}>
-                {/* Línea del slider */}
                 <div style={{
                     position: "absolute",
                     top: "50%",
@@ -147,7 +165,6 @@ const WorkloadSlider = ({ value, onChange }) => {
                     transform: "translateY(-50%)"
                 }} />
 
-                {/* Línea de progreso */}
                 <div style={{
                     position: "absolute",
                     top: "50%",
@@ -160,7 +177,6 @@ const WorkloadSlider = ({ value, onChange }) => {
                     transition: "width 0.3s ease"
                 }} />
 
-                {/* Puntos del slider */}
                 <div style={{
                     position: "relative",
                     display: "flex",
@@ -187,7 +203,6 @@ const WorkloadSlider = ({ value, onChange }) => {
                 </div>
             </div>
 
-            {/* Labels */}
             <div style={{
                 display: "flex",
                 justifyContent: "space-between",
@@ -216,7 +231,7 @@ export default function AuthModal_HacerResenia({
                                                    open,
                                                    onClose,
                                                    onSave,
-                                                   preSelectedEntity = null // {id, nombre, tipo}
+                                                   preSelectedEntity = null
                                                }) {
     const isPreSelected = !!preSelectedEntity;
 
@@ -225,26 +240,22 @@ export default function AuthModal_HacerResenia({
         selectedEntity: preSelectedEntity || null,
         selectedMateria: null,
         rating: 5,
-        titulo: "",
+        selectedTags: [],
         texto: "",
-        workload: "Medio",
-        metodologia: "Clases prácticas"
+        workload: "Medio"
     });
 
     const [errors, setErrors] = useState({});
     const [isSubmitting, setIsSubmitting] = useState(false);
 
-    // Estados para búsqueda (solo si NO está preseleccionado)
     const [searchTerm, setSearchTerm] = useState("");
     const [searchResults, setSearchResults] = useState([]);
     const [searchLoading, setSearchLoading] = useState(false);
     const [showSuggestions, setShowSuggestions] = useState(false);
 
-    // Estados para materias
     const [materias, setMaterias] = useState([]);
     const [loadingMaterias, setLoadingMaterias] = useState(false);
 
-    // Búsqueda de profesores/mentores (solo si no está preseleccionado)
     useEffect(() => {
         if (isPreSelected) return;
         if (!searchTerm.trim()) {
@@ -293,7 +304,6 @@ export default function AuthModal_HacerResenia({
         return () => clearTimeout(debounce);
     }, [searchTerm, form.tipo, isPreSelected]);
 
-    // Cargar materias cuando se selecciona una entidad
     useEffect(() => {
         if (!form.selectedEntity) {
             setMaterias([]);
@@ -341,12 +351,34 @@ export default function AuthModal_HacerResenia({
 
     if (!open) return null;
 
+    const toggleTag = (tagId) => {
+        setForm(prev => {
+            const isSelected = prev.selectedTags.includes(tagId);
+            let newTags;
+
+            if (isSelected) {
+                newTags = prev.selectedTags.filter(t => t !== tagId);
+            } else {
+                if (prev.selectedTags.length >= 3) {
+                    return prev;
+                }
+                newTags = [...prev.selectedTags, tagId];
+            }
+
+            return { ...prev, selectedTags: newTags };
+        });
+
+        if (errors.selectedTags) {
+            setErrors({ ...errors, selectedTags: "" });
+        }
+    };
+
     const validateForm = () => {
         const newErrors = {};
 
         if (!form.selectedEntity) newErrors.selectedEntity = "Debes seleccionar un " + form.tipo;
         if (!form.selectedMateria) newErrors.selectedMateria = "Debes seleccionar una materia";
-        if (!form.titulo.trim()) newErrors.titulo = "El título es obligatorio";
+        if (form.selectedTags.length === 0) newErrors.selectedTags = "Debes seleccionar al menos un tag";
         if (!form.texto.trim()) newErrors.texto = "El comentario es obligatorio";
         if (form.texto.trim().length < 20) newErrors.texto = "El comentario debe tener al menos 20 caracteres";
 
@@ -366,10 +398,9 @@ export default function AuthModal_HacerResenia({
                 form.rating,
                 form.texto,
                 {
-                    titulo: form.titulo,
                     workload: form.workload,
-                    metodologia: form.metodologia,
-                    materia_id: form.selectedMateria.id
+                    materia_id: form.selectedMateria.id,
+                    tags: form.selectedTags
                 }
             );
 
@@ -386,16 +417,14 @@ export default function AuthModal_HacerResenia({
                     });
                 }
 
-                // Limpiar formulario
                 setForm({
                     tipo: isPreSelected ? preSelectedEntity.tipo : "profesor",
                     selectedEntity: isPreSelected ? preSelectedEntity : null,
                     selectedMateria: null,
                     rating: 5,
-                    titulo: "",
+                    selectedTags: [],
                     texto: "",
-                    workload: "Medio",
-                    metodologia: "Clases prácticas"
+                    workload: "Medio"
                 });
                 setSearchTerm("");
                 setErrors({});
@@ -412,18 +441,18 @@ export default function AuthModal_HacerResenia({
 
     return (
         <>
-            {/* Backdrop */}
+            {/* Backdrop - Click para cerrar */}
             <div
                 onClick={onClose}
                 style={{
                     position: "fixed",
                     inset: 0,
                     background: "rgba(0,0,0,.35)",
-                    zIndex: 3000
+                    zIndex: 3000,
+                    cursor: "pointer"
                 }}
             />
 
-            {/* Modal */}
             <div
                 role="dialog"
                 aria-modal="true"
@@ -433,21 +462,25 @@ export default function AuthModal_HacerResenia({
                     display: "grid",
                     placeItems: "center",
                     zIndex: 3010,
-                    padding: "20px"
+                    padding: "20px",
+                    pointerEvents: "none"
                 }}
             >
-                <div style={{
-                    width: "min(720px, 92vw)",
-                    background: "#fff",
-                    borderRadius: 14,
-                    border: "1px solid var(--border)",
-                    boxShadow: "0 24px 60px rgba(0,0,0,.25)",
-                    padding: 18,
-                    display: "grid",
-                    gap: 12,
-                    maxHeight: "90vh",
-                    overflowY: "auto"
-                }}>
+                <div
+                    onClick={(e) => e.stopPropagation()}
+                    style={{
+                        width: "min(720px, 92vw)",
+                        background: "#fff",
+                        borderRadius: 14,
+                        border: "1px solid var(--border)",
+                        boxShadow: "0 24px 60px rgba(0,0,0,.25)",
+                        padding: 18,
+                        display: "grid",
+                        gap: 12,
+                        maxHeight: "90vh",
+                        overflowY: "auto",
+                        pointerEvents: "auto"
+                    }}>
                     {/* Header */}
                     <div style={{
                         display: "flex",
@@ -479,7 +512,23 @@ export default function AuthModal_HacerResenia({
                         </button>
                     </div>
 
-                    {/* Selector de tipo (Profesor o Mentor) - Solo si NO está preseleccionado */}
+                    {/* Recordatorio de anonimato */}
+                    <div style={{
+                        background: "linear-gradient(135deg, #fef3c7 0%, #fde68a 100%)",
+                        padding: 12,
+                        borderRadius: 10,
+                        border: "1px solid #fcd34d",
+                        display: "flex",
+                        alignItems: "center",
+                        gap: 10
+                    }}>
+                        <span style={{ fontSize: 20 }}>🔒</span>
+                        <p style={{ margin: 0, fontSize: 13, color: "#78350f", fontWeight: 500 }}>
+                            <strong>Tu reseña es completamente anónima.</strong> Nadie sabrá quién la escribió.
+                        </p>
+                    </div>
+
+                    {/* Selector de tipo (solo si NO está preseleccionado) */}
                     {!isPreSelected && (
                         <label style={{ display: "grid", gap: 8 }}>
                             <span style={{ fontWeight: 600 }}>
@@ -552,7 +601,7 @@ export default function AuthModal_HacerResenia({
                         </label>
                     )}
 
-                    {/* Buscador de profesor/mentor - Solo si NO está preseleccionado */}
+                    {/* Buscador (solo si NO está preseleccionado) */}
                     {!isPreSelected && (
                         <label style={{ display: "grid", gap: 8, position: "relative" }}>
                             <span style={{ fontWeight: 600 }}>
@@ -581,7 +630,6 @@ export default function AuthModal_HacerResenia({
                                         }}
                                     />
 
-                                    {/* Sugerencias */}
                                     {showSuggestions && searchTerm.trim() && (
                                         <div style={{
                                             position: "absolute",
@@ -718,7 +766,7 @@ export default function AuthModal_HacerResenia({
                         </label>
                     )}
 
-                    {/* Calificación con estrellas */}
+                    {/* Calificación y Tags */}
                     {form.selectedEntity && form.selectedMateria && (
                         <>
                             <label style={{ display: "grid", gap: 8, marginTop: 8 }}>
@@ -731,45 +779,56 @@ export default function AuthModal_HacerResenia({
                                 />
                             </label>
 
-                            {/* Título */}
-                            <label style={{ display: "grid", gap: 6 }}>
+                            {/* Selector de Tags */}
+                            <label style={{ display: "grid", gap: 8 }}>
                                 <span style={{ fontWeight: 600 }}>
-                                    Título de tu reseña <span style={{color: "#ef4444"}}>*</span>
+                                    Características (elegí entre 1 y 3) <span style={{color: "#ef4444"}}>*</span>
                                 </span>
-                                <input
-                                    type="text"
-                                    value={form.titulo}
-                                    onChange={(e) => {
-                                        setForm({...form, titulo: e.target.value});
-                                        if (errors.titulo) setErrors({...errors, titulo: ""});
-                                    }}
-                                    placeholder="Ej: Excelente profesor, muy didáctico"
-                                    maxLength={100}
-                                    style={{
-                                        height: 44,
-                                        border: errors.titulo ? "2px solid #ef4444" : "1px solid #d1d5db",
-                                        borderRadius: 10,
-                                        padding: "0 12px",
-                                        outline: "none",
-                                        transition: "border-color 0.2s ease"
-                                    }}
-                                />
                                 <div style={{
+                                    display: "flex",
+                                    flexWrap: "wrap",
+                                    gap: 8
+                                }}>
+                                    {AVAILABLE_TAGS.map(tag => {
+                                        const isSelected = form.selectedTags.includes(tag.id);
+                                        return (
+                                            <button
+                                                key={tag.id}
+                                                type="button"
+                                                onClick={() => toggleTag(tag.id)}
+                                                style={{
+                                                    padding: "8px 14px",
+                                                    borderRadius: 20,
+                                                    border: isSelected ? "2px solid #2563eb" : "1px solid #d1d5db",
+                                                    background: isSelected ? "#eff6ff" : "#fff",
+                                                    color: isSelected ? "#2563eb" : "#374151",
+                                                    cursor: "pointer",
+                                                    fontWeight: isSelected ? 600 : 500,
+                                                    fontSize: 13,
+                                                    transition: "all 0.2s ease",
+                                                    opacity: form.selectedTags.length >= 3 && !isSelected ? 0.5 : 1
+                                                }}
+                                                disabled={form.selectedTags.length >= 3 && !isSelected}
+                                            >
+                                                {tag.label}
+                                            </button>
+                                        );
+                                    })}
+                                </div>
+                                <div style={{
+                                    fontSize: 12,
+                                    color: "#6b7280",
                                     display: "flex",
                                     justifyContent: "space-between",
                                     alignItems: "center"
                                 }}>
-                                    {errors.titulo && (
-                                        <span style={{ color: "#ef4444", fontSize: 12 }}>
-                                            {errors.titulo}
+                                    {errors.selectedTags && (
+                                        <span style={{ color: "#ef4444" }}>
+                                            {errors.selectedTags}
                                         </span>
                                     )}
-                                    <span style={{
-                                        color: "#6b7280",
-                                        fontSize: 12,
-                                        marginLeft: "auto"
-                                    }}>
-                                        {form.titulo.length}/100
+                                    <span style={{ marginLeft: "auto" }}>
+                                        {form.selectedTags.length}/3 seleccionados
                                     </span>
                                 </div>
                             </label>
@@ -819,42 +878,14 @@ export default function AuthModal_HacerResenia({
                                 </div>
                             </label>
 
-                            {/* Campos adicionales */}
-                            <div style={{
-                                display: "grid",
-                                gridTemplateColumns: "1fr 1fr",
-                                gap: 12
-                            }}>
-                                {/* Workload con Slider */}
-                                <label style={{ display: "grid", gap: 6 }}>
-                                    <span style={{ fontWeight: 600 }}>Carga de trabajo</span>
-                                    <WorkloadSlider
-                                        value={form.workload}
-                                        onChange={(value) => setForm({...form, workload: value})}
-                                    />
-                                </label>
-
-                                {/* Metodología */}
-                                <label style={{ display: "grid", gap: 6 }}>
-                                    <span style={{ fontWeight: 600 }}>Metodología</span>
-                                    <select
-                                        value={form.metodologia}
-                                        onChange={(e) => setForm({...form, metodologia: e.target.value})}
-                                        style={{
-                                            height: 44,
-                                            border: "1px solid #d1d5db",
-                                            borderRadius: 10,
-                                            padding: "0 10px",
-                                            outline: "none",
-                                            cursor: "pointer"
-                                        }}
-                                    >
-                                        {["Clases teóricas", "Clases prácticas", "Proyectos", "Parciales frecuentes", "Talleres", "Seminarios"].map(v =>
-                                            <option key={v} value={v}>{v}</option>
-                                        )}
-                                    </select>
-                                </label>
-                            </div>
+                            {/* Carga de trabajo */}
+                            <label style={{ display: "grid", gap: 6 }}>
+                                <span style={{ fontWeight: 600 }}>Carga de trabajo</span>
+                                <WorkloadSlider
+                                    value={form.workload}
+                                    onChange={(value) => setForm({...form, workload: value})}
+                                />
+                            </label>
 
                             {/* Información adicional */}
                             <div style={{
