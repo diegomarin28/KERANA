@@ -1,9 +1,9 @@
-// src/pages/EditProfile.jsx
 import { useEffect, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { supabase } from '../supabase';
 import { Card } from '../components/ui/Card';
 import { Button } from '../components/ui/Button';
+import { useAvatar } from '../contexts/AvatarContext';
 
 export default function EditProfile() {
     const [formData, setFormData] = useState({

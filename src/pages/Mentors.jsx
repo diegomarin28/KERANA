@@ -1,13 +1,12 @@
 import { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
 import { supabase } from '../supabase';
 import { Card } from '../components/ui/Card';
+import { MentorCard } from '../components/MentorCard';
 
 export default function Mentors() {
     const [mentors, setMentors] = useState([]);
     const [loading, setLoading] = useState(true);
     const [searchTerm, setSearchTerm] = useState('');
-    const navigate = useNavigate();
 
     useEffect(() => {
         loadMentors();
@@ -15,10 +14,10 @@ export default function Mentors() {
 
     const loadMentors = async () => {
         try {
-            // Primero obtener mentores
+            // Obtener mentores
             const { data: mentorsData, error: mentorsError } = await supabase
                 .from('mentor')
-                .select('id_mentor, estrellas_mentor, descripcion')
+                .select('id_mentor, estrellas_mentor, descripcion, id_usuario')
                 .limit(50);
 
             if (mentorsError) throw mentorsError;
@@ -26,12 +25,12 @@ export default function Mentors() {
             // Para cada mentor, obtener usuario y materias
             const mentorsWithDetails = await Promise.all(
                 (mentorsData || []).map(async (m) => {
-                    // Obtener usuario
+                    // Obtener usuario (CORREGIDO: ahora usa m.id_usuario)
                     const { data: usuario } = await supabase
                         .from('usuario')
-                        .select('nombre, correo')
-                        .eq('id_usuario', m.id_mentor)
-                        .single();
+                        .select('nombre, username, foto')
+                        .eq('id_usuario', m.id_usuario)
+                        .maybeSingle();
 
                     // Obtener materias
                     const { data: materias } = await supabase
@@ -41,8 +40,10 @@ export default function Mentors() {
 
                     return {
                         id_mentor: m.id_mentor,
-                        nombre: usuario?.nombre || 'Mentor',
-                        estrellas: m.estrellas_mentor || 0,
+                        mentor_nombre: usuario?.nombre || 'Mentor',
+                        username: usuario?.username,
+                        foto: usuario?.foto,
+                        estrellas_mentor: m.estrellas_mentor || 0,
                         descripcion: m.descripcion,
                         materias: materias?.map(mm => mm.materia.nombre_materia) || []
                     };
@@ -58,7 +59,7 @@ export default function Mentors() {
     };
 
     const filteredMentors = mentors.filter(m =>
-        m.nombre.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        m.mentor_nombre.toLowerCase().includes(searchTerm.toLowerCase()) ||
         m.materias.some(mat => mat.toLowerCase().includes(searchTerm.toLowerCase()))
     );
 
@@ -111,92 +112,7 @@ export default function Mentors() {
                     gap: 20
                 }}>
                     {filteredMentors.map(mentor => (
-                        <Card
-                            key={mentor.id_mentor}
-                            style={{
-                                padding: 24,
-                                cursor: 'pointer',
-                                transition: 'transform 0.2s, box-shadow 0.2s'
-                            }}
-                            onClick={() => navigate(`/mentores/${mentor.id_mentor}`)}
-                            onMouseEnter={(e) => {
-                                e.currentTarget.style.transform = 'translateY(-4px)';
-                                e.currentTarget.style.boxShadow = '0 8px 16px rgba(0,0,0,0.1)';
-                            }}
-                            onMouseLeave={(e) => {
-                                e.currentTarget.style.transform = 'translateY(0)';
-                                e.currentTarget.style.boxShadow = 'none';
-                            }}
-                        >
-                            <div style={{ marginBottom: 16 }}>
-                                <div style={{
-                                    width: 60,
-                                    height: 60,
-                                    borderRadius: '50%',
-                                    background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-                                    display: 'grid',
-                                    placeItems: 'center',
-                                    fontSize: 24,
-                                    fontWeight: 700,
-                                    color: '#fff',
-                                    marginBottom: 12
-                                }}>
-                                    {mentor.nombre[0]}
-                                </div>
-                                <h3 style={{ margin: '0 0 8px 0', fontSize: 18 }}>
-                                    {mentor.nombre}
-                                </h3>
-                                <div style={{ color: '#f59e0b', marginBottom: 8 }}>
-                                    {'★'.repeat(Math.round(mentor.estrellas))}
-                                    {'☆'.repeat(5 - Math.round(mentor.estrellas))}
-                                    <span style={{ color: '#6b7280', marginLeft: 8, fontSize: 14 }}>
-                                        ({mentor.estrellas})
-                                    </span>
-                                </div>
-                            </div>
-
-                            {mentor.descripcion && (
-                                <p style={{
-                                    color: '#4b5563',
-                                    fontSize: 14,
-                                    marginBottom: 12,
-                                    lineHeight: 1.5
-                                }}>
-                                    {mentor.descripcion.length > 100
-                                        ? mentor.descripcion.substring(0, 100) + '...'
-                                        : mentor.descripcion}
-                                </p>
-                            )}
-
-                            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
-                                {mentor.materias.slice(0, 3).map((materia, idx) => (
-                                    <span
-                                        key={idx}
-                                        style={{
-                                            padding: '4px 10px',
-                                            background: '#dcfce7',
-                                            color: '#166534',
-                                            borderRadius: 16,
-                                            fontSize: 12,
-                                            fontWeight: 500
-                                        }}
-                                    >
-                                        {materia}
-                                    </span>
-                                ))}
-                                {mentor.materias.length > 3 && (
-                                    <span style={{
-                                        padding: '4px 10px',
-                                        background: '#f3f4f6',
-                                        color: '#6b7280',
-                                        borderRadius: 16,
-                                        fontSize: 12
-                                    }}>
-                                        +{mentor.materias.length - 3} más
-                                    </span>
-                                )}
-                            </div>
-                        </Card>
+                        <MentorCard key={mentor.id_mentor} mentor={mentor} />
                     ))}
                 </div>
             )}

@@ -9,6 +9,7 @@ import { fetchUserProfile, cleanLogout } from "../utils/authHelpers";
 import NotificationBadge from "../components/NotificationBadge";
 import { useSeguidores } from "../hooks/useSeguidores";
 import { useAvatar } from '../contexts/AvatarContext';
+import { LogoutConfirmModal } from '../components/LogoutConfirmModal';
 
 export default function Header() {
     const [menuOpen, setMenuOpen] = useState(false);
@@ -31,6 +32,7 @@ export default function Header() {
     const { obtenerContadores } = useSeguidores();
     const { updateTrigger } = useAvatar();
     const [avatarLoading, setAvatarLoading] = useState(true);
+    const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
 
     const openAuthModal = () => setAuthOpen(true);
     const closeAuthModal = () => setAuthOpen(false);
@@ -780,7 +782,7 @@ export default function Header() {
                                                 <button
                                                     type="button"
                                                     onClick={() => {
-                                                        handleLogout?.();
+                                                        setShowLogoutConfirm(true);
                                                         setAvatarMenuOpen(false);
                                                     }}
                                                     style={{
@@ -814,6 +816,7 @@ export default function Header() {
                                         </div>
                                     )}
                                 </div>
+
                             </>
                         )}
                     </div>
@@ -850,6 +853,15 @@ export default function Header() {
                 onClose={() => setReseniaOpen(false)}
                 onSave={() => {}}
             />
+            <LogoutConfirmModal
+                isOpen={showLogoutConfirm}
+                onClose={() => setShowLogoutConfirm(false)}
+                onConfirm={() => {
+                    setShowLogoutConfirm(false);
+                    handleLogout();
+                    setAvatarMenuOpen(false);
+                }}
+            />
 
             <style>{`
     @keyframes dropdownSlide {
@@ -875,6 +887,7 @@ export default function Header() {
         </>
     );
 }
+
 
 // Componente MenuItem mejorado
 function MenuItem({ icon, label, badge, onClick }) {
