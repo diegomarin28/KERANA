@@ -165,6 +165,7 @@ async function searchNotes(term) {
     if (!q) return { data: [], error: null };
 
     try {
+        // 1️⃣ Primero buscamos solo los IDs
         const { data: apuntes, error } = await supabase
             .rpc('buscar_apuntes_sin_tildes', { termino: q });
 
@@ -173,14 +174,71 @@ async function searchNotes(term) {
             return { data: [], error };
         }
 
-        const transformed = (apuntes || []).map(a => ({
-            id: a.id_apunte,
-            id_apunte: a.id_apunte,
-            titulo: a.titulo,
-            estrellas: 4.0,
-            materia_nombre: '',
-            autor_nombre: ''
-        }));
+        if (!apuntes || apuntes.length === 0) {
+            return { data: [], error: null };
+        }
+
+        // 2️⃣ Obtenemos los IDs encontrados
+        const ids = apuntes.map(a => a.id_apunte);
+
+        // 3️⃣ Traemos toda la info de esos apuntes
+        const { data: apuntesCompletos, error: errorCompleto } = await supabase
+            .from('apunte')
+            .select(`
+                id_apunte,
+                titulo,
+                descripcion,
+                file_path,
+                estrellas,
+                creditos,
+                id_usuario,
+                id_materia,
+                materia(nombre_materia)
+            `)
+            .in('id_apunte', ids);
+
+        if (errorCompleto) {
+            console.error('Error obteniendo apuntes completos:', errorCompleto);
+            return { data: [], error: errorCompleto };
+        }
+
+        // 4️⃣ Obtener nombres de usuarios separadamente
+        const userIds = [...new Set(apuntesCompletos.map(a => a.id_usuario))];
+        const { data: usuarios } = await supabase
+            .from('usuario')
+            .select('id_usuario, nombre')
+            .in('id_usuario', userIds);
+
+        const userMap = new Map(usuarios?.map(u => [u.id_usuario, u.nombre]) || []);
+
+        // 5️⃣ Generar signed URLs y transformar
+        const transformed = [];
+        for (const a of (apuntesCompletos || [])) {
+            let signedUrl = null;
+
+            if (a.file_path) {
+                const { data: signedData, error: signedError } = await supabase.storage
+                    .from('apuntes')
+                    .createSignedUrl(a.file_path, 3600);
+
+                if (!signedError && signedData) {
+                    signedUrl = signedData.signedUrl;
+                }
+            }
+
+            transformed.push({
+                id: a.id_apunte,
+                id_apunte: a.id_apunte,
+                titulo: a.titulo,
+                descripcion: a.descripcion || '',
+                estrellas: a.estrellas || 0,
+                creditos: a.creditos || 0,
+                file_path: a.file_path,
+                signedUrl: signedUrl,
+                materia: a.materia,
+                usuario: { nombre: userMap.get(a.id_usuario) || 'Anónimo' }
+            });
+        }
 
         return { data: transformed, error: null };
 
