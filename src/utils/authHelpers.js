@@ -142,12 +142,22 @@ export async function fetchUserProfile() {
             .eq('auth_id', user.id)
             .maybeSingle();
 
-        if (error) return { data: null, error };
-        if (!profile) return { data: null, error: new Error('Perfil inexistente') };
+        // ✅ CAMBIO: Si no hay perfil, devolver null sin error
+        if (error) {
+            // Solo loguear, no devolver como error
+            console.warn('[fetchUserProfile] Error en query:', error);
+            return { data: null, error: null }; // ← CAMBIO AQUÍ
+        }
+
+        if (!profile) {
+            console.log('[fetchUserProfile] Perfil no existe aún');
+            return { data: null, error: null }; // ← Y AQUÍ
+        }
 
         return { data: profile, error: null };
     } catch (err) {
-        return { data: null, error: err };
+        console.error('[fetchUserProfile] Excepción:', err);
+        return { data: null, error: null }; // ← Y AQUÍ
     }
 }
 

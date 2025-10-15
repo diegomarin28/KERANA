@@ -1,4 +1,5 @@
 import { supabase } from '../supabase';
+import { notificationTypes } from './notificationTypes';
 
 export const followersAPI = {
     /**
@@ -52,6 +53,30 @@ export const followersAPI = {
             if (error) {
                 console.error('[followersAPI] Error en seguirUsuario:', error);
                 return { success: false, error: error.message };
+            }
+
+            // ✅ CREAR NOTIFICACIÓN
+            try {
+                // Obtener mi nombre
+                const { data: miUsuario } = await supabase
+                    .from('usuario')
+                    .select('nombre, username')
+                    .eq('id_usuario', miId)
+                    .single();
+
+                const miNombre = miUsuario?.nombre || miUsuario?.username || 'Alguien';
+
+                // Crear notificación para el usuario seguido
+                await notificationTypes.nuevoSeguidor(
+                    miId,           // ID de quien sigue
+                    usuarioId,      // ID de quien recibe la notificación
+                    miNombre        // Nombre de quien sigue
+                );
+
+                console.log('✅ Notificación de seguidor creada');
+            } catch (notifError) {
+                console.error('⚠️ Error creando notificación (no crítico):', notifError);
+                // No fallar toda la operación si falla la notificación
             }
 
             return { success: true };
