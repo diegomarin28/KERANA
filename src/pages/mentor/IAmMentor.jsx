@@ -1,9 +1,11 @@
 import { useState, useEffect, useRef } from 'react';
 import { supabase } from '../../supabase';
+import { useNavigate } from 'react-router-dom';
 import { Card } from '../../components/ui/Card';
 import { Button } from '../../components/ui/Button';
 
 export default function IAmMentor() {
+    const navigate = useNavigate();
     const [materias, setMaterias] = useState([]);
     const [todasMaterias, setTodasMaterias] = useState([]);
     const [loading, setLoading] = useState(true);
@@ -15,6 +17,8 @@ export default function IAmMentor() {
     const [selectedMateria, setSelectedMateria] = useState(null);
     const [showDropdown, setShowDropdown] = useState(false);
     const dropdownRef = useRef(null);
+    const [showConfirmModal, setShowConfirmModal] = useState(false);
+    const [materiaToRemove, setMateriaToRemove] = useState(null);
 
     useEffect(() => { fetchData(); }, []);
 
@@ -49,7 +53,7 @@ export default function IAmMentor() {
     const fetchData = async () => {
         try {
             setLoading(true);
-            setError(''); // Limpiar errores previos
+            setError('');
 
             const { data: { user } } = await supabase.auth.getUser();
             if (!user) {
@@ -57,7 +61,6 @@ export default function IAmMentor() {
                 return;
             }
 
-            // 1. Obtener id_usuario
             const { data: usuarioData, error: usuarioErr } = await supabase
                 .from('usuario')
                 .select('id_usuario')
@@ -70,9 +73,6 @@ export default function IAmMentor() {
                 return;
             }
 
-            console.log('👤 ID Usuario:', usuarioData.id_usuario);
-
-            // 2️⃣ Obtener todos los mentores del usuario
             const { data: mentores, error: mentorErr } = await supabase
                 .from('mentor')
                 .select('id_mentor')
@@ -85,30 +85,23 @@ export default function IAmMentor() {
             }
 
             if (!mentores || mentores.length === 0) {
-                console.log('⚠️ No estás registrado como mentor');
                 setMaterias([]);
                 setError('');
                 setLoading(false);
                 return;
             }
 
-            console.log('🎓 Mentores encontrados:', mentores);
-
-            // 3️⃣ Obtener materias para *todos* los mentores
             let todasMisMaterias = [];
 
             for (const mentor of mentores) {
                 const { data: materiasDeEsteMentor, error: fetchError } = await supabase
                     .from('mentor_materia')
-                    .select(`
-            id,
-            id_materia,
-            materia (id_materia, nombre_materia, semestre)`)
+                    .select(`id, id_mentor, id_materia, materia (id_materia, nombre_materia, semestre)`)
                     .eq('id_mentor', mentor.id_mentor);
 
                 if (fetchError) {
                     console.error(`❌ Error obteniendo materias del mentor ${mentor.id_mentor}:`, fetchError);
-                    continue; // seguimos con el resto
+                    continue;
                 }
 
                 if (materiasDeEsteMentor) {
@@ -116,7 +109,6 @@ export default function IAmMentor() {
                 }
             }
 
-            console.log('📚 Total materias encontradas:', todasMisMaterias?.length);
             setMaterias(todasMisMaterias);
         } catch (err) {
             console.error('❌ Error general en fetchData:', err);
@@ -132,14 +124,12 @@ export default function IAmMentor() {
             setError(''); setSuccess('');
             const { data: { user } } = await supabase.auth.getUser();
 
-            // 1. Obtener id_usuario
             const { data: usuarioData } = await supabase
                 .from('usuario')
                 .select('id_usuario')
                 .eq('auth_id', user.id)
                 .single();
 
-            // 2️⃣ Obtener todos los mentores del usuario
             const { data: mentores } = await supabase
                 .from('mentor')
                 .select('id_mentor')
@@ -150,10 +140,8 @@ export default function IAmMentor() {
                 return;
             }
 
-            // 🧩 Tomamos el primero por simplicidad
             const idMentor = mentores[0].id_mentor;
 
-            // 3️⃣ Insertar en mentor_materia
             const { error: insertError } = await supabase
                 .from('mentor_materia')
                 .insert([{
@@ -173,16 +161,72 @@ export default function IAmMentor() {
         }
     };
 
-    const handleRemoveMateria = async (mentorMateriaId, materiaNombre) => {
-        if (!confirm(`¿Dejar de ser mentor de ${materiaNombre}?`)) return;
+    const handleRemoveMateria = (mentorMateriaId, materiaNombre) => {
+        setMateriaToRemove({ id: mentorMateriaId, nombre: materiaNombre });
+        setShowConfirmModal(true);
+    };
+
+    const confirmRemoveMateria = async () => {
         try {
-            const { error } = await supabase.from('mentor_materia').delete().eq('id', mentorMateriaId);
-            if (error) throw error;
-            setMaterias(materias.filter(m => m.id !== mentorMateriaId));
+            console.log('🔍 ID a borrar:', materiaToRemove.id);
+
+            // 1. Obtener id_mentor antes de borrar
+            const { data: registroExistente } = await supabase
+                .from('mentor_materia')
+                .select('id_mentor')
+                .eq('id', materiaToRemove.id)
+                .single();
+
+            if (!registroExistente) {
+                setError('El registro no existe');
+                setShowConfirmModal(false);
+                return;
+            }
+
+            const idMentor = registroExistente.id_mentor;
+
+            // 2. Borrar de mentor_materia
+            const { error: deleteError } = await supabase
+                .from('mentor_materia')
+                .delete()
+                .eq('id', materiaToRemove.id);
+
+            if (deleteError) {
+                console.error('❌ ERROR:', deleteError);
+                setError(`Error: ${deleteError.message}`);
+                setShowConfirmModal(false);
+                return;
+            }
+
+            // 3. Verificar si el mentor tiene otras materias
+            const { data: otrasMaterias } = await supabase
+                .from('mentor_materia')
+                .select('id')
+                .eq('id_mentor', idMentor);
+
+            // 4. Si no tiene más materias, borrar de la tabla mentor
+            if (!otrasMaterias || otrasMaterias.length === 0) {
+                console.log('🗑️ No tiene más materias, borrando de tabla mentor...');
+                const { error: deleteMentorError } = await supabase
+                    .from('mentor')
+                    .delete()
+                    .eq('id_mentor', idMentor);
+
+                if (deleteMentorError) {
+                    console.error('⚠️ Error al borrar mentor:', deleteMentorError);
+                }
+            }
+
+            // 5. Actualizar estado local
+            setMaterias(materias.filter(m => m.id !== materiaToRemove.id));
             setSuccess('Te diste de baja exitosamente');
             setTimeout(() => setSuccess(''), 3000);
-        } catch {
-            setError('Error al darte de baja');
+            setShowConfirmModal(false);
+            setMateriaToRemove(null);
+        } catch (err) {
+            console.error('💥 Error inesperado:', err);
+            setError('Error al darte de baja: ' + err.message);
+            setShowConfirmModal(false);
         }
     };
 
@@ -199,14 +243,21 @@ export default function IAmMentor() {
                     <h1 style={{ margin: '0 0 8px 0' }}>Soy Mentor</h1>
                     <p style={{ color: '#6b7280', margin: 0 }}>Gestiona las materias en las que sos mentor</p>
                 </div>
-                <Button onClick={() => setShowAddModal(true)} style={{
-                    padding: '12px 24px', background: '#2563eb', color: '#fff', border: 'none', borderRadius: 8,
-                    fontWeight: 600, cursor: 'pointer'
-                }}>
+                <Button
+                    onClick={() => navigate('/mentores/postular')}
+                    style={{
+                        padding: '12px 24px',
+                        background: '#2563eb',
+                        color: '#fff',
+                        border: 'none',
+                        borderRadius: 8,
+                        fontWeight: 600,
+                        cursor: 'pointer'
+                    }}
+                >
                     + Agregar Materia
                 </Button>
             </div>
-
             {error && <Card style={{ background: '#fef2f2', border: '1px solid #fecaca', color: '#dc2626', padding: 16, marginBottom: 20 }}>{error}</Card>}
             {success && <Card style={{ background: '#d1fae5', border: '1px solid #6ee7b7', color: '#065f46', padding: 16, marginBottom: 20 }}>{success}</Card>}
 
@@ -225,8 +276,8 @@ export default function IAmMentor() {
                                     <h3 style={{ margin: '0 0 8px 0', fontSize: 18 }}>{m.materia.nombre_materia}</h3>
                                     <p style={{ color: '#6b7280', margin: 0, fontSize: 14 }}>Semestre {m.materia.semestre}</p>
                                 </div>
-                                <button //Personalizado para esta parte
-                                    onClick={() => handleRemoveMateria(m.id, m.materia.nombre_materia)}
+                                <button
+                                    onClick={() => handleRemoveMateria(m.id, m.materia.nombre_materia)} // 👈 Cambia a m.id
                                     onMouseEnter={(e) => e.currentTarget.style.background = '#b91c1c'}
                                     onMouseLeave={(e) => e.currentTarget.style.background = '#dc2626'}
                                     style={{
@@ -301,6 +352,51 @@ export default function IAmMentor() {
                             <button type="button" onClick={handleAddMateria} disabled={!selectedMateria}
                                     style={{ flex: 1, padding: 12, background: selectedMateria ? '#2563eb' : '#9ca3af', color: '#fff', border: 'none', borderRadius: 8, fontWeight: 600, cursor: selectedMateria ? 'pointer' : 'not-allowed' }}>
                                 Agregar
+                            </button>
+                        </div>
+                    </div>
+                </>
+            )}
+
+            {/* Modal Confirmación Eliminar */}
+            {showConfirmModal && materiaToRemove && (
+                <>
+                    <div
+                        onClick={() => setShowConfirmModal(false)}
+                        style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', zIndex: 1000 }}
+                    />
+                    <div style={{
+                        position: 'fixed', top: '50%', left: '50%', transform: 'translate(-50%, -50%)',
+                        background: '#fff', borderRadius: 12, padding: 32, width: 'min(90vw, 450px)',
+                        zIndex: 1001, boxShadow: '0 20px 60px rgba(0,0,0,0.3)'
+                    }}>
+                        <div style={{ fontSize: 48, textAlign: 'center', marginBottom: 16 }}>⚠️</div>
+                        <h2 style={{ margin: '0 0 12px 0', textAlign: 'center' }}>¿Confirmar baja?</h2>
+                        <p style={{ color: '#6b7280', textAlign: 'center', margin: '0 0 24px 0' }}>
+                            ¿Estás seguro de que querés dejar de ser mentor de <strong>{materiaToRemove.nombre}</strong>?
+                        </p>
+
+                        <div style={{ display: 'flex', gap: 12 }}>
+                            <button
+                                onClick={() => setShowConfirmModal(false)}
+                                style={{
+                                    flex: 1, padding: 12, background: '#f3f4f6', color: '#374151',
+                                    border: 'none', borderRadius: 8, fontWeight: 600, cursor: 'pointer'
+                                }}
+                            >
+                                Cancelar
+                            </button>
+                            <button
+                                onClick={confirmRemoveMateria}
+                                onMouseEnter={(e) => e.currentTarget.style.background = '#b91c1c'}
+                                onMouseLeave={(e) => e.currentTarget.style.background = '#dc2626'}
+                                style={{
+                                    flex: 1, padding: 12, background: '#dc2626', color: '#fff',
+                                    border: 'none', borderRadius: 8, fontWeight: 600, cursor: 'pointer',
+                                    transition: 'background 0.2s ease'
+                                }}
+                            >
+                                Sí, darme de baja
                             </button>
                         </div>
                     </div>
