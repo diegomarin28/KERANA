@@ -10,6 +10,7 @@ import NotificationBadge from "../components/NotificationBadge";
 import { useSeguidores } from "../hooks/useSeguidores";
 import { useAvatar } from '../contexts/AvatarContext';
 import { LogoutConfirmModal } from '../components/LogoutConfirmModal';
+import { useSidebarStats } from '../hooks/useSidebarStats';
 
 export default function Header() {
     const [menuOpen, setMenuOpen] = useState(false);
@@ -33,6 +34,9 @@ export default function Header() {
     const { updateTrigger } = useAvatar();
     const [avatarLoading, setAvatarLoading] = useState(true);
     const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
+    const { credits, seguidores, siguiendo, apuntes } = useSidebarStats();
+    const headerStats = useSidebarStats();
+
 
     const openAuthModal = () => setAuthOpen(true);
     const closeAuthModal = () => setAuthOpen(false);
@@ -712,7 +716,7 @@ export default function Header() {
                                                 }}>
                                                     <div style={{ flex: 1, textAlign: "center" }}>
                                                         <div style={{ fontSize: 20, fontWeight: 700, marginBottom: 2 }}>
-                                                            {followStats.seguidores}
+                                                            {headerStats.seguidores}
                                                         </div>
                                                         <div style={{ fontSize: 12, opacity: 0.85 }}>
                                                             Seguidores
@@ -724,7 +728,7 @@ export default function Header() {
                                                     }} />
                                                     <div style={{ flex: 1, textAlign: "center" }}>
                                                         <div style={{ fontSize: 20, fontWeight: 700, marginBottom: 2 }}>
-                                                            {followStats.siguiendo}
+                                                            {headerStats.siguiendo}
                                                         </div>
                                                         <div style={{ fontSize: 12, opacity: 0.85 }}>
                                                             Siguiendo
@@ -831,6 +835,7 @@ export default function Header() {
                 open={menuOpen}
                 onClose={() => setMenuOpen(false)}
                 isAuthenticated={!!user}
+                stats={{ credits, seguidores, siguiendo, apuntes }}
                 user={
                     user
                         ? {

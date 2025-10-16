@@ -4,6 +4,8 @@ import { supabase } from '../supabase';
 import { Card } from '../components/ui/Card';
 import { Button } from '../components/ui/Button';
 import PDFThumbnail from '../components/PDFThumbnail';
+import emailjs from '@emailjs/browser';
+
 
 
 export const ApunteView = () => {
@@ -28,8 +30,14 @@ export const ApunteView = () => {
     const [deleting, setDeleting] = useState(false);
     const [showDeleteSuccessModal, setShowDeleteSuccessModal] = useState(false);
     const [isFavorite, setIsFavorite] = useState(false);
-    const [showFavoriteModal, setShowFavoriteModal] = useState(false);
-    const [showUnfavoriteModal, setShowUnfavoriteModal] = useState(false);
+    const [showToast, setShowToast] = useState(false);
+    const [userLike, setUserLike] = useState(null);
+    const [showReportModal, setShowReportModal] = useState(false);
+    const [reportMotivo, setReportMotivo] = useState('');
+    const [reportDescripcion, setReportDescripcion] = useState('');
+    const [submittingReport, setSubmittingReport] = useState(false);
+    const [showReportSuccessModal, setShowReportSuccessModal] = useState(false);
+
 
     useEffect(() => {
         loadApunteData();
@@ -120,6 +128,17 @@ export const ApunteView = () => {
                 .eq('id_apunte', id);
             if (favoriteError) throw favoriteError;
             setIsFavorite(favoriteData.length > 0);
+
+            const { data: likeData, error: likeError } = await supabase
+                .from('likes')
+                .select('tipo')
+                .eq('id_usuario', usuarioData.id_usuario)
+                .eq('id_apunte', id)
+                .maybeSingle();
+            if (likeError) throw likeError;
+            if (likeData) {
+                setUserLike(likeData.tipo);
+            }
 
             await calculateAverageStars(id);
 
@@ -328,20 +347,137 @@ export const ApunteView = () => {
                     .match({ id_usuario: currentUserId, id_apunte: apunte.id_apunte });
                 if (error) throw error;
                 setIsFavorite(false);
-                setShowUnfavoriteModal(true);
-                setTimeout(() => setShowUnfavoriteModal(false), 2000);
             } else {
                 const { error } = await supabase
                     .from('apunte_fav')
                     .insert({ id_usuario: currentUserId, id_apunte: apunte.id_apunte });
                 if (error) throw error;
                 setIsFavorite(true);
-                setShowFavoriteModal(true);
-                setTimeout(() => setShowFavoriteModal(false), 2000);
+                setShowToast(true);
+                setTimeout(() => setShowToast(false), 3000);
             }
         } catch (error) {
             console.error('Error al manejar favorito:', error);
             alert("Error al guardar/quitar favorito: " + (error.message || ""));
+        }
+    };
+
+    const handleLike = async (tipo) => {
+        if (!apunte || !currentUserId) return;
+
+        try {
+            // Si ya tiene ese tipo, lo elimina (toggle)
+            if (userLike === tipo) {
+                const { error } = await supabase
+                    .from('likes')
+                    .delete()
+                    .match({ id_usuario: currentUserId, id_apunte: apunte.id_apunte });
+                if (error) throw error;
+                setUserLike(null);
+            } else {
+                // Si no tiene like/dislike o tiene el contrario, inserta o actualiza
+                const { error } = await supabase
+                    .from('likes')
+                    .upsert({
+                        id_usuario: currentUserId,
+                        id_apunte: apunte.id_apunte,
+                        tipo: tipo
+                    }, {
+                        onConflict: 'id_usuario,id_apunte'
+                    });
+                if (error) throw error;
+                setUserLike(tipo);
+            }
+        } catch (error) {
+            console.error('Error al dar like/dislike:', error);
+            alert("Error al registrar tu reacción: " + (error.message || ""));
+        }
+    };
+
+    const handleReport = async () => {
+        if (!reportMotivo) {
+            alert("Por favor seleccioná un motivo para el reporte");
+            return;
+        }
+
+        if (reportMotivo === 'otro' && !reportDescripcion.trim()) {
+            alert("Por favor describí el motivo del reporte");
+            return;
+        }
+
+        try {
+            setSubmittingReport(true);
+
+            // 1. Guardar en la base de datos
+            const { error } = await supabase
+                .from('reportes')
+                .insert({
+                    id_usuario: currentUserId,
+                    id_apunte: apunte.id_apunte,
+                    motivo: reportMotivo,
+                    descripcion: reportDescripcion.trim() || null
+                });
+
+            if (error) {
+                if (error.code === '23505') {
+                    alert("Ya reportaste este apunte anteriormente");
+                } else {
+                    throw error;
+                }
+            } else {
+                // 2. Obtener datos del usuario actual
+                const { data: usuarioData } = await supabase
+                    .from('usuario')
+                    .select('nombre, correo')
+                    .eq('id_usuario', currentUserId)
+                    .single();
+
+                // 3. Mapear motivos a texto legible
+                const motivosMap = {
+                    'contenido_inapropiado': 'Contenido inapropiado',
+                    'spam': 'Spam o publicidad',
+                    'plagio': 'Plagio o violación de derechos',
+                    'informacion_incorrecta': 'Información incorrecta',
+                    'otro': 'Otro motivo'
+                };
+
+                // 4. Enviar email con EmailJS
+                try {
+                    await emailjs.send(
+                        "service_dan74a5", // Tu service ID
+                        "TU_TEMPLATE_ID_AQUI", // ⚠️ REEMPLAZÁ con el template ID que creaste
+                        {
+                            titulo_apunte: apunte.titulo,
+                            id_apunte: apunte.id_apunte,
+                            usuario_nombre: usuarioData?.nombre || 'Anónimo',
+                            usuario_email: usuarioData?.correo || 'No disponible',
+                            fecha: new Date().toLocaleString('es-UY'),
+                            motivo: motivosMap[reportMotivo] || reportMotivo,
+                            descripcion: reportDescripcion.trim()
+                                ? `\n📝 Descripción adicional:\n${reportDescripcion.trim()}`
+                                : '\n(Sin descripción adicional)',
+                            link_apunte: `${window.location.origin}/apuntes/${apunte.id_apunte}`,
+                            to_email: "kerana.soporte@gmail.com"
+                        },
+                        "DMO310micvFWXx-j4" // Tu public key
+                    );
+                    console.log('✅ Email de reporte enviado');
+                } catch (emailError) {
+                    console.error('❌ Error enviando email:', emailError);
+                    // No bloqueamos el flujo si falla el email
+                }
+
+                // 5. Mostrar modal de agradecimiento
+                setShowReportModal(false);
+                setReportMotivo('');
+                setReportDescripcion('');
+                setShowReportSuccessModal(true);
+            }
+        } catch (error) {
+            console.error('Error al enviar reporte:', error);
+            alert("Error al enviar el reporte: " + (error.message || ""));
+        } finally {
+            setSubmittingReport(false);
         }
     };
 
@@ -553,166 +689,48 @@ export const ApunteView = () => {
             )}
 
             {/* Modal de éxito - Favorito */}
-            {showFavoriteModal && (
-                <div style={{
-                    position: 'fixed',
-                    top: 0,
-                    left: 0,
-                    right: 0,
-                    bottom: 0,
-                    background: 'rgba(0, 0, 0, 0.5)',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    zIndex: 1000,
-                    backdropFilter: 'blur(4px)'
-                }}>
-                    <Card style={{
-                        maxWidth: 450,
-                        padding: 40,
-                        textAlign: 'center',
-                        background: '#fff',
-                        boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)',
-                        animation: 'fadeIn 0.3s ease-out'
-                    }}>
-                        <div style={{
-                            width: 80,
-                            height: 80,
-                            background: 'linear-gradient(135deg, #2563eb 0%, #1e40af 100%)',
-                            borderRadius: '50%',
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'center',
-                            margin: '0 auto 24px',
-                            fontSize: 40
-                        }}>
-                            🔖
-                        </div>
-                        <h2 style={{
-                            margin: '0 0 12px 0',
-                            fontSize: 28,
-                            fontWeight: 700,
-                            background: 'linear-gradient(135deg, #2563eb 0%, #1e40af 100%)',
-                            WebkitBackgroundClip: 'text',
-                            WebkitTextFillColor: 'transparent',
-                            backgroundClip: 'text'
-                        }}>
-                            Apunte guardado en favoritos
-                        </h2>
-                        <p style={{
-                            color: '#6b7280',
-                            fontSize: 16,
-                            lineHeight: 1.6,
-                            marginBottom: 32
-                        }}>
-                            Encontrarás este apunte en tu sección de <strong style={{ color: '#374151' }}>Favoritos</strong>.
-                        </p>
-                        <Button
-                            onClick={() => setShowFavoriteModal(false)}
-                            style={{
-                                padding: '14px 32px',
-                                background: 'linear-gradient(135deg, #2563eb 0%, #1e40af 100%)',
-                                color: '#fff',
-                                border: 'none',
-                                borderRadius: 8,
-                                fontWeight: 600,
-                                cursor: 'pointer',
-                                fontSize: 16,
-                                width: '100%',
-                                transition: 'transform 0.2s'
-                            }}
-                            onMouseEnter={(e) => e.currentTarget.style.transform = 'scale(1.02)'}
-                            onMouseLeave={(e) => e.currentTarget.style.transform = 'scale(1)'}
-                        >
-                            Continuar
-                        </Button>
-                    </Card>
-                </div>
-            )}
-
-            {/* Modal de éxito - Quitar favorito */}
-            {showUnfavoriteModal && (
-                <div style={{
-                    position: 'fixed',
-                    top: 0,
-                    left: 0,
-                    right: 0,
-                    bottom: 0,
-                    background: 'rgba(0, 0, 0, 0.5)',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    zIndex: 1000,
-                    backdropFilter: 'blur(4px)'
-                }}>
-                    <Card style={{
-                        maxWidth: 450,
-                        padding: 40,
-                        textAlign: 'center',
-                        background: '#fff',
-                        boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)',
-                        animation: 'fadeIn 0.3s ease-out'
-                    }}>
-                        <div style={{
-                            width: 80,
-                            height: 80,
-                            background: 'linear-gradient(135deg, #2563eb 0%, #1e40af 100%)',
-                            borderRadius: '50%',
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'center',
-                            margin: '0 auto 24px',
-                            fontSize: 40
-                        }}>
-                            📌
-                        </div>
-                        <h2 style={{
-                            margin: '0 0 12px 0',
-                            fontSize: 28,
-                            fontWeight: 700,
-                            background: 'linear-gradient(135deg, #2563eb 0%, #1e40af 100%)',
-                            WebkitBackgroundClip: 'text',
-                            WebkitTextFillColor: 'transparent',
-                            backgroundClip: 'text'
-                        }}>
-                            Se ha quitado este apunte de favoritos
-                        </h2>
-                        <p style={{
-                            color: '#6b7280',
-                            fontSize: 16,
-                            lineHeight: 1.6,
-                            marginBottom: 32
-                        }}>
-                            Este apunte ya no está en tu sección de <strong style={{ color: '#374151' }}>Favoritos</strong>.
-                        </p>
-                        <Button
-                            onClick={() => setShowUnfavoriteModal(false)}
-                            style={{
-                                padding: '14px 32px',
-                                background: 'linear-gradient(135deg, #2563eb 0%, #1e40af 100%)',
-                                color: '#fff',
-                                border: 'none',
-                                borderRadius: 8,
-                                fontWeight: 600,
-                                cursor: 'pointer',
-                                fontSize: 16,
-                                width: '100%',
-                                transition: 'transform 0.2s'
-                            }}
-                            onMouseEnter={(e) => e.currentTarget.style.transform = 'scale(1.02)'}
-                            onMouseLeave={(e) => e.currentTarget.style.transform = 'scale(1)'}
-                        >
-                            Continuar
-                        </Button>
-                    </Card>
-                </div>
-            )}
 
             <h1 style={{ textAlign: 'center', margin: '0 0 32px 0', fontSize: 32, fontWeight: 700 }}>
                 {apunte.titulo}
             </h1>
 
-            <Card style={{ padding: 32 }}>
+            <Card style={{ padding: 32, position: 'relative' }}>
+                {/* Bookmark - Solo visible si NO es owner y NO ha comprado */}
+                {!isOwner  && (
+                    <button
+                        onClick={handleFavoriteToggle}
+                        style={{
+                            position: 'absolute',
+                            top: 24,
+                            right: 24,
+                            background: 'transparent',
+                            border: 'none',
+                            cursor: 'pointer',
+                            padding: 8,
+                            zIndex: 10,
+                            transition: 'transform 0.2s ease',
+                        }}
+                        onMouseEnter={(e) => e.currentTarget.style.transform = 'scale(1.1)'}
+                        onMouseLeave={(e) => e.currentTarget.style.transform = 'scale(1)'}
+                    >
+                        <svg
+                            width="32"
+                            height="32"
+                            viewBox="0 0 24 24"
+                            fill={isFavorite ? '#1e293b' : 'none'}
+                            stroke="#1e293b"
+                            strokeWidth="2"
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            style={{
+                                transition: 'all 0.3s ease',
+                                animation: isFavorite ? 'bookmarkBounce 0.5s ease' : 'none'
+                            }}
+                        >
+                            <path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z" />
+                        </svg>
+                    </button>
+                )}
                 <div style={{ display: 'flex', gap: 32, marginBottom: 24 }}>
                     <div style={{ flexShrink: 0 }}>
                         <PDFThumbnail
@@ -824,41 +842,99 @@ export const ApunteView = () => {
                                         📥 Descargar apunte
                                     </Button>
                                     {!isOwner && (
-                                        <Button
-                                            variant="ghost"
-                                            onClick={() => alert('Función de calificación próximamente...')}
-                                            style={{
-                                                padding: '14px 28px',
-                                                fontSize: 16,
-                                                fontWeight: 600,
-                                                width: '100%',
-                                                border: '2px solid #f59e0b',
-                                                color: '#f59e0b'
-                                            }}
-                                        >
-                                            ⭐ Calificá este apunte
-                                        </Button>
+                                        <div style={{ display: 'flex', gap: 12, justifyContent: 'center' }}>
+                                            <button
+                                                onClick={() => handleLike('like')}
+                                                style={{
+                                                    width: 56,
+                                                    height: 56,
+                                                    borderRadius: '50%',
+                                                    border: `2px solid ${userLike === 'like' ? '#2563eb' : '#d1d5db'}`,
+                                                    background: userLike === 'like' ? '#dbeafe' : '#fff',
+                                                    cursor: 'pointer',
+                                                    fontSize: 24,
+                                                    display: 'flex',
+                                                    alignItems: 'center',
+                                                    justifyContent: 'center',
+                                                    transition: 'all 0.2s ease',
+                                                    boxShadow: '0 2px 4px rgba(0,0,0,0.1)'
+                                                }}
+                                                onMouseEnter={(e) => {
+                                                    e.currentTarget.style.transform = 'scale(1.1)';
+                                                    if (userLike !== 'like') {
+                                                        e.currentTarget.style.borderColor = '#2563eb';
+                                                    }
+                                                }}
+                                                onMouseLeave={(e) => {
+                                                    e.currentTarget.style.transform = 'scale(1)';
+                                                    if (userLike !== 'like') {
+                                                        e.currentTarget.style.borderColor = '#d1d5db';
+                                                    }
+                                                }}
+                                            >
+                                                👍
+                                            </button>
+                                            <button
+                                                onClick={() => handleLike('dislike')}
+                                                style={{
+                                                    width: 56,
+                                                    height: 56,
+                                                    borderRadius: '50%',
+                                                    border: `2px solid ${userLike === 'dislike' ? '#ef4444' : '#d1d5db'}`,
+                                                    background: userLike === 'dislike' ? '#fee2e2' : '#fff',
+                                                    cursor: 'pointer',
+                                                    fontSize: 24,
+                                                    display: 'flex',
+                                                    alignItems: 'center',
+                                                    justifyContent: 'center',
+                                                    transition: 'all 0.2s ease',
+                                                    boxShadow: '0 2px 4px rgba(0,0,0,0.1)'
+                                                }}
+                                                onMouseEnter={(e) => {
+                                                    e.currentTarget.style.transform = 'scale(1.1)';
+                                                    if (userLike !== 'dislike') {
+                                                        e.currentTarget.style.borderColor = '#ef4444';
+                                                    }
+                                                }}
+                                                onMouseLeave={(e) => {
+                                                    e.currentTarget.style.transform = 'scale(1)';
+                                                    if (userLike !== 'dislike') {
+                                                        e.currentTarget.style.borderColor = '#d1d5db';
+                                                    }
+                                                }}
+                                            >
+                                                👎
+                                            </button>
+                                            <button
+                                                onClick={() => setShowReportModal(true)}
+                                                style={{
+                                                    width: 56,
+                                                    height: 56,
+                                                    borderRadius: '50%',
+                                                    border: '2px solid #f59e0b',
+                                                    background: '#fff',
+                                                    cursor: 'pointer',
+                                                    fontSize: 24,
+                                                    display: 'flex',
+                                                    alignItems: 'center',
+                                                    justifyContent: 'center',
+                                                    transition: 'all 0.2s ease',
+                                                    boxShadow: '0 2px 4px rgba(0,0,0,0.1)'
+                                                }}
+                                                onMouseEnter={(e) => {
+                                                    e.currentTarget.style.transform = 'scale(1.1)';
+                                                    e.currentTarget.style.background = '#fef3c7';
+                                                }}
+                                                onMouseLeave={(e) => {
+                                                    e.currentTarget.style.transform = 'scale(1)';
+                                                    e.currentTarget.style.background = '#fff';
+                                                }}
+                                            >
+                                                🚩
+                                            </button>
+                                        </div>
                                     )}
                                 </>
-                            )}
-                            {!isOwner && !hasPurchased && (
-                                <Button
-                                    variant="ghost"
-                                    onClick={handleFavoriteToggle}
-                                    style={{
-                                        padding: '14px 28px',
-                                        fontSize: 16,
-                                        fontWeight: 600,
-                                        width: '100%',
-                                        border: `2px solid ${isFavorite ? '#2563eb' : '#6b7280'}`,
-                                        color: isFavorite ? '#2563eb' : '#6b7280',
-                                        transition: 'transform 0.2s'
-                                    }}
-                                    onMouseEnter={(e) => e.currentTarget.style.transform = 'scale(1.02)'}
-                                    onMouseLeave={(e) => e.currentTarget.style.transform = 'scale(1)'}
-                                >
-                                    {isFavorite ? '🔖 Quitar de favoritos' : '📌 Agregar a favoritos'}
-                                </Button>
                             )}
                         </div>
 
@@ -1061,6 +1137,321 @@ export const ApunteView = () => {
                     </Card>
                 </div>
             )}
+
+            {/* Toast de confirmación */}
+            {showToast && (
+                <div style={{
+                    position: 'fixed',
+                    bottom: 40,
+                    right: 40,
+                    background: '#1e293b',
+                    color: '#fff',
+                    padding: '16px 24px',
+                    borderRadius: 12,
+                    boxShadow: '0 10px 40px rgba(0, 0, 0, 0.3)',
+                    zIndex: 1000,
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 12,
+                    animation: 'slideInUp 0.3s ease-out',
+                    maxWidth: 400
+                }}>
+                    <div style={{
+                        fontSize: 24,
+                        flexShrink: 0
+                    }}>
+                        ✓
+                    </div>
+                    <div>
+                        <div style={{ fontWeight: 600, marginBottom: 4, fontSize: 15 }}>
+                            Apunte guardado con éxito
+                        </div>
+                        <div style={{ fontSize: 13, opacity: 0.9 }}>
+                            Podés encontrarlo en la sección <strong>Favoritos</strong>
+                        </div>
+                    </div>
+                </div>
+            )}
+            {/* Modal de reporte */}
+            {showReportModal && (
+                <div style={{
+                    position: 'fixed',
+                    top: 0,
+                    left: 0,
+                    right: 0,
+                    bottom: 0,
+                    background: 'rgba(0, 0, 0, 0.6)',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    zIndex: 1000,
+                    backdropFilter: 'blur(4px)'
+                }}>
+                    <Card style={{
+                        maxWidth: 500,
+                        width: '90%',
+                        padding: 32,
+                        background: '#fff',
+                        boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1)',
+                        maxHeight: '90vh',
+                        overflowY: 'auto'
+                    }}>
+                        <div style={{
+                            width: 64,
+                            height: 64,
+                            background: '#fef3c7',
+                            borderRadius: '50%',
+                            margin: '0 auto 20px',
+                            fontSize: 32,
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                        }}>
+                            🚩
+                        </div>
+                        <h3 style={{
+                            margin: '0 0 12px 0',
+                            fontSize: 22,
+                            fontWeight: 700,
+                            color: '#1f2937',
+                            textAlign: 'center'
+                        }}>
+                            Reportar apunte
+                        </h3>
+                        <p style={{
+                            color: '#6b7280',
+                            fontSize: 14,
+                            lineHeight: 1.6,
+                            marginBottom: 24,
+                            textAlign: 'center'
+                        }}>
+                            Ayudanos a mantener la calidad del contenido. Seleccioná el motivo del reporte:
+                        </p>
+
+                        <div style={{ marginBottom: 20 }}>
+                            <label style={{ display: 'block', marginBottom: 12, fontSize: 14, fontWeight: 600, color: '#374151' }}>
+                                Motivo del reporte *
+                            </label>
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                                {[
+                                    { value: 'contenido_inapropiado', label: '🚫 Contenido inapropiado', icon: '🚫' },
+                                    { value: 'spam', label: '📧 Spam o publicidad', icon: '📧' },
+                                    { value: 'plagio', label: '©️ Plagio o violación de derechos', icon: '©️' },
+                                    { value: 'informacion_incorrecta', label: '❌ Información incorrecta', icon: '❌' },
+                                    { value: 'otro', label: '💬 Otro motivo', icon: '💬' }
+                                ].map((opcion) => (
+                                    <button
+                                        key={opcion.value}
+                                        type="button"
+                                        onClick={() => setReportMotivo(opcion.value)}
+                                        style={{
+                                            padding: '14px 16px',
+                                            border: `2px solid ${reportMotivo === opcion.value ? '#f59e0b' : '#e5e7eb'}`,
+                                            borderRadius: 10,
+                                            background: reportMotivo === opcion.value ? '#fef3c7' : '#fff',
+                                            color: reportMotivo === opcion.value ? '#92400e' : '#374151',
+                                            fontSize: 15,
+                                            fontWeight: reportMotivo === opcion.value ? 600 : 500,
+                                            cursor: 'pointer',
+                                            textAlign: 'left',
+                                            transition: 'all 0.2s ease',
+                                            display: 'flex',
+                                            alignItems: 'center',
+                                            gap: 12
+                                        }}
+                                        onMouseEnter={(e) => {
+                                            if (reportMotivo !== opcion.value) {
+                                                e.currentTarget.style.borderColor = '#fbbf24';
+                                                e.currentTarget.style.background = '#fffbeb';
+                                            }
+                                        }}
+                                        onMouseLeave={(e) => {
+                                            if (reportMotivo !== opcion.value) {
+                                                e.currentTarget.style.borderColor = '#e5e7eb';
+                                                e.currentTarget.style.background = '#fff';
+                                            }
+                                        }}
+                                    >
+                                        <span style={{ fontSize: 20 }}>{opcion.icon}</span>
+                                        <span>{opcion.label.substring(opcion.label.indexOf(' ') + 1)}</span>
+                                    </button>
+                                ))}
+                            </div>
+                        </div>
+
+                        {reportMotivo && (
+                            <div style={{ marginBottom: 24 }}>
+                                <label style={{ display: 'block', marginBottom: 8, fontSize: 14, fontWeight: 600, color: '#374151' }}>
+                                    Descripción {reportMotivo === 'otro' && <span style={{ color: '#ef4444' }}>*</span>}
+                                </label>
+                                <textarea
+                                    value={reportDescripcion}
+                                    onChange={(e) => setReportDescripcion(e.target.value)}
+                                    placeholder={reportMotivo === 'otro' ? 'Describí el motivo del reporte...' : 'Información adicional (opcional)...'}
+                                    rows={4}
+                                    style={{
+                                        width: '100%',
+                                        padding: '12px',
+                                        border: '2px solid #e5e7eb',
+                                        borderRadius: 8,
+                                        fontSize: 14,
+                                        color: '#1f2937',
+                                        outline: 'none',
+                                        resize: 'vertical',
+                                        fontFamily: 'inherit'
+                                    }}
+                                />
+                            </div>
+                        )}
+
+                        <div style={{ display: 'flex', gap: 12 }}>
+                            <Button
+                                onClick={() => {
+                                    setShowReportModal(false);
+                                    setReportMotivo('');
+                                    setReportDescripcion('');
+                                }}
+                                disabled={submittingReport}
+                                style={{
+                                    flex: 1,
+                                    padding: '12px 24px',
+                                    background: '#fff',
+                                    color: '#374151',
+                                    border: '1px solid #d1d5db',
+                                    borderRadius: 8,
+                                    fontWeight: 600,
+                                    cursor: submittingReport ? 'not-allowed' : 'pointer',
+                                    opacity: submittingReport ? 0.5 : 1
+                                }}
+                            >
+                                Cancelar
+                            </Button>
+                            <Button
+                                onClick={handleReport}
+                                disabled={submittingReport || !reportMotivo}
+                                style={{
+                                    flex: 1,
+                                    padding: '12px 24px',
+                                    background: reportMotivo ? '#f59e0b' : '#d1d5db',
+                                    color: '#fff',
+                                    border: 'none',
+                                    borderRadius: 8,
+                                    fontWeight: 600,
+                                    cursor: (submittingReport || !reportMotivo) ? 'not-allowed' : 'pointer',
+                                    opacity: (submittingReport || !reportMotivo) ? 0.6 : 1
+                                }}
+                            >
+                                {submittingReport ? 'Enviando...' : 'Enviar reporte'}
+                            </Button>
+                        </div>
+                    </Card>
+                </div>
+            )}
+            {/* Modal de éxito - Reporte enviado */}
+            {showReportSuccessModal && (
+                <div style={{
+                    position: 'fixed',
+                    top: 0,
+                    left: 0,
+                    right: 0,
+                    bottom: 0,
+                    background: 'rgba(0, 0, 0, 0.6)',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    zIndex: 1001,
+                    backdropFilter: 'blur(4px)'
+                }}>
+                    <Card style={{
+                        maxWidth: 500,
+                        padding: 48,
+                        textAlign: 'center',
+                        background: '#fff',
+                        boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1)',
+                        animation: 'fadeIn 0.3s ease-out'
+                    }}>
+                        <div style={{
+                            width: 100,
+                            height: 100,
+                            background: 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)',
+                            borderRadius: '50%',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            margin: '0 auto 24px',
+                            fontSize: 50,
+                            boxShadow: '0 10px 30px rgba(245, 158, 11, 0.3)'
+                        }}>
+                            🙏
+                        </div>
+                        <h2 style={{
+                            margin: '0 0 16px 0',
+                            fontSize: 32,
+                            fontWeight: 700,
+                            background: 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)',
+                            WebkitBackgroundClip: 'text',
+                            WebkitTextFillColor: 'transparent',
+                            backgroundClip: 'text'
+                        }}>
+                            Kerana te agradece
+                        </h2>
+                        <p style={{
+                            color: '#6b7280',
+                            fontSize: 17,
+                            lineHeight: 1.7,
+                            marginBottom: 36,
+                            padding: '0 20px'
+                        }}>
+                            Tu reporte nos ayuda a mantener la calidad del contenido. Lo revisaremos a la brevedad.
+                        </p>
+                        <Button
+                            onClick={() => setShowReportSuccessModal(false)}
+                            style={{
+                                padding: '16px 40px',
+                                background: 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)',
+                                color: '#fff',
+                                border: 'none',
+                                borderRadius: 10,
+                                fontWeight: 600,
+                                cursor: 'pointer',
+                                fontSize: 16,
+                                boxShadow: '0 4px 14px rgba(245, 158, 11, 0.4)',
+                                transition: 'all 0.2s'
+                            }}
+                            onMouseEnter={(e) => {
+                                e.currentTarget.style.transform = 'scale(1.05)';
+                                e.currentTarget.style.boxShadow = '0 6px 20px rgba(245, 158, 11, 0.5)';
+                            }}
+                            onMouseLeave={(e) => {
+                                e.currentTarget.style.transform = 'scale(1)';
+                                e.currentTarget.style.boxShadow = '0 4px 14px rgba(245, 158, 11, 0.4)';
+                            }}
+                        >
+                            Continuar
+                        </Button>
+                    </Card>
+                </div>
+            )}
+
+            <style>{`
+    @keyframes bookmarkBounce {
+        0%, 100% { transform: scale(1); }
+        25% { transform: scale(1.2); }
+        50% { transform: scale(0.9); }
+        75% { transform: scale(1.1); }
+    }
+    
+    @keyframes slideInUp {
+        from {
+            transform: translateY(100px);
+            opacity: 0;
+        }
+        to {
+            transform: translateY(0);
+            opacity: 1;
+        }
+    }
+`}</style>
         </div>
     );
 };

@@ -156,8 +156,6 @@ export default function Profile() {
                 <div style={tabsStyle}>
                     {[
                         { id: 'perfil', label: '👤 Perfil' },
-                        { id: 'seguidores', label: `👥 Seguidores (${stats.seguidores})` },
-                        { id: 'seguidos', label: `✔️ Siguiendo (${stats.siguiendo})` }
                     ].map(t => (
                         <button
                             key={t.id}
@@ -283,20 +281,6 @@ export default function Profile() {
                             </div>
                         </Card>
                     </>
-                )}
-
-                {tab === 'seguidores' && (
-                    <Card style={activityCardStyle}>
-                        <h3 style={sectionTitleStyle}>Mis Seguidores ({stats.seguidores})</h3>
-                        <FollowersList userId={userId} type="seguidores" />
-                    </Card>
-                )}
-
-                {tab === 'seguidos' && (
-                    <Card style={activityCardStyle}>
-                        <h3 style={sectionTitleStyle}>Usuarios que sigo ({stats.siguiendo})</h3>
-                        <FollowersList userId={userId} type="siguiendo" />
-                    </Card>
                 )}
             </div>
         </div>

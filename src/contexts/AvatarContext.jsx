@@ -2,7 +2,7 @@ import { createContext, useContext, useState, useCallback } from 'react';
 
 const AvatarContext = createContext();
 
-export function AvatarProvider({ children }) {
+export function AvatarProvider({ children, sidebarStats }) {
     const [avatarUrl, setAvatarUrl] = useState(null);
     const [updateTrigger, setUpdateTrigger] = useState(0);
 
@@ -11,12 +11,13 @@ export function AvatarProvider({ children }) {
         setUpdateTrigger(prev => prev + 1);
     }, []);
 
-    const refreshAvatar = useCallback(() => {
-        setUpdateTrigger(prev => prev + 1);
-    }, []);
-
     return (
-        <AvatarContext.Provider value={{ avatarUrl, updateAvatar, refreshAvatar, updateTrigger }}>
+        <AvatarContext.Provider value={{
+            avatarUrl,
+            updateAvatar,
+            updateTrigger,
+            sidebarStats // ← AGREGAR
+        }}>
             {children}
         </AvatarContext.Provider>
     );

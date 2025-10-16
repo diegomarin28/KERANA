@@ -7,12 +7,39 @@ import { FollowersList } from '../components/FollowersList';
 export default function FollowersPage() {
     const [userId, setUserId] = useState(null);
     const [loading, setLoading] = useState(true);
-    const [tab, setTab] = useState('me-siguen'); // 'me-siguen' | 'sigo'
+    const [tab, setTab] = useState('me-siguen');
+    const [counts, setCounts] = useState({ seguidores: 0, siguiendo: 0 }); // ← MOVER ACÁ
     const navigate = useNavigate();
 
     useEffect(() => {
         fetchUserId();
     }, []);
+
+    // ← MOVER ACÁ (antes del if loading)
+    useEffect(() => {
+        if (!userId) return;
+
+        const loadCounts = async () => {
+            const { count: seguidoresCount } = await supabase
+                .from('seguidores')
+                .select('*', { count: 'exact', head: true })
+                .eq('seguido_id', userId)
+                .eq('estado', 'activo');
+
+            const { count: siguiendoCount } = await supabase
+                .from('seguidores')
+                .select('*', { count: 'exact', head: true })
+                .eq('seguidor_id', userId)
+                .eq('estado', 'activo');
+
+            setCounts({
+                seguidores: seguidoresCount || 0,
+                siguiendo: siguiendoCount || 0
+            });
+        };
+
+        loadCounts();
+    }, [userId]);
 
     const fetchUserId = async () => {
         try {
@@ -67,8 +94,8 @@ export default function FollowersPage() {
                 {/* Tabs */}
                 <div style={tabsStyle}>
                     {[
-                        { id: 'me-siguen', label: '👥 Me siguen' },
-                        { id: 'sigo', label: '✔️ Sigo' }
+                        { id: 'me-siguen', label: `💥 Seguidores (${counts.seguidores})` },
+                        { id: 'sigo', label: `✔️ Seguidos (${counts.siguiendo})` }
                     ].map(t => (
                         <button
                             key={t.id}
@@ -99,7 +126,7 @@ export default function FollowersPage() {
     );
 }
 
-// ESTILOS
+// ESTILOS (igual que antes)
 const pageStyle = {
     minHeight: '100vh',
     background: 'linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%)',

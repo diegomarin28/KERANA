@@ -1501,40 +1501,40 @@ export const foldersAPI = {
 
     // Obtener todas las carpetas del usuario con estructura jerárquica
     async getMyFolders() {
-        const { data: { user } } = await supabase.auth.getUser()
-        if (!user) return { data: null, error: 'No hay usuario logueado' }
+        const {data: {user}} = await supabase.auth.getUser()
+        if (!user) return {data: null, error: 'No hay usuario logueado'}
 
-        const { data: usuarioData } = await supabase
+        const {data: usuarioData} = await supabase
             .from('usuario')
             .select('id_usuario')
             .eq('auth_id', user.id)
             .single()
 
-        if (!usuarioData) return { data: null, error: 'Usuario no encontrado' }
+        if (!usuarioData) return {data: null, error: 'Usuario no encontrado'}
 
-        const { data, error } = await supabase
+        const {data, error} = await supabase
             .from('carpeta_compras')
             .select('*')
             .eq('comprador_id', usuarioData.id_usuario)
-            .order('orden', { ascending: true })
+            .order('orden', {ascending: true})
 
-        return { data, error }
+        return {data, error}
     },
 
     // Crear nueva carpeta
     async createFolder(nombre, tipo = 'personalizada', parentId = null, orden = 0) {
-        const { data: { user } } = await supabase.auth.getUser()
-        if (!user) return { data: null, error: 'No hay usuario logueado' }
+        const {data: {user}} = await supabase.auth.getUser()
+        if (!user) return {data: null, error: 'No hay usuario logueado'}
 
-        const { data: usuarioData } = await supabase
+        const {data: usuarioData} = await supabase
             .from('usuario')
             .select('id_usuario')
             .eq('auth_id', user.id)
             .single()
 
-        if (!usuarioData) return { data: null, error: 'Usuario no encontrado' }
+        if (!usuarioData) return {data: null, error: 'Usuario no encontrado'}
 
-        const { data, error } = await supabase
+        const {data, error} = await supabase
             .from('carpeta_compras')
             .insert([{
                 comprador_id: usuarioData.id_usuario,
@@ -1546,34 +1546,34 @@ export const foldersAPI = {
             .select()
             .single()
 
-        return { data, error }
+        return {data, error}
     },
 
     // Editar nombre de carpeta
     async updateFolder(carpetaId, nuevoNombre) {
-        const { data, error } = await supabase
+        const {data, error} = await supabase
             .from('carpeta_compras')
-            .update({ nombre: nuevoNombre })
+            .update({nombre: nuevoNombre})
             .eq('id_carpeta', carpetaId)
             .select()
             .single()
 
-        return { data, error }
+        return {data, error}
     },
 
     // Eliminar carpeta (y sus subcarpetas por CASCADE)
     async deleteFolder(carpetaId) {
-        const { data, error } = await supabase
+        const {data, error} = await supabase
             .from('carpeta_compras')
             .delete()
             .eq('id_carpeta', carpetaId)
 
-        return { data, error }
+        return {data, error}
     },
 
     // Mover carpeta a otra carpeta padre
     async moveFolder(carpetaId, nuevoParentId, nuevoOrden) {
-        const { data, error } = await supabase
+        const {data, error} = await supabase
             .from('carpeta_compras')
             .update({
                 parent_id: nuevoParentId,
@@ -1583,7 +1583,7 @@ export const foldersAPI = {
             .select()
             .single()
 
-        return { data, error }
+        return {data, error}
     },
 
     // ==========================================
@@ -1592,7 +1592,7 @@ export const foldersAPI = {
 
     // Obtener todos los apuntes de una carpeta
     async getNotesInFolder(carpetaId) {
-        const { data, error } = await supabase
+        const {data, error} = await supabase
             .from('apunte_en_carpeta')
             .select(`
                 *,
@@ -1603,14 +1603,14 @@ export const foldersAPI = {
                 )
             `)
             .eq('carpeta_id', carpetaId)
-            .order('agregado_en', { ascending: false })
+            .order('agregado_en', {ascending: false})
 
-        return { data, error }
+        return {data, error}
     },
 
     // Agregar apunte a carpeta
     async addNoteToFolder(carpetaId, compraId) {
-        const { data, error } = await supabase
+        const {data, error} = await supabase
             .from('apunte_en_carpeta')
             .insert([{
                 carpeta_id: carpetaId,
@@ -1619,18 +1619,18 @@ export const foldersAPI = {
             .select()
             .single()
 
-        return { data, error }
+        return {data, error}
     },
 
     // Quitar apunte de carpeta
     async removeNoteFromFolder(carpetaId, compraId) {
-        const { data, error } = await supabase
+        const {data, error} = await supabase
             .from('apunte_en_carpeta')
             .delete()
             .eq('carpeta_id', carpetaId)
             .eq('compra_id', compraId)
 
-        return { data, error }
+        return {data, error}
     },
 
     // Mover apunte entre carpetas
@@ -1647,33 +1647,33 @@ export const foldersAPI = {
     // ==========================================
 
     async autoOrganize() {
-        const { data: { user } } = await supabase.auth.getUser()
-        if (!user) return { data: null, error: 'No hay usuario logueado' }
+        const {data: {user}} = await supabase.auth.getUser()
+        if (!user) return {data: null, error: 'No hay usuario logueado'}
 
-        const { data: usuarioData } = await supabase
+        const {data: usuarioData} = await supabase
             .from('usuario')
             .select('id_usuario')
             .eq('auth_id', user.id)
             .single()
 
-        if (!usuarioData) return { data: null, error: 'Usuario no encontrado' }
+        if (!usuarioData) return {data: null, error: 'Usuario no encontrado'}
 
         try {
             // 1. Obtener todas las compras del usuario
-            const { data: compras, error: comprasError } = await supabase
+            const {data: compras, error: comprasError} = await supabase
                 .from('compra_apunte')
                 .select(`
-                    id,
-                    apunte_id,
-                    apunte:apunte(
+                id,
+                apunte_id,
+                apunte:apunte(
+                    id_materia,
+                    materia:materia(
                         id_materia,
-                        materia:materia(
-                            id_materia,
-                            nombre_materia,
-                            semestre
-                        )
+                        nombre_materia,
+                        semestre
                     )
-                `)
+                )
+            `)
                 .eq('comprador_id', usuarioData.id_usuario)
 
             if (comprasError) throw comprasError
@@ -1685,22 +1685,26 @@ export const foldersAPI = {
                 const materia = compra.apunte?.materia
                 if (!materia) return
 
-                const semestre = materia.semestre || 'Sin semestre'
+                // ✅ CAMBIO: Agregar "Semestre" al nombre
+                // ✅ CAMBIO: Agregar "Semestre" al nombre
+                const semestreNum = materia.semestre || 'Sin semestre'
+                const semestreNombre = semestreNum === 'Sin semestre' ? semestreNum : `Semestre ${semestreNum}`
+                console.log('🔍 Semestre detectado:', semestreNum, '→ Nombre:', semestreNombre);
                 const nombreMateria = materia.nombre_materia
                 const idMateria = materia.id_materia
 
-                if (!estructura[semestre]) {
-                    estructura[semestre] = {}
+                if (!estructura[semestreNombre]) {
+                    estructura[semestreNombre] = {}
                 }
 
-                if (!estructura[semestre][nombreMateria]) {
-                    estructura[semestre][nombreMateria] = {
+                if (!estructura[semestreNombre][nombreMateria]) {
+                    estructura[semestreNombre][nombreMateria] = {
                         id_materia: idMateria,
                         compras: []
                     }
                 }
 
-                estructura[semestre][nombreMateria].compras.push(compra.id)
+                estructura[semestreNombre][nombreMateria].compras.push(compra.id)
             })
 
             // 3. Crear carpetas y asignar apuntes
@@ -1708,7 +1712,7 @@ export const foldersAPI = {
 
             for (const [nombreSemestre, materias] of Object.entries(estructura)) {
                 // Crear carpeta de semestre
-                const { data: carpetaSemestre } = await this.createFolder(
+                const {data: carpetaSemestre} = await this.createFolder(
                     nombreSemestre,
                     'semestre',
                     null,
@@ -1721,7 +1725,7 @@ export const foldersAPI = {
 
                 // Crear carpetas de materias dentro del semestre
                 for (const [nombreMateria, datos] of Object.entries(materias)) {
-                    const { data: carpetaMateria } = await this.createFolder(
+                    const {data: carpetaMateria} = await this.createFolder(
                         nombreMateria,
                         'materia',
                         carpetaSemestre.id_carpeta,
@@ -1749,7 +1753,7 @@ export const foldersAPI = {
 
         } catch (error) {
             console.error('Error en organización automática:', error)
-            return { data: null, error }
+            return {data: null, error}
         }
     }
 }

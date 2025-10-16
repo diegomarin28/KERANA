@@ -6,14 +6,14 @@ import { useSidebarStats } from '../hooks/useSidebarStats';
 import { useAvatar } from '../contexts/AvatarContext';
 import { useNavigate } from 'react-router-dom';
 
-export default function Sidebar({ open, onClose, isAuthenticated, user, onLogout, onGo, onOpenAuth }) {
+export default function Sidebar({ open, onClose, isAuthenticated, user, onLogout, onGo, onOpenAuth, stats }) {
     const panelRef = useRef(null);
     const [authOpen, setAuthOpen] = useState(false);
     const { updateTrigger } = useAvatar();
     const navigate = useNavigate();
     const [avatarLoading, setAvatarLoading] = useState(true);
     const { isMentor, loading: checkingMentor, refetch } = useMentorStatus(false);
-    const { credits, seguidores, siguiendo, apuntes, loading: loadingStats } = useSidebarStats();
+
 
 
     useEffect(() => {
@@ -193,10 +193,10 @@ export default function Sidebar({ open, onClose, isAuthenticated, user, onLogout
                                 </div>
                             )}
                             <div style={{ display: "flex", gap: 6, fontSize: 12, opacity: .9 }}>
-                                <StatLink onClick={() => go("/credits")} label="Créditos" value={credits} />
-                                <StatLink onClick={() => navigate("/followers")} label="Seguidores" value={seguidores} />
-                                <StatLink onClick={() => navigate("/followers")} label="Siguiendo" value={siguiendo} />
-                                <StatLink onClick={() => go("/my_papers")} label="Apuntes" value={apuntes} />
+                                <StatLink onClick={() => { navigate("/credits"); onClose?.(); }} label="Créditos" value={stats?.credits || 0} />
+                                <StatLink onClick={() => { navigate("/followers"); onClose?.(); }} label="Seguidores" value={stats?.seguidores || 0} />
+                                <StatLink onClick={() => { navigate("/followers"); onClose?.(); }} label="Siguiendo" value={stats?.siguiendo || 0} />
+                                <StatLink onClick={() => { navigate("/my_papers"); onClose?.(); }} label="Apuntes" value={stats?.apuntes || 0} />
                             </div>
                         </div>
                     </div>
@@ -499,11 +499,19 @@ const smallDangerButtonStyle = {
 function StatLink({ label, value, onClick }) {
     return (
         <div
-            onClick={onClick}
+            onClick={(e) => {
+                e.stopPropagation(); // ← AGREGAR ESTO
+                onClick?.();
+            }}
             style={statLinkStyle}
             role="button"
             tabIndex={0}
-            onKeyDown={(e) => e.key === 'Enter' && onClick?.()}
+            onKeyDown={(e) => {
+                if (e.key === 'Enter') {
+                    e.stopPropagation(); // ← Y ESTO
+                    onClick?.();
+                }
+            }}
             onMouseEnter={(e) => e.currentTarget.style.background = "rgba(255,255,255,.08)"}
             onMouseLeave={(e) => e.currentTarget.style.background = "transparent"}
         >

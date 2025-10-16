@@ -204,7 +204,7 @@ export default function IAmMentor() {
                 .select('id')
                 .eq('id_mentor', idMentor);
 
-            // 4. Si no tiene más materias, borrar de la tabla mentor
+            // 4. Si no tiene más materias, borrar de la tabla mentor para que no aparezca más
             if (!otrasMaterias || otrasMaterias.length === 0) {
                 console.log('🗑️ No tiene más materias, borrando de tabla mentor...');
                 const { error: deleteMentorError } = await supabase

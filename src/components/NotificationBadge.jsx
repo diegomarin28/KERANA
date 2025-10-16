@@ -2,7 +2,6 @@ import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useNotificationsContext } from '../contexts/NotificationsContext';
 import { useTabBadge } from '../hooks/useTabBadge';
-import { getNotificationRoute, isNotificationClickable } from '../utils/notificationRouter';
 
 export default function NotificationBadge() {
     const [isOpen, setIsOpen] = useState(false);
@@ -10,6 +9,7 @@ export default function NotificationBadge() {
     const dropdownRef = useRef(null);
     const navigate = useNavigate();
     const prevUnreadCount = useRef(0);
+    const autoMarkTimerRef = useRef(null);
 
     const {
         notificaciones,
@@ -17,6 +17,7 @@ export default function NotificationBadge() {
         loading,
         marcarComoLeida,
         marcarTodasLeidas,
+        eliminarNotificacion,
     } = useNotificationsContext();
 
     // Tab badge para título del navegador
@@ -30,6 +31,29 @@ export default function NotificationBadge() {
         }
         prevUnreadCount.current = unreadCount;
     }, [unreadCount]);
+
+    // 🕐 Auto-marcar como leídas después de 15s con modal abierto
+    useEffect(() => {
+        if (isOpen && unreadCount > 0) {
+            // Iniciar timer de 15 segundos
+            autoMarkTimerRef.current = setTimeout(() => {
+                console.log('⏰ 15s transcurridos, marcando todas como leídas');
+                marcarTodasLeidas();
+            }, 15000);
+        } else {
+            // Cancelar timer si se cierra el modal
+            if (autoMarkTimerRef.current) {
+                clearTimeout(autoMarkTimerRef.current);
+                autoMarkTimerRef.current = null;
+            }
+        }
+
+        return () => {
+            if (autoMarkTimerRef.current) {
+                clearTimeout(autoMarkTimerRef.current);
+            }
+        };
+    }, [isOpen, unreadCount, marcarTodasLeidas]);
 
     // Cerrar con ESC
     useEffect(() => {
@@ -55,12 +79,18 @@ export default function NotificationBadge() {
         }
     }, [isOpen]);
 
-    const handleNotificationClick = async (notif) => {
+    const handleNotificationClick = async (e, notif) => {
+        e.stopPropagation();
+
+        // Solo marcar como leída, NO redireccionar
         if (!notif.leida) {
             await marcarComoLeida(notif.id);
         }
-        setIsOpen(false);
-        // Aquí podrías navegar según el tipo usando notificationRouter
+    };
+
+    const handleDelete = async (e, notifId) => {
+        e.stopPropagation();
+        await eliminarNotificacion(notifId);
     };
 
     const handleVerTodas = () => {
@@ -234,8 +264,9 @@ export default function NotificationBadge() {
                             recentNotifications.map((notif) => (
                                 <div
                                     key={notif.id}
-                                    onClick={() => handleNotificationClick(notif)}
+                                    onClick={(e) => handleNotificationClick(e, notif)}
                                     style={{
+                                        position: 'relative',
                                         padding: '12px 20px',
                                         borderBottom: '1px solid #f3f4f6',
                                         background: notif.leida ? '#fff' : '#f0f9ff',
@@ -284,7 +315,7 @@ export default function NotificationBadge() {
                                     )}
 
                                     {/* Contenido */}
-                                    <div style={{ flex: 1, minWidth: 0 }}>
+                                    <div style={{ flex: 1, minWidth: 0, paddingRight: 30 }}>
                                         <p style={{
                                             margin: '0 0 4px 0',
                                             fontSize: 13,
@@ -302,15 +333,50 @@ export default function NotificationBadge() {
                                         </span>
                                     </div>
 
+                                    {/* Botón eliminar */}
+                                    <button
+                                        onClick={(e) => handleDelete(e, notif.id)}
+                                        style={{
+                                            position: 'absolute',
+                                            top: 10,
+                                            right: 10,
+                                            width: 24,
+                                            height: 24,
+                                            borderRadius: '50%',
+                                            background: 'transparent',
+                                            border: 'none',
+                                            color: '#94a3b8',
+                                            cursor: 'pointer',
+                                            display: 'flex',
+                                            alignItems: 'center',
+                                            justifyContent: 'center',
+                                            fontSize: 18,
+                                            fontWeight: 700,
+                                            transition: 'all 0.2s ease',
+                                        }}
+                                        onMouseEnter={(e) => {
+                                            e.currentTarget.style.background = '#fef2f2';
+                                            e.currentTarget.style.color = '#dc2626';
+                                        }}
+                                        onMouseLeave={(e) => {
+                                            e.currentTarget.style.background = 'transparent';
+                                            e.currentTarget.style.color = '#94a3b8';
+                                        }}
+                                        aria-label="Eliminar notificación"
+                                    >
+                                        ×
+                                    </button>
+
                                     {/* Indicador no leída */}
                                     {!notif.leida && (
                                         <div style={{
+                                            position: 'absolute',
+                                            top: 14,
+                                            right: 40,
                                             width: 8,
                                             height: 8,
                                             borderRadius: '50%',
                                             background: '#2563eb',
-                                            flexShrink: 0,
-                                            marginTop: 6,
                                         }} />
                                     )}
                                 </div>
