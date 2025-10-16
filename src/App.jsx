@@ -43,15 +43,16 @@ const UserCard = lazy(() => import("./components/UserCard"));
 const PublicProfile = lazy(() => import("./pages/PublicProfile"));
 const Profile = lazy(() => import('./pages/Profile.jsx'));
 const FollowersPage = lazy(() => import('./pages/FollowersPage.jsx'));
-
+const FolderView = lazy(() => import("./pages/FolderView"));
+const PublicProfileMentor = lazy(() => import("./pages/PublicProfileMentor"));
 
 // Componentes cargados inmediatamente
+import { useSidebarStats } from './hooks/useSidebarStats';
 import {ApunteView} from './pages/ApunteView';
 import AuthConfirm from './pages/AuthConfirm';
 import AuthModal_SignIn from "./components/AuthModal_SignIn";
 import PrivacyBanner from './components/PrivacyBanner';
 import { NotificationProvider } from "./components/NotificationProvider";
-import FollowersTest from "./pages/FollowersTest";
 import { NotificationsProvider } from './contexts/NotificationsContext';
 import NotificationsRealtimeSubscriber from "./components/NotificationsRealtimeSubscriber";
 
@@ -154,6 +155,7 @@ function AppRoutes() {
                     {/* Detalles */}
                     <Route path="/profesores/:id" element={<ProfessorDetail />} />
                     <Route path="/cursos/:id" element={<CourseDetail />} />
+                    <Route path="/mentor/:username" element={<PublicProfileMentor />} />
 
                     {/* Usuario - PROTEGIDAS */}
                     <Route path="/profile" element={<AuthGuard requireAuth={true}><Profile /></AuthGuard>} />
@@ -169,6 +171,7 @@ function AppRoutes() {
 
                     {/* Recursos del usuario - PROTEGIDAS */}
                     <Route path="/purchased" element={<AuthGuard requireAuth={true}><Purchased /></AuthGuard>} />
+                    <Route path="/purchased/folder/:id" element={<AuthGuard requireAuth={true}><FolderView /></AuthGuard>} />
                     <Route path="/favorites" element={<AuthGuard requireAuth={true}><Favorites /></AuthGuard>} />
                     <Route path="/my_papers" element={<AuthGuard requireAuth={true}><MyPapers /></AuthGuard>} />
 
@@ -216,16 +219,18 @@ function AppRoutes() {
 }
 
 export default function App() {
+    const { credits, seguidores, siguiendo, apuntes, loading: loadingStats } = useSidebarStats();
+
     return (
         <BrowserRouter>
-            <AvatarProvider>
-            <NotificationProvider>
-                <NotificationsProvider>
-                    <NotificationsRealtimeSubscriber />
-                    <PrivacyBanner />
-                    <AppRoutes />
-                </NotificationsProvider>
-            </NotificationProvider>
+            <AvatarProvider sidebarStats={{ credits, seguidores, siguiendo, apuntes }}>
+                <NotificationProvider>
+                    <NotificationsProvider>
+                        <NotificationsRealtimeSubscriber />
+                        <PrivacyBanner />
+                        <AppRoutes />
+                    </NotificationsProvider>
+                </NotificationProvider>
             </AvatarProvider>
         </BrowserRouter>
     );

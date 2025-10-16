@@ -35,15 +35,9 @@ export default function Notifications() {
         : notificaciones.map(n => ({ ...n, isGroup: false }));
 
     const handleNotificationClick = async (notif) => {
+        // Solo marcar como leída, NO redireccionar
         if (!notif.leida) {
             await marcarComoLeida(notif.id);
-        }
-
-        if (isNotificationClickable(notif)) {
-            const route = getNotificationRoute(notif);
-            if (route) {
-                navigate(route);
-            }
         }
     };
 
@@ -204,15 +198,6 @@ export default function Notifications() {
                                                 }}>
                                                     {formatTimeAgo(notif.creado_en)}
                                                 </span>
-                                                {isClickable && (
-                                                    <span style={{
-                                                        fontSize: 12,
-                                                        color: '#2563eb',
-                                                        fontWeight: 600,
-                                                    }}>
-                                                        Ver →
-                                                    </span>
-                                                )}
                                             </div>
                                         </div>
                                     </div>

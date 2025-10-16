@@ -88,7 +88,7 @@ export function MentorCard({ mentor }) {
     };
 
     const irAlPerfil = () => {
-        navigate(`/profile/${mentor.username || mentor.id_mentor}`);
+        navigate(`/mentor/${mentor.username || mentor.id_mentor}`);
     };
 
     const estrellas = mentor.estrellas_mentor || mentor.rating_promedio || 0;

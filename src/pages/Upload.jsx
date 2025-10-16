@@ -4,6 +4,7 @@ import { supabase } from '../supabase';
 import { Card } from '../components/ui/Card';
 import { Button } from '../components/ui/Button';
 import FileDrop from "../components/FileDrop";
+import { useNotificationSound } from '../hooks/useNotificationSound';
 
 export default function Upload() {
     const navigate = useNavigate();
@@ -23,6 +24,7 @@ export default function Upload() {
     const [error, setError] = useState('');
     const [showSuccessModal, setShowSuccessModal] = useState(false);
     const dropdownRef = useRef(null);
+    const { playSound } = useNotificationSound();
 
 
     const sanitizeFilename = (filename) => {
@@ -98,6 +100,8 @@ export default function Upload() {
         setSearchTerm(materia.nombre_materia);
         setShowDropdown(false);
     };
+
+
 
     const handleFileChange = (file) => {
         if (file) {
@@ -222,11 +226,14 @@ export default function Upload() {
             }
 
             // Mostrar modal de éxito
+            playSound('apunte_publicado');
+
             setShowSuccessModal(true);
 
         } catch (err) {
             console.error('Error al subir:', err);
             setError(err.message || 'Error al subir el apunte');
+            playSound('error');
         } finally {
             setLoading(false);
             setUploading(false);
