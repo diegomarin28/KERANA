@@ -97,7 +97,7 @@ export default function MyCalendar() {
     );
 
     return (
-        <div style={{ maxWidth: 1200, margin: '0 auto', padding: 20 }}>
+        <div style={{ maxWidth: 1400, margin: '0 auto', padding: 20 }}>
             {/* Header */}
             <div style={{ marginBottom: 32 }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
@@ -163,7 +163,7 @@ export default function MyCalendar() {
             )}
 
             {/* Calendar Grid */}
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 16 }}>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 12 }}>
                 {diasSemana.map(({ num, nombre, emoji }) => {
                     const slots = groupedByDay[num] || [];
                     const hasSlots = slots.length > 0;
@@ -175,8 +175,8 @@ export default function MyCalendar() {
                                 background: '#fff',
                                 borderRadius: 12,
                                 border: hasSlots ? '2px solid #3b82f6' : '1px solid #e5e7eb',
-                                padding: 20,
-                                minHeight: 200,
+                                padding: 16,
+                                minHeight: 160,
                                 transition: 'transform 0.2s, box-shadow 0.2s',
                                 cursor: 'default'
                             }}
@@ -190,81 +190,81 @@ export default function MyCalendar() {
                             }}
                         >
                             {/* Day Header */}
-                            <div style={{ marginBottom: 16, paddingBottom: 12, borderBottom: '1px solid #e5e7eb' }}>
-                                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                                    <span style={{ fontSize: 24 }}>{emoji}</span>
-                                    <h3 style={{ margin: 0, fontSize: 18, fontWeight: 600, color: '#111827' }}>
+                            <div style={{ marginBottom: 12, paddingBottom: 10, borderBottom: '1px solid #e5e7eb' }}>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                                    <span style={{ fontSize: 20 }}>{emoji}</span>
+                                    <h3 style={{ margin: 0, fontSize: 15, fontWeight: 600, color: '#111827' }}>
                                         {nombre}
                                     </h3>
                                 </div>
-                                <p style={{ margin: '4px 0 0 32px', fontSize: 12, color: hasSlots ? '#3b82f6' : '#9ca3af' }}>
+                                <p style={{ margin: '4px 0 0 26px', fontSize: 11, color: hasSlots ? '#3b82f6' : '#9ca3af' }}>
                                     {hasSlots ? `${slots.length} horario${slots.length > 1 ? 's' : ''}` : 'Sin horarios'}
                                 </p>
                             </div>
 
                             {/* Slots */}
                             {hasSlots ? (
-                                <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+                                <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
                                     {slots.map(slot => (
                                         <div
                                             key={slot.id_disponibilidad}
                                             style={{
-                                                padding: 16,
+                                                padding: 12,
                                                 background: slot.activo ? 'linear-gradient(135deg, #f0f9ff 0%, #e0f2fe 100%)' : '#f9fafb',
                                                 border: `1px solid ${slot.activo ? '#bfdbfe' : '#e5e7eb'}`,
                                                 borderRadius: 8,
                                                 opacity: slot.activo ? 1 : 0.7
                                             }}
                                         >
-                                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
-                                                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                                                    <span style={{ fontSize: 20 }}>🕐</span>
-                                                    <span style={{ fontWeight: 600, color: slot.activo ? '#1e40af' : '#4b5563', fontSize: 15 }}>
+                                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
+                                                <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                                                    <span style={{ fontSize: 16 }}>🕐</span>
+                                                    <span style={{ fontWeight: 600, color: slot.activo ? '#1e40af' : '#4b5563', fontSize: 13 }}>
                                                         {slot.hora_inicio} - {slot.hora_fin}
                                                     </span>
                                                 </div>
                                                 <span style={{
-                                                    fontSize: 11,
+                                                    fontSize: 10,
                                                     fontWeight: 600,
-                                                    padding: '4px 8px',
-                                                    borderRadius: 12,
+                                                    padding: '3px 6px',
+                                                    borderRadius: 10,
                                                     background: slot.activo ? '#10b981' : '#9ca3af',
                                                     color: '#fff'
                                                 }}>
-                                                    {slot.activo ? 'Activo' : 'Inactivo'}
+                                                    {slot.activo ? 'ON' : 'OFF'}
                                                 </span>
                                             </div>
 
-                                            <div style={{ display: 'flex', gap: 6 }}>
+                                            <div style={{ display: 'flex', gap: 4 }}>
                                                 <button
                                                     onClick={() => handleToggle(slot.id_disponibilidad, slot.activo)}
                                                     style={{
                                                         flex: 1,
-                                                        padding: '8px 12px',
+                                                        padding: '6px 8px',
                                                         background: slot.activo ? '#fbbf24' : '#10b981',
                                                         color: '#fff',
                                                         border: 'none',
                                                         borderRadius: 6,
                                                         cursor: 'pointer',
-                                                        fontSize: 13,
+                                                        fontSize: 11,
                                                         fontWeight: 600,
                                                         transition: 'opacity 0.2s'
                                                     }}
                                                     onMouseEnter={(e) => e.currentTarget.style.opacity = '0.8'}
                                                     onMouseLeave={(e) => e.currentTarget.style.opacity = '1'}
                                                 >
-                                                    {slot.activo ? '⏸️ Pausar' : '▶️ Activar'}
+                                                    {slot.activo ? '⏸️' : '▶️'}
                                                 </button>
                                                 <button
                                                     onClick={() => confirmDelete(slot)}
                                                     style={{
-                                                        padding: '8px 12px',
+                                                        padding: '6px 10px',
                                                         background: '#dc2626',
                                                         color: '#fff',
                                                         border: 'none',
                                                         borderRadius: 6,
                                                         cursor: 'pointer',
-                                                        fontSize: 13,
+                                                        fontSize: 11,
                                                         fontWeight: 600,
                                                         transition: 'background 0.2s'
                                                     }}
@@ -278,10 +278,10 @@ export default function MyCalendar() {
                                     ))}
                                 </div>
                             ) : (
-                                <div style={{ textAlign: 'center', padding: '40px 20px', color: '#9ca3af' }}>
-                                    <div style={{ fontSize: 48, marginBottom: 12, opacity: 0.3 }}>📭</div>
-                                    <p style={{ margin: 0, fontSize: 14, fontStyle: 'italic' }}>
-                                        Sin horarios configurados
+                                <div style={{ textAlign: 'center', padding: '30px 10px', color: '#9ca3af' }}>
+                                    <div style={{ fontSize: 36, marginBottom: 8, opacity: 0.3 }}>📭</div>
+                                    <p style={{ margin: 0, fontSize: 12, fontStyle: 'italic' }}>
+                                        Sin horarios
                                     </p>
                                 </div>
                             )}
@@ -295,7 +295,7 @@ export default function MyCalendar() {
                 <>
                     <div
                         onClick={() => setShowAddModal(false)}
-                        style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', zIndex: 1000, backdropFilter: 'blur(4px)' }}
+                        style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.6)', zIndex: 1000, backdropFilter: 'blur(4px)' }}
                     />
                     <div style={{
                         position: 'fixed',
@@ -303,16 +303,16 @@ export default function MyCalendar() {
                         left: '50%',
                         transform: 'translate(-50%, -50%)',
                         background: '#fff',
-                        borderRadius: 16,
-                        padding: 32,
-                        width: 'min(90vw, 500px)',
+                        borderRadius: 20,
+                        padding: '40px 36px',
+                        width: 'min(92vw, 480px)',
                         zIndex: 1001,
-                        boxShadow: '0 20px 60px rgba(0,0,0,0.3)'
+                        boxShadow: '0 25px 50px -12px rgba(0,0,0,0.25)'
                     }}>
-                        <h2 style={{ margin: '0 0 24px 0', fontSize: 24, fontWeight: 700 }}>Agregar Horario</h2>
+                        <h2 style={{ margin: '0 0 28px 0', fontSize: 26, fontWeight: 700, color: '#111827' }}>Agregar Horario</h2>
 
-                        <div style={{ marginBottom: 20 }}>
-                            <label style={{ display: 'block', marginBottom: 8, fontWeight: 600, fontSize: 14 }}>
+                        <div style={{ marginBottom: 24 }}>
+                            <label style={{ display: 'block', marginBottom: 10, fontWeight: 600, fontSize: 14, color: '#374151' }}>
                                 Día de la semana
                             </label>
                             <select
@@ -320,12 +320,18 @@ export default function MyCalendar() {
                                 onChange={(e) => setNewSlot({ ...newSlot, dia_semana: parseInt(e.target.value, 10) })}
                                 style={{
                                     width: '100%',
-                                    padding: 12,
-                                    border: '1px solid #d1d5db',
-                                    borderRadius: 8,
-                                    fontSize: 14,
-                                    cursor: 'pointer'
+                                    padding: '14px 16px',
+                                    border: '2px solid #e5e7eb',
+                                    borderRadius: 10,
+                                    fontSize: 15,
+                                    cursor: 'pointer',
+                                    background: '#fff',
+                                    color: '#111827',
+                                    outline: 'none',
+                                    transition: 'border 0.2s'
                                 }}
+                                onFocus={(e) => e.currentTarget.style.border = '2px solid #2563eb'}
+                                onBlur={(e) => e.currentTarget.style.border = '2px solid #e5e7eb'}
                             >
                                 {diasSemana.map(({ num, nombre, emoji }) => (
                                     <option key={num} value={num}>{emoji} {nombre}</option>
@@ -333,9 +339,9 @@ export default function MyCalendar() {
                             </select>
                         </div>
 
-                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, marginBottom: 24 }}>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: 20, marginBottom: 32 }}>
                             <div>
-                                <label style={{ display: 'block', marginBottom: 8, fontWeight: 600, fontSize: 14 }}>
+                                <label style={{ display: 'block', marginBottom: 10, fontWeight: 600, fontSize: 14, color: '#374151' }}>
                                     Hora de inicio
                                 </label>
                                 <input
@@ -344,16 +350,20 @@ export default function MyCalendar() {
                                     onChange={(e) => setNewSlot({ ...newSlot, hora_inicio: e.target.value })}
                                     style={{
                                         width: '100%',
-                                        padding: 12,
-                                        border: '1px solid #d1d5db',
-                                        borderRadius: 8,
-                                        fontSize: 14
+                                        padding: '14px 16px',
+                                        border: '2px solid #e5e7eb',
+                                        borderRadius: 10,
+                                        fontSize: 15,
+                                        outline: 'none',
+                                        transition: 'border 0.2s'
                                     }}
+                                    onFocus={(e) => e.currentTarget.style.border = '2px solid #2563eb'}
+                                    onBlur={(e) => e.currentTarget.style.border = '2px solid #e5e7eb'}
                                 />
                             </div>
 
                             <div>
-                                <label style={{ display: 'block', marginBottom: 8, fontWeight: 600, fontSize: 14 }}>
+                                <label style={{ display: 'block', marginBottom: 10, fontWeight: 600, fontSize: 14, color: '#374151' }}>
                                     Hora de fin
                                 </label>
                                 <input
@@ -362,11 +372,15 @@ export default function MyCalendar() {
                                     onChange={(e) => setNewSlot({ ...newSlot, hora_fin: e.target.value })}
                                     style={{
                                         width: '100%',
-                                        padding: 12,
-                                        border: '1px solid #d1d5db',
-                                        borderRadius: 8,
-                                        fontSize: 14
+                                        padding: '14px 16px',
+                                        border: '2px solid #e5e7eb',
+                                        borderRadius: 10,
+                                        fontSize: 15,
+                                        outline: 'none',
+                                        transition: 'border 0.2s'
                                     }}
+                                    onFocus={(e) => e.currentTarget.style.border = '2px solid #2563eb'}
+                                    onBlur={(e) => e.currentTarget.style.border = '2px solid #e5e7eb'}
                                 />
                             </div>
                         </div>
@@ -377,14 +391,23 @@ export default function MyCalendar() {
                                 onClick={() => setShowAddModal(false)}
                                 style={{
                                     flex: 1,
-                                    padding: 14,
+                                    padding: '14px 20px',
                                     background: '#f3f4f6',
                                     color: '#374151',
                                     border: 'none',
-                                    borderRadius: 8,
+                                    borderRadius: 10,
                                     fontWeight: 600,
                                     cursor: 'pointer',
-                                    fontSize: 15
+                                    fontSize: 15,
+                                    transition: 'all 0.2s'
+                                }}
+                                onMouseEnter={(e) => {
+                                    e.currentTarget.style.background = '#e5e7eb';
+                                    e.currentTarget.style.transform = 'translateY(-1px)';
+                                }}
+                                onMouseLeave={(e) => {
+                                    e.currentTarget.style.background = '#f3f4f6';
+                                    e.currentTarget.style.transform = 'translateY(0)';
                                 }}
                             >
                                 Cancelar
@@ -394,14 +417,25 @@ export default function MyCalendar() {
                                 onClick={handleAddSlot}
                                 style={{
                                     flex: 1,
-                                    padding: 14,
+                                    padding: '14px 20px',
                                     background: '#2563eb',
                                     color: '#fff',
                                     border: 'none',
-                                    borderRadius: 8,
+                                    borderRadius: 10,
                                     fontWeight: 600,
                                     cursor: 'pointer',
-                                    fontSize: 15
+                                    fontSize: 15,
+                                    transition: 'all 0.2s'
+                                }}
+                                onMouseEnter={(e) => {
+                                    e.currentTarget.style.background = '#1d4ed8';
+                                    e.currentTarget.style.transform = 'translateY(-1px)';
+                                    e.currentTarget.style.boxShadow = '0 4px 12px rgba(37, 99, 235, 0.4)';
+                                }}
+                                onMouseLeave={(e) => {
+                                    e.currentTarget.style.background = '#2563eb';
+                                    e.currentTarget.style.transform = 'translateY(0)';
+                                    e.currentTarget.style.boxShadow = 'none';
                                 }}
                             >
                                 Agregar
@@ -416,7 +450,7 @@ export default function MyCalendar() {
                 <>
                     <div
                         onClick={() => setShowConfirmDelete(false)}
-                        style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', zIndex: 1000, backdropFilter: 'blur(4px)' }}
+                        style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.6)', zIndex: 1000, backdropFilter: 'blur(4px)' }}
                     />
                     <div style={{
                         position: 'fixed',
@@ -424,17 +458,17 @@ export default function MyCalendar() {
                         left: '50%',
                         transform: 'translate(-50%, -50%)',
                         background: '#fff',
-                        borderRadius: 16,
-                        padding: 32,
-                        width: 'min(90vw, 450px)',
+                        borderRadius: 20,
+                        padding: '40px 36px',
+                        width: 'min(92vw, 420px)',
                         zIndex: 1001,
-                        boxShadow: '0 20px 60px rgba(0,0,0,0.3)',
+                        boxShadow: '0 25px 50px -12px rgba(0,0,0,0.25)',
                         textAlign: 'center'
                     }}>
-                        <div style={{ fontSize: 56, marginBottom: 16 }}>⚠️</div>
-                        <h2 style={{ margin: '0 0 12px 0', fontSize: 22 }}>¿Eliminar horario?</h2>
-                        <p style={{ color: '#6b7280', margin: '0 0 24px 0' }}>
-                            ¿Estás seguro de eliminar el horario de <strong>{slotToDelete.hora_inicio} - {slotToDelete.hora_fin}</strong>?
+                        <div style={{ fontSize: 64, marginBottom: 20, lineHeight: 1 }}>⚠️</div>
+                        <h2 style={{ margin: '0 0 12px 0', fontSize: 24, fontWeight: 700, color: '#111827' }}>¿Eliminar horario?</h2>
+                        <p style={{ color: '#6b7280', margin: '0 0 32px 0', fontSize: 15, lineHeight: 1.6 }}>
+                            ¿Estás seguro de eliminar el horario de <strong style={{ color: '#374151' }}>{slotToDelete.hora_inicio} - {slotToDelete.hora_fin}</strong>?
                         </p>
 
                         <div style={{ display: 'flex', gap: 12 }}>
@@ -442,13 +476,23 @@ export default function MyCalendar() {
                                 onClick={() => setShowConfirmDelete(false)}
                                 style={{
                                     flex: 1,
-                                    padding: 12,
+                                    padding: '14px 20px',
                                     background: '#f3f4f6',
                                     color: '#374151',
                                     border: 'none',
-                                    borderRadius: 8,
+                                    borderRadius: 10,
                                     fontWeight: 600,
-                                    cursor: 'pointer'
+                                    cursor: 'pointer',
+                                    fontSize: 15,
+                                    transition: 'all 0.2s'
+                                }}
+                                onMouseEnter={(e) => {
+                                    e.currentTarget.style.background = '#e5e7eb';
+                                    e.currentTarget.style.transform = 'translateY(-1px)';
+                                }}
+                                onMouseLeave={(e) => {
+                                    e.currentTarget.style.background = '#f3f4f6';
+                                    e.currentTarget.style.transform = 'translateY(0)';
                                 }}
                             >
                                 Cancelar
@@ -457,13 +501,25 @@ export default function MyCalendar() {
                                 onClick={handleDelete}
                                 style={{
                                     flex: 1,
-                                    padding: 12,
+                                    padding: '14px 20px',
                                     background: '#dc2626',
                                     color: '#fff',
                                     border: 'none',
-                                    borderRadius: 8,
+                                    borderRadius: 10,
                                     fontWeight: 600,
-                                    cursor: 'pointer'
+                                    cursor: 'pointer',
+                                    fontSize: 15,
+                                    transition: 'all 0.2s'
+                                }}
+                                onMouseEnter={(e) => {
+                                    e.currentTarget.style.background = '#b91c1c';
+                                    e.currentTarget.style.transform = 'translateY(-1px)';
+                                    e.currentTarget.style.boxShadow = '0 4px 12px rgba(220, 38, 38, 0.4)';
+                                }}
+                                onMouseLeave={(e) => {
+                                    e.currentTarget.style.background = '#dc2626';
+                                    e.currentTarget.style.transform = 'translateY(0)';
+                                    e.currentTarget.style.boxShadow = 'none';
                                 }}
                             >
                                 Sí, eliminar
