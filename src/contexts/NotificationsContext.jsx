@@ -1,5 +1,5 @@
 import { createContext, useContext, useState, useEffect, useCallback } from 'react';
-import { notificationsAPI } from '../api/database';
+import { notificationsAPI } from '../api/notifications';
 import { notificationStorage } from '../utils/notificationStorage';
 import { fetchUserProfile } from '../utils/authHelpers';
 
@@ -33,16 +33,29 @@ export function NotificationsProvider({ children }) {
                 return;
             }
 
-            const { data, error } = await notificationsAPI.getMyNotifications();
+            const { data, error } = await notificationsAPI.obtenerMisNotificaciones();
 
             if (error) {
-                console.error('Error cargando notificaciones:', error.message || error);
+                console.error('Error cargando notificaciones:', error);
+                setNotificaciones([]);
                 return;
             }
 
-            // ... resto del código igual
+            setNotificaciones(data || []);
+
+            // Calcular cuántas son nuevas desde última visita
+            const newCount = notificationStorage.countNewSinceLastVisit(data || []);
+            setNewSinceLastVisit(newCount);
+
+            if (newCount > 0) {
+                const message = newCount === 1
+                    ? '1 nueva desde tu última visita'
+                    : `${newCount} nuevas desde tu última visita`;
+                setNewSinceLastVisitMessage(message);
+            }
         } catch (error) {
             console.error('Error en cargarNotificaciones:', error);
+            setNotificaciones([]);
         } finally {
             setLoading(false);
         }
@@ -50,19 +63,18 @@ export function NotificationsProvider({ children }) {
 
     const contarNoLeidas = useCallback(async () => {
         try {
-            const { data, error } = await notificationsAPI.getUnreadCount();
-            if (!error) {
-                setUnreadCount(data || 0);
-            }
+            const { count } = await notificationsAPI.contarNoLeidas();
+            setUnreadCount(count || 0);
         } catch (error) {
             console.error('Error contando no leídas:', error);
+            setUnreadCount(0);
         }
     }, []);
 
     const marcarComoLeida = useCallback(async (notificationId) => {
         try {
-            const { error } = await notificationsAPI.markAsRead(notificationId);
-            if (!error) {
+            const { success } = await notificationsAPI.marcarComoLeida(notificationId);
+            if (success) {
                 setNotificaciones(prev =>
                     prev.map(n => n.id === notificationId ? { ...n, leida: true } : n)
                 );
@@ -78,8 +90,8 @@ export function NotificationsProvider({ children }) {
 
     const marcarTodasLeidas = useCallback(async () => {
         try {
-            const { error } = await notificationsAPI.markAllAsRead();
-            if (!error) {
+            const { success } = await notificationsAPI.marcarTodasLeidas();
+            if (success) {
                 setNotificaciones(prev => prev.map(n => ({ ...n, leida: true })));
                 setUnreadCount(0);
                 setNewSinceLastVisit(0);
@@ -95,8 +107,11 @@ export function NotificationsProvider({ children }) {
 
     const eliminarNotificacion = useCallback(async (notificationId) => {
         try {
-            setNotificaciones(prev => prev.filter(n => n.id !== notificationId));
-            await contarNoLeidas();
+            const { success } = await notificationsAPI.eliminarNotificacion(notificationId);
+            if (success) {
+                setNotificaciones(prev => prev.filter(n => n.id !== notificationId));
+                await contarNoLeidas();
+            }
         } catch (error) {
             console.error('Error eliminando notificación:', error);
         }

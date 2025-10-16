@@ -121,6 +121,7 @@ const NotificationItem = ({ notification, onClose }) => {
             pointerEvents: 'auto',
             backdropFilter: 'blur(12px)',
             border: '1px solid rgba(255,255,255,0.2)',
+            position: 'relative',
         };
 
         const typeStyles = {
@@ -147,7 +148,41 @@ const NotificationItem = ({ notification, onClose }) => {
 
     return (
         <div style={getStyles(notification.type)}>
-            <div style={{ flex: 1 }}>
+            {/* Botón X para cerrar */}
+            <button
+                onClick={onClose}
+                style={{
+                    position: 'absolute',
+                    top: 8,
+                    right: 8,
+                    width: 24,
+                    height: 24,
+                    borderRadius: '50%',
+                    background: 'rgba(255, 255, 255, 0.2)',
+                    border: 'none',
+                    color: '#ffffff',
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    fontSize: 16,
+                    fontWeight: 700,
+                    transition: 'all 0.2s ease',
+                }}
+                onMouseEnter={(e) => {
+                    e.currentTarget.style.background = 'rgba(255, 255, 255, 0.3)';
+                    e.currentTarget.style.transform = 'scale(1.1)';
+                }}
+                onMouseLeave={(e) => {
+                    e.currentTarget.style.background = 'rgba(255, 255, 255, 0.2)';
+                    e.currentTarget.style.transform = 'scale(1)';
+                }}
+                aria-label="Cerrar notificación"
+            >
+                ×
+            </button>
+
+            <div style={{ flex: 1, paddingRight: 20 }}>
                 {notification.title && (
                     <div style={{
                         fontWeight: '700',
@@ -165,7 +200,7 @@ const NotificationItem = ({ notification, onClose }) => {
                     {notification.message}
                 </div>
 
-                {/* ✅ BOTÓN DE ACCIÓN */}
+                {/* Botón de acción */}
                 {notification.action && (
                     <button
                         onClick={(e) => {

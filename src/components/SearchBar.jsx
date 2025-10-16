@@ -179,9 +179,11 @@ export default function SearchBar() {
         saveRecent(suggestion.text);
         setOpen(false);
 
-        // Si es usuario, ir a su perfil público
+        // Ruteo según tipo
         if (suggestion.type === 'usuario') {
             navigate(`/user/${suggestion.username}`);
+        } else if (suggestion.type === 'mentor') {
+            navigate(`/mentor/${suggestion.username}`);
         } else {
             navigate(`/search?q=${encodeURIComponent(suggestion.text)}&type=${suggestion.type}`);
         }

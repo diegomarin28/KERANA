@@ -1,21 +1,17 @@
 import { supabase } from '../supabase';
 
 /**
- * Crear notificación genérica
+ * Crear notificación usando función RPC (bypasea RLS)
  */
 async function createNotification({ usuarioId, tipo, emisorId, relacionId, mensaje }) {
     try {
-        const { data, error } = await supabase
-            .from('notificaciones')
-            .insert([{
-                usuario_id: Number(usuarioId),
-                tipo: String(tipo),
-                emisor_id: emisorId ? Number(emisorId) : null,
-                relacion_id: relacionId ? Number(relacionId) : null,
-                mensaje: String(mensaje),
-                leida: false,
-            }])
-            .select();
+        const { data, error } = await supabase.rpc('crear_notificacion', {
+            p_usuario_id: Number(usuarioId),
+            p_tipo: String(tipo),
+            p_emisor_id: emisorId ? Number(emisorId) : null,
+            p_relacion_id: relacionId ? Number(relacionId) : null,
+            p_mensaje: String(mensaje),
+        });
 
         if (error) throw error;
         return { data, error: null };
@@ -173,20 +169,3 @@ export const notificationTypes = {
         });
     },
 };
-
-// ============================================
-// EJEMPLO DE USO:
-// ============================================
-
-/*
-// Cuando alguien comenta en un apunte:
-import { notificationTypes } from '../api/notificationTypes';
-
-await notificationTypes.nuevoComentario(
-  autorApunteId,      // ID del dueño del apunte
-  comentadorId,       // ID de quien comenta
-  'Juan Pérez',       // Nombre de quien comenta
-  123,                // ID del apunte
-  'Resumen de Álgebra' // Título del apunte
-);
-*/

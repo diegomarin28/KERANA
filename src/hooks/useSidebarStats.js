@@ -13,27 +13,32 @@ export function useSidebarStats() {
     const [userId, setUserId] = useState(null);
     const { obtenerContadores } = useSeguidores();
 
-    // Obtener datos iniciales
+    // 1️⃣ Obtener datos iniciales
     useEffect(() => {
         loadStats();
     }, []);
 
-    // Suscripción realtime
+    // 2️⃣ Suscripción realtime (intentamos primero con esto)
     useEffect(() => {
         if (!userId) return;
 
+        console.log('🔌 Iniciando suscripciones Realtime para userId:', userId);
+
         // Suscribirse a cambios en seguidores
         const seguidoresChannel = supabase
-            .channel('sidebar-seguidores')
+            .channel(`sidebar-seguidores-${userId}`)
             .on(
                 'postgres_changes',
                 {
                     event: '*',
                     schema: 'public',
                     table: 'seguidores',
-                    filter: `seguidor_id=eq.${userId}`
+                    filter: `id_seguidor=eq.${userId}`
                 },
-                () => loadFollowStats()
+                () => {
+                    console.log('👥 Siguiendo actualizado (Realtime)');
+                    loadFollowStats();
+                }
             )
             .on(
                 'postgres_changes',
@@ -41,24 +46,28 @@ export function useSidebarStats() {
                     event: '*',
                     schema: 'public',
                     table: 'seguidores',
-                    filter: `seguido_id=eq.${userId}`
+                    filter: `id_seguido=eq.${userId}`
                 },
-                () => loadFollowStats()
+                () => {
+                    console.log('👥 Seguidores actualizado (Realtime)');
+                    loadFollowStats();
+                }
             )
             .subscribe();
 
         // Suscribirse a cambios en créditos
         const usuarioChannel = supabase
-            .channel('sidebar-usuario')
+            .channel(`sidebar-usuario-${userId}`)
             .on(
                 'postgres_changes',
                 {
                     event: 'UPDATE',
                     schema: 'public',
-                    table: 'usuario',
+                    table: 'usuarios',
                     filter: `id_usuario=eq.${userId}`
                 },
                 (payload) => {
+                    console.log('💰 Créditos actualizados (Realtime):', payload.new?.creditos);
                     if (payload.new?.creditos !== undefined) {
                         setStats(prev => ({ ...prev, credits: payload.new.creditos }));
                     }
@@ -68,24 +77,40 @@ export function useSidebarStats() {
 
         // Suscribirse a cambios en apuntes
         const apuntesChannel = supabase
-            .channel('sidebar-apuntes')
+            .channel(`sidebar-apuntes-${userId}`)
             .on(
                 'postgres_changes',
                 {
                     event: '*',
                     schema: 'public',
-                    table: 'apunte',
+                    table: 'apuntes',
                     filter: `id_usuario=eq.${userId}`
                 },
-                () => loadApuntesCount()
+                () => {
+                    console.log('📚 Apuntes actualizado (Realtime)');
+                    loadApuntesCount();
+                }
             )
             .subscribe();
 
         return () => {
+            console.log('🔌 Cerrando canales Realtime');
             supabase.removeChannel(seguidoresChannel);
             supabase.removeChannel(usuarioChannel);
             supabase.removeChannel(apuntesChannel);
         };
+    }, [userId]);
+
+    // 3️⃣ 🆕 POLLING como backup (cada 10 segundos)
+    useEffect(() => {
+        if (!userId) return;
+
+        const interval = setInterval(() => {
+            console.log('🔄 Actualizando stats (polling cada 10s)...');
+            loadStats();
+        }, 5000); // 5 segundos
+
+        return () => clearInterval(interval);
     }, [userId]);
 
     const loadStats = async () => {
@@ -142,7 +167,7 @@ export function useSidebarStats() {
     const loadApuntesCount = async () => {
         if (!userId) return;
         const { count } = await supabase
-            .from('apunte')
+            .from('apuntes')
             .select('id_apunte', { count: 'exact', head: true })
             .eq('id_usuario', userId);
 
