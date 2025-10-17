@@ -21,6 +21,7 @@ export default function MyStudents() {
         tipo: 'pdf',
         publico: false
     });
+    const [recursoToDelete, setRecursoToDelete] = useState(null);
 
     useEffect(() => { fetchData(); }, []);
 
@@ -30,22 +31,70 @@ export default function MyStudents() {
             const { data: { user } } = await supabase.auth.getUser();
             if (!user) { setError('Debes iniciar sesión'); return; }
 
-            const { data: usuarioData } = await supabase
+            console.log('Auth user ID:', user.id);
+
+            const { data: usuarioData, error: usuarioError } = await supabase
                 .from('usuario')
                 .select('id_usuario')
                 .eq('auth_id', user.id)
                 .single();
+
+            console.log('Usuario data:', usuarioData);
+            console.log('Error usuario:', usuarioError);
+
             if (!usuarioData) { setError('No se encontró tu perfil'); return; }
 
+            // Obtener el id_mentor de la tabla mentor
+            const { data: mentorData } = await supabase
+                .from('mentor')
+                .select('id_mentor')
+                .eq('id_usuario', usuarioData.id_usuario)
+                .single();
+
+            console.log('Mentor data:', mentorData);
+
+            if (!mentorData) {
+                setError('No estás registrado como mentor');
+                setLoading(false);
+                return;
+            }
+
+            const idMentor = mentorData.id_mentor;
+
             // Materias donde soy mentor
-            const { data: materias } = await supabase
+            console.log('Buscando materias para mentor ID:', idMentor);
+
+            // Primero obtenemos los IDs de las materias
+            const { data: mentorMaterias, error: mentorMateriasError } = await supabase
                 .from('mentor_materia')
-                .select(`
-          id_materia,
-          materia:id_materia!mentor_materia_id_materia_fkey (id_materia, nombre_materia, semestre)
-        `)
-                .eq('id_mentor', usuarioData.id_usuario);
-            setMisMaterias(materias || []);
+                .select('id_materia')
+                .eq('id_mentor', idMentor);
+
+            console.log('Relaciones mentor_materia:', mentorMaterias);
+            console.log('Error mentor_materia:', mentorMateriasError);
+
+            if (mentorMaterias && mentorMaterias.length > 0) {
+                const materiasIds = mentorMaterias.map(m => m.id_materia);
+
+                // Ahora obtenemos los datos completos de las materias
+                const { data: materiasCompletas, error: materiasError } = await supabase
+                    .from('materia')
+                    .select('id_materia, nombre_materia, semestre')
+                    .in('id_materia', materiasIds);
+
+                console.log('Materias completas:', materiasCompletas);
+                console.log('Error materias:', materiasError);
+
+                // Formateamos para que tenga la estructura que espera el resto del código
+                const materiasFormateadas = materiasCompletas?.map(mat => ({
+                    id_materia: mat.id_materia,
+                    materia: mat
+                })) || [];
+
+                setMisMaterias(materiasFormateadas);
+            } else {
+                setMisMaterias([]);
+            }
 
             // Sesiones (si tu tabla existe así; si no, comentá este bloque)
             const { data: sesiones } = await supabase
@@ -57,7 +106,7 @@ export default function MyStudents() {
           alumno:usuario!mentor_sesion_id_alumno_fkey(nombre, correo),
           materia(nombre_materia)
         `)
-                .eq('id_mentor', usuarioData.id_usuario)
+                .eq('id_mentor', idMentor)
                 .in('estado', ['confirmada', 'completada']);
 
             const alumnosMap = {};
@@ -83,7 +132,7 @@ export default function MyStudents() {
             const { data: recursosData } = await supabase
                 .from('mentor_recurso')
                 .select(`*, materia(nombre_materia)`)
-                .eq('id_mentor', usuarioData.id_usuario)
+                .eq('id_mentor', idMentor)
                 .order('created_at', { ascending: false });
             setRecursos(recursosData || []);
         } catch {
@@ -109,8 +158,15 @@ export default function MyStudents() {
                 .eq('auth_id', user.id)
                 .single();
 
+            // Obtener id_mentor
+            const { data: mentorData } = await supabase
+                .from('mentor')
+                .select('id_mentor')
+                .eq('id_usuario', usuarioData.id_usuario)
+                .single();
+
             const fileExt = newRecurso.archivo.name.split('.').pop();
-            const fileName = `${usuarioData.id_usuario}_${Date.now()}.${fileExt}`;
+            const fileName = `${mentorData.id_mentor}_${Date.now()}.${fileExt}`;
             const filePath = `recursos/${fileName}`;
 
             const { error: uploadError } = await supabase.storage
@@ -125,7 +181,7 @@ export default function MyStudents() {
             const { error: insertError } = await supabase
                 .from('mentor_recurso')
                 .insert([{
-                    id_mentor: usuarioData.id_usuario,
+                    id_mentor: mentorData.id_mentor,
                     id_materia: parseInt(newRecurso.id_materia, 10),
                     titulo: newRecurso.titulo,
                     descripcion: newRecurso.descripcion,
@@ -136,6 +192,7 @@ export default function MyStudents() {
             if (insertError) throw insertError;
 
             setSuccess('Recurso subido exitosamente');
+            setTimeout(() => setSuccess(''), 3000); // Oculta el mensaje después de 3 segundos
             setShowResourceModal(false);
             setNewRecurso({ id_materia: '', titulo: '', descripcion: '', archivo: null, tipo: 'pdf', publico: false });
             fetchData();
@@ -147,7 +204,6 @@ export default function MyStudents() {
     };
 
     const handleDeleteRecurso = async (recursoId) => {
-        if (!confirm('¿Eliminar este recurso?')) return;
         try {
             const { error } = await supabase
                 .from('mentor_recurso')
@@ -155,9 +211,12 @@ export default function MyStudents() {
                 .eq('id_recurso', recursoId);
             if (error) throw error;
             setSuccess('Recurso eliminado');
+            setTimeout(() => setSuccess(''), 3000); // Oculta el mensaje después de 3 segundos
             fetchData();
         } catch {
             setError('Error al eliminar recurso');
+        } finally {
+            setRecursoToDelete(null);
         }
     };
 
@@ -287,12 +346,21 @@ export default function MyStudents() {
                                             </a>
                                         </div>
 
-                                        <Button
-                                            onClick={() => handleDeleteRecurso(recurso.id_recurso)}
-                                            style={{ padding: '8px 16px', background: '#dc2626', color: '#fff', border: 'none', borderRadius: 6, fontWeight: 600, cursor: 'pointer' }}
+                                        <button
+                                            onClick={() => setRecursoToDelete(recurso.id_recurso)}
+                                            style={{
+                                                padding: '8px 16px',
+                                                background: '#dc2626',
+                                                color: '#fff',
+                                                border: 'none',
+                                                borderRadius: 6,
+                                                fontWeight: 600,
+                                                cursor: 'pointer',
+                                                transition: 'background 0.2s ease'
+                                            }}
                                         >
                                             Eliminar
-                                        </Button>
+                                        </button>
                                     </div>
                                 </Card>
                             ))}
@@ -323,9 +391,9 @@ export default function MyStudents() {
                                 style={{ width: '100%', padding: 12, border: '1px solid #d1d5db', borderRadius: 8, fontSize: 14 }}
                             >
                                 <option value="">Selecciona una materia</option>
-                                {misMaterias.map(m => (
-                                    <option key={m.id_materia} value={m.id_materia}>
-                                        {m.materia?.nombre_materia}
+                                {misMaterias.map(mm => (
+                                    <option key={mm.id_materia} value={mm.id_materia}>
+                                        {mm.materia?.nombre_materia || 'Materia sin nombre'}
                                     </option>
                                 ))}
                             </select>
@@ -381,6 +449,65 @@ export default function MyStudents() {
                             <button type="button" onClick={handleUploadRecurso} disabled={uploadingFile}
                                     style={{ flex: 1, padding: 12, background: uploadingFile ? '#9ca3af' : '#2563eb', color: '#fff', border: 'none', borderRadius: 8, fontWeight: 600, cursor: uploadingFile ? 'not-allowed' : 'pointer' }}>
                                 {uploadingFile ? 'Subiendo...' : 'Subir'}
+                            </button>
+                        </div>
+                    </div>
+                </>
+            )}
+
+            {/* Modal Confirmar Eliminación */}
+            {recursoToDelete && (
+                <>
+                    <div
+                        onClick={() => setRecursoToDelete(null)}
+                        style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', zIndex: 1000 }}
+                    />
+                    <div style={{
+                        position: 'fixed', top: '50%', left: '50%', transform: 'translate(-50%, -50%)',
+                        background: '#fff', borderRadius: 12, padding: 32, width: 'min(90vw, 400px)',
+                        zIndex: 1001, boxShadow: '0 20px 60px rgba(0,0,0,0.3)'
+                    }}>
+                        <div style={{ textAlign: 'center', marginBottom: 24 }}>
+                            <div style={{ fontSize: 48, marginBottom: 16 }}>⚠️</div>
+                            <h2 style={{ margin: '0 0 12px 0', fontSize: 20 }}>¿Deseás eliminar este recurso?</h2>
+                            <p style={{ color: '#6b7280', margin: 0, fontSize: 14 }}>
+                                Esta acción no se puede deshacer. El recurso será eliminado permanentemente.
+                            </p>
+                        </div>
+
+                        <div style={{ display: 'flex', gap: 12 }}>
+                            <button
+                                type="button"
+                                onClick={() => setRecursoToDelete(null)}
+                                style={{
+                                    flex: 1,
+                                    padding: 12,
+                                    background: '#f3f4f6',
+                                    color: '#374151',
+                                    border: 'none',
+                                    borderRadius: 8,
+                                    fontWeight: 600,
+                                    cursor: 'pointer'
+                                }}
+                            >
+                                Cancelar
+                            </button>
+                            <button
+                                type="button"
+                                onClick={() => handleDeleteRecurso(recursoToDelete)}
+                                style={{
+                                    flex: 1,
+                                    padding: 12,
+                                    background: '#dc2626',
+                                    color: '#fff',
+                                    border: 'none',
+                                    borderRadius: 8,
+                                    fontWeight: 600,
+                                    cursor: 'pointer',
+                                    transition: 'background 0.2s ease'
+                                }}
+                            >
+                                Eliminar
                             </button>
                         </div>
                     </div>
