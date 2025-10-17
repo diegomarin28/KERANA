@@ -224,11 +224,6 @@ export default function Contact() {
                                 type="submit"
                                 disabled={sending}
                                 variant="primary"
-                                style={{
-                                    background: "linear-gradient(90deg, #2563eb, #3b82f6 60%, #60a5fa)",
-                                    color: "white",
-                                    border: "none",
-                                }}
                             >
                                 {sending ? "Enviando..." : "Enviar mensaje"}
                             </Button>

@@ -32,6 +32,14 @@ export default function NotificationBadge() {
         prevUnreadCount.current = unreadCount;
     }, [unreadCount]);
 
+    // 🚪 Cerrar automáticamente si no hay notificaciones
+    useEffect(() => {
+        if (isOpen && notificaciones.length === 0) {
+            console.log('📪 No hay notificaciones, cerrando modal');
+            setIsOpen(false);
+        }
+    }, [notificaciones.length, isOpen]);
+
     // 🕐 Auto-marcar como leídas después de 15s con modal abierto
     useEffect(() => {
         if (isOpen && unreadCount > 0) {
@@ -91,6 +99,7 @@ export default function NotificationBadge() {
     const handleDelete = async (e, notifId) => {
         e.stopPropagation();
         await eliminarNotificacion(notifId);
+        // El useEffect de arriba cerrará automáticamente si era la última
     };
 
     const handleVerTodas = () => {
@@ -255,7 +264,7 @@ export default function NotificationBadge() {
                                 textAlign: 'center',
                                 color: '#64748b',
                             }}>
-                                <div style={{ fontSize: 40, marginBottom: 8 }}>🔔</div>
+                                <div style={{ fontSize: 40, marginBottom: 8 }}>🔕</div>
                                 <p style={{ margin: 0, fontSize: 14 }}>
                                     No tenés notificaciones
                                 </p>

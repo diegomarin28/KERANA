@@ -55,20 +55,11 @@ export default function SearchResults() {
 
     const fetchAll = async (query) => {
         setLoading(true);
-        console.log("🔍 Buscando:", query);
         try {
             const { data, error } = await searchAPI.searchAll(query);
-            console.log("📦 Resultado searchAPI:", { data, error });
 
             if (error) throw new Error(error.message || JSON.stringify(error));
 
-            console.log("📊 Datos parseados:", {
-                materias: data?.materias?.length || 0,
-                profesores: data?.profesores?.length || 0,
-                mentores: data?.mentores?.length || 0,
-                apuntes: data?.apuntes?.length || 0,
-                usuarios: data?.usuarios?.length || 0,
-            });
 
             setSubjects(data?.materias ?? []);
             setNotes(data?.apuntes ?? []);
@@ -141,12 +132,7 @@ export default function SearchResults() {
         };
     }, [subjects, professors, mentors, notes, users, currentUserId]);
 
-    useEffect(() => {
-        if (filtered.mentors.length > 0) {
-            console.log('Mentores:', filtered.mentors[0]);
-            console.log('currentUserId:', currentUserId);
-        }
-    }, [filtered.mentors, currentUserId]);
+
 
     // Usamos plural para los tabs y la lógica de show
     const show = (k) => tab === "todos" || tab === k;

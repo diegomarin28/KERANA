@@ -5,7 +5,7 @@ import { useNotificationsContext } from '../contexts/NotificationsContext';
 import { useNotifications } from './NotificationProvider';
 import { useNotificationSettings } from '../hooks/useNotificationSettings';
 
-const POLLING_INTERVAL = 5000; // 10 segundos
+const POLLING_INTERVAL = 10000; // 10 segundos
 
 // 🔊 Audio context global para evitar el autoplay policy
 let audioContext = null;
@@ -18,6 +18,30 @@ export default function NotificationsRealtimeSubscriber() {
     const intervalRef = useRef(null);
     const lastCheckRef = useRef(new Date());
     const miUsuarioIdRef = useRef(null);
+    const isOnlineRef = useRef(navigator.onLine);
+
+    // 🌐 Detectar cambios de conexión
+    useEffect(() => {
+        const handleOnline = () => {
+            console.log('🌐 Conexión restaurada');
+            isOnlineRef.current = true;
+            // Hacer un check inmediato al volver online
+            lastCheckRef.current = new Date(Date.now() - 30000); // Buscar últimos 30s
+        };
+
+        const handleOffline = () => {
+            console.log('📡 Conexión perdida');
+            isOnlineRef.current = false;
+        };
+
+        window.addEventListener('online', handleOnline);
+        window.addEventListener('offline', handleOffline);
+
+        return () => {
+            window.removeEventListener('online', handleOnline);
+            window.removeEventListener('offline', handleOffline);
+        };
+    }, []);
 
     // 🔓 Desbloquear audio con la primera interacción del usuario
     useEffect(() => {
@@ -80,7 +104,6 @@ export default function NotificationsRealtimeSubscriber() {
 
                 miUsuarioIdRef.current = usuarioData.id_usuario;
 
-                console.log('🔄 Polling de notificaciones iniciado (cada 10s)');
 
                 // Función de polling
                 const checkForNewNotifications = async () => {
@@ -109,7 +132,6 @@ export default function NotificationsRealtimeSubscriber() {
 
                         // Si hay notificaciones nuevas
                         if (nuevasNotifs && nuevasNotifs.length > 0) {
-                            console.log(`🔔 ${nuevasNotifs.length} notificación(es) nueva(s) detectada(s)`);
 
                             // Actualizar última verificación
                             lastCheckRef.current = new Date();
@@ -122,7 +144,6 @@ export default function NotificationsRealtimeSubscriber() {
                             for (const notif of nuevasNotifs) {
                                 // Verificar si el tipo está habilitado
                                 if (!isTypeEnabled(notif.tipo)) {
-                                    console.log('⏭️ Notificación ignorada por settings:', notif.tipo);
                                     continue;
                                 }
 
@@ -168,7 +189,6 @@ export default function NotificationsRealtimeSubscriber() {
             if (intervalRef.current) {
                 clearInterval(intervalRef.current);
                 intervalRef.current = null;
-                console.log('🛑 Polling de notificaciones detenido');
             }
         };
     }, [cargarNotificaciones, contarNoLeidas, addNotification, shouldPlaySound, shouldShowToast, isTypeEnabled]);

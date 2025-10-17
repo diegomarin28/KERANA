@@ -397,8 +397,8 @@ export default function FolderView() {
             }}>
                 <Button
                     variant="ghost"
-                    onClick={() => navigate('/purchased')}
-                    style={{padding: '8px 12px'}}
+                    onClick={() => navigate('/purchased?tab=folders')}
+                    style={{ padding: '8px 12px' }}
                 >
                     Mis compras
                 </Button>

@@ -248,41 +248,6 @@ async function searchNotes(term) {
     }
 }
 
-async function searchMentors(term) {
-    const q = (term || "").trim();
-    if (!q) return { data: [], error: null };
-
-    const { data, error } = await supabase
-        .rpc('buscar_mentores_sin_tildes', { termino: q });
-
-    if (error) return { data: [], error };
-
-    // Obtener los id_usuario de cada mentor
-    const mentorIds = (data || []).map(m => m.id_mentor);
-
-    const { data: mentorUsers } = await supabase
-        .from('mentor')
-        .select('id_mentor, id_usuario')
-        .in('id_mentor', mentorIds);
-
-    const userMap = new Map(mentorUsers?.map(m => [m.id_mentor, m.id_usuario]) || []);
-
-    const transformed = (data || []).map(m => ({
-        id: m.id_mentor,
-        id_mentor: m.id_mentor,
-        id_usuario: userMap.get(m.id_mentor) || null,  // ← Obtener del map
-        mentor_nombre: m.nombre || 'Mentor',
-        mentor_correo: '',
-        username: m.username,
-        foto: m.foto,
-        estrellas_mentor: m.estrellas_mentor,
-        rating_promedio: m.estrellas_mentor,
-        contacto: ''
-    }));
-
-    return { data: transformed, error: null };
-}
-
 
 async function searchUsers(term) {
     const q = (term || "").trim();
@@ -313,6 +278,20 @@ async function searchUsers(term) {
             return noEsMiUsuario && noEsMentor;
         });
 
+        // ✨ NUEVO: Obtener quiénes estoy siguiendo
+        let siguiendoSet = new Set();
+        if (miId && usuariosFiltrados.length > 0) {
+            const userIds = usuariosFiltrados.map(u => u.id_usuario);
+            const { data: seguimientos } = await supabase
+                .from('seguidores')
+                .select('seguido_id')
+                .eq('seguidor_id', miId)
+                .eq('estado', 'activo')
+                .in('seguido_id', userIds);
+
+            siguiendoSet = new Set(seguimientos?.map(s => s.seguido_id) || []);
+        }
+
         const transformed = usuariosFiltrados.map(usuario => ({
             id: usuario.id_usuario,
             id_usuario: usuario.id_usuario,
@@ -320,7 +299,8 @@ async function searchUsers(term) {
             foto: usuario.foto,
             username: usuario.username,
             tipo: 'usuario',
-            label: usuario.nombre
+            label: usuario.nombre,
+            siguiendo: siguiendoSet.has(usuario.id_usuario) // ✨ NUEVO
         }));
 
         return { data: transformed, error: null };
@@ -330,6 +310,69 @@ async function searchUsers(term) {
         return { data: [], error };
     }
 }
+
+async function searchMentors(term) {
+    const q = (term || "").trim();
+    if (!q) return { data: [], error: null };
+
+    try {
+        const { data: miIdData } = await supabase.rpc('obtener_usuario_actual_id');
+        const miId = miIdData || null;
+
+        const { data, error } = await supabase
+            .rpc('buscar_mentores_sin_tildes', { termino: q });
+
+        if (error) return { data: [], error };
+
+        // Obtener los id_usuario de cada mentor
+        const mentorIds = (data || []).map(m => m.id_mentor);
+
+        const { data: mentorUsers } = await supabase
+            .from('mentor')
+            .select('id_mentor, id_usuario')
+            .in('id_mentor', mentorIds);
+
+        const userMap = new Map(mentorUsers?.map(m => [m.id_mentor, m.id_usuario]) || []);
+
+        // ✨ NUEVO: Obtener quiénes estoy siguiendo
+        let siguiendoSet = new Set();
+        if (miId && mentorUsers && mentorUsers.length > 0) {
+            const userIds = mentorUsers.map(m => m.id_usuario);
+            const { data: seguimientos } = await supabase
+                .from('seguidores')
+                .select('seguido_id')
+                .eq('seguidor_id', miId)
+                .eq('estado', 'activo')
+                .in('seguido_id', userIds);
+
+            siguiendoSet = new Set(seguimientos?.map(s => s.seguido_id) || []);
+        }
+
+        const transformed = (data || []).map(m => {
+            const userId = userMap.get(m.id_mentor) || null;
+            return {
+                id: m.id_mentor,
+                id_mentor: m.id_mentor,
+                id_usuario: userId,
+                mentor_nombre: m.nombre || 'Mentor',
+                mentor_correo: '',
+                username: m.username,
+                foto: m.foto,
+                estrellas_mentor: m.estrellas_mentor,
+                rating_promedio: m.estrellas_mentor,
+                contacto: '',
+                siguiendo: userId ? siguiendoSet.has(userId) : false // ✨ NUEVO
+            };
+        });
+
+        return { data: transformed, error: null };
+
+    } catch (error) {
+        console.error('Error en searchMentors:', error);
+        return { data: [], error };
+    }
+}
+
 
 export const searchAPI = {
     searchProfessors,
@@ -346,13 +389,6 @@ export const searchAPI = {
             searchUsers(term),
         ]);
 
-        console.log('🔍 Resultados individuales:', {
-            profesores: { data: prof.data, error: prof.error },
-            materias: { data: mat.data, error: mat.error },
-            apuntes: { data: ap.data, error: ap.error },
-            mentores: { data: men.data, error: men.error },
-            usuarios: { data: users.data, error: users.error }
-        });
 
         return {
             data: {
@@ -1647,20 +1683,20 @@ export const foldersAPI = {
     // ==========================================
 
     async autoOrganize() {
-        const {data: {user}} = await supabase.auth.getUser()
-        if (!user) return {data: null, error: 'No hay usuario logueado'}
+        const { data: { user } } = await supabase.auth.getUser()
+        if (!user) return { data: null, error: 'No hay usuario logueado' }
 
-        const {data: usuarioData} = await supabase
+        const { data: usuarioData } = await supabase
             .from('usuario')
             .select('id_usuario')
             .eq('auth_id', user.id)
             .single()
 
-        if (!usuarioData) return {data: null, error: 'Usuario no encontrado'}
+        if (!usuarioData) return { data: null, error: 'Usuario no encontrado' }
 
         try {
             // 1. Obtener todas las compras del usuario
-            const {data: compras, error: comprasError} = await supabase
+            const { data: compras, error: comprasError } = await supabase
                 .from('compra_apunte')
                 .select(`
                 id,
@@ -1685,11 +1721,9 @@ export const foldersAPI = {
                 const materia = compra.apunte?.materia
                 if (!materia) return
 
-                // ✅ CAMBIO: Agregar "Semestre" al nombre
-                // ✅ CAMBIO: Agregar "Semestre" al nombre
                 const semestreNum = materia.semestre || 'Sin semestre'
                 const semestreNombre = semestreNum === 'Sin semestre' ? semestreNum : `Semestre ${semestreNum}`
-                console.log('🔍 Semestre detectado:', semestreNum, '→ Nombre:', semestreNombre);
+
                 const nombreMateria = materia.nombre_materia
                 const idMateria = materia.id_materia
 
@@ -1712,8 +1746,8 @@ export const foldersAPI = {
 
             for (const [nombreSemestre, materias] of Object.entries(estructura)) {
                 // Crear carpeta de semestre
-                const {data: carpetaSemestre} = await this.createFolder(
-                    nombreSemestre,
+                const { data: carpetaSemestre } = await this.createFolder(
+                    nombreSemestre, // ← Ya tiene "Semestre 3" en el nombre
                     'semestre',
                     null,
                     0
@@ -1725,7 +1759,7 @@ export const foldersAPI = {
 
                 // Crear carpetas de materias dentro del semestre
                 for (const [nombreMateria, datos] of Object.entries(materias)) {
-                    const {data: carpetaMateria} = await this.createFolder(
+                    const { data: carpetaMateria } = await this.createFolder(
                         nombreMateria,
                         'materia',
                         carpetaSemestre.id_carpeta,
@@ -1753,7 +1787,7 @@ export const foldersAPI = {
 
         } catch (error) {
             console.error('Error en organización automática:', error)
-            return {data: null, error}
+            return { data: null, error }
         }
     }
 }

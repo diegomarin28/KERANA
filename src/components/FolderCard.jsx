@@ -291,21 +291,34 @@ export function FolderCard({ folder, semestres, onDragStart, onDragOver, onDrop,
                         gap: 8,
                         marginBottom: 8
                     }}>
-                        <span style={{
-                            padding: '2px 8px',
-                            background: bgColor,
-                            color: iconColor,
-                            borderRadius: 12,
-                            fontSize: 12,
-                            fontWeight: 500,
-                            textTransform: 'capitalize'
-                        }}>
-                            {/* ✅ Mostrar semestres si existen */}
-                            {semestres && semestres.length > 0
-                                ? `Semestre ${semestres.sort((a, b) => parseInt(a) - parseInt(b)).join(', ')}`
-                                : folder.tipo
-                            }
-                        </span>
+                        {/* Badge dinámico */}
+                        {semestres && semestres.length > 0 && (
+                            <span style={{
+                                padding: '2px 8px',
+                                background: '#dbeafe',
+                                color: '#2563eb',
+                                borderRadius: 12,
+                                fontSize: 12,
+                                fontWeight: 500
+                            }}>
+                                    Semestre {semestres.sort((a, b) => parseInt(a) - parseInt(b)).join(', ')}
+                                </span>
+                        )}
+
+                        {/* Badge de tipo (solo si no hay semestres) */}
+                        {(!semestres || semestres.length === 0) && (
+                            <span style={{
+                                padding: '2px 8px',
+                                background: bgColor,
+                                color: iconColor,
+                                borderRadius: 12,
+                                fontSize: 12,
+                                fontWeight: 500,
+                                textTransform: 'capitalize'
+                            }}>
+                                {folder.tipo}
+                            </span>
+                        )}
                     </div>
 
                     <div style={{

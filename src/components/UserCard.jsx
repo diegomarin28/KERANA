@@ -1,49 +1,25 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { supabase } from '../supabase';
 import { useSeguidores } from '../hooks/useSeguidores';
 
-
 export const UserCard = ({ usuario }) => {
-    const [siguiendo, setSiguiendo] = useState(false);
+    // ✨ NUEVO: Inicializar con el estado que viene de la búsqueda
+    const [siguiendo, setSiguiendo] = useState(usuario.siguiendo || false);
     const [cargando, setCargando] = useState(false);
     const [showUnfollowModal, setShowUnfollowModal] = useState(false);
     const navigate = useNavigate();
-    const { seguirUsuario, dejarDeSeguir, obtenerMiUsuarioId } = useSeguidores();
+    const { seguirUsuario, dejarDeSeguir } = useSeguidores();
 
-    useEffect(() => {
-        verificarSiSigo();
-    }, [usuario.id_usuario]);
-
-    const verificarSiSigo = async () => {
-        try {
-            const miId = await obtenerMiUsuarioId();
-            if (!miId) return;
-
-            const { data } = await supabase
-                .from('seguidores')
-                .select('id')
-                .eq('seguidor_id', miId)
-                .eq('seguido_id', usuario.id_usuario)
-                .eq('estado', 'activo')
-                .maybeSingle();
-
-            setSiguiendo(!!data);
-        } catch (error) {
-            console.error('Error verificando seguimiento:', error);
-        }
-    };
+    // ❌ ELIMINADO: useEffect que verificaba si seguías (ya no es necesario)
 
     const manejarSeguir = async (e) => {
         e.stopPropagation();
 
-        // Si ya está siguiendo, mostrar modal
         if (siguiendo) {
             setShowUnfollowModal(true);
             return;
         }
 
-        // Si no está siguiendo, seguir directamente
         try {
             setCargando(true);
             const resultado = await seguirUsuario(usuario.id_usuario);
@@ -188,23 +164,12 @@ export const UserCard = ({ usuario }) => {
                 </button>
             </div>
 
-            {/* Modal de confirmación */}
             {showUnfollowModal && (
-                <div
-                    style={modalOverlayStyle}
-                    onClick={() => setShowUnfollowModal(false)}
-                >
-                    <div
-                        style={modalContentStyle}
-                        onClick={(e) => e.stopPropagation()}
-                    >
+                <div style={modalOverlayStyle} onClick={() => setShowUnfollowModal(false)}>
+                    <div style={modalContentStyle} onClick={(e) => e.stopPropagation()}>
                         <div style={modalAvatarContainerStyle}>
                             {usuario.foto ? (
-                                <img
-                                    src={usuario.foto}
-                                    alt={usuario.nombre}
-                                    style={modalAvatarStyle}
-                                />
+                                <img src={usuario.foto} alt={usuario.nombre} style={modalAvatarStyle} />
                             ) : (
                                 <div style={modalAvatarPlaceholderStyle}>
                                     {(usuario.nombre?.[0] || 'U').toUpperCase()}
@@ -217,18 +182,10 @@ export const UserCard = ({ usuario }) => {
                         </h3>
 
                         <div style={modalButtonsStyle}>
-                            <button
-                                onClick={confirmarDejarDeSeguir}
-                                disabled={cargando}
-                                style={modalConfirmButtonStyle}
-                            >
+                            <button onClick={confirmarDejarDeSeguir} disabled={cargando} style={modalConfirmButtonStyle}>
                                 {cargando ? 'Procesando...' : 'Dejar de seguir'}
                             </button>
-                            <button
-                                onClick={() => setShowUnfollowModal(false)}
-                                disabled={cargando}
-                                style={modalCancelButtonStyle}
-                            >
+                            <button onClick={() => setShowUnfollowModal(false)} disabled={cargando} style={modalCancelButtonStyle}>
                                 Cancelar
                             </button>
                         </div>
@@ -239,91 +196,12 @@ export const UserCard = ({ usuario }) => {
     );
 };
 
-// Estilos del modal
-const modalOverlayStyle = {
-    position: 'fixed',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    background: 'rgba(0, 0, 0, 0.5)',
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-    zIndex: 9999,
-    backdropFilter: 'blur(4px)',
-};
-
-const modalContentStyle = {
-    background: 'white',
-    borderRadius: 16,
-    padding: '32px 24px 24px 24px',
-    maxWidth: 400,
-    width: '90%',
-    boxShadow: '0 20px 60px rgba(0,0,0,0.3)',
-    textAlign: 'center',
-};
-
-const modalAvatarContainerStyle = {
-    width: 80,
-    height: 80,
-    margin: '0 auto 16px auto',
-    borderRadius: '50%',
-    overflow: 'hidden',
-    border: '3px solid #E5E7EB',
-};
-
-const modalAvatarStyle = {
-    width: '100%',
-    height: '100%',
-    objectFit: 'cover',
-};
-
-const modalAvatarPlaceholderStyle = {
-    width: '100%',
-    height: '100%',
-    background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-    fontSize: 32,
-    fontWeight: 'bold',
-    color: 'white',
-};
-
-const modalTitleStyle = {
-    margin: '0 0 24px 0',
-    fontSize: 18,
-    fontWeight: 600,
-    color: '#111827',
-};
-
-const modalButtonsStyle = {
-    display: 'flex',
-    flexDirection: 'column',
-    gap: 10,
-};
-
-const modalConfirmButtonStyle = {
-    padding: '12px 24px',
-    background: '#EF4444',
-    color: 'white',
-    border: 'none',
-    borderRadius: 8,
-    fontWeight: 700,
-    fontSize: 14,
-    cursor: 'pointer',
-    transition: 'all 0.2s ease',
-};
-
-const modalCancelButtonStyle = {
-    padding: '12px 24px',
-    background: 'transparent',
-    color: '#6B7280',
-    border: 'none',
-    borderRadius: 8,
-    fontWeight: 600,
-    fontSize: 14,
-    cursor: 'pointer',
-    transition: 'all 0.2s ease',
-};
+const modalOverlayStyle = { position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0, 0, 0, 0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 9999, backdropFilter: 'blur(4px)' };
+const modalContentStyle = { background: 'white', borderRadius: 16, padding: '32px 24px 24px 24px', maxWidth: 400, width: '90%', boxShadow: '0 20px 60px rgba(0,0,0,0.3)', textAlign: 'center' };
+const modalAvatarContainerStyle = { width: 80, height: 80, margin: '0 auto 16px auto', borderRadius: '50%', overflow: 'hidden', border: '3px solid #E5E7EB' };
+const modalAvatarStyle = { width: '100%', height: '100%', objectFit: 'cover' };
+const modalAvatarPlaceholderStyle = { width: '100%', height: '100%', background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 32, fontWeight: 'bold', color: 'white' };
+const modalTitleStyle = { margin: '0 0 24px 0', fontSize: 18, fontWeight: 600, color: '#111827' };
+const modalButtonsStyle = { display: 'flex', flexDirection: 'column', gap: 10 };
+const modalConfirmButtonStyle = { padding: '12px 24px', background: '#EF4444', color: 'white', border: 'none', borderRadius: 8, fontWeight: 700, fontSize: 14, cursor: 'pointer', transition: 'all 0.2s ease' };
+const modalCancelButtonStyle = { padding: '12px 24px', background: 'transparent', color: '#6B7280', border: 'none', borderRadius: 8, fontWeight: 600, fontSize: 14, cursor: 'pointer', transition: 'all 0.2s ease' };
