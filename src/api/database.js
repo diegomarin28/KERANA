@@ -935,6 +935,51 @@ export const ratingsAPI = {
         const count = data?.length || 0;
         const sum = (data || []).reduce((a, r) => a + (r.estrellas || 0), 0);
         return { data: { count, avg: count ? +(sum / count).toFixed(2) : 0 }, error: null };
+    },
+    // Agregar esta función dentro de ratingsAPI (después de getAverageForMentor)
+
+    async deleteRating(ratingId) {
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user) return { data: null, error: 'No hay usuario logueado' };
+
+        const { data: usuarioData } = await supabase
+            .from('usuario')
+            .select('id_usuario')
+            .eq('auth_id', user.id)
+            .single();
+
+        if (!usuarioData) return { data: null, error: 'Usuario no encontrado' };
+
+        // Verificar que la reseña pertenece al usuario
+        const { data: rating } = await supabase
+            .from('rating')
+            .select('user_id, created_at')
+            .eq('id', ratingId)
+            .single();
+
+        if (!rating) return { data: null, error: 'Reseña no encontrada' };
+
+        if (rating.user_id !== usuarioData.id_usuario) {
+            return { data: null, error: 'No tienes permiso para borrar esta reseña' };
+        }
+
+        // Verificar que no hayan pasado más de 24 horas
+        const createdAt = new Date(rating.created_at);
+        const now = new Date();
+        const hoursDiff = (now - createdAt) / (1000 * 60 * 60);
+
+        if (hoursDiff > 24) {
+            return { data: null, error: 'Solo puedes borrar reseñas dentro de las primeras 24 horas' };
+        }
+
+        // Borrar la reseña
+        const { data, error } = await supabase
+            .from('rating')
+            .delete()
+            .eq('id', ratingId)
+            .select();
+
+        return { data, error };
     }
 }
 // ==========================================

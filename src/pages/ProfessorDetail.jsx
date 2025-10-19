@@ -5,6 +5,7 @@ import { ratingsAPI } from '../api/Database';
 import AuthModal_HacerResenia from '../components/AuthModal_HacerResenia';
 import SubjectCarousel from '../components/SubjectCarousel';
 import ReviewsSection from '../components/ReviewsSection';
+import StarDisplay from '../components/StarDisplay';
 
 // Tags disponibles (mismo array)
 const AVAILABLE_TAGS = [
@@ -176,6 +177,11 @@ export default function ProfessorDetail() {
         loadProfessorData();
     };
 
+    const handleReviewDeleted = () => {
+        // Recargar todos los datos del profesor
+        loadProfessorData();
+    };
+
     if (loading) {
         return (
             <div style={{ maxWidth: 1200, margin: '0 auto', padding: 40, textAlign: 'center' }}>
@@ -288,19 +294,7 @@ export default function ProfessorDetail() {
                     }}>
                         {/* Calificación */}
                         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                            <div style={{
-                                display: 'flex',
-                                gap: 2,
-                                fontSize: 20
-                            }}>
-                                {[...Array(5)].map((_, i) => (
-                                    <span key={i} style={{
-                                        color: i < Math.floor(averageRating) ? '#f59e0b' : i < averageRating ? '#f59e0b' : '#e5e7eb'
-                                    }}>
-                                        {i < Math.floor(averageRating) ? '★' : i < averageRating ? '⭐' : '☆'}
-                                    </span>
-                                ))}
-                            </div>
+                            <StarDisplay rating={averageRating} size={24} />
                             <span style={{ fontWeight: 700, fontSize: 16 }}>
                                 {averageRating.toFixed(1)}
                             </span>
@@ -406,6 +400,7 @@ export default function ProfessorDetail() {
                 onFilterChange={setSelectedFilter}
                 onMateriaChange={setSelectedMateria}
                 onAddReview={() => setShowReviewModal(true)}
+                onReviewDeleted={handleReviewDeleted}
             />
 
             {/* Modal de reseña con información preseleccionada */}

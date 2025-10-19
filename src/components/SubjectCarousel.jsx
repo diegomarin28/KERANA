@@ -1,4 +1,5 @@
 import { useRef, useState, useEffect } from 'react';
+import StarDisplay from './StarDisplay';
 
 export default function SubjectCarousel({ materias, materiasByRating }) {
     const scrollRef = useRef(null);
@@ -35,20 +36,7 @@ export default function SubjectCarousel({ materias, materiasByRating }) {
         }
     };
 
-    const renderStars = (rating) => {
-        return (
-            <div style={{ display: 'flex', gap: 2 }}>
-                {[...Array(5)].map((_, i) => (
-                    <span key={i} style={{
-                        fontSize: 14,
-                        color: i < Math.floor(rating) ? '#f59e0b' : i < rating ? '#f59e0b' : '#e5e7eb'
-                    }}>
-                        {i < Math.floor(rating) ? '★' : i < rating ? '⭐' : '☆'}
-                    </span>
-                ))}
-            </div>
-        );
-    };
+
 
     return (
         <div style={{ marginBottom: 40, position: 'relative' }}>
@@ -173,8 +161,7 @@ export default function SubjectCarousel({ materias, materiasByRating }) {
                                         gap: 8,
                                         justifyContent: 'space-between'
                                     }}>
-                                        {renderStars(promedio)}
-                                        <span style={{
+                                        <StarDisplay rating={promedio} size={18} />                                        <span style={{
                                             fontSize: 13,
                                             fontWeight: 600,
                                             color: '#1f2937'
