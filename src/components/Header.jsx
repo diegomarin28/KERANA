@@ -11,6 +11,7 @@ import { useSeguidores } from "../hooks/useSeguidores";
 import { useAvatar } from '../contexts/AvatarContext';
 import { LogoutConfirmModal } from '../components/LogoutConfirmModal';
 import { useSidebarStats } from '../hooks/useSidebarStats';
+import { useMentorStatus } from '../hooks/useMentorStatus';
 
 export default function Header() {
     const [menuOpen, setMenuOpen] = useState(false);
@@ -36,6 +37,9 @@ export default function Header() {
     const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
     const { credits, seguidores, siguiendo, apuntes } = useSidebarStats();
     const headerStats = useSidebarStats();
+
+    // 🎓 Verificar si es mentor (se carga al inicio)
+    const { isMentor, loading: mentorLoading } = useMentorStatus(true);
 
 
     const openAuthModal = () => setAuthOpen(true);
@@ -490,13 +494,62 @@ export default function Header() {
                         justifyContent: "center",
                         flexWrap: "wrap",
                     }}>
-                        <PillLink to="/upload">Subir Apuntes</PillLink>
-                        <PillButton onClick={() => navigate("/mentores/postular")}>
-                            ¡Quiero ser Mentor!
-                        </PillButton>
-                        <PillButton onClick={handleReseniaClick}>
-                            ¡Hacé tu reseña!
-                        </PillButton>
+                        {mentorLoading ? (
+                            // Skeleton con shimmer de las 3 burbujas
+                            <>
+                                <span style={{
+                                    ...pillBox,
+                                    background: 'linear-gradient(90deg, rgba(255,255,255,0.1) 0%, rgba(255,255,255,0.2) 50%, rgba(255,255,255,0.1) 100%)',
+                                    backgroundSize: '200% 100%',
+                                    animation: 'shimmer 1.5s infinite',
+                                    color: 'transparent',
+                                    pointerEvents: 'none',
+                                    border: '1px solid #13346b'
+                                }}>
+                                    Subir Apuntes
+                                </span>
+                                <span style={{
+                                    ...pillBox,
+                                    background: 'linear-gradient(90deg, rgba(255,255,255,0.1) 0%, rgba(255,255,255,0.2) 50%, rgba(255,255,255,0.1) 100%)',
+                                    backgroundSize: '200% 100%',
+                                    animation: 'shimmer 1.5s infinite',
+                                    color: 'transparent',
+                                    pointerEvents: 'none',
+                                    border: '1px solid #13346b'
+                                }}>
+                                ¡Quiero ser Mentor!
+                            </span>
+                                <span style={{
+                                    ...pillBox,
+                                    background: 'linear-gradient(90deg, rgba(255,255,255,0.1) 0%, rgba(255,255,255,0.2) 50%, rgba(255,255,255,0.1) 100%)',
+                                    backgroundSize: '200% 100%',
+                                    animation: 'shimmer 1.5s infinite',
+                                    color: 'transparent',
+                                    pointerEvents: 'none',
+                                    border: '1px solid #13346b'
+                                }}>
+                ¡Hacé tu reseña!
+            </span>
+                            </>
+                        ) : (
+                            <>
+                                <PillLink to="/upload">Subir Apuntes</PillLink>
+
+                                {isMentor ? (
+                                    <PillButton onClick={() => navigate("/mentor/courses")}>
+                                        Mis Mentorías
+                                    </PillButton>
+                                ) : (
+                                    <PillButton onClick={() => navigate("/mentores/postular")}>
+                                        ¡Quiero ser Mentor!
+                                    </PillButton>
+                                )}
+
+                                <PillButton onClick={handleReseniaClick}>
+                                    ¡Hacé tu reseña!
+                                </PillButton>
+                            </>
+                        )}
                     </nav>
 
                     <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
@@ -836,12 +889,14 @@ export default function Header() {
                 onClose={() => setMenuOpen(false)}
                 isAuthenticated={!!user}
                 stats={{ credits, seguidores, siguiendo, apuntes }}
+                isMentor={isMentor}  // ← AGREGAR ESTA LÍNEA
+                mentorLoading={mentorLoading}  // ← Y ESTA
                 user={
                     user
                         ? {
                             name: displayName,
                             email: user.email,
-                            avatarUrl: getAppAvatarSrc(userProfile?.foto) || null,  // ← CAMBIO AQUÍ
+                            avatarUrl: getAppAvatarSrc(userProfile?.foto) || null,
                             credits: userProfile?.creditos || 0,
                             followers: 0,
                             following: 0,
@@ -867,6 +922,36 @@ export default function Header() {
                     setAvatarMenuOpen(false);
                 }}
             />
+            <style>{`
+    @keyframes dropdownSlide {
+        from {
+            opacity: 0;
+            transform: translateY(-12px) scale(0.96);
+        }
+        to {
+            opacity: 1;
+            transform: translateY(0) scale(1);
+        }
+    }
+    
+    @keyframes shimmer {
+        0% {
+            background-position: -200% 0;
+        }
+        100% {
+            background-position: 200% 0;
+        }
+    }
+    
+    @keyframes pulse {
+        0%, 100% {
+            opacity: 0.3;
+        }
+        50% {
+            opacity: 0.6;
+        }
+    }
+`}</style>
 
             <style>{`
     @keyframes dropdownSlide {

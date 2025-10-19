@@ -57,7 +57,7 @@ export const followersAPI = {
 
             // ✅ CREAR NOTIFICACIÓN
             try {
-                // Obtener mi nombre
+                // Obtener mi nombre y username
                 const { data: miUsuario } = await supabase
                     .from('usuario')
                     .select('nombre, username')
@@ -65,12 +65,14 @@ export const followersAPI = {
                     .single();
 
                 const miNombre = miUsuario?.nombre || miUsuario?.username || 'Alguien';
+                const miUsername = miUsuario?.username || null;
 
                 // Crear notificación para el usuario seguido
                 await notificationTypes.nuevoSeguidor(
                     miId,           // ID de quien sigue
                     usuarioId,      // ID de quien recibe la notificación
-                    miNombre        // Nombre de quien sigue
+                    miNombre,       // Nombre de quien sigue
+                    miUsername      // Username de quien sigue
                 );
 
                 console.log('✅ Notificación de seguidor creada');

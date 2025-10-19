@@ -1695,15 +1695,14 @@ export const foldersAPI = {
         if (!usuarioData) return { data: null, error: 'Usuario no encontrado' }
 
         try {
-            // 1. Obtener todas las compras del usuario
+            // 1. Obtener todas las compras del usuario CON materia
             const { data: compras, error: comprasError } = await supabase
                 .from('compra_apunte')
                 .select(`
                 id,
                 apunte_id,
-                apunte:apunte(
-                    id_materia,
-                    materia:materia(
+                apunte:apunte!inner(
+                    materia:materia!inner(
                         id_materia,
                         nombre_materia,
                         semestre
@@ -1712,20 +1711,30 @@ export const foldersAPI = {
             `)
                 .eq('comprador_id', usuarioData.id_usuario)
 
-            if (comprasError) throw comprasError
+            if (comprasError) {
+                console.error('❌ Error obteniendo compras:', comprasError)
+                throw comprasError
+            }
 
-            // 2. Agrupar por semestre y materia
+            if (!compras || compras.length === 0) {
+                return { data: { carpetasCreadas: 0 }, error: null }
+            }
+
+            // 2. Agrupar por semestre
             const estructura = {}
 
             compras.forEach(compra => {
                 const materia = compra.apunte?.materia
-                if (!materia) return
+                if (!materia || !materia.semestre) {
+                    console.log('⚠️ Compra sin materia/semestre:', compra.id)
+                    return
+                }
 
-                const semestreNum = materia.semestre || 'Sin semestre'
-                const semestreNombre = semestreNum === 'Sin semestre' ? semestreNum : `Semestre ${semestreNum}`
-
+                const semestreNum = materia.semestre
+                const semestreNombre = `Semestre ${semestreNum}` // ← "Semestre 3"
                 const nombreMateria = materia.nombre_materia
-                const idMateria = materia.id_materia
+
+                console.log(`📂 Procesando: ${semestreNombre} → ${nombreMateria}`)
 
                 if (!estructura[semestreNombre]) {
                     estructura[semestreNombre] = {}
@@ -1733,7 +1742,6 @@ export const foldersAPI = {
 
                 if (!estructura[semestreNombre][nombreMateria]) {
                     estructura[semestreNombre][nombreMateria] = {
-                        id_materia: idMateria,
                         compras: []
                     }
                 }
@@ -1741,23 +1749,32 @@ export const foldersAPI = {
                 estructura[semestreNombre][nombreMateria].compras.push(compra.id)
             })
 
-            // 3. Crear carpetas y asignar apuntes
+            console.log('📊 Estructura generada:', estructura)
+
+            // 3. Crear carpetas
             const carpetasCreadas = []
 
             for (const [nombreSemestre, materias] of Object.entries(estructura)) {
-                // Crear carpeta de semestre
-                const { data: carpetaSemestre } = await this.createFolder(
-                    nombreSemestre, // ← Ya tiene "Semestre 3" en el nombre
+                console.log(`✅ Creando carpeta: "${nombreSemestre}"`)
+
+                const { data: carpetaSemestre, error: errorSemestre } = await this.createFolder(
+                    nombreSemestre, // "Semestre 3"
                     'semestre',
                     null,
                     0
                 )
 
+                if (errorSemestre) {
+                    console.error(`❌ Error creando carpeta semestre "${nombreSemestre}":`, errorSemestre)
+                    continue
+                }
+
                 if (!carpetaSemestre) continue
 
                 carpetasCreadas.push(carpetaSemestre)
+                console.log(`✅ Carpeta creada: ${carpetaSemestre.nombre} (ID: ${carpetaSemestre.id_carpeta})`)
 
-                // Crear carpetas de materias dentro del semestre
+                // Crear carpetas de materias
                 for (const [nombreMateria, datos] of Object.entries(materias)) {
                     const { data: carpetaMateria } = await this.createFolder(
                         nombreMateria,
@@ -1770,12 +1787,14 @@ export const foldersAPI = {
 
                     carpetasCreadas.push(carpetaMateria)
 
-                    // Agregar apuntes a la carpeta de materia
+                    // Agregar apuntes
                     for (const compraId of datos.compras) {
                         await this.addNoteToFolder(carpetaMateria.id_carpeta, compraId)
                     }
                 }
             }
+
+            console.log(`✅ Organización completa. ${carpetasCreadas.length} carpetas creadas.`)
 
             return {
                 data: {
@@ -1786,7 +1805,7 @@ export const foldersAPI = {
             }
 
         } catch (error) {
-            console.error('Error en organización automática:', error)
+            console.error('❌ Error en organización automática:', error)
             return { data: null, error }
         }
     }

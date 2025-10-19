@@ -121,6 +121,7 @@ export default function Purchased() {
                     const { data: notes } = await foldersAPI.getNotesInFolder(folder.id_carpeta);
                     const subfolders = (data || []).filter(f => f.parent_id === folder.id_carpeta);
 
+                    // ✅ Calcular semestres SIEMPRE
                     let semestres = [];
                     if (notes?.length > 0) {
                         const compraIds = notes.map(n => n.compra_id);
@@ -140,7 +141,7 @@ export default function Purchased() {
                     return {
                         ...folder,
                         item_count: (notes?.length || 0) + subfolders.length,
-                        semestres
+                        semestres // ← Esto es lo importante
                     };
                 })
             );
@@ -314,22 +315,134 @@ export default function Purchased() {
             ) : (
                 <div>
                     <div style={{ display: 'flex', gap: 12, marginBottom: 24, flexWrap: 'wrap' }}>
-                        <Button variant="secondary" onClick={() => setShowCreateFolderModal(true)} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '10px 18px', borderRadius: 10, fontWeight: 600 }}>
-                            ➕ Crear carpeta
-                        </Button>
+                        <button
+                            onClick={() => setShowCreateFolderModal(true)}
+                            style={{
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: 8,
+                                padding: '10px 18px',
+                                borderRadius: 8,
+                                fontWeight: 500,
+                                fontSize: 14,
+                                background: 'white',
+                                border: '2px solid #e5e7eb',
+                                color: '#374151',
+                                cursor: 'pointer',
+                                transition: 'all 0.2s'
+                            }}
+                            onMouseEnter={(e) => e.target.style.background = '#f9fafb'}
+                            onMouseLeave={(e) => e.target.style.background = 'white'}
+                        >
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+                                <path d="M12 5v14M5 12h14"/>
+                            </svg>
+                            Crear carpeta
+                        </button>
 
                         {folders.length === 0 && purchases.length > 0 && (
-                            <Button variant="primary" onClick={() => setShowOrgModal(true)} disabled={organizing}
-                                    style={{ display: 'flex', alignItems: 'center', gap: 8, background: organizing ? '#d1d5db' : '#2563eb', border: 'none', padding: '10px 18px', borderRadius: 10, fontWeight: 600 }}>
-                                {organizing ? '⏳ Organizando...' : '🤖 Organizar con IA'}
-                            </Button>
+                            <button
+                                onClick={() => setShowOrgModal(true)}
+                                disabled={organizing}
+                                style={{
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    gap: 8,
+                                    background: organizing ? '#9ca3af' : '#2563eb',
+                                    color: 'white',
+                                    border: 'none',
+                                    padding: '10px 18px',
+                                    borderRadius: 8,
+                                    fontWeight: 500,
+                                    fontSize: 14,
+                                    cursor: organizing ? 'not-allowed' : 'pointer',
+                                    transition: 'all 0.2s'
+                                }}
+                                onMouseEnter={(e) => {
+                                    if (!organizing) e.target.style.background = '#1d4ed8';
+                                }}
+                                onMouseLeave={(e) => {
+                                    if (!organizing) e.target.style.background = '#2563eb';
+                                }}
+                            >
+                                {organizing ? (
+                                    <>
+                                        <div style={{
+                                            width: 14,
+                                            height: 14,
+                                            border: '2px solid white',
+                                            borderTop: '2px solid transparent',
+                                            borderRadius: '50%',
+                                            animation: 'spin 1s linear infinite'
+                                        }} />
+                                        Organizando...
+                                    </>
+                                ) : (
+                                    <>
+                                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                                            <circle cx="12" cy="12" r="10"/>
+                                            <circle cx="12" cy="12" r="3"/>
+                                            <path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83"/>
+                                        </svg>
+                                        Organizar automáticamente
+                                    </>
+                                )}
+                            </button>
                         )}
 
                         {folders.length > 0 && (
-                            <Button variant="secondary" onClick={handleDeleteAllFolders} disabled={organizing}
-                                    style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '10px 18px', borderRadius: 10, fontWeight: 600, color: '#dc2626', borderColor: '#fecaca' }}>
-                                🗑️ Borrar todas las carpetas
-                            </Button>
+                            <button
+                                onClick={handleDeleteAllFolders}
+                                disabled={organizing}
+                                style={{
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    gap: 8,
+                                    padding: '10px 18px',
+                                    borderRadius: 8,
+                                    fontWeight: 500,
+                                    fontSize: 14,
+                                    background: 'white',
+                                    border: '2px solid #fecaca',
+                                    color: '#dc2626',
+                                    cursor: organizing ? 'not-allowed' : 'pointer',
+                                    opacity: organizing ? 0.6 : 1,
+                                    transition: 'all 0.2s'
+                                }}
+                                onMouseEnter={(e) => {
+                                    if (!organizing) {
+                                        e.target.style.background = '#fef2f2';
+                                        e.target.style.borderColor = '#fca5a5';
+                                    }
+                                }}
+                                onMouseLeave={(e) => {
+                                    if (!organizing) {
+                                        e.target.style.background = 'white';
+                                        e.target.style.borderColor = '#fecaca';
+                                    }
+                                }}
+                            >
+                                {organizing ? (
+                                    <>
+                                        <div style={{
+                                            width: 14,
+                                            height: 14,
+                                            border: '2px solid #dc2626',
+                                            borderTop: '2px solid transparent',
+                                            borderRadius: '50%',
+                                            animation: 'spin 1s linear infinite'
+                                        }} />
+                                        Borrando...
+                                    </>
+                                ) : (
+                                    <>
+                                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                                            <path d="M3 6h18M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2"/>
+                                        </svg>
+                                        Borrar todas las carpetas
+                                    </>
+                                )}
+                            </button>
                         )}
                     </div>
 
@@ -337,12 +450,8 @@ export default function Purchased() {
                         <Card style={{ textAlign: "center", padding: "48px 24px", background: "#fafafa" }}>
                             <div style={{ fontSize: 48, marginBottom: 16 }}>📁</div>
                             <h3 style={{ margin: "0 0 12px 0", color: "#374151" }}>No tenés carpetas todavía</h3>
-                            <p style={{ color: "#6b7280", margin: "0 0 24px 0" }}>Organizá tus compras automáticamente o creá carpetas personalizadas.</p>
-                            {purchases.length > 0 && (
-                                <Button variant="primary" onClick={() => setShowOrgModal(true)} style={{ background: '#2563eb' }}>
-                                    🤖 Organizar con IA
-                                </Button>
-                            )}
+                            <p style={{ color: "#6b7280", margin: "0 0 24px 0" }}>Organizá tus compras automáticamente o creá carpetas personalizadas.
+                            </p>
                         </Card>
                     ) : (
                         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: 20 }}>

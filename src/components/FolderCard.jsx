@@ -276,6 +276,7 @@ export function FolderCard({ folder, semestres, onDragStart, onDragOver, onDrop,
                     )}
                 </div>
 
+                {/* Contenido de la card */}
                 <div style={{ padding: 16 }}>
                     <h3 style={{
                         margin: '0 0 8px 0',
@@ -289,36 +290,78 @@ export function FolderCard({ folder, semestres, onDragStart, onDragOver, onDrop,
                         display: 'flex',
                         alignItems: 'center',
                         gap: 8,
-                        marginBottom: 8
+                        marginBottom: 8,
+                        flexWrap: 'wrap'
                     }}>
-                        {/* Badge dinámico */}
-                        {semestres && semestres.length > 0 && (
-                            <span style={{
-                                padding: '2px 8px',
-                                background: '#dbeafe',
-                                color: '#2563eb',
-                                borderRadius: 12,
-                                fontSize: 12,
-                                fontWeight: 500
-                            }}>
-                                    Semestre {semestres.sort((a, b) => parseInt(a) - parseInt(b)).join(', ')}
-                                </span>
-                        )}
+                        {/* Badge dinámico - PRIORIDAD: semestres calculados */}
+                        {(() => {
+                            // 🎯 PRIORIDAD 1: Si tiene semestres calculados dinámicamente
+                            if (semestres && semestres.length > 0) {
+                                const sortedSems = semestres.sort((a, b) => parseInt(a) - parseInt(b));
+                                return (
+                                    <span style={{
+                                        padding: '4px 10px',
+                                        background: '#dbeafe',
+                                        color: '#2563eb',
+                                        borderRadius: 12,
+                                        fontSize: 12,
+                                        fontWeight: 600
+                                    }}>
+                        Semestre {sortedSems.join(', ')}
+                    </span>
+                                );
+                            }
 
-                        {/* Badge de tipo (solo si no hay semestres) */}
-                        {(!semestres || semestres.length === 0) && (
-                            <span style={{
-                                padding: '2px 8px',
-                                background: bgColor,
-                                color: iconColor,
-                                borderRadius: 12,
-                                fontSize: 12,
-                                fontWeight: 500,
-                                textTransform: 'capitalize'
-                            }}>
-                                {folder.tipo}
-                            </span>
-                        )}
+                            // 🎯 PRIORIDAD 2: Si es carpeta de semestre, extraer del nombre
+                            if (folder.tipo === 'semestre' && folder.nombre) {
+                                const match = folder.nombre.match(/Semestre (\d+)/);
+                                if (match) {
+                                    return (
+                                        <span style={{
+                                            padding: '4px 10px',
+                                            background: '#dbeafe',
+                                            color: '#2563eb',
+                                            borderRadius: 12,
+                                            fontSize: 12,
+                                            fontWeight: 600
+                                        }}>
+                            Semestre {match[1]}
+                        </span>
+                                    );
+                                }
+                            }
+
+                            // 🎯 PRIORIDAD 3: Si es carpeta de materia
+                            if (folder.tipo === 'materia') {
+                                return (
+                                    <span style={{
+                                        padding: '4px 10px',
+                                        background: '#d1fae5',
+                                        color: '#059669',
+                                        borderRadius: 12,
+                                        fontSize: 12,
+                                        fontWeight: 500
+                                    }}>
+                        Materia
+                    </span>
+                                );
+                            }
+
+                            // 🎯 DEFAULT: Carpeta personalizada
+                            return (
+                                <span style={{
+                                    padding: '4px 10px',
+                                    background: '#f3f4f6',
+                                    color: '#6b7280',
+                                    borderRadius: 12,
+                                    fontSize: 12,
+                                    fontWeight: 500,
+                                    textTransform: 'capitalize'
+                                }}>
+                    Personalizada
+                </span>
+                            );
+                        })()}
                     </div>
 
                     <div style={{

@@ -2,10 +2,12 @@ import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useNotificationsContext } from '../contexts/NotificationsContext';
 import { useTabBadge } from '../hooks/useTabBadge';
+import { useSeguidores } from '../hooks/useSeguidores';
 
 export default function NotificationBadge() {
     const [isOpen, setIsOpen] = useState(false);
     const [shouldAnimate, setShouldAnimate] = useState(false);
+    const [followingStates, setFollowingStates] = useState({});
     const dropdownRef = useRef(null);
     const navigate = useNavigate();
     const prevUnreadCount = useRef(0);
@@ -19,6 +21,8 @@ export default function NotificationBadge() {
         marcarTodasLeidas,
         eliminarNotificacion,
     } = useNotificationsContext();
+
+    const { seguirUsuario, verificarSiSigue } = useSeguidores();
 
     // Tab badge para título del navegador
     useTabBadge(unreadCount);
@@ -35,7 +39,6 @@ export default function NotificationBadge() {
     // 🚪 Cerrar automáticamente si no hay notificaciones
     useEffect(() => {
         if (isOpen && notificaciones.length === 0) {
-            console.log('📪 No hay notificaciones, cerrando modal');
             setIsOpen(false);
         }
     }, [notificaciones.length, isOpen]);
@@ -43,13 +46,11 @@ export default function NotificationBadge() {
     // 🕐 Auto-marcar como leídas después de 15s con modal abierto
     useEffect(() => {
         if (isOpen && unreadCount > 0) {
-            // Iniciar timer de 15 segundos
             autoMarkTimerRef.current = setTimeout(() => {
                 console.log('⏰ 15s transcurridos, marcando todas como leídas');
                 marcarTodasLeidas();
             }, 15000);
         } else {
-            // Cancelar timer si se cierra el modal
             if (autoMarkTimerRef.current) {
                 clearTimeout(autoMarkTimerRef.current);
                 autoMarkTimerRef.current = null;
@@ -62,6 +63,26 @@ export default function NotificationBadge() {
             }
         };
     }, [isOpen, unreadCount, marcarTodasLeidas]);
+
+    // ✅ Verificar estado de seguimiento INMEDIATAMENTE cuando llegan notificaciones
+    useEffect(() => {
+        const checkFollowingStates = async () => {
+            const states = {};
+            const promises = notificaciones
+                .filter(notif => notif.tipo === 'nuevo_seguidor' && notif.emisor_id)
+                .map(async (notif) => {
+                    const result = await verificarSiSigue(notif.emisor_id);
+                    states[notif.emisor_id] = result.sigue;
+                });
+
+            await Promise.all(promises);
+            setFollowingStates(states);
+        };
+
+        if (notificaciones.length > 0) {
+            checkFollowingStates();
+        }
+    }, [notificaciones, verificarSiSigue]);
 
     // Cerrar con ESC
     useEffect(() => {
@@ -90,16 +111,36 @@ export default function NotificationBadge() {
     const handleNotificationClick = async (e, notif) => {
         e.stopPropagation();
 
-        // Solo marcar como leída, NO redireccionar
+        // Marcar como leída
         if (!notif.leida) {
             await marcarComoLeida(notif.id);
+        }
+
+        // Si es "nuevo_seguidor", ir al perfil del emisor
+        if (notif.tipo === 'nuevo_seguidor' && notif.emisor?.username) {
+            setIsOpen(false);
+            navigate(`/user/${notif.emisor.username}`);
+        }
+    };
+
+    const handleFollowBack = async (e, notif) => {
+        e.stopPropagation();
+
+        if (!notif.emisor_id) return;
+
+        const result = await seguirUsuario(notif.emisor_id);
+        if (result.success) {
+            // Actualizar estado local
+            setFollowingStates(prev => ({
+                ...prev,
+                [notif.emisor_id]: true
+            }));
         }
     };
 
     const handleDelete = async (e, notifId) => {
         e.stopPropagation();
         await eliminarNotificacion(notifId);
-        // El useEffect de arriba cerrará automáticamente si era la última
     };
 
     const handleVerTodas = () => {
@@ -120,7 +161,7 @@ export default function NotificationBadge() {
 
     return (
         <div ref={dropdownRef} style={{ position: 'relative' }}>
-            {/* Botón Badge con animación */}
+            {/* Botón Badge */}
             <button
                 onClick={() => setIsOpen(!isOpen)}
                 className={shouldAnimate ? 'badge-bounce' : ''}
@@ -155,7 +196,6 @@ export default function NotificationBadge() {
                     />
                 </svg>
 
-                {/* Contador con animación */}
                 {unreadCount > 0 && (
                     <span style={{
                         position: 'absolute',
@@ -184,7 +224,7 @@ export default function NotificationBadge() {
                     position: 'absolute',
                     top: 50,
                     right: 0,
-                    width: 380,
+                    width: 420,
                     maxHeight: 500,
                     background: '#ffffff',
                     borderRadius: 12,
@@ -264,136 +304,185 @@ export default function NotificationBadge() {
                                 textAlign: 'center',
                                 color: '#64748b',
                             }}>
-                                <div style={{ fontSize: 40, marginBottom: 8 }}>🔕</div>
+                                <div style={{ fontSize: 40, marginBottom: 8 }}>🔔</div>
                                 <p style={{ margin: 0, fontSize: 14 }}>
                                     No tenés notificaciones
                                 </p>
                             </div>
                         ) : (
-                            recentNotifications.map((notif) => (
-                                <div
-                                    key={notif.id}
-                                    onClick={(e) => handleNotificationClick(e, notif)}
-                                    style={{
-                                        position: 'relative',
-                                        padding: '12px 20px',
-                                        borderBottom: '1px solid #f3f4f6',
-                                        background: notif.leida ? '#fff' : '#f0f9ff',
-                                        cursor: 'pointer',
-                                        transition: 'background 0.2s ease',
-                                        display: 'flex',
-                                        gap: 12,
-                                        alignItems: 'flex-start',
-                                    }}
-                                    onMouseEnter={(e) => {
-                                        e.currentTarget.style.background = notif.leida ? '#f8fafc' : '#e0f2fe';
-                                    }}
-                                    onMouseLeave={(e) => {
-                                        e.currentTarget.style.background = notif.leida ? '#fff' : '#f0f9ff';
-                                    }}
-                                >
-                                    {/* Avatar */}
-                                    {notif.emisor?.foto ? (
-                                        <img
-                                            src={notif.emisor.foto}
-                                            alt={notif.emisor.nombre}
-                                            style={{
-                                                width: 36,
-                                                height: 36,
-                                                borderRadius: '50%',
-                                                objectFit: 'cover',
-                                                border: '2px solid #e5e7eb',
-                                                flexShrink: 0,
-                                            }}
-                                        />
-                                    ) : (
-                                        <div style={{
-                                            width: 36,
-                                            height: 36,
-                                            borderRadius: '50%',
-                                            background: 'linear-gradient(135deg, #3b82f6 0%, #1e40af 100%)',
-                                            color: '#fff',
-                                            display: 'grid',
-                                            placeItems: 'center',
-                                            fontSize: 14,
-                                            fontWeight: 700,
-                                            flexShrink: 0,
-                                        }}>
-                                            {notif.emisor?.nombre?.[0]?.toUpperCase() || '?'}
-                                        </div>
-                                    )}
+                            recentNotifications.map((notif) => {
+                                const isFollowerNotif = notif.tipo === 'nuevo_seguidor';
+                                const isFollowing = followingStates[notif.emisor_id];
 
-                                    {/* Contenido */}
-                                    <div style={{ flex: 1, minWidth: 0, paddingRight: 30 }}>
-                                        <p style={{
-                                            margin: '0 0 4px 0',
-                                            fontSize: 13,
-                                            color: '#0f172a',
-                                            lineHeight: 1.4,
-                                            fontWeight: notif.leida ? 400 : 600,
-                                        }}>
-                                            <strong>{notif.emisor?.nombre || 'Alguien'}</strong> {notif.mensaje}
-                                        </p>
-                                        <span style={{
-                                            fontSize: 11,
-                                            color: '#94a3b8',
-                                        }}>
-                                            {formatTimeAgo(notif.creado_en)}
-                                        </span>
-                                    </div>
-
-                                    {/* Botón eliminar */}
-                                    <button
-                                        onClick={(e) => handleDelete(e, notif.id)}
+                                return (
+                                    <div
+                                        key={notif.id}
+                                        onClick={(e) => handleNotificationClick(e, notif)}
                                         style={{
-                                            position: 'absolute',
-                                            top: 10,
-                                            right: 10,
-                                            width: 24,
-                                            height: 24,
-                                            borderRadius: '50%',
-                                            background: 'transparent',
-                                            border: 'none',
-                                            color: '#94a3b8',
-                                            cursor: 'pointer',
-                                            display: 'flex',
-                                            alignItems: 'center',
-                                            justifyContent: 'center',
-                                            fontSize: 18,
-                                            fontWeight: 700,
-                                            transition: 'all 0.2s ease',
+                                            position: 'relative',
+                                            padding: '12px 20px',
+                                            borderBottom: '1px solid #f3f4f6',
+                                            background: notif.leida ? '#fff' : '#f0f9ff',
+                                            cursor: isFollowerNotif ? 'pointer' : 'default',
+                                            transition: 'background 0.2s ease',
                                         }}
                                         onMouseEnter={(e) => {
-                                            e.currentTarget.style.background = '#fef2f2';
-                                            e.currentTarget.style.color = '#dc2626';
+                                            if (isFollowerNotif) {
+                                                e.currentTarget.style.background = notif.leida ? '#f8fafc' : '#e0f2fe';
+                                            }
                                         }}
                                         onMouseLeave={(e) => {
-                                            e.currentTarget.style.background = 'transparent';
-                                            e.currentTarget.style.color = '#94a3b8';
+                                            e.currentTarget.style.background = notif.leida ? '#fff' : '#f0f9ff';
                                         }}
-                                        aria-label="Eliminar notificación"
                                     >
-                                        ×
-                                    </button>
+                                        <div style={{ display: 'flex', gap: 12, alignItems: 'center', paddingRight: 30 }}>
+                                            {/* Avatar */}
+                                            {notif.emisor?.foto ? (
+                                                <img
+                                                    src={notif.emisor.foto}
+                                                    alt={notif.emisor.nombre}
+                                                    style={{
+                                                        width: 36,
+                                                        height: 36,
+                                                        borderRadius: '50%',
+                                                        objectFit: 'cover',
+                                                        border: '2px solid #e5e7eb',
+                                                        flexShrink: 0,
+                                                    }}
+                                                />
+                                            ) : (
+                                                <div style={{
+                                                    width: 36,
+                                                    height: 36,
+                                                    borderRadius: '50%',
+                                                    background: 'linear-gradient(135deg, #3b82f6 0%, #1e40af 100%)',
+                                                    color: '#fff',
+                                                    display: 'grid',
+                                                    placeItems: 'center',
+                                                    fontSize: 14,
+                                                    fontWeight: 700,
+                                                    flexShrink: 0,
+                                                }}>
+                                                    {notif.emisor?.nombre?.[0]?.toUpperCase() || '?'}
+                                                </div>
+                                            )}
 
-                                    {/* Indicador no leída */}
-                                    {!notif.leida && (
-                                        <div style={{
-                                            position: 'absolute',
-                                            top: 14,
-                                            right: 40,
-                                            width: 8,
-                                            height: 8,
-                                            borderRadius: '50%',
-                                            background: '#2563eb',
-                                        }} />
-                                    )}
-                                </div>
-                            ))
+                                            {/* Contenido: Mensaje + Tiempo */}
+                                            <div style={{ flex: 1, minWidth: 0 }}>
+                                                <p style={{
+                                                    margin: 0,
+                                                    fontSize: 13,
+                                                    color: '#0f172a',
+                                                    lineHeight: 1.4,
+                                                    fontWeight: notif.leida ? 400 : 600,
+                                                }}>
+                                                    <strong>{notif.emisor?.nombre || 'Alguien'}</strong> {notif.mensaje}{' '}
+                                                    <span style={{
+                                                        fontSize: 11,
+                                                        color: '#94a3b8',
+                                                        fontWeight: 400,
+                                                    }}>
+                                                        {formatTimeAgo(notif.creado_en)}
+                                                    </span>
+                                                </p>
+                                            </div>
+
+                                            {/* Botón Seguir o Estado */}
+                                            {isFollowerNotif && !isFollowing && (
+                                                <button
+                                                    onClick={(e) => handleFollowBack(e, notif)}
+                                                    style={{
+                                                        padding: '6px 20px',
+                                                        fontSize: 13,
+                                                        fontWeight: 600,
+                                                        color: '#fff',
+                                                        background: '#2563eb',
+                                                        border: 'none',
+                                                        borderRadius: 6,
+                                                        cursor: 'pointer',
+                                                        transition: 'all 0.2s ease',
+                                                        whiteSpace: 'nowrap',
+                                                        flexShrink: 0,
+                                                    }}
+                                                    onMouseEnter={(e) => {
+                                                        e.target.style.background = '#1d4ed8';
+                                                    }}
+                                                    onMouseLeave={(e) => {
+                                                        e.target.style.background = '#2563eb';
+                                                    }}
+                                                >
+                                                    Seguir
+                                                </button>
+                                            )}
+                                            {isFollowerNotif && isFollowing && (
+                                                <span style={{
+                                                    padding: '6px 20px',
+                                                    fontSize: 13,
+                                                    color: '#6b7280',
+                                                    fontWeight: 600,
+                                                    background: '#f3f4f6',
+                                                    borderRadius: 6,
+                                                    whiteSpace: 'nowrap',
+                                                    flexShrink: 0,
+                                                }}>
+                                                    Siguiendo
+                                                </span>
+                                            )}
+                                        </div>
+
+                                        {/* Botón eliminar - arriba a la derecha */}
+                                        <button
+                                            onClick={(e) => handleDelete(e, notif.id)}
+                                            style={{
+                                                position: 'absolute',
+                                                top: 8,
+                                                right: 8,
+                                                width: 20,
+                                                height: 20,
+                                                borderRadius: '50%',
+                                                background: 'transparent',
+                                                border: 'none',
+                                                color: '#94a3b8',
+                                                cursor: 'pointer',
+                                                display: 'flex',
+                                                alignItems: 'center',
+                                                justifyContent: 'center',
+                                                fontSize: 16,
+                                                fontWeight: 700,
+                                                transition: 'all 0.2s ease',
+                                            }}
+                                            onMouseEnter={(e) => {
+                                                e.currentTarget.style.background = '#fef2f2';
+                                                e.currentTarget.style.color = '#dc2626';
+                                            }}
+                                            onMouseLeave={(e) => {
+                                                e.currentTarget.style.background = 'transparent';
+                                                e.currentTarget.style.color = '#94a3b8';
+                                            }}
+                                            aria-label="Eliminar notificación"
+                                        >
+                                            ×
+                                        </button>
+
+                                        {/* Indicador no leída */}
+                                        {!notif.leida && (
+                                            <div style={{
+                                                position: 'absolute',
+                                                top: 12,
+                                                right: 34,
+                                                width: 8,
+                                                height: 8,
+                                                borderRadius: '50%',
+                                                background: '#2563eb',
+                                            }} />
+                                        )}
+                                    </div>
+                                );
+                            })
                         )}
                     </div>
 
-                    {/* Footer con botones */}
+                    {/* Footer */}
                     {recentNotifications.length > 0 && (
                         <div style={{
                             padding: '12px 20px',
@@ -455,7 +544,7 @@ export default function NotificationBadge() {
     );
 }
 
-// Helper para formatear tiempo
+// Helper
 function formatTimeAgo(dateString) {
     const date = new Date(dateString);
     const now = new Date();
@@ -471,7 +560,7 @@ function formatTimeAgo(dateString) {
     return date.toLocaleDateString();
 }
 
-// Agregar animaciones si no existen
+// Animaciones
 if (typeof document !== 'undefined' && !document.getElementById('notification-animations')) {
     const style = document.createElement('style');
     style.id = 'notification-animations';

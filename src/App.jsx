@@ -6,6 +6,7 @@ import Home from "./pages/Home.jsx";
 import AuthGuard from "./components/AuthGuard";
 import Equipo from "./pages/Equipo";
 import { AvatarProvider } from './contexts/AvatarContext';
+import { ConnectionMonitor } from './components/ConnectionMonitor';
 
 // Componentes lazy
 const HelpCenter = lazy(() => import("./pages/HelpCenter"));
@@ -228,6 +229,7 @@ export default function App() {
                     <NotificationsProvider>
                         <NotificationsRealtimeSubscriber />
                         <PrivacyBanner />
+                        <ConnectionMonitor />
                         <AppRoutes />
                     </NotificationsProvider>
                 </NotificationProvider>
