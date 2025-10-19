@@ -38,21 +38,21 @@ export default function Favorites() {
 
             let noteItems = [];
             if (notesFav?.length) {
-
                 const apIds = notesFav.map(r => r.id_apunte);
+
                 const { data: apuntes, error: apuntesError } = await supabase
                     .from('apunte')
                     .select(`
-                                id_apunte,
-                                titulo,
-                                descripcion,
-                                creditos,
-                                estrellas,
-                                id_materia,
-                                id_usuario,
-                                file_path,
-                                materia:id_materia(nombre_materia)
-                            `)
+            id_apunte,
+            titulo,
+            descripcion,
+            creditos,
+            estrellas,
+            id_materia,
+            id_usuario,
+            file_path,
+            materia:id_materia(nombre_materia)
+        `)
                     .in('id_apunte', apIds);
 
                 if (apuntesError) {
@@ -60,6 +60,24 @@ export default function Favorites() {
                     throw apuntesError;
                 }
                 console.log('Apuntes cargados:', apuntes);
+
+                // Contar likes por apunte
+                const { data: likesData, error: likesError } = await supabase
+                    .from('likes')
+                    .select('id_apunte')
+                    .eq('tipo', 'like')
+                    .in('id_apunte', apIds);
+
+                if (likesError) {
+                    console.error('Error cargando likes:', likesError);
+                }
+
+                // Crear un mapa de conteo de likes
+                const likesCountMap = {};
+                likesData?.forEach(like => {
+                    likesCountMap[like.id_apunte] = (likesCountMap[like.id_apunte] || 0) + 1;
+                });
+
                 // autor (opcional)
                 let userMap = {};
                 const uIds = [...new Set((apuntes || []).map(a => a.id_usuario).filter(Boolean))];
@@ -95,11 +113,11 @@ export default function Favorites() {
                                 titulo: a.titulo,
                                 descripcion: a.descripcion,
                                 creditos: a.creditos,
-                                estrellas: a.estrellas,
                                 signedUrl: a.signedUrl,
                                 materia: a.materia,
                                 usuario: { nombre: userMap[a.id_usuario] || 'Anónimo' },
-                                id_usuario: a.id_usuario
+                                id_usuario: a.id_usuario,
+                                likes_count: likesCountMap[a.id_apunte] || 0  // ← NUEVO
                             }
                         } : null;
                     })

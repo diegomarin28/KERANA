@@ -185,16 +185,16 @@ async function searchNotes(term) {
         const { data: apuntesCompletos, error: errorCompleto } = await supabase
             .from('apunte')
             .select(`
-                id_apunte,
-                titulo,
-                descripcion,
-                file_path,
-                estrellas,
-                creditos,
-                id_usuario,
-                id_materia,
-                materia(nombre_materia)
-            `)
+        id_apunte,
+        titulo,
+        descripcion,
+        file_path,
+        estrellas,
+        creditos,
+        id_usuario,
+        id_materia,
+        materia(nombre_materia)
+    `)
             .in('id_apunte', ids);
 
         if (errorCompleto) {
@@ -202,6 +202,23 @@ async function searchNotes(term) {
             return { data: [], error: errorCompleto };
         }
 
+// 3.5️⃣ Contar likes por apunte
+        const apunteIds = apuntesCompletos.map(a => a.id_apunte);
+        const { data: likesData, error: likesError } = await supabase
+            .from('likes')
+            .select('id_apunte')
+            .eq('tipo', 'like')
+            .in('id_apunte', apunteIds);
+
+        if (likesError) {
+            console.error('Error cargando likes:', likesError);
+        }
+
+        // Crear un mapa de conteo de likes
+        const likesCountMap = {};
+        likesData?.forEach(like => {
+            likesCountMap[like.id_apunte] = (likesCountMap[like.id_apunte] || 0) + 1;
+        });
         // 4️⃣ Obtener nombres de usuarios separadamente
         const userIds = [...new Set(apuntesCompletos.map(a => a.id_usuario))];
         const { data: usuarios } = await supabase
@@ -236,7 +253,8 @@ async function searchNotes(term) {
                 file_path: a.file_path,
                 signedUrl: signedUrl,
                 materia: a.materia,
-                usuario: { nombre: userMap.get(a.id_usuario) || 'Anónimo' }
+                usuario: { nombre: userMap.get(a.id_usuario) || 'Anónimo' },
+                likes_count: likesCountMap[a.id_apunte] || 0  // ← AGREGAR ESTA LÍNEA
             });
         }
 

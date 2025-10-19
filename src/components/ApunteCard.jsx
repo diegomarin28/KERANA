@@ -57,9 +57,16 @@ export default function ApunteCard({ note }) {
                     }}>
                         {note.materia?.nombre_materia || 'Sin materia'}
                     </span>
-                    {note.estrellas > 0 && (
-                        <span style={{ color: '#f59e0b', fontSize: 14 }}>
-                            {'★'.repeat(note.estrellas)}
+                    {(note.likes_count !== undefined && note.likes_count !== null) && (
+                        <span style={{
+                            color: '#2563eb',
+                            fontSize: 14,
+                            fontWeight: 600,
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: 4
+                        }}>
+                         👍 {note.likes_count}
                         </span>
                     )}
                 </div>
