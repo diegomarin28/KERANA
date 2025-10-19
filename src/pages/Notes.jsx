@@ -21,30 +21,54 @@ export default function Notes() {
             const { data, error } = await supabase
                 .from('apunte')
                 .select(`
-                    id_apunte,
-                    titulo,
-                    descripcion,
-                    creditos,
-                    estrellas,
-                    created_at,
-                    file_path,
-                    usuario:id_usuario(nombre),
-                    materia:id_materia(nombre_materia)
-                `)
+                id_apunte,
+                titulo,
+                descripcion,
+                creditos,
+                created_at,
+                file_path,
+                usuario:id_usuario(nombre),
+                materia:id_materia(nombre_materia)
+            `)
                 .order('created_at', { ascending: false })
                 .limit(50);
 
             if (error) throw error;
-            setNotes(data || []);
 
-            // 🆕 Generar signed URLs para todos los apuntes
+            // Contar likes por apunte
+            const apIds = (data || []).map(n => n.id_apunte);
+            const { data: likesData, error: likesError } = await supabase
+                .from('likes')
+                .select('id_apunte')
+                .eq('tipo', 'like')
+                .in('id_apunte', apIds);
+
+            if (likesError) {
+                console.error('Error cargando likes:', likesError);
+            }
+
+            // Crear un mapa de conteo de likes
+            const likesCountMap = {};
+            likesData?.forEach(like => {
+                likesCountMap[like.id_apunte] = (likesCountMap[like.id_apunte] || 0) + 1;
+            });
+
+            // Agregar likes_count a cada apunte
+            const notesWithLikes = (data || []).map(note => ({
+                ...note,
+                likes_count: likesCountMap[note.id_apunte] || 0
+            }));
+
+            setNotes(notesWithLikes);
+
+            // Generar signed URLs para todos los apuntes
             if (data && data.length > 0) {
                 const urls = {};
                 for (const note of data) {
                     if (note.file_path) {
                         const { data: signedData, error: signedError } = await supabase.storage
                             .from('apuntes')
-                            .createSignedUrl(note.file_path, 3600); // Válida por 1 hora
+                            .createSignedUrl(note.file_path, 3600);
 
                         if (!signedError && signedData) {
                             urls[note.id_apunte] = signedData.signedUrl;

@@ -20,9 +20,9 @@ export const ApunteView = () => {
     const [currentUserId, setCurrentUserId] = useState(null);
     const [userCredits, setUserCredits] = useState(0);
     const [hasPurchased, setHasPurchased] = useState(false);
-    const [averageStars, setAverageStars] = useState(0);
-    const [totalReviews, setTotalReviews] = useState(0);
     const [purchasing, setPurchasing] = useState(false);
+    const [likesCount, setLikesCount] = useState(0);
+    const [dislikesCount, setDislikesCount] = useState(0);
     const [showSuccessModal, setShowSuccessModal] = useState(false);
     const [showErrorModal, setShowErrorModal] = useState(false);
     const [errorMessage, setErrorMessage] = useState("");
@@ -140,8 +140,8 @@ export const ApunteView = () => {
                 setUserLike(likeData.tipo);
             }
 
-            await calculateAverageStars(id);
 
+            await loadLikesCount(id);
         } catch (err) {
             console.error('Error cargando apunte:', err);
             setError(err.message || "Error cargando el apunte");
@@ -150,64 +150,25 @@ export const ApunteView = () => {
         }
     };
 
-    const calculateAverageStars = async (apunteId) => {
+    const loadLikesCount = async (apunteId) => {
         try {
-            const { data: reviews, error: reviewsError } = await supabase
-                .from('puntua')
-                .select(`
-                    numero_estrellas,
-                    id_usuario
-                `)
+            const { data: likesData, error } = await supabase
+                .from('likes')
+                .select('tipo')
                 .eq('id_apunte', apunteId);
 
-            if (reviewsError) throw reviewsError;
-            if (!reviews || reviews.length === 0) {
-                setAverageStars(0);
-                setTotalReviews(0);
-                return;
-            }
+            if (error) throw error;
 
-            setTotalReviews(reviews.length);
+            const likes = likesData?.filter(l => l.tipo === 'like').length || 0;
+            const dislikes = likesData?.filter(l => l.tipo === 'dislike').length || 0;
 
-            if (reviews.length < 10) {
-                const simpleAvg = reviews.reduce((sum, r) => sum + r.numero_estrellas, 0) / reviews.length;
-                setAverageStars(simpleAvg);
-                return;
-            }
-
-            const userIds = [...new Set(reviews.map(r => r.id_usuario))];
-
-            const { data: userPurchases, error: purchasesError } = await supabase
-                .from('compra_apunte')
-                .select('comprador_id')
-                .in('comprador_id', userIds);
-
-            if (purchasesError) throw purchasesError;
-
-            const purchaseCount = {};
-            userPurchases?.forEach(p => {
-                purchaseCount[p.comprador_id] = (purchaseCount[p.comprador_id] || 0) + 1;
-            });
-
-            let weightedSum = 0;
-            let totalWeight = 0;
-
-            reviews.forEach(review => {
-                const userTotalPurchases = purchaseCount[review.id_usuario] || 0;
-                const weight = userTotalPurchases < 5 ? 0.5 : 1.0;
-
-                weightedSum += review.numero_estrellas * weight;
-                totalWeight += weight;
-            });
-
-            const weightedAvg = totalWeight > 0 ? weightedSum / totalWeight : 0;
-            setAverageStars(weightedAvg);
-
+            setLikesCount(likes);
+            setDislikesCount(dislikes);
         } catch (err) {
-            console.error('Error calculando promedio de estrellas:', err);
-            setAverageStars(0);
+            console.error('Error cargando likes/dislikes:', err);
         }
     };
+
 
     const handlePurchase = async () => {
         if (!apunte || !currentUserId) return;
@@ -241,14 +202,7 @@ export const ApunteView = () => {
 
             if (compraError) throw compraError;
 
-            let creditosVendedor = 5;
-
-            if (totalReviews >= 10) {
-                if (averageStars >= 4.5) creditosVendedor = 100;
-                else if (averageStars >= 3.5) creditosVendedor = 60;
-                else if (averageStars >= 2.5) creditosVendedor = 30;
-                else creditosVendedor = 10;
-            }
+            const creditosVendedor = 5;
 
             const { error: agregarError } = await supabase.rpc('agregar_creditos', {
                 uid: apunte.id_usuario,
@@ -258,6 +212,7 @@ export const ApunteView = () => {
             if (agregarError) {
                 console.error('Error agregando créditos al vendedor:', agregarError);
             }
+
 
             setHasPurchased(true);
             setUserCredits(prev => prev - apunte.creditos);
@@ -444,8 +399,8 @@ export const ApunteView = () => {
                 // 4. Enviar email con EmailJS
                 try {
                     await emailjs.send(
-                        "service_dan74a5", // Tu service ID
-                        "TU_TEMPLATE_ID_AQUI", // ⚠️ REEMPLAZÁ con el template ID que creaste
+                        "service_fbf675u",
+                        "template_sn2a1ih", // ⚠️ REEMPLAZÁ con el template ID que creaste
                         {
                             titulo_apunte: apunte.titulo,
                             id_apunte: apunte.id_apunte,
@@ -459,12 +414,12 @@ export const ApunteView = () => {
                             link_apunte: `${window.location.origin}/apuntes/${apunte.id_apunte}`,
                             to_email: "kerana.soporte@gmail.com"
                         },
-                        "DMO310micvFWXx-j4" // Tu public key
+                        "JA_sGzk8UJMPOtSmE"// Tu public key
                     );
                     console.log('✅ Email de reporte enviado');
                 } catch (emailError) {
                     console.error('❌ Error enviando email:', emailError);
-                    // No bloqueamos el flujo si falla el email
+
                 }
 
                 // 5. Mostrar modal de agradecimiento
@@ -772,21 +727,24 @@ export const ApunteView = () => {
                             </div>
                         )}
 
-                        <div style={{ marginBottom: 16, padding: '12px 16px', background: '#eff6ff', borderRadius: 12, border: '1px solid #bfdbfe' }}>
-                            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                                <span style={{ fontSize: 18, color: '#f59e0b', fontWeight: 700 }}>
-                                    {totalReviews > 0 ? averageStars.toFixed(1) : '--'} ★
-                                </span>
-                                <span style={{ fontSize: 13, color: '#1e40af' }}>
-                                    {totalReviews > 0
-                                        ? `(${totalReviews} reseña${totalReviews !== 1 ? 's' : ''})`
-                                        : '(Sin calificaciones)'}
-                                </span>
-                                {totalReviews > 0 && totalReviews < 10 && (
-                                    <span style={{ fontSize: 12, color: '#1e40af', marginLeft: 'auto', fontStyle: 'italic' }}>
-                                        +{10 - totalReviews} para bonificación
-                                    </span>
-                                )}
+                        {/* ✅ NUEVO (reemplaza el cuadro de estrellas) */}
+                        <div style={{ marginBottom: 16, padding: '16px', background: '#f9fafb', borderRadius: 12, border: '1px solid #e5e7eb' }}>
+                            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 24 }}>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                                    <span style={{ fontSize: 24 }}>👍</span>
+                                    <span style={{ fontSize: 18, fontWeight: 700, color: '#2563eb' }}>
+                {likesCount}
+            </span>
+                                    <span style={{ fontSize: 14, color: '#6b7280' }}>likes</span>
+                                </div>
+                                <div style={{ width: 2, height: 30, background: '#d1d5db' }} />
+                                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                                    <span style={{ fontSize: 24 }}>👎</span>
+                                    <span style={{ fontSize: 18, fontWeight: 700, color: '#ef4444' }}>
+                {dislikesCount}
+            </span>
+                                    <span style={{ fontSize: 14, color: '#6b7280' }}>dislikes</span>
+                                </div>
                             </div>
                         </div>
 

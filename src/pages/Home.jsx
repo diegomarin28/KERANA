@@ -40,14 +40,28 @@ export default function Home() {
                 const { data: apuntes, error: apError } = await supabase
                     .from('apunte')
                     .select(`
-                                     id_apunte, 
-                                     file_path,
-                                     usuario:id_usuario(nombre)
-                                     `)
+                    id_apunte, 
+                    file_path,
+                    usuario:id_usuario(nombre)
+                `)
                     .in('id_apunte', apIds);
 
-
                 if (apError) throw apError;
+
+                // Contar likes por apunte
+                const { data: likesData, error: likesError } = await supabase
+                    .from('likes')
+                    .select('id_apunte')
+                    .eq('tipo', 'like')
+                    .in('id_apunte', apIds);
+
+                if (likesError) throw likesError;
+
+                // Crear un mapa de conteo de likes
+                const likesCountMap = {};
+                likesData?.forEach(like => {
+                    likesCountMap[like.id_apunte] = (likesCountMap[like.id_apunte] || 0) + 1;
+                });
 
                 const filePathMap = new Map(apuntes.map(a => [a.id_apunte, a.file_path]));
 
@@ -71,7 +85,8 @@ export default function Home() {
                     return {
                         ...note,
                         usuario: apunte?.usuario || { nombre: 'Anónimo' },
-                        signedUrl: urls[note.apunte_id] || null
+                        signedUrl: urls[note.apunte_id] || null,
+                        likes_count: likesCountMap[note.apunte_id] || 0
                     };
                 });
 
@@ -234,10 +249,11 @@ export default function Home() {
                                                 titulo: n.titulo,
                                                 descripcion: n.descripcion || '',
                                                 creditos: n.creditos,
-                                                estrellas: n.rating_promedio || 0,
+//                                                estrellas: n.rating_promedio || 0,
                                                 usuario: { nombre: n.usuario_nombre },  // ← CAMBIO
                                                 materia: { nombre_materia: n.nombre_materia },  // ← CAMBIO
-                                                signedUrl: n.signedUrl
+                                                signedUrl: n.signedUrl,
+                                                likes_count: n.likes_count  // ← NUEVO
                                             }}
                                         />
                                     </div>
