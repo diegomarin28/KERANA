@@ -1,4 +1,5 @@
 import { Link } from "react-router-dom";
+import StarDisplay from "./StarDisplay";
 
 export default function ProfessorCard({ professor }) {
     const rating = professor.rating_promedio || professor.estrellas || 0;
@@ -63,16 +64,7 @@ export default function ProfessorCard({ professor }) {
                         </p>
 
                         <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                            <div style={{ display: "flex", gap: 2 }}>
-                                {Array.from({ length: 5 }, (_, i) => (
-                                    <span key={i} style={{
-                                        color: i < Math.floor(rating) ? "#F59E0B" : "#E5E7EB",
-                                        fontSize: 14
-                                    }}>
-                                        ★
-                                    </span>
-                                ))}
-                            </div>
+                            <StarDisplay rating={rating} size={16} />
                             <span style={{
                                 fontSize: 14,
                                 color: "#6B7280",

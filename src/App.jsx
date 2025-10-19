@@ -14,7 +14,7 @@ const Terms = lazy(() => import("./pages/Terms"));
 const Privacy = lazy(() => import("./pages/Privacy"));
 const SearchResults = lazy(() => import("./pages/SearchResults"));
 const ProfessorDetail = lazy(() => import("./pages/ProfessorDetail"));
-const CourseDetail = lazy(() => import("./pages/CourseDetail"));
+const SubjectDetail = lazy(() => import("./pages/SubjectDetail")); // REEMPLAZA CourseDetail
 const Contact = lazy(() => import("./pages/Contact"));
 const Upload = lazy(() => import("./pages/Upload"));
 const MentorApply = lazy(() => import("./pages/MentorApply"));
@@ -139,7 +139,7 @@ function AppRoutes() {
                     <Route path="/notifications" element={<AuthGuard requireAuth={true}><Notifications /></AuthGuard>} />
                     <Route path="/notifications-badge" element={<NotificationBadge />} />
 
-                    {/* Settings - NUEVA RUTA */}
+                    {/* Settings */}
                     <Route path="/settings" element={<AuthGuard requireAuth={true}><Settings /></AuthGuard>} />
 
                     {/* Búsqueda y exploración */}
@@ -155,7 +155,9 @@ function AppRoutes() {
 
                     {/* Detalles */}
                     <Route path="/profesores/:id" element={<ProfessorDetail />} />
-                    <Route path="/cursos/:id" element={<CourseDetail />} />
+                    <Route path="/materias/:id" element={<SubjectDetail />} />
+                    {/* Redirigir /cursos/:id a /materias/:id si es necesario */}
+                    <Route path="/cursos/:id" element={<Navigate to="/materias/:id" replace />} />
                     <Route path="/mentor/:username" element={<PublicProfileMentor />} />
 
                     {/* Usuario - PROTEGIDAS */}
