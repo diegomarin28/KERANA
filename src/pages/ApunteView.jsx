@@ -320,17 +320,52 @@ export const ApunteView = () => {
     const handleLike = async (tipo) => {
         if (!apunte || !currentUserId) return;
 
+        // Guardar estado anterior para posible rollback
+        const previousUserLike = userLike;
+        const previousLikesCount = likesCount;
+        const previousDislikesCount = dislikesCount;
+
         try {
-            // Si ya tiene ese tipo, lo elimina (toggle)
+            // Update optimista del frontend
             if (userLike === tipo) {
+                // Toggle: quitar el voto
+                setUserLike(null);
+                if (tipo === 'like') {
+                    setLikesCount(prev => prev - 1);
+                } else {
+                    setDislikesCount(prev => prev - 1);
+                }
+            } else {
+                // Cambiar voto o agregar nuevo
+                if (userLike === 'like') {
+                    // Tenía like, cambio a dislike
+                    setLikesCount(prev => prev - 1);
+                    setDislikesCount(prev => prev + 1);
+                } else if (userLike === 'dislike') {
+                    // Tenía dislike, cambio a like
+                    setDislikesCount(prev => prev - 1);
+                    setLikesCount(prev => prev + 1);
+                } else {
+                    // No tenía voto, agregar nuevo
+                    if (tipo === 'like') {
+                        setLikesCount(prev => prev + 1);
+                    } else {
+                        setDislikesCount(prev => prev + 1);
+                    }
+                }
+                setUserLike(tipo);
+            }
+
+            // Actualizar en Supabase
+            if (previousUserLike === tipo) {
+                // Eliminar voto
                 const { error } = await supabase
                     .from('likes')
                     .delete()
                     .match({ id_usuario: currentUserId, id_apunte: apunte.id_apunte });
                 if (error) throw error;
-                setUserLike(null);
             } else {
-                // Si no tiene like/dislike o tiene el contrario, inserta o actualiza
+                // Insertar o actualizar voto
                 const { error } = await supabase
                     .from('likes')
                     .upsert({
@@ -341,10 +376,13 @@ export const ApunteView = () => {
                         onConflict: 'id_usuario,id_apunte'
                     });
                 if (error) throw error;
-                setUserLike(tipo);
             }
         } catch (error) {
             console.error('Error al dar like/dislike:', error);
+            // Rollback en caso de error
+            setUserLike(previousUserLike);
+            setLikesCount(previousLikesCount);
+            setDislikesCount(previousDislikesCount);
             alert("Error al registrar tu reacción: " + (error.message || ""));
         }
     };
@@ -727,23 +765,207 @@ export const ApunteView = () => {
                             </div>
                         )}
 
-                        {/* ✅ NUEVO (reemplaza el cuadro de estrellas) */}
-                        <div style={{ marginBottom: 16, padding: '16px', background: '#f9fafb', borderRadius: 12, border: '1px solid #e5e7eb' }}>
-                            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 24 }}>
-                                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                                    <span style={{ fontSize: 24 }}>👍</span>
-                                    <span style={{ fontSize: 18, fontWeight: 700, color: '#2563eb' }}>
-                {likesCount}
-            </span>
-                                    <span style={{ fontSize: 14, color: '#6b7280' }}>likes</span>
+                        {/* Botones de votación con contadores */}
+                        <div style={{ marginBottom: 16, display: 'flex', gap: 16, justifyContent: 'center', alignItems: 'center' }}>
+                            <div style={{ position: 'relative' }}>
+                                <button
+                                    onClick={() => hasPurchased && !isOwner && handleLike('like')}
+                                    onMouseEnter={(e) => {
+                                        const cannotVote = isOwner || !hasPurchased;
+                                        const button = e.currentTarget; // Guardar referencia
+                                        if (cannotVote) {
+                                            button.dataset.hovering = 'true';
+                                            setTimeout(() => {
+                                                if (button.dataset.hovering === 'true') {
+                                                    const tooltip = button.parentElement.children[1];
+                                                    if (tooltip) {
+                                                        tooltip.style.opacity = '1';
+                                                        tooltip.style.visibility = 'visible';
+                                                    }
+                                                }
+                                            }, 500);
+                                        } else {
+                                            button.style.transform = 'scale(1.1)';
+                                            if (userLike !== 'like') {
+                                                button.style.borderColor = '#2563eb';
+                                            }
+                                        }
+                                    }}
+                                    onMouseLeave={(e) => {
+                                        e.currentTarget.dataset.hovering = 'false';
+                                        const tooltip = e.currentTarget.parentElement.children[1];
+                                        if (tooltip) {
+                                            tooltip.style.opacity = '0';
+                                            tooltip.style.visibility = 'hidden';
+                                        }
+                                        if (hasPurchased && !isOwner) {
+                                            e.currentTarget.style.transform = 'scale(1)';
+                                            if (userLike !== 'like') {
+                                                e.currentTarget.style.borderColor = '#d1d5db';
+                                            }
+                                        }
+                                    }}
+                                    style={{
+                                        width: 56,
+                                        height: 56,
+                                        borderRadius: '50%',
+                                        border: `2px solid ${userLike === 'like' ? '#2563eb' : '#d1d5db'}`,
+                                        background: userLike === 'like' ? '#dbeafe' : '#fff',
+                                        cursor: (hasPurchased && !isOwner) ? 'pointer' : 'not-allowed',
+                                        fontSize: 24,
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        justifyContent: 'center',
+                                        transition: 'all 0.2s ease',
+                                        boxShadow: '0 2px 4px rgba(0,0,0,0.1)',
+                                        opacity:  1,
+                                        position: 'relative'
+                                    }}
+                                >
+                                    👍
+                                </button>
+                                <div style={{
+                                    position: 'absolute',
+                                    bottom: '-45px',
+                                    left: '50%',
+                                    transform: 'translateX(-50%)',
+                                    background: '#374151',
+                                    color: '#fff',
+                                    padding: '8px 12px',
+                                    borderRadius: 6,
+                                    fontSize: 12,
+                                    whiteSpace: 'nowrap',
+                                    opacity: 0,
+                                    visibility: 'hidden',
+                                    transition: 'opacity 0.2s ease',
+                                    zIndex: 10,
+                                    pointerEvents: 'none',
+                                    boxShadow: '0 2px 8px rgba(0,0,0,0.15)'
+                                }}>
+                                    {isOwner ? 'No podés votar tu propio apunte' : 'Para votar tenés que comprar el apunte'}                                    <div style={{
+                                        position: 'absolute',
+                                        top: '-4px',
+                                        left: '50%',
+                                        transform: 'translateX(-50%)',
+                                        width: 0,
+                                        height: 0,
+                                        borderLeft: '4px solid transparent',
+                                        borderRight: '4px solid transparent',
+                                        borderBottom: '4px solid #374151'
+                                    }} />
                                 </div>
-                                <div style={{ width: 2, height: 30, background: '#d1d5db' }} />
-                                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                                    <span style={{ fontSize: 24 }}>👎</span>
-                                    <span style={{ fontSize: 18, fontWeight: 700, color: '#ef4444' }}>
-                {dislikesCount}
-            </span>
-                                    <span style={{ fontSize: 14, color: '#6b7280' }}>dislikes</span>
+                                <div style={{
+                                    position: 'absolute',
+                                    bottom: '-20px',
+                                    left: '50%',
+                                    transform: 'translateX(-50%)',
+                                    fontSize: 14,
+                                    fontWeight: 700,
+                                    color: '#2563eb'
+                                }}>
+                                    {likesCount}
+                                </div>
+                            </div>
+
+                            <div style={{ width: 2, height: 40, background: '#d1d5db' }} />
+
+                            <div style={{ position: 'relative' }}>
+                                <button
+                                    onClick={() => hasPurchased && !isOwner && handleLike('dislike')}
+                                    onMouseEnter={(e) => {
+                                        const cannotVote = isOwner || !hasPurchased;
+                                        const button = e.currentTarget; // Guardar referencia
+                                        if (cannotVote) {
+                                            button.dataset.hovering = 'true';
+                                            setTimeout(() => {
+                                                if (button.dataset.hovering === 'true') {
+                                                    const tooltip = button.parentElement.children[1];
+                                                    if (tooltip) {
+                                                        tooltip.style.opacity = '1';
+                                                        tooltip.style.visibility = 'visible';
+                                                    }
+                                                }
+                                            }, 500);
+                                        } else {
+                                            button.style.transform = 'scale(1.1)';
+                                            if (userLike !== 'dislike') {
+                                                button.style.borderColor = '#ef4444';
+                                            }
+                                        }
+                                    }}
+                                    onMouseLeave={(e) => {
+                                        e.currentTarget.dataset.hovering = 'false';
+                                        const tooltip = e.currentTarget.parentElement.children[1];
+                                        if (tooltip) {
+                                            tooltip.style.opacity = '0';
+                                            tooltip.style.visibility = 'hidden';
+                                        }
+                                        if (hasPurchased && !isOwner) {
+                                            e.currentTarget.style.transform = 'scale(1)';
+                                            if (userLike !== 'dislike') {
+                                                e.currentTarget.style.borderColor = '#d1d5db';
+                                            }
+                                        }
+                                    }}
+                                    style={{
+                                        width: 56,
+                                        height: 56,
+                                        borderRadius: '50%',
+                                        border: `2px solid ${userLike === 'dislike' ? '#ef4444' : '#d1d5db'}`,
+                                        background: userLike === 'dislike' ? '#fee2e2' : '#fff',
+                                        cursor: (hasPurchased && !isOwner) ? 'pointer' : 'not-allowed',
+                                        fontSize: 24,
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        justifyContent: 'center',
+                                        transition: 'all 0.2s ease',
+                                        boxShadow: '0 2px 4px rgba(0,0,0,0.1)',
+                                        opacity: 1,
+                                        position: 'relative'
+                                    }}
+                                >
+                                    👎
+                                </button>
+                                <div style={{
+                                    position: 'absolute',
+                                    bottom: '-45px',
+                                    left: '50%',
+                                    transform: 'translateX(-50%)',
+                                    background: '#374151',
+                                    color: '#fff',
+                                    padding: '8px 12px',
+                                    borderRadius: 6,
+                                    fontSize: 12,
+                                    whiteSpace: 'nowrap',
+                                    opacity: 0,
+                                    visibility: 'hidden',
+                                    transition: 'opacity 0.2s ease',
+                                    zIndex: 10,
+                                    pointerEvents: 'none',
+                                    boxShadow: '0 2px 8px rgba(0,0,0,0.15)'
+                                }}>
+                                    {isOwner ? 'No podés votar tu propio apunte' : 'Para votar tenés que comprar el apunte'}                                    <div style={{
+                                        position: 'absolute',
+                                        top: '-4px',
+                                        left: '50%',
+                                        transform: 'translateX(-50%)',
+                                        width: 0,
+                                        height: 0,
+                                        borderLeft: '4px solid transparent',
+                                        borderRight: '4px solid transparent',
+                                        borderBottom: '4px solid #374151'
+                                    }} />
+                                </div>
+                                <div style={{
+                                    position: 'absolute',
+                                    bottom: '-20px',
+                                    left: '50%',
+                                    transform: 'translateX(-50%)',
+                                    fontSize: 14,
+                                    fontWeight: 700,
+                                    color: '#ef4444'
+                                }}>
+                                    {dislikesCount}
                                 </div>
                             </div>
                         </div>
@@ -752,11 +974,12 @@ export const ApunteView = () => {
                             padding: '10px 16px',
                             background: '#eff6ff',
                             borderRadius: 12,
+                            marginTop:32,
                             marginBottom: 24,
                             border: '2px solid #bfdbfe',
                             display: 'flex',
                             alignItems: 'center',
-                            gap: 12
+                            gap: 120
                         }}>
                             <div>
                                 <div style={{ fontSize: 12, color: '#1e40af', fontWeight: 600 }}>
@@ -787,113 +1010,51 @@ export const ApunteView = () => {
                                 </Button>
                             ) : (
                                 <>
-                                    <Button
-                                        variant="primary"
-                                        onClick={handleDownload}
-                                        style={{
-                                            padding: '14px 28px',
-                                            fontSize: 16,
-                                            fontWeight: 600,
-                                            width: '100%'
-                                        }}
-                                    >
-                                        📥 Descargar apunte
-                                    </Button>
-                                    {!isOwner && (
-                                        <div style={{ display: 'flex', gap: 12, justifyContent: 'center' }}>
-                                            <button
-                                                onClick={() => handleLike('like')}
-                                                style={{
-                                                    width: 56,
-                                                    height: 56,
-                                                    borderRadius: '50%',
-                                                    border: `2px solid ${userLike === 'like' ? '#2563eb' : '#d1d5db'}`,
-                                                    background: userLike === 'like' ? '#dbeafe' : '#fff',
-                                                    cursor: 'pointer',
-                                                    fontSize: 24,
-                                                    display: 'flex',
-                                                    alignItems: 'center',
-                                                    justifyContent: 'center',
-                                                    transition: 'all 0.2s ease',
-                                                    boxShadow: '0 2px 4px rgba(0,0,0,0.1)'
-                                                }}
-                                                onMouseEnter={(e) => {
-                                                    e.currentTarget.style.transform = 'scale(1.1)';
-                                                    if (userLike !== 'like') {
-                                                        e.currentTarget.style.borderColor = '#2563eb';
-                                                    }
-                                                }}
-                                                onMouseLeave={(e) => {
-                                                    e.currentTarget.style.transform = 'scale(1)';
-                                                    if (userLike !== 'like') {
-                                                        e.currentTarget.style.borderColor = '#d1d5db';
-                                                    }
-                                                }}
-                                            >
-                                                👍
-                                            </button>
-                                            <button
-                                                onClick={() => handleLike('dislike')}
-                                                style={{
-                                                    width: 56,
-                                                    height: 56,
-                                                    borderRadius: '50%',
-                                                    border: `2px solid ${userLike === 'dislike' ? '#ef4444' : '#d1d5db'}`,
-                                                    background: userLike === 'dislike' ? '#fee2e2' : '#fff',
-                                                    cursor: 'pointer',
-                                                    fontSize: 24,
-                                                    display: 'flex',
-                                                    alignItems: 'center',
-                                                    justifyContent: 'center',
-                                                    transition: 'all 0.2s ease',
-                                                    boxShadow: '0 2px 4px rgba(0,0,0,0.1)'
-                                                }}
-                                                onMouseEnter={(e) => {
-                                                    e.currentTarget.style.transform = 'scale(1.1)';
-                                                    if (userLike !== 'dislike') {
-                                                        e.currentTarget.style.borderColor = '#ef4444';
-                                                    }
-                                                }}
-                                                onMouseLeave={(e) => {
-                                                    e.currentTarget.style.transform = 'scale(1)';
-                                                    if (userLike !== 'dislike') {
-                                                        e.currentTarget.style.borderColor = '#d1d5db';
-                                                    }
-                                                }}
-                                            >
-                                                👎
-                                            </button>
-                                            <button
-                                                onClick={() => setShowReportModal(true)}
-                                                style={{
-                                                    width: 56,
-                                                    height: 56,
-                                                    borderRadius: '50%',
-                                                    border: '2px solid #f59e0b',
-                                                    background: '#fff',
-                                                    cursor: 'pointer',
-                                                    fontSize: 24,
-                                                    display: 'flex',
-                                                    alignItems: 'center',
-                                                    justifyContent: 'center',
-                                                    transition: 'all 0.2s ease',
-                                                    boxShadow: '0 2px 4px rgba(0,0,0,0.1)'
-                                                }}
-                                                onMouseEnter={(e) => {
-                                                    e.currentTarget.style.transform = 'scale(1.1)';
-                                                    e.currentTarget.style.background = '#fef3c7';
-                                                }}
-                                                onMouseLeave={(e) => {
-                                                    e.currentTarget.style.transform = 'scale(1)';
-                                                    e.currentTarget.style.background = '#fff';
-                                                }}
-                                            >
-                                                🚩
-                                            </button>
-                                        </div>
-                                    )}
-                                </>
-                            )}
+                                <Button
+                                variant="primary"
+                                onClick={handleDownload}
+                            style={{
+                                padding: '14px 28px',
+                                fontSize: 16,
+                                fontWeight: 600,
+                                width: '100%'
+                            }}
+                        >
+                            📥 Descargar apunte
+                        </Button>
+                        {!isOwner && (
+                            <div style={{ display: 'flex', justifyContent: 'center', marginTop: 12 }}>
+                                <button
+                                    onClick={() => setShowReportModal(true)}
+                                    style={{
+                                        width: 56,
+                                        height: 56,
+                                        borderRadius: '50%',
+                                        border: '2px solid #f59e0b',
+                                        background: '#fff',
+                                        cursor: 'pointer',
+                                        fontSize: 24,
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        justifyContent: 'center',
+                                        transition: 'all 0.2s ease',
+                                        boxShadow: '0 2px 4px rgba(0,0,0,0.1)'
+                                    }}
+                                    onMouseEnter={(e) => {
+                                        e.currentTarget.style.transform = 'scale(1.1)';
+                                        e.currentTarget.style.background = '#fef3c7';
+                                    }}
+                                    onMouseLeave={(e) => {
+                                        e.currentTarget.style.transform = 'scale(1)';
+                                        e.currentTarget.style.background = '#fff';
+                                    }}
+                                >
+                                    🚩
+                                </button>
+                            </div>
+                        )}
+                    </>
+                    )}
                         </div>
 
                         {isOwner && (

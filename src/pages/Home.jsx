@@ -32,7 +32,7 @@ export default function Home() {
         (async () => {
             try {
                 setLoadingTop(true);
-                const { data, error } = await supabase.rpc("top_apuntes_best", { limit_count: 6 });
+                const { data, error } = await supabase.rpc("top_apuntes_best", { limit_count: 8 });
                 if (error) throw error;
 
                 // Obtener file_path de cada apunte
@@ -216,7 +216,7 @@ export default function Home() {
                                     justifyItems: "center",
                                 }}
                             >
-                                {Array.from({ length: 6 }).map((_, i) => (
+                                {Array.from({ length: 8 }).map((_, i) => (
                                     <SkeletonCard key={i} />
                                 ))}
                             </div>
@@ -234,7 +234,7 @@ export default function Home() {
                                     justifyItems: "center",
                                 }}
                             >
-                                {topNotes.slice(0, 6).map((n) => (
+                                {topNotes.slice(0,8).map((n) => (
                                     <div
                                         key={n.apunte_id}
                                         style={{
