@@ -1,5 +1,7 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '../supabase';
+import { ratingsAPI } from '../api/Database';
+import StarDisplay from './StarDisplay';
 
 // Tags disponibles (mismo array que en AuthModal)
 const AVAILABLE_TAGS = [
@@ -25,51 +27,93 @@ export default function ReviewsSection({
                                            selectedMateria,
                                            onFilterChange,
                                            onMateriaChange,
-                                           onAddReview
+                                           onAddReview,
+                                           onReviewDeleted
                                        }) {
     const [materiasNames, setMateriasNames] = useState({});
+    const [currentUserId, setCurrentUserId] = useState(null);
+    const [deleteModalOpen, setDeleteModalOpen] = useState(false);
+    const [reviewToDelete, setReviewToDelete] = useState(null);
+    const [deleting, setDeleting] = useState(false);
 
     useEffect(() => {
-        const loadMateriasNames = async () => {
-            if (reviews.length === 0) return;
-
-            const materiaIds = [...new Set(reviews.map(r => r.materia_id).filter(Boolean))];
-            const names = {};
-
-            for (const id of materiaIds) {
-                const { data } = await supabase
-                    .from('materia')
-                    .select('nombre_materia')
-                    .eq('id_materia', id)
-                    .single();
-
-                if (data) names[id] = data.nombre_materia;
-            }
-
-            setMateriasNames(names);
-        };
-
         loadMateriasNames();
+        loadCurrentUser();
     }, [reviews]);
+
+    const loadCurrentUser = async () => {
+        const { data: { user } } = await supabase.auth.getUser();
+        if (user) {
+            const { data: usuarioData } = await supabase
+                .from('usuario')
+                .select('id_usuario')
+                .eq('auth_id', user.id)
+                .single();
+
+            if (usuarioData) {
+                setCurrentUserId(usuarioData.id_usuario);
+            }
+        }
+    };
+
+    const loadMateriasNames = async () => {
+        if (reviews.length === 0) return;
+
+        const materiaIds = [...new Set(reviews.map(r => r.materia_id).filter(Boolean))];
+        const names = {};
+
+        for (const id of materiaIds) {
+            const { data } = await supabase
+                .from('materia')
+                .select('nombre_materia')
+                .eq('id_materia', id)
+                .single();
+
+            if (data) names[id] = data.nombre_materia;
+        }
+
+        setMateriasNames(names);
+    };
+
+    const canDeleteReview = (review) => {
+        if (!currentUserId || review.user_id !== currentUserId) return false;
+
+        const createdAt = new Date(review.created_at);
+        const now = new Date();
+        const hoursDiff = (now - createdAt) / (1000 * 60 * 60);
+
+        return hoursDiff <= 24;
+    };
+
+    const handleDeleteClick = (review) => {
+        setReviewToDelete(review);
+        setDeleteModalOpen(true);
+    };
+
+    const handleConfirmDelete = async () => {
+        if (!reviewToDelete) return;
+
+        setDeleting(true);
+        const { data, error } = await ratingsAPI.deleteRating(reviewToDelete.id);
+
+        if (error) {
+            alert('Error al borrar la reseña: ' + error.message);
+        } else {
+            // Cerrar modal
+            setDeleteModalOpen(false);
+            setReviewToDelete(null);
+
+            // Notificar al componente padre para que recargue los datos
+            if (onReviewDeleted) {
+                onReviewDeleted();
+            }
+        }
+        setDeleting(false);
+    };
 
     const getTagLabel = (tagId) => {
         const tag = AVAILABLE_TAGS.find(t => t.id === tagId);
         return tag ? tag.label : tagId;
-    };
-
-    const renderStars = (rating) => {
-        return (
-            <div style={{ display: 'flex', gap: 2 }}>
-                {[...Array(5)].map((_, i) => (
-                    <span key={i} style={{
-                        fontSize: 20,
-                        color: i < Math.floor(rating) ? '#f59e0b' : i < rating ? '#f59e0b' : '#e5e7eb'
-                    }}>
-                        {i < Math.floor(rating) ? '★' : i < rating ? '⭐' : '☆'}
-                    </span>
-                ))}
-            </div>
-        );
     };
 
     const getReviewBorderColor = (rating) => {
@@ -230,7 +274,8 @@ export default function ReviewsSection({
                                 background: getReviewBackgroundColor(review.estrellas),
                                 border: `2px solid ${getReviewBorderColor(review.estrellas)}`,
                                 borderRadius: 12,
-                                transition: 'all 0.2s ease'
+                                transition: 'all 0.2s ease',
+                                position: 'relative'
                             }}
                             onMouseEnter={(e) => {
                                 e.currentTarget.style.boxShadow = '0 4px 12px rgba(0,0,0,0.08)';
@@ -241,6 +286,40 @@ export default function ReviewsSection({
                                 e.currentTarget.style.transform = 'translateY(0)';
                             }}
                         >
+                            {/* Botón de borrar (solo si puede borrar) */}
+                            {canDeleteReview(review) && (
+                                <button
+                                    onClick={() => handleDeleteClick(review)}
+                                    style={{
+                                        position: 'absolute',
+                                        top: 12,
+                                        right: 12,
+                                        background: '#fee',
+                                        border: '1px solid #fcc',
+                                        borderRadius: 6,
+                                        padding: '6px 10px',
+                                        cursor: 'pointer',
+                                        fontSize: 18,
+                                        color: '#dc2626',
+                                        transition: 'all 0.2s ease',
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        justifyContent: 'center'
+                                    }}
+                                    onMouseEnter={(e) => {
+                                        e.target.style.background = '#dc2626';
+                                        e.target.style.color = '#fff';
+                                    }}
+                                    onMouseLeave={(e) => {
+                                        e.target.style.background = '#fee';
+                                        e.target.style.color = '#dc2626';
+                                    }}
+                                    title="Borrar reseña"
+                                >
+                                    🗑️
+                                </button>
+                            )}
+
                             {/* Materia (primero) */}
                             {review.materia_id && (
                                 <div style={{
@@ -257,7 +336,7 @@ export default function ReviewsSection({
                                 </div>
                             )}
 
-                            {/* Header de la reseña con estrellas más grandes */}
+                            {/* Header de la reseña con estrellas */}
                             <div style={{
                                 display: 'flex',
                                 justifyContent: 'space-between',
@@ -265,7 +344,7 @@ export default function ReviewsSection({
                                 marginBottom: 12
                             }}>
                                 <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-                                    {renderStars(review.estrellas)}
+                                    <StarDisplay rating={review.estrellas} size={26} />
                                 </div>
                                 <div style={{
                                     fontSize: 12,
@@ -330,6 +409,99 @@ export default function ReviewsSection({
                     ))
                 )}
             </div>
+
+            {/* Modal de confirmación para borrar */}
+            {deleteModalOpen && (
+                <div style={{
+                    position: 'fixed',
+                    top: 0,
+                    left: 0,
+                    right: 0,
+                    bottom: 0,
+                    background: 'rgba(0,0,0,0.5)',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    zIndex: 1000
+                }}>
+                    <div style={{
+                        background: '#fff',
+                        borderRadius: 16,
+                        padding: 24,
+                        maxWidth: 400,
+                        width: '90%',
+                        boxShadow: '0 20px 60px rgba(0,0,0,0.3)'
+                    }}>
+                        <div style={{
+                            fontSize: 48,
+                            textAlign: 'center',
+                            marginBottom: 16
+                        }}>
+                            ⚠️
+                        </div>
+                        <h3 style={{
+                            margin: '0 0 12px 0',
+                            fontSize: 20,
+                            fontWeight: 700,
+                            textAlign: 'center'
+                        }}>
+                            ¿Borrar reseña?
+                        </h3>
+                        <p style={{
+                            margin: '0 0 24px 0',
+                            fontSize: 14,
+                            color: '#6b7280',
+                            textAlign: 'center',
+                            lineHeight: 1.5
+                        }}>
+                            Esta acción no se puede deshacer. La reseña será eliminada permanentemente.
+                        </p>
+                        <div style={{
+                            display: 'flex',
+                            gap: 12,
+                            justifyContent: 'center'
+                        }}>
+                            <button
+                                onClick={() => {
+                                    setDeleteModalOpen(false);
+                                    setReviewToDelete(null);
+                                }}
+                                disabled={deleting}
+                                style={{
+                                    padding: '10px 20px',
+                                    background: '#f3f4f6',
+                                    color: '#374151',
+                                    border: 'none',
+                                    borderRadius: 8,
+                                    fontWeight: 600,
+                                    cursor: deleting ? 'not-allowed' : 'pointer',
+                                    fontSize: 14,
+                                    opacity: deleting ? 0.5 : 1
+                                }}
+                            >
+                                Cancelar
+                            </button>
+                            <button
+                                onClick={handleConfirmDelete}
+                                disabled={deleting}
+                                style={{
+                                    padding: '10px 20px',
+                                    background: '#dc2626',
+                                    color: '#fff',
+                                    border: 'none',
+                                    borderRadius: 8,
+                                    fontWeight: 600,
+                                    cursor: deleting ? 'not-allowed' : 'pointer',
+                                    fontSize: 14,
+                                    opacity: deleting ? 0.5 : 1
+                                }}
+                            >
+                                {deleting ? 'Borrando...' : 'Sí, borrar'}
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
     );
 }
