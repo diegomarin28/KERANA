@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { useParams } from 'react-router-dom';
+import { useParams, useNavigate } from 'react-router-dom';
 import { supabase } from '../supabase';
 import { ratingsAPI } from '../api/Database';
 import AuthModal_HacerResenia from '../components/AuthModal_HacerResenia';
@@ -26,6 +26,7 @@ const AVAILABLE_TAGS = [
 
 export default function ProfessorDetail() {
     const { id } = useParams();
+    const navigate = useNavigate();
     const [professor, setProfessor] = useState(null);
     const [materias, setMaterias] = useState([]);
     const [reviews, setReviews] = useState([]);
@@ -233,6 +234,46 @@ export default function ProfessorDetail() {
 
     return (
         <div style={{ maxWidth: 1200, margin: '0 auto', padding: '20px' }}>
+            {/* Botón de volver */}
+            <div style={{ marginBottom: 20 }}>
+                <button
+                    onClick={() => navigate(-1)}
+                    style={{
+                        width: 40,
+                        height: 40,
+                        borderRadius: '50%',
+                        background: '#f3f4f6',
+                        border: '1px solid #e5e7eb',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        cursor: 'pointer',
+                        transition: 'all 0.2s ease'
+                    }}
+                    onMouseEnter={(e) => {
+                        e.currentTarget.style.background = '#e5e7eb';
+                        e.currentTarget.style.borderColor = '#d1d5db';
+                    }}
+                    onMouseLeave={(e) => {
+                        e.currentTarget.style.background = '#f3f4f6';
+                        e.currentTarget.style.borderColor = '#e5e7eb';
+                    }}
+                >
+                    <svg
+                        width="20"
+                        height="20"
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="#374151"
+                        strokeWidth="2"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                    >
+                        <path d="M19 12H5M12 19l-7-7 7-7" />
+                    </svg>
+                </button>
+            </div>
+
             {/* Sección de información del profesor */}
             <div style={{
                 display: 'flex',

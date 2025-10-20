@@ -2,7 +2,24 @@ import { useRef, useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import StarDisplay from './StarDisplay';
 
-export default function SubjectCarousel({ materias, materiasByRating }) {
+// Tags disponibles
+const AVAILABLE_TAGS = [
+    { id: 'muy-claro', label: '✨ Muy claro' },
+    { id: 'querido', label: '🎓 Querido por los estudiantes' },
+    { id: 'apasionado', label: '🔥 Apasionado' },
+    { id: 'disponible', label: '💬 Disponible' },
+    { id: 'ordenado', label: '📋 Ordenado' },
+    { id: 'dinamico', label: '⚡ Dinámico' },
+    { id: 'cercano', label: '🤝 Cercano' },
+    { id: 'califica-duro', label: '📊 Califica duro' },
+    { id: 'mucha-tarea', label: '📖 Mucha tarea' },
+    { id: 'participacion', label: '🎤 Participación' },
+    { id: 'confuso', label: '🤔 Confuso' },
+    { id: 'lejano', label: '🚪 Lejano' },
+    { id: 'examenes-dificiles', label: '📝 Exámenes difíciles' }
+];
+
+export default function ProfessorCarousel({ profesores, profesoresByRating }) {
     const scrollRef = useRef(null);
     const navigate = useNavigate();
     const [showLeftArrow, setShowLeftArrow] = useState(false);
@@ -26,11 +43,11 @@ export default function SubjectCarousel({ materias, materiasByRating }) {
             element?.removeEventListener('scroll', checkScroll);
             window.removeEventListener('resize', checkScroll);
         };
-    }, [materias]);
+    }, [profesores]);
 
     const scroll = (direction) => {
         if (scrollRef.current) {
-            const scrollAmount = 220;
+            const scrollAmount = 280;
             scrollRef.current.scrollBy({
                 left: direction === 'left' ? -scrollAmount : scrollAmount,
                 behavior: 'smooth'
@@ -38,10 +55,15 @@ export default function SubjectCarousel({ materias, materiasByRating }) {
         }
     };
 
+    // Ordenar profesores alfabéticamente
+    const sortedProfesores = [...profesores].sort((a, b) =>
+        a.profesor_nombre.localeCompare(b.profesor_nombre)
+    );
+
     return (
         <div style={{ marginBottom: 40, position: 'relative' }}>
             <h2 style={{ fontSize: 20, fontWeight: 700, marginBottom: 16 }}>
-                Materias que dicta
+                Profesores que dictan esta materia
             </h2>
 
             <div style={{ position: 'relative' }}>
@@ -94,22 +116,24 @@ export default function SubjectCarousel({ materias, materiasByRating }) {
                         scrollSnapType: 'x mandatory',
                         paddingRight: 20,
                         paddingLeft: 0,
-                        marginRight: -20
+                        marginRight: -20,
+                        scrollbarWidth: 'none',
+                        msOverflowStyle: 'none'
                     }}
                     onScroll={checkScroll}
                 >
-                    {materias.map(materia => {
-                        const rating = materiasByRating[materia.id];
-                        const promedio = rating?.promedio || 0;
-                        const cantidad = rating?.cantidad || 0;
+                    {sortedProfesores.map(profesor => {
+                        const rating = profesoresByRating[profesor.id_profesor] || {};
+                        const promedio = rating.promedio || 0;
+                        const cantidad = rating.cantidad || 0;
+                        const topTags = rating.topTags || [];
 
                         return (
                             <div
-                                key={materia.id}
-                                onClick={() => navigate(`/materias/${materia.id}`)}
+                                key={profesor.id_profesor}
+                                onClick={() => navigate(`/profesores/${profesor.id_profesor}`)}
                                 style={{
-                                    minWidth: 200,
-                                    height: 160,
+                                    minWidth: 260,
                                     padding: 16,
                                     background: '#fff',
                                     borderRadius: 12,
@@ -118,7 +142,7 @@ export default function SubjectCarousel({ materias, materiasByRating }) {
                                     scrollSnapAlign: 'start',
                                     display: 'flex',
                                     flexDirection: 'column',
-                                    justifyContent: 'space-between',
+                                    gap: 10,
                                     transition: 'all 0.2s ease',
                                     cursor: 'pointer'
                                 }}
@@ -131,55 +155,116 @@ export default function SubjectCarousel({ materias, materiasByRating }) {
                                     e.currentTarget.style.transform = 'translateY(0)';
                                 }}
                             >
-                                <div>
-                                    <h3 style={{
-                                        margin: 0,
-                                        fontSize: 16,
-                                        fontWeight: 600,
-                                        marginBottom: 8,
-                                        color: '#1f2937',
-                                        overflow: 'hidden',
-                                        textOverflow: 'ellipsis',
-                                        whiteSpace: 'nowrap'
-                                    }}>
-                                        {materia.nombre}
-                                    </h3>
+                                {/* Foto/Iniciales */}
+                                <div style={{
+                                    width: 56,
+                                    height: 56,
+                                    borderRadius: '50%',
+                                    background: profesor.foto ? 'transparent' : '#dbeafe',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    justifyContent: 'center',
+                                    overflow: 'hidden',
+                                    margin: '0 auto'
+                                }}>
+                                    {profesor.foto ? (
+                                        <img
+                                            src={profesor.foto}
+                                            alt={profesor.profesor_nombre}
+                                            style={{
+                                                width: '100%',
+                                                height: '100%',
+                                                objectFit: 'cover'
+                                            }}
+                                        />
+                                    ) : (
+                                        <div style={{
+                                            fontSize: 20,
+                                            fontWeight: 700,
+                                            color: '#1e40af'
+                                        }}>
+                                            {profesor.profesor_nombre.split(' ').map(n => n[0]).join('').slice(0, 2).toUpperCase()}
+                                        </div>
+                                    )}
                                 </div>
 
+                                {/* Nombre */}
+                                <h3 style={{
+                                    margin: 0,
+                                    fontSize: 15,
+                                    fontWeight: 600,
+                                    textAlign: 'center',
+                                    color: '#1f2937'
+                                }}>
+                                    {profesor.profesor_nombre}
+                                </h3>
+
+                                {/* Rating */}
                                 <div style={{
                                     display: 'flex',
                                     flexDirection: 'column',
-                                    gap: 8,
+                                    alignItems: 'center',
+                                    gap: 4,
                                     paddingTop: 8,
                                     borderTop: '1px solid #f3f4f6'
                                 }}>
-                                    <div style={{ fontSize: 12, color: '#6b7280' }}>
-                                        Evaluación en esta materia:
-                                    </div>
+                                    <StarDisplay rating={promedio} size={18} />
                                     <div style={{
                                         display: 'flex',
                                         alignItems: 'center',
-                                        gap: 8,
-                                        justifyContent: 'space-between'
+                                        gap: 6
                                     }}>
-                                        <StarDisplay rating={promedio} size={18} />
                                         <span style={{
-                                            fontSize: 13,
+                                            fontSize: 14,
                                             fontWeight: 600,
                                             color: '#1f2937'
                                         }}>
                                             {promedio > 0 ? promedio.toFixed(1) : '—'}
                                         </span>
+                                        {cantidad > 0 && (
+                                            <span style={{
+                                                fontSize: 12,
+                                                color: '#6b7280'
+                                            }}>
+                                                ({cantidad})
+                                            </span>
+                                        )}
                                     </div>
-                                    {cantidad > 0 && (
-                                        <div style={{
-                                            fontSize: 11,
-                                            color: '#9ca3af'
-                                        }}>
-                                            {cantidad} evaluación{cantidad !== 1 ? 'es' : ''}
-                                        </div>
-                                    )}
                                 </div>
+
+                                {/* Top 3 Tags - Sin cortarse */}
+                                {topTags.length > 0 && (
+                                    <div style={{
+                                        display: 'flex',
+                                        flexWrap: 'wrap',
+                                        gap: 6,
+                                        paddingTop: 8,
+                                        borderTop: '1px solid #f3f4f6',
+                                        justifyContent: 'center'
+                                    }}>
+                                        {topTags.map((tagId) => {
+                                            const tag = AVAILABLE_TAGS.find(t => t.id === tagId);
+                                            if (!tag) return null;
+                                            return (
+                                                <div
+                                                    key={tagId}
+                                                    style={{
+                                                        padding: '4px 10px',
+                                                        background: '#eff6ff',
+                                                        borderRadius: 8,
+                                                        fontSize: 11,
+                                                        color: '#1e40af',
+                                                        whiteSpace: 'nowrap',
+                                                        fontWeight: 500,
+                                                        flexShrink: 0
+                                                    }}
+                                                >
+                                                    {tag.label}
+                                                </div>
+                                            );
+                                        })}
+                                    </div>
+                                )}
                             </div>
                         );
                     })}
@@ -223,6 +308,14 @@ export default function SubjectCarousel({ materias, materiasByRating }) {
                     </button>
                 )}
             </div>
+
+            <style>
+                {`
+                    div::-webkit-scrollbar {
+                        display: none;
+                    }
+                `}
+            </style>
         </div>
     );
 }
