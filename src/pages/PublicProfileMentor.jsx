@@ -1,8 +1,9 @@
 import { useEffect, useState, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { publicProfileAPI } from '../api/database';
+import {calendlyAPI, publicProfileAPI} from '../api/database';
 import { useSeguidores } from '../hooks/useSeguidores';
 import NoteCard from '../components/NoteCard';
+import {supabase} from "../supabase.js";
 
 export default function PublicProfileMentor() {
     const { username } = useParams();
@@ -27,6 +28,9 @@ export default function PublicProfileMentor() {
     const [showUnfollowModal, setShowUnfollowModal] = useState(false);
     const { seguirUsuario, dejarDeSeguir } = useSeguidores();
 
+    const [showCalendlyModal, setShowCalendlyModal] = useState(false);
+    const [calendlyUrl, setCalendlyUrl] = useState(null);
+
     const carouselRef = useRef(null);
 
     useEffect(() => {
@@ -48,6 +52,63 @@ export default function PublicProfileMentor() {
             setStats(statsData);
             const { data: mentorData } = await publicProfileAPI.checkIfMentor(userId);
             setMentorInfo(mentorData);
+
+            // Obtener URL de Calendly del mentor (si tiene id_mentor)
+            if (mentorData?.id_mentor) {
+                const { data: calendlyData } = await supabase
+                    .from('usuario')
+                    .select('calendly_url')
+                    .eq('id_usuario', userId)
+                    .single();
+
+                console.log('🔍 DEBUG Calendly - URL original:', calendlyData?.calendly_url);
+
+                let finalUrl = calendlyData?.calendly_url || null;
+
+                // Pre-rellenar con los datos del usuario actual (quien está viendo el perfil)
+                if (finalUrl) {
+                    const { data: { user } } = await supabase.auth.getUser();
+                    console.log('🔍 DEBUG Calendly - Usuario actual:', user);
+                    console.log('🔍 DEBUG Calendly - Email del usuario:', user?.email);
+
+                    if (user?.email) {
+                        try {
+                            const url = new URL(finalUrl);
+                            url.searchParams.set('email', user.email);
+
+                            // Obtener el nombre del usuario actual
+                            const { data: currentUserData, error: userError } = await supabase
+                                .from('usuario')
+                                .select('nombre')
+                                .eq('correo', user.email)
+                                .single();
+
+                            if (userError) {
+                                console.error('❌ Error obteniendo nombre:', userError);
+                            }
+
+                            console.log('🔍 DEBUG Calendly - Datos usuario:', currentUserData);
+
+                            if (currentUserData?.nombre) {
+                                url.searchParams.set('name', currentUserData.nombre);
+                            }
+
+                            finalUrl = url.toString();
+                            console.log('✅ DEBUG Calendly - URL FINAL:', finalUrl);
+                        } catch (error) {
+                            console.error('❌ DEBUG Calendly - Error:', error);
+                        }
+                    } else {
+                        console.warn('⚠️ DEBUG Calendly - No hay email de usuario');
+                    }
+                } else {
+                    console.warn('⚠️ DEBUG Calendly - No hay URL de Calendly configurada');
+                }
+
+                setCalendlyUrl(finalUrl);
+                console.log('💾 DEBUG Calendly - URL guardada en estado:', finalUrl);
+            }
+
             const { data: notesData } = await publicProfileAPI.getRecentNotes(userId, 4);
             setRecentNotes(notesData || []);
             const { data: isFollowingData } = await publicProfileAPI.isFollowing(userId);
@@ -57,6 +118,7 @@ export default function PublicProfileMentor() {
         } finally {
             setLoading(false);
         }
+
     };
 
     const handleVerTodos = async () => {
@@ -294,6 +356,7 @@ export default function PublicProfileMentor() {
                         </div>
                     </div>
                 </div>
+
                 <div style={tabsContainerStyle}>
                     {['mentorias', 'apuntes'].map(t => (
                         <button key={t} onClick={() => setTab(t)} style={{ ...tabButtonStyle, background: tab === t ? '#10B981' : 'transparent', color: tab === t ? 'white' : '#666', borderBottom: tab === t ? '3px solid #10B981' : '3px solid transparent' }}>
@@ -302,31 +365,75 @@ export default function PublicProfileMentor() {
                         </button>
                     ))}
                 </div>
+
                 {tab === 'mentorias' && mentorInfo && (
                     <div style={{ marginTop: 24 }}>
                         <div style={sectionHeaderStyle}>
                             <div>
                                 <h2 style={sectionTitleStyle}>Mentorías Ofrecidas</h2>
-                                <p style={sectionSubtitleStyle}>Materias en las que brinda apoyo académico</p>
+                                <p style={sectionSubtitleStyle}>
+                                    Materias en las que brinda apoyo académico
+                                </p>
                             </div>
+
+                            {calendlyUrl && (
+                                <button
+                                    onClick={() => setShowCalendlyModal(true)}
+                                    style={{
+                                        background: '#10B981',
+                                        color: '#fff',
+                                        fontWeight: 700,
+                                        padding: '12px 20px',
+                                        borderRadius: '12px',
+                                        border: 'none',
+                                        cursor: 'pointer',
+                                        fontSize: 16,
+                                        boxShadow: '0 4px 12px rgba(16, 185, 129, 0.25)',
+                                        transition: 'all 0.2s ease-in-out'
+                                    }}
+                                    onMouseEnter={(e) => {
+                                        e.currentTarget.style.background = '#059669';
+                                        e.currentTarget.style.transform = 'translateY(-2px)';
+                                        e.currentTarget.style.boxShadow = '0 8px 20px rgba(16, 185, 129, 0.35)';
+                                    }}
+                                    onMouseLeave={(e) => {
+                                        e.currentTarget.style.background = '#10B981';
+                                        e.currentTarget.style.transform = 'translateY(0)';
+                                        e.currentTarget.style.boxShadow = '0 4px 12px rgba(16, 185, 129, 0.25)';
+                                    }}
+                                >
+                                    📅 Agendar Mentoría
+                                </button>
+                            )}
                         </div>
+
                         <div style={mentorCardStyle}>
                             {mentorInfo.estrellas_mentor && (
                                 <div style={mentorRatingCardStyle}>
                                     <span style={{ fontSize: 32 }}>⭐</span>
                                     <div>
-                                        <div style={{ fontSize: 36, fontWeight: 800, color: '#10B981' }}>{mentorInfo.estrellas_mentor.toFixed(1)}</div>
-                                        <div style={{ fontSize: 14, color: '#666', fontWeight: 600 }}>Calificación promedio</div>
+                                        <div style={{ fontSize: 36, fontWeight: 800, color: '#10B981' }}>
+                                            {mentorInfo.estrellas_mentor.toFixed(1)}
+                                        </div>
+                                        <div style={{ fontSize: 14, color: '#666', fontWeight: 600 }}>
+                                            Calificación promedio
+                                        </div>
                                     </div>
                                 </div>
                             )}
                             <div style={mentorMateriasGridStyle}>
-                                {mentorInfo.materias?.map(m => (
+                                {mentorInfo.materias?.map((m) => (
                                     <div key={m.id_materia} style={mentorMateriaCardStyle}>
                                         <div style={mentorMateriaIconStyle}>📚</div>
                                         <div>
-                                            <div style={mentorMateriaTitleStyle}>{m.materia.nombre_materia}</div>
-                                            {m.materia.semestre && <div style={mentorMateriaSemestreStyle}>Semestre {m.materia.semestre}</div>}
+                                            <div style={mentorMateriaTitleStyle}>
+                                                {m.materia.nombre_materia}
+                                            </div>
+                                            {m.materia.semestre && (
+                                                <div style={mentorMateriaSemestreStyle}>
+                                                    Semestre {m.materia.semestre}
+                                                </div>
+                                            )}
                                         </div>
                                     </div>
                                 ))}
@@ -334,6 +441,7 @@ export default function PublicProfileMentor() {
                         </div>
                     </div>
                 )}
+
                 {tab === 'apuntes' && (
                     <div style={{ marginTop: 24 }}>
                         {!showAllNotes ? (
@@ -409,27 +517,144 @@ export default function PublicProfileMentor() {
                         )}
                     </div>
                 )}
-            </div>
-            {showUnfollowModal && (
-                <div style={modalOverlayStyle} onClick={() => setShowUnfollowModal(false)}>
-                    <div style={modalContentStyle} onClick={(e) => e.stopPropagation()}>
-                        <div style={modalAvatarContainerStyle}>
-                            {avatarSrc && avatarOk ? (<img src={avatarSrc} alt={profile.nombre} style={modalAvatarStyle} />) : (<div style={modalAvatarPlaceholderStyle}>{(profile.nombre?.[0] || 'M').toUpperCase()}</div>)}
-                        </div>
-                        <h3 style={modalTitleStyle}>¿Dejar de seguir a @{profile.username}?</h3>
-                        <div style={modalButtonsStyle}>
-                            <button onClick={confirmarDejarDeSeguir} disabled={loadingFollow} style={modalConfirmButtonStyle}>{loadingFollow ? 'Procesando...' : 'Dejar de seguir'}</button>
-                            <button onClick={() => setShowUnfollowModal(false)} disabled={loadingFollow} style={modalCancelButtonStyle}>Cancelar</button>
+
+                {showCalendlyModal && (
+                    <div
+                        style={{
+                            position: 'fixed',
+                            inset: 0,
+                            background: 'rgba(0,0,0,0.6)',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            zIndex: 1000,
+                            padding: '20px'
+                        }}
+                        onClick={() => setShowCalendlyModal(false)}
+                    >
+                        <div
+                            style={{
+                                background: '#fff',
+                                borderRadius: 12,
+                                width: '100%',
+                                maxWidth: '900px',
+                                height: '85vh',
+                                maxHeight: '700px',
+                                position: 'relative',
+                                overflow: 'hidden',
+                                boxShadow: '0 10px 30px rgba(0,0,0,0.3)',
+                                display: 'flex',
+                                flexDirection: 'column'
+                            }}
+                            onClick={(e) => e.stopPropagation()}
+                        >
+                            {/* Header limpio con info */}
+                            <div style={{
+                                padding: '16px 20px',
+                                borderBottom: '1px solid #e5e7eb',
+                                background: 'linear-gradient(135deg, #10B981 0%, #059669 100%)',
+                                color: 'white'
+                            }}>
+                                <div style={{
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    justifyContent: 'space-between'
+                                }}>
+                                    <div>
+                                        <h3 style={{ margin: 0, fontSize: 18, fontWeight: 700 }}>
+                                            📅 Agendar Mentoría
+                                        </h3>
+                                        <p style={{ margin: '4px 0 0 0', fontSize: 13, opacity: 0.9 }}>
+                                            Tu email ya está pre-cargado ✓
+                                        </p>
+                                    </div>
+                                    <button
+                                        onClick={() => setShowCalendlyModal(false)}
+                                        style={{
+                                            background: 'rgba(255,255,255,0.2)',
+                                            border: 'none',
+                                            borderRadius: '50%',
+                                            width: 32,
+                                            height: 32,
+                                            fontSize: 18,
+                                            cursor: 'pointer',
+                                            display: 'flex',
+                                            alignItems: 'center',
+                                            justifyContent: 'center',
+                                            color: 'white',
+                                            transition: 'all 0.2s ease'
+                                        }}
+                                        onMouseEnter={(e) => {
+                                            e.currentTarget.style.background = 'rgba(255,255,255,0.3)';
+                                        }}
+                                        onMouseLeave={(e) => {
+                                            e.currentTarget.style.background = 'rgba(255,255,255,0.2)';
+                                        }}
+                                    >
+                                        ✕
+                                    </button>
+                                </div>
+                            </div>
+
+                            {/* Iframe Calendly */}
+                            <iframe
+                                src={calendlyUrl}
+                                style={{
+                                    border: 'none',
+                                    width: '100%',
+                                    height: '100%',
+                                    flex: 1
+                                }}
+                                title="Agendar Mentoría"
+                            />
                         </div>
                     </div>
-                </div>
-            )}
+                )}
+
+                {showUnfollowModal && (
+                    <div style={modalOverlayStyle} onClick={() => setShowUnfollowModal(false)}>
+                        <div style={modalContentStyle} onClick={(e) => e.stopPropagation()}>
+                            <div style={modalAvatarContainerStyle}>
+                                {avatarSrc && avatarOk ? (
+                                    <img src={avatarSrc} alt={profile.nombre} style={modalAvatarStyle} />
+                                ) : (
+                                    <div style={modalAvatarPlaceholderStyle}>
+                                        {(profile.nombre?.[0] || 'M').toUpperCase()}
+                                    </div>
+                                )}
+                            </div>
+                            <h3 style={modalTitleStyle}>¿Dejar de seguir a @{profile.username}?</h3>
+                            <div style={modalButtonsStyle}>
+                                <button
+                                    onClick={confirmarDejarDeSeguir}
+                                    disabled={loadingFollow}
+                                    style={modalConfirmButtonStyle}
+                                >
+                                    {loadingFollow ? 'Procesando...' : 'Dejar de seguir'}
+                                </button>
+                                <button
+                                    onClick={() => setShowUnfollowModal(false)}
+                                    disabled={loadingFollow}
+                                    style={modalCancelButtonStyle}
+                                >
+                                    Cancelar
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                )}
+            </div>
         </div>
     );
 }
 
 function StatInline({ number, label }) {
-    return (<div style={{ display: 'flex', alignItems: 'baseline', gap: 4 }}><span style={{ fontSize: 15, fontWeight: 700, color: '#111827' }}>{number}</span><span style={{ fontSize: 14, color: '#666' }}>{label}</span></div>);
+    return (
+        <div style={{ display: 'flex', alignItems: 'baseline', gap: 4 }}>
+            <span style={{ fontSize: 15, fontWeight: 700, color: '#111827' }}>{number}</span>
+            <span style={{ fontSize: 14, color: '#666' }}>{label}</span>
+        </div>
+    );
 }
 
 const pageStyle = { minHeight: '100vh', background: '#F0FDF4', paddingBottom: 40 };
@@ -446,7 +671,7 @@ const avatarPlaceholderStyle = { width: '100%', height: '100%', background: 'lin
 const profileInfoContainerStyle = { display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 20, flexWrap: 'wrap' };
 const profileInfoLeftStyle = { flex: 1, minWidth: 280 };
 const nameStyle = { margin: 0, fontSize: 28, fontWeight: 700, color: '#000000E6', letterSpacing: '-0.5px' };
-const usernameStyle = { margin: '4px 0 12px 0', fontSize: 16, color: '#666', fontWeight: 500};
+const usernameStyle = { margin: '4px 0 12px 0', fontSize: 16, color: '#666', fontWeight: 500 };
 const mentorVerifiedBadgeStyle = { background: 'linear-gradient(135deg, #10B981 0%, #059669 100%)', color: 'white', padding: '6px 14px', borderRadius: 20, fontSize: 13, fontWeight: 600, display: 'inline-flex', alignItems: 'center', gap: 4, boxShadow: '0 2px 8px rgba(16, 185, 129, 0.3)' };
 const badgesContainerStyle = { display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 12 };
 const badgeStyle = { display: 'inline-flex', alignItems: 'center', gap: 6, padding: '6px 12px', borderRadius: 20, fontSize: 13, fontWeight: 600, background: 'white', border: '2px solid', transition: 'all 0.2s ease' };
