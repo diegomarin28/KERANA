@@ -1,20 +1,26 @@
 import { useEffect, useRef, useState } from "react";
 import { supabase } from "../supabase";
-import { useMentorStatus } from '../hooks/useMentorStatus';
 import AuthModal_SignIn from "../components/AuthModal_SignIn";
-import { useSidebarStats } from '../hooks/useSidebarStats';
 import { useAvatar } from '../contexts/AvatarContext';
 import { useNavigate } from 'react-router-dom';
 
-export default function Sidebar({ open, onClose, isAuthenticated, user, onLogout, onGo, onOpenAuth, stats }) {
+export default function Sidebar({
+                                    open,
+                                    onClose,
+                                    isAuthenticated,
+                                    user,
+                                    onLogout,
+                                    onGo,
+                                    onOpenAuth,
+                                    stats,
+                                    isMentor = false,
+                                    mentorLoading = false
+                                }) {
     const panelRef = useRef(null);
     const [authOpen, setAuthOpen] = useState(false);
     const { updateTrigger } = useAvatar();
     const navigate = useNavigate();
     const [avatarLoading, setAvatarLoading] = useState(true);
-    const { isMentor, loading: checkingMentor, refetch } = useMentorStatus(false);
-
-
 
     useEffect(() => {
         if (user) {
@@ -25,16 +31,13 @@ export default function Sidebar({ open, onClose, isAuthenticated, user, onLogout
     useEffect(() => {
         if (open) {
             document.body.style.overflow = "hidden";
-            refetch();
         } else {
             document.body.style.overflow = "unset";
         }
         return () => {
             document.body.style.overflow = "unset";
         };
-    }, [open, refetch, updateTrigger]);
-
-
+    }, [open, updateTrigger]);
 
     useEffect(() => {
         if (!open) return;
@@ -177,7 +180,7 @@ export default function Sidebar({ open, onClose, isAuthenticated, user, onLogout
                             <div style={usernameStyle}>
                                 {username}
                             </div>
-                            {isMentor && (
+                            {isMentor && !mentorLoading && (
                                 <div style={{
                                     display: 'inline-block',
                                     padding: '2px 8px',
@@ -208,11 +211,11 @@ export default function Sidebar({ open, onClose, isAuthenticated, user, onLogout
                     <MenuLink icon="⭐" label="Favoritos" onClick={() => go("/favorites")} />
                     <MenuLink icon="📄" label="Mis Apuntes" onClick={() => go("/my_papers")} />
 
-                    {/* SECCIÓN DE MENTOR */}
-                    {isMentor && !checkingMentor && (
+                    {/* SECCIÓN DE MENTOR - Sin lag porque viene del Header */}
+                    {isMentor && !mentorLoading && (
                         <>
                             <Group title="Panel de Mentor" />
-                            <MenuLink icon="📚" label="I Am Mentor" onClick={() => go("/mentor/courses")} />
+                            <MenuLink icon="📚" label="Mis Mentorías" onClick={() => go("/mentor/courses")} />
                             <MenuLink icon="👥" label="Mis Alumnos" onClick={() => go("/mentor/students")} />
                             <MenuLink icon="📅" label="Mi Calendario" onClick={() => go("/mentor/calendar")} />
                         </>
@@ -342,13 +345,6 @@ const usernameStyle = {
     textOverflow: "ellipsis",
     overflow: "hidden",
     marginBottom: 4
-};
-
-const statsContainerStyle = {
-    display: "flex",
-    gap: 6,
-    fontSize: 12,
-    opacity: .9
 };
 
 const navStyle = {
@@ -500,7 +496,7 @@ function StatLink({ label, value, onClick }) {
     return (
         <div
             onClick={(e) => {
-                e.stopPropagation(); // ← AGREGAR ESTO
+                e.stopPropagation();
                 onClick?.();
             }}
             style={statLinkStyle}
@@ -508,7 +504,7 @@ function StatLink({ label, value, onClick }) {
             tabIndex={0}
             onKeyDown={(e) => {
                 if (e.key === 'Enter') {
-                    e.stopPropagation(); // ← Y ESTO
+                    e.stopPropagation();
                     onClick?.();
                 }
             }}

@@ -11,6 +11,7 @@ export function MentorCard({ mentor }) {
     const [showUnfollowModal, setShowUnfollowModal] = useState(false);
     const navigate = useNavigate();
     const { seguirUsuario, dejarDeSeguir } = useSeguidores();
+    const { toggleSeguir } = useSeguidores();
 
     // ✅ Solo cargar materias si no vienen en mentor
     useEffect(() => {
@@ -35,6 +36,7 @@ export function MentorCard({ mentor }) {
         }
     };
 
+// Y en manejarSeguir:
     const manejarSeguir = async (e) => {
         e.stopPropagation();
 
@@ -43,16 +45,11 @@ export function MentorCard({ mentor }) {
             return;
         }
 
-        if (!mentor.id_usuario) {
-            console.error('No se encontró el ID del usuario del mentor');
-            return;
-        }
-
         try {
             setCargando(true);
-            const resultado = await seguirUsuario(mentor.id_usuario);
+            const resultado = await toggleSeguir(mentor.id_usuario, siguiendo);
             if (resultado.success) {
-                setSiguiendo(true);
+                setSiguiendo(!siguiendo);
             }
         } catch (error) {
             console.error('Error al seguir:', error);
@@ -64,9 +61,9 @@ export function MentorCard({ mentor }) {
     const confirmarDejarDeSeguir = async () => {
         try {
             setCargando(true);
-            const resultado = await dejarDeSeguir(mentor.id_usuario);
+            const resultado = await toggleSeguir(mentor.id_usuario, siguiendo);
             if (resultado.success) {
-                setSiguiendo(false);
+                setSiguiendo(!siguiendo);
             }
         } catch (error) {
             console.error('Error al dejar de seguir:', error);

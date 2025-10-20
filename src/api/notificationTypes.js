@@ -29,7 +29,7 @@ export const notificationTypes = {
     /**
      * Alguien te siguió
      */
-    async nuevoSeguidor(seguidorId, seguidoId, nombreSeguidor) {
+    async nuevoSeguidor(seguidorId, seguidoId, nombreSeguidor, usernameSeguidor = null) {
         return createNotification({
             usuarioId: seguidoId,
             tipo: 'nuevo_seguidor',

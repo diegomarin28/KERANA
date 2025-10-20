@@ -92,6 +92,8 @@ export default function FolderView() {
         }
     };
 
+
+
     const toggleNoteSelection = (compraId) => {
         setSelectedNotes(prev =>
             prev.includes(compraId)
@@ -167,6 +169,7 @@ export default function FolderView() {
             setErrorMsg("Error al añadir apuntes");
         }
     };
+
 
     const handleRenameFolder = async (carpetaId, nuevoNombre) => {
         try {
@@ -385,6 +388,8 @@ export default function FolderView() {
         ...notes.map(n => ({...n, itemType: 'note'}))
     ];
 
+
+
     return (
         <div style={{width: "min(1200px, 92vw)", margin: "0 auto", padding: "32px 0"}}>
             {/* Breadcrumb */}
@@ -398,27 +403,27 @@ export default function FolderView() {
                 <Button
                     variant="ghost"
                     onClick={() => navigate('/purchased?tab=folders')}
-                    style={{ padding: '8px 12px' }}
+                    style={{ padding: '8px 12px', fontSize: 14 }}
                 >
                     Mis compras
                 </Button>
                 {breadcrumb.map((crumb, idx) => (
-                    <div key={crumb.id_carpeta} style={{display: 'flex', alignItems: 'center', gap: 8}}>
-                        <span style={{color: '#9ca3af'}}>›</span>
+                    <div key={crumb.id_carpeta} style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                        <span style={{ color: '#9ca3af' }}>›</span>
                         {idx === breadcrumb.length - 1 ? (
-                            <span style={{fontWeight: 600}}>{crumb.nombre}</span>
+                            <span style={{ fontWeight: 600, fontSize: 14 }}>{crumb.nombre}</span>
                         ) : (
                             <Button
                                 variant="ghost"
                                 onClick={() => navigate(`/purchased/folder/${crumb.id_carpeta}`)}
-                                style={{padding: '8px 12px'}}
+                                style={{ padding: '8px 12px', fontSize: 14 }}
                             >
                                 {crumb.nombre}
                             </Button>
                         )}
                     </div>
                 ))}
-            </div>
+            </div>        Crear carpeta
 
             {/* Header con botones */}
             <div style={{
@@ -470,17 +475,27 @@ export default function FolderView() {
             )}
 
             {allItems.length === 0 ? (
-                <Card style={{textAlign: "center", padding: "48px 24px", background: "#fafafa"}}>
-                    <div style={{fontSize: 48, marginBottom: 16}}>📂</div>
-                    <h3 style={{margin: "0 0 12px 0", color: "#374151"}}>Carpeta vacía</h3>
-                    <p style={{color: "#6b7280", margin: "0 0 24px 0"}}>
+                <Card style={{ textAlign: "center", padding: "48px 24px", background: "#fafafa" }}>
+                    <div style={{ fontSize: 48, marginBottom: 16 }}>📂</div>
+                    <h3 style={{ margin: "0 0 12px 0", color: "#374151" }}>Carpeta vacía</h3>
+                    <p style={{ color: "#6b7280", margin: "0 0 24px 0" }}>
                         Arrastrá apuntes o carpetas aquí, o usá los botones de arriba.
                     </p>
-                    <div style={{display: 'flex', gap: 12, justifyContent: 'center'}}>
+                    <div style={{ display: 'flex', gap: 12, justifyContent: 'center' }}>
                         <Button variant="secondary" onClick={() => setShowCreateFolderModal(true)}>
                             Crear subcarpeta
                         </Button>
-                        <Button variant="primary" onClick={() => setShowAddNotesModal(true)}>
+                        <Button
+                            variant="primary"
+                            onClick={() => {
+                                loadAvailableNotes();  // ← IMPORTANTE
+                                setShowAddNotesModal(true);
+                            }}
+                            style={{ display: 'flex', alignItems: 'center', gap: 8 }}
+                        >
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                                <path d="M12 5v14M5 12h14"/>
+                            </svg>
                             Añadir apuntes
                         </Button>
                     </div>

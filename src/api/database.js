@@ -103,11 +103,14 @@ export const subjectsAPI = {
 // ==========================================
 // 🔍 BÚSQUEDA GENERAL
 // ==========================================
+// SOLO LA FUNCIÓN searchProfessors - Reemplazá esta función en Database.js
+
 async function searchProfessors(term) {
     const q = (term || "").trim();
     if (!q) return { data: [], error: null };
 
     try {
+        // 1. Buscar profesores (con la función vieja que solo devuelve id y nombre)
         const { data: profesores, error } = await supabase
             .rpc('buscar_profesores_sin_tildes', { termino: q });
 
@@ -116,14 +119,53 @@ async function searchProfessors(term) {
             return { data: [], error };
         }
 
-        const transformed = (profesores || []).map(prof => ({
-            id: prof.id_profesor,
-            id_profesor: prof.id_profesor,
-            profesor_nombre: prof.profesor_nombre,
-            materia_nombre: '',
-            rating_promedio: 0,
-            estrellas: 0
-        }));
+        if (!profesores || profesores.length === 0) {
+            return { data: [], error: null };
+        }
+
+        // 2. Obtener los IDs de los profesores encontrados
+        const profesorIds = profesores.map(p => p.id_profesor);
+
+        // 3. Obtener los ratings de todos esos profesores en una sola query
+        const { data: ratings, error: ratingsError } = await supabase
+            .from('rating')
+            .select('ref_id, estrellas')
+            .eq('tipo', 'profesor')
+            .in('ref_id', profesorIds);
+
+        if (ratingsError) {
+            console.error('Error obteniendo ratings:', ratingsError);
+        }
+
+        // 4. Calcular el promedio de cada profesor
+        const ratingsMap = {};
+
+        if (ratings && ratings.length > 0) {
+            ratings.forEach(rating => {
+                if (!ratingsMap[rating.ref_id]) {
+                    ratingsMap[rating.ref_id] = { sum: 0, count: 0 };
+                }
+                ratingsMap[rating.ref_id].sum += rating.estrellas;
+                ratingsMap[rating.ref_id].count += 1;
+            });
+        }
+
+        // 5. Transformar los resultados con el rating calculado
+        const transformed = profesores.map(prof => {
+            const ratingData = ratingsMap[prof.id_profesor];
+            const avgRating = ratingData
+                ? Number((ratingData.sum / ratingData.count).toFixed(1))
+                : 0;
+
+            return {
+                id: prof.id_profesor,
+                id_profesor: prof.id_profesor,
+                profesor_nombre: prof.profesor_nombre,
+                materia_nombre: '',
+                rating_promedio: avgRating,
+                estrellas: avgRating
+            };
+        });
 
         return { data: transformed, error: null };
 
@@ -132,7 +174,6 @@ async function searchProfessors(term) {
         return { data: [], error };
     }
 }
-
 
 async function searchSubjects(term) {
     const q = (term || "").trim();
@@ -185,22 +226,40 @@ async function searchNotes(term) {
         const { data: apuntesCompletos, error: errorCompleto } = await supabase
             .from('apunte')
             .select(`
-                id_apunte,
-                titulo,
-                descripcion,
-                file_path,
-                estrellas,
-                creditos,
-                id_usuario,
-                id_materia,
-                materia(nombre_materia)
-            `)
+        id_apunte,
+        titulo,
+        descripcion,
+        file_path,
+        estrellas,
+        creditos,
+        id_usuario,
+        id_materia,
+        materia(nombre_materia)
+    `)
             .in('id_apunte', ids);
 
         if (errorCompleto) {
             console.error('Error obteniendo apuntes completos:', errorCompleto);
             return { data: [], error: errorCompleto };
         }
+
+        // 3.5️⃣ Contar likes por apunte
+        const apunteIds = apuntesCompletos.map(a => a.id_apunte);
+        const { data: likesData, error: likesError } = await supabase
+            .from('likes')
+            .select('id_apunte')
+            .eq('tipo', 'like')
+            .in('id_apunte', apunteIds);
+
+        if (likesError) {
+            console.error('Error cargando likes:', likesError);
+        }
+
+        // Crear un mapa de conteo de likes
+        const likesCountMap = {};
+        likesData?.forEach(like => {
+            likesCountMap[like.id_apunte] = (likesCountMap[like.id_apunte] || 0) + 1;
+        });
 
         // 4️⃣ Obtener nombres de usuarios separadamente
         const userIds = [...new Set(apuntesCompletos.map(a => a.id_usuario))];
@@ -236,7 +295,8 @@ async function searchNotes(term) {
                 file_path: a.file_path,
                 signedUrl: signedUrl,
                 materia: a.materia,
-                usuario: { nombre: userMap.get(a.id_usuario) || 'Anónimo' }
+                usuario: { nombre: userMap.get(a.id_usuario) || 'Anónimo' },
+                likes_count: likesCountMap[a.id_apunte] || 0
             });
         }
 
@@ -300,7 +360,7 @@ async function searchUsers(term) {
             username: usuario.username,
             tipo: 'usuario',
             label: usuario.nombre,
-            siguiendo: siguiendoSet.has(usuario.id_usuario) // ✨ NUEVO
+            siguiendo: siguiendoSet.has(usuario.id_usuario)
         }));
 
         return { data: transformed, error: null };
@@ -361,7 +421,7 @@ async function searchMentors(term) {
                 estrellas_mentor: m.estrellas_mentor,
                 rating_promedio: m.estrellas_mentor,
                 contacto: '',
-                siguiendo: userId ? siguiendoSet.has(userId) : false // ✨ NUEVO
+                siguiendo: userId ? siguiendoSet.has(userId) : false
             };
         });
 
@@ -917,8 +977,50 @@ export const ratingsAPI = {
         const count = data?.length || 0;
         const sum = (data || []).reduce((a, r) => a + (r.estrellas || 0), 0);
         return { data: { count, avg: count ? +(sum / count).toFixed(2) : 0 }, error: null };
+    },
+
+    async deleteRating(ratingId) {
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user) return { data: null, error: 'No hay usuario logueado' };
+
+        const { data: usuarioData } = await supabase
+            .from('usuario')
+            .select('id_usuario')
+            .eq('auth_id', user.id)
+            .single();
+
+        if (!usuarioData) return { data: null, error: 'Usuario no encontrado' };
+
+        const { data: rating } = await supabase
+            .from('rating')
+            .select('user_id, created_at')
+            .eq('id', ratingId)
+            .single();
+
+        if (!rating) return { data: null, error: 'Reseña no encontrada' };
+
+        if (rating.user_id !== usuarioData.id_usuario) {
+            return { data: null, error: 'No tienes permiso para borrar esta reseña' };
+        }
+
+        const createdAt = new Date(rating.created_at);
+        const now = new Date();
+        const hoursDiff = (now - createdAt) / (1000 * 60 * 60);
+
+        if (hoursDiff > 24) {
+            return { data: null, error: 'Solo puedes borrar reseñas dentro de las primeras 24 horas' };
+        }
+
+        const { data, error } = await supabase
+            .from('rating')
+            .delete()
+            .eq('id', ratingId)
+            .select();
+
+        return { data, error };
     }
 }
+
 // ==========================================
 // 👨‍🏫 PROFESORES
 // ==========================================
@@ -1277,13 +1379,11 @@ export const followersAPI = {
         return { data: !!data, error }
     }
 }
-// AGREGAR AL FINAL DE database.js (después de followersAPI)
 
 // ==========================================
 // 👤 PERFIL PÚBLICO
 // ==========================================
 export const publicProfileAPI = {
-    // Obtener perfil público por username
     async getPublicProfile(username) {
         const { data, error } = await supabase
             .from('usuario')
@@ -1303,7 +1403,6 @@ export const publicProfileAPI = {
         if (error) return { data: null, error };
         if (!data) return { data: null, error: { message: 'Usuario no encontrado' } };
 
-        // Si el perfil no es público, retornar error
         if (!data.perfil_publico) {
             return { data: null, error: { message: 'Este perfil es privado' } };
         }
@@ -1311,29 +1410,24 @@ export const publicProfileAPI = {
         return { data, error: null };
     },
 
-    // Obtener estadísticas del usuario
     async getPublicStats(userId) {
         try {
-            // Apuntes subidos
             const { count: apuntesCount } = await supabase
                 .from('apunte')
                 .select('*', { count: 'exact', head: true })
                 .eq('id_usuario', userId);
 
-            // Reseñas escritas
             const { count: resenasCount } = await supabase
                 .from('rating')
                 .select('*', { count: 'exact', head: true })
                 .eq('user_id', userId);
 
-            // Seguidores
             const { count: seguidoresCount } = await supabase
                 .from('seguidores')
                 .select('*', { count: 'exact', head: true })
                 .eq('seguido_id', userId)
                 .eq('estado', 'activo');
 
-            // Siguiendo
             const { count: siguiendoCount } = await supabase
                 .from('seguidores')
                 .select('*', { count: 'exact', head: true })
@@ -1355,7 +1449,6 @@ export const publicProfileAPI = {
         }
     },
 
-    // Verificar si el usuario es mentor
     async checkIfMentor(userId) {
         const { data, error } = await supabase
             .from('mentor')
@@ -1370,7 +1463,6 @@ export const publicProfileAPI = {
 
         if (error) return { data: null, error };
 
-        // Si es mentor, obtener sus materias
         if (data) {
             const { data: materias } = await supabase
                 .from('mentor_materia')
@@ -1386,7 +1478,6 @@ export const publicProfileAPI = {
         return { data, error: null };
     },
 
-    // Obtener últimos apuntes del usuario (para el carrusel)
     async getRecentNotes(userId, limit = 4) {
         const { data, error } = await supabase
             .from('apunte')
@@ -1404,7 +1495,6 @@ export const publicProfileAPI = {
             .order('created_at', { ascending: false })
             .limit(limit);
 
-        // Transformar para que funcione con NoteCard
         const transformed = (data || []).map(note => ({
             id_apunte: note.id_apunte,
             titulo: note.titulo,
@@ -1418,7 +1508,6 @@ export const publicProfileAPI = {
         return { data: transformed, error };
     },
 
-    // Obtener TODOS los apuntes con filtro opcional por materia
     async getAllNotes(userId, materiaId = null) {
         let query = supabase
             .from('apunte')
@@ -1441,7 +1530,6 @@ export const publicProfileAPI = {
 
         const { data, error } = await query;
 
-        // Transformar para que funcione con NoteCard
         const transformed = (data || []).map(note => ({
             id_apunte: note.id_apunte,
             titulo: note.titulo,
@@ -1455,7 +1543,6 @@ export const publicProfileAPI = {
         return { data: transformed, error };
     },
 
-    // Obtener materias únicas del usuario (para el filtro)
     async getUserSubjects(userId) {
         const { data, error } = await supabase
             .from('apunte')
@@ -1467,7 +1554,6 @@ export const publicProfileAPI = {
 
         if (error) return { data: [], error };
 
-        // Obtener materias únicas
         const uniqueSubjects = [];
         const seenIds = new Set();
 
@@ -1481,7 +1567,6 @@ export const publicProfileAPI = {
         return { data: uniqueSubjects, error: null };
     },
 
-    // Obtener reseñas escritas por el usuario
     async getUserReviews(userId, limit = 10) {
         const { data, error } = await supabase
             .from('rating')
@@ -1502,7 +1587,6 @@ export const publicProfileAPI = {
         return { data, error };
     },
 
-    // Verificar si el usuario actual sigue a este usuario
     async isFollowing(targetUserId) {
         const { data: { user } } = await supabase.auth.getUser();
         if (!user) return { data: false, error: null };
@@ -1531,11 +1615,6 @@ export const publicProfileAPI = {
 // 📁 CARPETAS DE COMPRAS
 // ==========================================
 export const foldersAPI = {
-    // ==========================================
-    // CARPETAS
-    // ==========================================
-
-    // Obtener todas las carpetas del usuario con estructura jerárquica
     async getMyFolders() {
         const {data: {user}} = await supabase.auth.getUser()
         if (!user) return {data: null, error: 'No hay usuario logueado'}
@@ -1557,7 +1636,6 @@ export const foldersAPI = {
         return {data, error}
     },
 
-    // Crear nueva carpeta
     async createFolder(nombre, tipo = 'personalizada', parentId = null, orden = 0) {
         const {data: {user}} = await supabase.auth.getUser()
         if (!user) return {data: null, error: 'No hay usuario logueado'}
@@ -1585,7 +1663,6 @@ export const foldersAPI = {
         return {data, error}
     },
 
-    // Editar nombre de carpeta
     async updateFolder(carpetaId, nuevoNombre) {
         const {data, error} = await supabase
             .from('carpeta_compras')
@@ -1597,7 +1674,6 @@ export const foldersAPI = {
         return {data, error}
     },
 
-    // Eliminar carpeta (y sus subcarpetas por CASCADE)
     async deleteFolder(carpetaId) {
         const {data, error} = await supabase
             .from('carpeta_compras')
@@ -1607,7 +1683,6 @@ export const foldersAPI = {
         return {data, error}
     },
 
-    // Mover carpeta a otra carpeta padre
     async moveFolder(carpetaId, nuevoParentId, nuevoOrden) {
         const {data, error} = await supabase
             .from('carpeta_compras')
@@ -1622,11 +1697,6 @@ export const foldersAPI = {
         return {data, error}
     },
 
-    // ==========================================
-    // APUNTES EN CARPETAS
-    // ==========================================
-
-    // Obtener todos los apuntes de una carpeta
     async getNotesInFolder(carpetaId) {
         const {data, error} = await supabase
             .from('apunte_en_carpeta')
@@ -1644,7 +1714,6 @@ export const foldersAPI = {
         return {data, error}
     },
 
-    // Agregar apunte a carpeta
     async addNoteToFolder(carpetaId, compraId) {
         const {data, error} = await supabase
             .from('apunte_en_carpeta')
@@ -1658,7 +1727,6 @@ export const foldersAPI = {
         return {data, error}
     },
 
-    // Quitar apunte de carpeta
     async removeNoteFromFolder(carpetaId, compraId) {
         const {data, error} = await supabase
             .from('apunte_en_carpeta')
@@ -1669,18 +1737,10 @@ export const foldersAPI = {
         return {data, error}
     },
 
-    // Mover apunte entre carpetas
     async moveNoteBetweenFolders(compraId, carpetaOrigenId, carpetaDestinoId) {
-        // Primero eliminar de la carpeta origen
         await this.removeNoteFromFolder(carpetaOrigenId, compraId)
-
-        // Luego agregar a la carpeta destino
         return await this.addNoteToFolder(carpetaDestinoId, compraId)
     },
-
-    // ==========================================
-    // ORGANIZACIÓN AUTOMÁTICA (LA "IA" 🧠)
-    // ==========================================
 
     async autoOrganize() {
         const { data: { user } } = await supabase.auth.getUser()
@@ -1695,15 +1755,13 @@ export const foldersAPI = {
         if (!usuarioData) return { data: null, error: 'Usuario no encontrado' }
 
         try {
-            // 1. Obtener todas las compras del usuario
             const { data: compras, error: comprasError } = await supabase
                 .from('compra_apunte')
                 .select(`
                 id,
                 apunte_id,
-                apunte:apunte(
-                    id_materia,
-                    materia:materia(
+                apunte:apunte!inner(
+                    materia:materia!inner(
                         id_materia,
                         nombre_materia,
                         semestre
@@ -1712,20 +1770,29 @@ export const foldersAPI = {
             `)
                 .eq('comprador_id', usuarioData.id_usuario)
 
-            if (comprasError) throw comprasError
+            if (comprasError) {
+                console.error('❌ Error obteniendo compras:', comprasError)
+                throw comprasError
+            }
 
-            // 2. Agrupar por semestre y materia
+            if (!compras || compras.length === 0) {
+                return { data: { carpetasCreadas: 0 }, error: null }
+            }
+
             const estructura = {}
 
             compras.forEach(compra => {
                 const materia = compra.apunte?.materia
-                if (!materia) return
+                if (!materia || !materia.semestre) {
+                    console.log('⚠️ Compra sin materia/semestre:', compra.id)
+                    return
+                }
 
-                const semestreNum = materia.semestre || 'Sin semestre'
-                const semestreNombre = semestreNum === 'Sin semestre' ? semestreNum : `Semestre ${semestreNum}`
-
+                const semestreNum = materia.semestre
+                const semestreNombre = `Semestre ${semestreNum}`
                 const nombreMateria = materia.nombre_materia
-                const idMateria = materia.id_materia
+
+                console.log(`📂 Procesando: ${semestreNombre} → ${nombreMateria}`)
 
                 if (!estructura[semestreNombre]) {
                     estructura[semestreNombre] = {}
@@ -1733,7 +1800,6 @@ export const foldersAPI = {
 
                 if (!estructura[semestreNombre][nombreMateria]) {
                     estructura[semestreNombre][nombreMateria] = {
-                        id_materia: idMateria,
                         compras: []
                     }
                 }
@@ -1741,23 +1807,30 @@ export const foldersAPI = {
                 estructura[semestreNombre][nombreMateria].compras.push(compra.id)
             })
 
-            // 3. Crear carpetas y asignar apuntes
+            console.log('📊 Estructura generada:', estructura)
+
             const carpetasCreadas = []
 
             for (const [nombreSemestre, materias] of Object.entries(estructura)) {
-                // Crear carpeta de semestre
-                const { data: carpetaSemestre } = await this.createFolder(
-                    nombreSemestre, // ← Ya tiene "Semestre 3" en el nombre
+                console.log(`✅ Creando carpeta: "${nombreSemestre}"`)
+
+                const { data: carpetaSemestre, error: errorSemestre } = await this.createFolder(
+                    nombreSemestre,
                     'semestre',
                     null,
                     0
                 )
 
+                if (errorSemestre) {
+                    console.error(`❌ Error creando carpeta semestre "${nombreSemestre}":`, errorSemestre)
+                    continue
+                }
+
                 if (!carpetaSemestre) continue
 
                 carpetasCreadas.push(carpetaSemestre)
+                console.log(`✅ Carpeta creada: ${carpetaSemestre.nombre} (ID: ${carpetaSemestre.id_carpeta})`)
 
-                // Crear carpetas de materias dentro del semestre
                 for (const [nombreMateria, datos] of Object.entries(materias)) {
                     const { data: carpetaMateria } = await this.createFolder(
                         nombreMateria,
@@ -1770,12 +1843,13 @@ export const foldersAPI = {
 
                     carpetasCreadas.push(carpetaMateria)
 
-                    // Agregar apuntes a la carpeta de materia
                     for (const compraId of datos.compras) {
                         await this.addNoteToFolder(carpetaMateria.id_carpeta, compraId)
                     }
                 }
             }
+
+            console.log(`✅ Organización completa. ${carpetasCreadas.length} carpetas creadas.`)
 
             return {
                 data: {
@@ -1786,7 +1860,7 @@ export const foldersAPI = {
             }
 
         } catch (error) {
-            console.error('Error en organización automática:', error)
+            console.error('❌ Error en organización automática:', error)
             return { data: null, error }
         }
     }

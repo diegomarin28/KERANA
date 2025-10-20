@@ -32,7 +32,7 @@ export default function Home() {
         (async () => {
             try {
                 setLoadingTop(true);
-                const { data, error } = await supabase.rpc("top_apuntes_best", { limit_count: 6 });
+                const { data, error } = await supabase.rpc("top_apuntes_best", { limit_count: 8 });
                 if (error) throw error;
 
                 // Obtener file_path de cada apunte
@@ -40,14 +40,28 @@ export default function Home() {
                 const { data: apuntes, error: apError } = await supabase
                     .from('apunte')
                     .select(`
-                                     id_apunte, 
-                                     file_path,
-                                     usuario:id_usuario(nombre)
-                                     `)
+                    id_apunte, 
+                    file_path,
+                    usuario:id_usuario(nombre)
+                `)
                     .in('id_apunte', apIds);
 
-
                 if (apError) throw apError;
+
+                // Contar likes por apunte
+                const { data: likesData, error: likesError } = await supabase
+                    .from('likes')
+                    .select('id_apunte')
+                    .eq('tipo', 'like')
+                    .in('id_apunte', apIds);
+
+                if (likesError) throw likesError;
+
+                // Crear un mapa de conteo de likes
+                const likesCountMap = {};
+                likesData?.forEach(like => {
+                    likesCountMap[like.id_apunte] = (likesCountMap[like.id_apunte] || 0) + 1;
+                });
 
                 const filePathMap = new Map(apuntes.map(a => [a.id_apunte, a.file_path]));
 
@@ -71,7 +85,8 @@ export default function Home() {
                     return {
                         ...note,
                         usuario: apunte?.usuario || { nombre: 'Anónimo' },
-                        signedUrl: urls[note.apunte_id] || null
+                        signedUrl: urls[note.apunte_id] || null,
+                        likes_count: likesCountMap[note.apunte_id] || 0
                     };
                 });
 
@@ -201,7 +216,7 @@ export default function Home() {
                                     justifyItems: "center",
                                 }}
                             >
-                                {Array.from({ length: 6 }).map((_, i) => (
+                                {Array.from({ length: 8 }).map((_, i) => (
                                     <SkeletonCard key={i} />
                                 ))}
                             </div>
@@ -219,7 +234,7 @@ export default function Home() {
                                     justifyItems: "center",
                                 }}
                             >
-                                {topNotes.slice(0, 6).map((n) => (
+                                {topNotes.slice(0,8).map((n) => (
                                     <div
                                         key={n.apunte_id}
                                         style={{
@@ -234,10 +249,11 @@ export default function Home() {
                                                 titulo: n.titulo,
                                                 descripcion: n.descripcion || '',
                                                 creditos: n.creditos,
-                                                estrellas: n.rating_promedio || 0,
+//                                                estrellas: n.rating_promedio || 0,
                                                 usuario: { nombre: n.usuario_nombre },  // ← CAMBIO
                                                 materia: { nombre_materia: n.nombre_materia },  // ← CAMBIO
-                                                signedUrl: n.signedUrl
+                                                signedUrl: n.signedUrl,
+                                                likes_count: n.likes_count  // ← NUEVO
                                             }}
                                         />
                                     </div>
