@@ -220,6 +220,13 @@ export function MentorCard({ mentor }) {
                 </button>
             </div>
 
+            {/* Botón Agendar Mentoría */}
+            {mentor.usuario?.calendly_url && (
+                <button onClick={() => window.open(mentor.usuario.calendly_url, "_blank")}>
+                    📅 Agendar Mentoría
+                </button>
+            )}
+
             {showUnfollowModal && (
                 <div style={modalOverlayStyle} onClick={() => setShowUnfollowModal(false)}>
                     <div style={modalContentStyle} onClick={(e) => e.stopPropagation()}>
@@ -249,7 +256,7 @@ export function MentorCard({ mentor }) {
                 </div>
             )}
         </>
-    );
+);
 }
 
 const modalOverlayStyle = { position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0, 0, 0, 0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 9999, backdropFilter: 'blur(4px)' };

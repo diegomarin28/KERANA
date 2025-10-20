@@ -1524,6 +1524,21 @@ export const publicProfileAPI = {
             .maybeSingle();
 
         return { data: !!data, error };
+    },
+    getMentorCalendly: async (userId) => {
+        try {
+            const { data, error } = await supabase
+                .from('mentores')
+                .select('url_calendly')
+                .eq('id_usuario', userId)
+                .single();
+
+            if (error) throw error;
+            return { data: data?.url_calendly || null, error: null };
+        } catch (error) {
+            console.error('Error obteniendo Calendly del mentor:', error);
+            return { data: null, error };
+        }
     }
 };
 
@@ -1683,20 +1698,20 @@ export const foldersAPI = {
     // ==========================================
 
     async autoOrganize() {
-        const { data: { user } } = await supabase.auth.getUser()
-        if (!user) return { data: null, error: 'No hay usuario logueado' }
+        const {data: {user}} = await supabase.auth.getUser()
+        if (!user) return {data: null, error: 'No hay usuario logueado'}
 
-        const { data: usuarioData } = await supabase
+        const {data: usuarioData} = await supabase
             .from('usuario')
             .select('id_usuario')
             .eq('auth_id', user.id)
             .single()
 
-        if (!usuarioData) return { data: null, error: 'Usuario no encontrado' }
+        if (!usuarioData) return {data: null, error: 'Usuario no encontrado'}
 
         try {
             // 1. Obtener todas las compras del usuario
-            const { data: compras, error: comprasError } = await supabase
+            const {data: compras, error: comprasError} = await supabase
                 .from('compra_apunte')
                 .select(`
                 id,
@@ -1746,7 +1761,7 @@ export const foldersAPI = {
 
             for (const [nombreSemestre, materias] of Object.entries(estructura)) {
                 // Crear carpeta de semestre
-                const { data: carpetaSemestre } = await this.createFolder(
+                const {data: carpetaSemestre} = await this.createFolder(
                     nombreSemestre, // ← Ya tiene "Semestre 3" en el nombre
                     'semestre',
                     null,
@@ -1759,7 +1774,7 @@ export const foldersAPI = {
 
                 // Crear carpetas de materias dentro del semestre
                 for (const [nombreMateria, datos] of Object.entries(materias)) {
-                    const { data: carpetaMateria } = await this.createFolder(
+                    const {data: carpetaMateria} = await this.createFolder(
                         nombreMateria,
                         'materia',
                         carpetaSemestre.id_carpeta,
@@ -1787,7 +1802,59 @@ export const foldersAPI = {
 
         } catch (error) {
             console.error('Error en organización automática:', error)
-            return { data: null, error }
+            return {data: null, error}
         }
+    }
+}
+// ==========================================
+// 📅 CALENDLY INTEGRATION
+// ==========================================
+export const calendlyAPI = {
+    // Guardar URL de Calendly del mentor
+    async saveCalendlyUrl(url) {
+        const { data: { user } } = await supabase.auth.getUser()
+        if (!user) return { data: null, error: 'No hay usuario logueado' }
+
+        // Actualizar directamente usando auth_id
+        const { data, error } = await supabase
+            .from('usuario')
+            .update({ calendly_url: url })
+            .eq('auth_id', user.id)  // ⬅️ Usar auth_id directamente
+            .select()
+            .single()
+
+        return { data, error }
+    },
+
+    // Obtener mi URL de Calendly
+    async getMyCalendlyUrl() {
+        const { data: { user } } = await supabase.auth.getUser()
+        if (!user) return { data: null, error: 'No hay usuario logueado' }
+
+        const { data: usuarioData } = await supabase
+            .from('usuario')
+            .select('calendly_url')
+            .eq('auth_id', user.id)
+            .single()
+
+        if (!usuarioData) return { data: null, error: 'Usuario no encontrado' }
+
+        return { data: usuarioData.calendly_url, error: null }
+    },
+
+    // Obtener URL de Calendly de un mentor específico (para estudiantes)
+    async getMentorCalendlyUrl(mentorId) {
+        const { data, error } = await supabase
+            .from('mentor')
+            .select(`
+                id_mentor,
+                usuario!inner(calendly_url)
+            `)
+            .eq('id_mentor', mentorId)
+            .single()
+
+        if (error) return { data: null, error }
+
+        return { data: data?.usuario?.calendly_url, error: null }
     }
 }
