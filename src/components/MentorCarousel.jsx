@@ -7,11 +7,11 @@ const AVAILABLE_TAGS = [
     { id: 'muy-claro', label: '✨ Muy claro' },
     { id: 'querido', label: '🎓 Querido por los estudiantes' },
     { id: 'apasionado', label: '🔥 Apasionado' },
-    { id: 'disponible', label: '💬 Siempre disponible' },
-    { id: 'ordenado', label: '📋 Muy ordenado' },
+    { id: 'disponible', label: '💬 Disponible' },
+    { id: 'ordenado', label: '📋 Ordenado' },
     { id: 'dinamico', label: '⚡ Dinámico' },
-    { id: 'cercano', label: '🤝 Cercano a los alumnos' },
-    { id: 'paciente', label: '🧘 Muy paciente' },
+    { id: 'cercano', label: '🤝 Cercano' },
+    { id: 'paciente', label: '🧘 Paciente' },
     { id: 'buenas-explicaciones', label: '💡 Buenas explicaciones' },
     { id: 'ejemplos-claros', label: '📚 Buenos ejemplos' }
 ];
@@ -56,6 +56,13 @@ export default function MentorCarousel({ mentores, mentoresByRating }) {
     const sortedMentores = [...mentores].sort((a, b) =>
         a.nombre.localeCompare(b.nombre)
     );
+
+    const handleMentorClick = (mentor) => {
+        // Navegar al perfil del mentor - sin el @ y usando /mentor/ en vez de /perfil/
+        if (mentor.username) {
+            navigate(`/mentor/${mentor.username}`);
+        }
+    };
 
     return (
         <div style={{ marginBottom: 40, position: 'relative' }}>
@@ -128,10 +135,10 @@ export default function MentorCarousel({ mentores, mentoresByRating }) {
                         return (
                             <div
                                 key={mentor.id_mentor}
-                                onClick={() => navigate(`/mentores/${mentor.id_mentor}`)}
+                                onClick={() => handleMentorClick(mentor)}
                                 style={{
                                     minWidth: 260,
-                                    padding: 20,
+                                    padding: 16,
                                     background: '#fff',
                                     borderRadius: 12,
                                     border: '1px solid #e5e7eb',
@@ -139,7 +146,7 @@ export default function MentorCarousel({ mentores, mentoresByRating }) {
                                     scrollSnapAlign: 'start',
                                     display: 'flex',
                                     flexDirection: 'column',
-                                    gap: 12,
+                                    gap: 10,
                                     transition: 'all 0.2s ease',
                                     cursor: 'pointer'
                                 }}
@@ -154,8 +161,8 @@ export default function MentorCarousel({ mentores, mentoresByRating }) {
                             >
                                 {/* Foto/Iniciales */}
                                 <div style={{
-                                    width: 64,
-                                    height: 64,
+                                    width: 56,
+                                    height: 56,
                                     borderRadius: '50%',
                                     background: mentor.foto ? 'transparent' : '#dbeafe',
                                     display: 'flex',
@@ -176,7 +183,7 @@ export default function MentorCarousel({ mentores, mentoresByRating }) {
                                         />
                                     ) : (
                                         <div style={{
-                                            fontSize: 24,
+                                            fontSize: 20,
                                             fontWeight: 700,
                                             color: '#1e40af'
                                         }}>
@@ -188,7 +195,7 @@ export default function MentorCarousel({ mentores, mentoresByRating }) {
                                 {/* Nombre */}
                                 <h3 style={{
                                     margin: 0,
-                                    fontSize: 16,
+                                    fontSize: 15,
                                     fontWeight: 600,
                                     textAlign: 'center',
                                     color: '#1f2937'
@@ -219,11 +226,11 @@ export default function MentorCarousel({ mentores, mentoresByRating }) {
                                     paddingTop: 8,
                                     borderTop: '1px solid #f3f4f6'
                                 }}>
-                                    <StarDisplay rating={promedio} size={20} />
+                                    <StarDisplay rating={promedio} size={18} />
                                     <div style={{
                                         display: 'flex',
                                         alignItems: 'center',
-                                        gap: 8
+                                        gap: 6
                                     }}>
                                         <span style={{
                                             fontSize: 14,
@@ -243,14 +250,15 @@ export default function MentorCarousel({ mentores, mentoresByRating }) {
                                     </div>
                                 </div>
 
-                                {/* Top 3 Tags */}
+                                {/* Top 3 Tags - Sin cortarse */}
                                 {topTags.length > 0 && (
                                     <div style={{
                                         display: 'flex',
-                                        flexDirection: 'column',
-                                        gap: 4,
+                                        flexWrap: 'wrap',
+                                        gap: 6,
                                         paddingTop: 8,
-                                        borderTop: '1px solid #f3f4f6'
+                                        borderTop: '1px solid #f3f4f6',
+                                        justifyContent: 'center'
                                     }}>
                                         {topTags.map((tagId) => {
                                             const tag = AVAILABLE_TAGS.find(t => t.id === tagId);
@@ -259,12 +267,14 @@ export default function MentorCarousel({ mentores, mentoresByRating }) {
                                                 <div
                                                     key={tagId}
                                                     style={{
-                                                        padding: '4px 8px',
-                                                        background: '#f0fdf4',
+                                                        padding: '4px 10px',
+                                                        background: '#eff6ff',
                                                         borderRadius: 8,
                                                         fontSize: 11,
-                                                        color: '#15803d',
-                                                        textAlign: 'center'
+                                                        color: '#1e40af',
+                                                        whiteSpace: 'nowrap',
+                                                        fontWeight: 500,
+                                                        flexShrink: 0
                                                     }}
                                                 >
                                                     {tag.label}

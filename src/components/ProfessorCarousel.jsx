@@ -7,15 +7,15 @@ const AVAILABLE_TAGS = [
     { id: 'muy-claro', label: '✨ Muy claro' },
     { id: 'querido', label: '🎓 Querido por los estudiantes' },
     { id: 'apasionado', label: '🔥 Apasionado' },
-    { id: 'disponible', label: '💬 Siempre disponible' },
-    { id: 'ordenado', label: '📋 Muy ordenado' },
-    { id: 'dinamico', label: '⚡ Clases dinámicas' },
-    { id: 'cercano', label: '🤝 Cercano a los alumnos' },
+    { id: 'disponible', label: '💬 Disponible' },
+    { id: 'ordenado', label: '📋 Ordenado' },
+    { id: 'dinamico', label: '⚡ Dinámico' },
+    { id: 'cercano', label: '🤝 Cercano' },
     { id: 'califica-duro', label: '📊 Califica duro' },
     { id: 'mucha-tarea', label: '📖 Mucha tarea' },
-    { id: 'participacion', label: '🎤 La participación importa' },
+    { id: 'participacion', label: '🎤 Participación' },
     { id: 'confuso', label: '🤔 Confuso' },
-    { id: 'lejano', label: '🚪 Lejano a los alumnos' },
+    { id: 'lejano', label: '🚪 Lejano' },
     { id: 'examenes-dificiles', label: '📝 Exámenes difíciles' }
 ];
 
@@ -134,7 +134,7 @@ export default function ProfessorCarousel({ profesores, profesoresByRating }) {
                                 onClick={() => navigate(`/profesores/${profesor.id_profesor}`)}
                                 style={{
                                     minWidth: 260,
-                                    padding: 20,
+                                    padding: 16,
                                     background: '#fff',
                                     borderRadius: 12,
                                     border: '1px solid #e5e7eb',
@@ -142,7 +142,7 @@ export default function ProfessorCarousel({ profesores, profesoresByRating }) {
                                     scrollSnapAlign: 'start',
                                     display: 'flex',
                                     flexDirection: 'column',
-                                    gap: 12,
+                                    gap: 10,
                                     transition: 'all 0.2s ease',
                                     cursor: 'pointer'
                                 }}
@@ -157,8 +157,8 @@ export default function ProfessorCarousel({ profesores, profesoresByRating }) {
                             >
                                 {/* Foto/Iniciales */}
                                 <div style={{
-                                    width: 64,
-                                    height: 64,
+                                    width: 56,
+                                    height: 56,
                                     borderRadius: '50%',
                                     background: profesor.foto ? 'transparent' : '#dbeafe',
                                     display: 'flex',
@@ -179,7 +179,7 @@ export default function ProfessorCarousel({ profesores, profesoresByRating }) {
                                         />
                                     ) : (
                                         <div style={{
-                                            fontSize: 24,
+                                            fontSize: 20,
                                             fontWeight: 700,
                                             color: '#1e40af'
                                         }}>
@@ -191,7 +191,7 @@ export default function ProfessorCarousel({ profesores, profesoresByRating }) {
                                 {/* Nombre */}
                                 <h3 style={{
                                     margin: 0,
-                                    fontSize: 16,
+                                    fontSize: 15,
                                     fontWeight: 600,
                                     textAlign: 'center',
                                     color: '#1f2937'
@@ -208,11 +208,11 @@ export default function ProfessorCarousel({ profesores, profesoresByRating }) {
                                     paddingTop: 8,
                                     borderTop: '1px solid #f3f4f6'
                                 }}>
-                                    <StarDisplay rating={promedio} size={20} />
+                                    <StarDisplay rating={promedio} size={18} />
                                     <div style={{
                                         display: 'flex',
                                         alignItems: 'center',
-                                        gap: 8
+                                        gap: 6
                                     }}>
                                         <span style={{
                                             fontSize: 14,
@@ -232,14 +232,15 @@ export default function ProfessorCarousel({ profesores, profesoresByRating }) {
                                     </div>
                                 </div>
 
-                                {/* Top 3 Tags */}
+                                {/* Top 3 Tags - Sin cortarse */}
                                 {topTags.length > 0 && (
                                     <div style={{
                                         display: 'flex',
-                                        flexDirection: 'column',
-                                        gap: 4,
+                                        flexWrap: 'wrap',
+                                        gap: 6,
                                         paddingTop: 8,
-                                        borderTop: '1px solid #f3f4f6'
+                                        borderTop: '1px solid #f3f4f6',
+                                        justifyContent: 'center'
                                     }}>
                                         {topTags.map((tagId) => {
                                             const tag = AVAILABLE_TAGS.find(t => t.id === tagId);
@@ -248,12 +249,14 @@ export default function ProfessorCarousel({ profesores, profesoresByRating }) {
                                                 <div
                                                     key={tagId}
                                                     style={{
-                                                        padding: '4px 8px',
-                                                        background: '#f3f4f6',
+                                                        padding: '4px 10px',
+                                                        background: '#eff6ff',
                                                         borderRadius: 8,
                                                         fontSize: 11,
-                                                        color: '#374151',
-                                                        textAlign: 'center'
+                                                        color: '#1e40af',
+                                                        whiteSpace: 'nowrap',
+                                                        fontWeight: 500,
+                                                        flexShrink: 0
                                                     }}
                                                 >
                                                     {tag.label}

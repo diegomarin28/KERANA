@@ -5,6 +5,7 @@ import { ratingsAPI } from '../api/Database';
 import ProfessorCarousel from '../components/ProfessorCarousel';
 import MentorCarousel from '../components/MentorCarousel';
 import NotesModal from '../components/NotesModal';
+import ApunteCard from '../components/ApunteCard';
 
 export default function SubjectDetail() {
     const { id } = useParams();
@@ -63,34 +64,42 @@ export default function SubjectDetail() {
             // Cargar mentores de esta materia
             const { data: mentorMateriaData, error: mentorMateriaError } = await supabase
                 .from('mentor_materia')
-                .select(`
-                    id_mentor,
-                    mentor!inner(
-                        id_mentor,
-                        id_usuario,
-                        estrellas_mentor,
-                        contacto,
-                        usuario!inner(
-                            nombre,
-                            foto,
-                            username
-                        )
-                    )
-                `)
+                .select('id_mentor, id_materia')
                 .eq('id_materia', id);
 
-            if (!mentorMateriaError && mentorMateriaData) {
-                const mentoresList = mentorMateriaData.map(m => ({
-                    ...m.mentor,
-                    nombre: m.mentor.usuario?.nombre || 'Mentor',
-                    foto: m.mentor.usuario?.foto,
-                    username: m.mentor.usuario?.username
-                }));
-                setMentores(mentoresList);
-                await loadMentoresRatings(mentoresList);
+            if (!mentorMateriaError && mentorMateriaData && mentorMateriaData.length > 0) {
+                const mentorIds = mentorMateriaData.map(mm => mm.id_mentor);
+
+                const { data: mentoresData, error: mentoresError } = await supabase
+                    .from('mentor')
+                    .select('id_mentor, id_usuario, estrellas_mentor, contacto')
+                    .in('id_mentor', mentorIds);
+
+                if (!mentoresError && mentoresData && mentoresData.length > 0) {
+                    const usuarioIds = mentoresData.map(m => m.id_usuario);
+                    const { data: usuariosData, error: usuariosError } = await supabase
+                        .from('usuario')
+                        .select('id_usuario, nombre, foto, username')
+                        .in('id_usuario', usuarioIds);
+
+                    if (!usuariosError && usuariosData) {
+                        const mentoresList = mentoresData.map(mentor => {
+                            const usuario = usuariosData.find(u => u.id_usuario === mentor.id_usuario);
+                            return {
+                                ...mentor,
+                                nombre: usuario?.nombre || 'Mentor',
+                                foto: usuario?.foto,
+                                username: usuario?.username
+                            };
+                        });
+
+                        setMentores(mentoresList);
+                        await loadMentoresRatings(mentoresList);
+                    }
+                }
             }
 
-            // Cargar apuntes de esta materia (solo los primeros para preview)
+            // Cargar apuntes de esta materia (solo los primeros 12 para preview)
             const { data: apuntesData, error: apuntesError } = await supabase
                 .from('apunte')
                 .select(`
@@ -101,15 +110,15 @@ export default function SubjectDetail() {
                     file_path,
                     created_at,
                     id_usuario,
-                    usuario:id_usuario(nombre)
+                    usuario:id_usuario(nombre),
+                    materia:id_materia(nombre_materia)
                 `)
                 .eq('id_materia', id)
                 .order('created_at', { ascending: false })
-                .limit(8);
+                .limit(12);
 
             if (!apuntesError && apuntesData) {
-                // Generar signed URLs para thumbnails
-                const apuntesConUrls = await Promise.all(
+                const apuntesConData = await Promise.all(
                     apuntesData.map(async (apunte) => {
                         let signedUrl = null;
                         if (apunte.file_path) {
@@ -120,10 +129,20 @@ export default function SubjectDetail() {
                                 signedUrl = signedData.signedUrl;
                             }
                         }
-                        return { ...apunte, signedUrl };
+
+                        // Contar likes y dislikes
+                        const { data: likesData } = await supabase
+                            .from('likes')
+                            .select('tipo')
+                            .eq('id_apunte', apunte.id_apunte);
+
+                        const likes = likesData?.filter(l => l.tipo === 'like').length || 0;
+                        const dislikes = likesData?.filter(l => l.tipo === 'dislike').length || 0;
+
+                        return { ...apunte, signedUrl, likes, dislikes };
                     })
                 );
-                setApuntes(apuntesConUrls);
+                setApuntes(apuntesConData);
             }
 
         } catch (err) {
@@ -141,12 +160,10 @@ export default function SubjectDetail() {
             const { data: reviewsData } = await ratingsAPI.listByProfesor(profesor.id_profesor);
 
             if (reviewsData) {
-                // Filtrar solo reviews de esta materia
                 const materiaReviews = reviewsData.filter(r => r.materia_id === parseInt(id));
                 const sum = materiaReviews.reduce((acc, r) => acc + (r.estrellas || 0), 0);
                 const avg = materiaReviews.length ? +(sum / materiaReviews.length).toFixed(1) : 0;
 
-                // Calcular top 3 tags
                 const tagCounts = {};
                 materiaReviews.forEach(review => {
                     if (review.tags && Array.isArray(review.tags)) {
@@ -249,6 +266,8 @@ export default function SubjectDetail() {
         );
     }
 
+    const showBlurEffect = apuntes.length > 8;
+
     return (
         <div style={{ maxWidth: 1200, margin: '0 auto', padding: '20px' }}>
             {/* Botón de volver */}
@@ -318,16 +337,8 @@ export default function SubjectDetail() {
                 />
             )}
 
-            {/* Carrusel de mentores */}
-            {mentores.length > 0 && (
-                <MentorCarousel
-                    mentores={mentores}
-                    mentoresByRating={mentoresByRating}
-                />
-            )}
-
-            {/* Sección de apuntes */}
-            <div style={{ marginBottom: 40 }}>
+            {/* Sección de apuntes con efecto blur */}
+            <div style={{ marginBottom: 40, position: 'relative' }}>
                 <div style={{
                     display: 'flex',
                     justifyContent: 'space-between',
@@ -337,100 +348,9 @@ export default function SubjectDetail() {
                     <h2 style={{ fontSize: 20, fontWeight: 700, margin: 0 }}>
                         Apuntes
                     </h2>
-                    <button
-                        onClick={() => setShowNotesModal(true)}
-                        style={{
-                            padding: '10px 20px',
-                            background: '#2563eb',
-                            color: '#fff',
-                            border: 'none',
-                            borderRadius: 8,
-                            fontWeight: 600,
-                            cursor: 'pointer',
-                            fontSize: 14,
-                            transition: 'all 0.2s ease'
-                        }}
-                        onMouseEnter={(e) => {
-                            e.currentTarget.style.background = '#1e40af';
-                        }}
-                        onMouseLeave={(e) => {
-                            e.currentTarget.style.background = '#2563eb';
-                        }}
-                    >
-                        Ver todos los apuntes
-                    </button>
                 </div>
 
-                {/* Grid de apuntes (preview) */}
-                <div style={{
-                    display: 'grid',
-                    gridTemplateColumns: 'repeat(4, 1fr)',
-                    gap: 16
-                }}>
-                    {apuntes.slice(0, 8).map((apunte) => (
-                        <div
-                            key={apunte.id_apunte}
-                            onClick={() => navigate(`/apuntes/${apunte.id_apunte}`)}
-                            style={{
-                                background: '#fff',
-                                borderRadius: 12,
-                                border: '1px solid #e5e7eb',
-                                padding: 12,
-                                cursor: 'pointer',
-                                transition: 'all 0.2s ease',
-                                display: 'flex',
-                                flexDirection: 'column',
-                                gap: 8
-                            }}
-                            onMouseEnter={(e) => {
-                                e.currentTarget.style.boxShadow = '0 4px 12px rgba(0,0,0,0.1)';
-                                e.currentTarget.style.transform = 'translateY(-2px)';
-                            }}
-                            onMouseLeave={(e) => {
-                                e.currentTarget.style.boxShadow = 'none';
-                                e.currentTarget.style.transform = 'translateY(0)';
-                            }}
-                        >
-                            <div style={{
-                                width: '100%',
-                                aspectRatio: '3/4',
-                                background: '#f3f4f6',
-                                borderRadius: 8,
-                                display: 'flex',
-                                alignItems: 'center',
-                                justifyContent: 'center',
-                                fontSize: 32
-                            }}>
-                                📄
-                            </div>
-                            <h4 style={{
-                                margin: 0,
-                                fontSize: 14,
-                                fontWeight: 600,
-                                overflow: 'hidden',
-                                textOverflow: 'ellipsis',
-                                whiteSpace: 'nowrap'
-                            }}>
-                                {apunte.titulo}
-                            </h4>
-                            <div style={{
-                                fontSize: 12,
-                                color: '#6b7280'
-                            }}>
-                                Por {apunte.usuario?.nombre || 'Anónimo'}
-                            </div>
-                            <div style={{
-                                fontSize: 13,
-                                fontWeight: 600,
-                                color: '#2563eb'
-                            }}>
-                                {apunte.creditos} 💰
-                            </div>
-                        </div>
-                    ))}
-                </div>
-
-                {apuntes.length === 0 && (
+                {apuntes.length === 0 ? (
                     <div style={{
                         padding: 40,
                         background: '#fff',
@@ -443,8 +363,88 @@ export default function SubjectDetail() {
                             Aún no hay apuntes para esta materia
                         </p>
                     </div>
+                ) : (
+                    <div style={{ position: 'relative' }}>
+                        <div style={{
+                            display: 'grid',
+                            gridTemplateColumns: 'repeat(4, 1fr)',
+                            gap: 16
+                        }}>
+                            {apuntes.slice(0, 12).map((apunte, index) => {
+                                const isInBlurZone = showBlurEffect && index >= 8;
+
+                                return (
+                                    <div
+                                        key={apunte.id_apunte}
+                                        style={{
+                                            filter: isInBlurZone ? 'blur(4px)' : 'none',
+                                            opacity: isInBlurZone ? 0.6 : 1,
+                                            pointerEvents: isInBlurZone ? 'none' : 'auto'
+                                        }}
+                                    >
+                                        <ApunteCard note={apunte} />
+                                    </div>
+                                );
+                            })}
+                        </div>
+
+                        {/* Overlay "Ver más" - SIEMPRE VISIBLE */}
+                        <div
+                            onClick={() => setShowNotesModal(true)}
+                            style={{
+                                position: 'absolute',
+                                bottom: 0,
+                                left: 0,
+                                right: 0,
+                                height: showBlurEffect ? '40%' : '30%',
+                                background: showBlurEffect
+                                    ? 'linear-gradient(to bottom, rgba(249,250,251,0) 0%, rgba(249,250,251,0.95) 40%)'
+                                    : 'linear-gradient(to bottom, rgba(249,250,251,0) 0%, rgba(249,250,251,0.85) 60%)',
+                                display: 'flex',
+                                alignItems: 'flex-end',
+                                justifyContent: 'center',
+                                paddingBottom: 40,
+                                cursor: 'pointer',
+                                pointerEvents: 'auto'
+                            }}
+                        >
+                            <div style={{
+                                padding: '16px 48px',
+                                background: '#2563eb',
+                                color: '#fff',
+                                borderRadius: 12,
+                                fontWeight: 700,
+                                fontSize: 18,
+                                boxShadow: '0 8px 24px rgba(37, 99, 235, 0.4)',
+                                transition: 'all 0.2s ease',
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: 12
+                            }}
+                                 onMouseEnter={(e) => {
+                                     e.currentTarget.style.transform = 'scale(1.05)';
+                                     e.currentTarget.style.boxShadow = '0 12px 32px rgba(37, 99, 235, 0.5)';
+                                 }}
+                                 onMouseLeave={(e) => {
+                                     e.currentTarget.style.transform = 'scale(1)';
+                                     e.currentTarget.style.boxShadow = '0 8px 24px rgba(37, 99, 235, 0.4)';
+                                 }}
+                            >
+                                <span style={{ fontSize: 24 }}>+</span>
+                                <span>Ver más</span>
+                            </div>
+                        </div>
+                    </div>
                 )}
             </div>
+
+            {/* Carrusel de mentores - AL FINAL */}
+            {mentores.length > 0 && (
+                <MentorCarousel
+                    mentores={mentores}
+                    mentoresByRating={mentoresByRating}
+                />
+            )}
 
             {/* Modal de apuntes */}
             {showNotesModal && (

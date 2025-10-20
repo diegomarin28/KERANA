@@ -2,16 +2,15 @@ import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '../supabase';
 import PDFThumbnail from './PDFThumbnail';
-import StarDisplay from './StarDisplay';
 
 export default function NotesModal({ materiaId, materiaNombre, onClose }) {
     const navigate = useNavigate();
     const [apuntes, setApuntes] = useState([]);
     const [loading, setLoading] = useState(true);
-    const [viewMode, setViewMode] = useState('grid'); // 'grid' o 'detail'
+    const [viewMode, setViewMode] = useState('grid');
     const [selectedNote, setSelectedNote] = useState(null);
-    const [sortBy, setSortBy] = useState('fecha'); // 'fecha', 'nombre', 'autor', 'rating', 'precio'
-    const [sortOrder, setSortOrder] = useState('desc'); // 'asc' o 'desc'
+    const [sortBy, setSortBy] = useState('fecha');
+    const [sortOrder, setSortOrder] = useState('desc');
 
     useEffect(() => {
         loadApuntes();
@@ -39,10 +38,8 @@ export default function NotesModal({ materiaId, materiaNombre, onClose }) {
             if (apuntesError) throw apuntesError;
 
             if (apuntesData) {
-                // Obtener ratings y likes para cada apunte
-                const apuntesConRatings = await Promise.all(
+                const apuntesConDatos = await Promise.all(
                     apuntesData.map(async (apunte) => {
-                        // Signed URL para thumbnail
                         let signedUrl = null;
                         if (apunte.file_path) {
                             const { data: signedData, error: signedError } = await supabase.storage
@@ -53,38 +50,25 @@ export default function NotesModal({ materiaId, materiaNombre, onClose }) {
                             }
                         }
 
-                        // Contar likes
+                        // Contar likes y dislikes
                         const { data: likesData } = await supabase
                             .from('likes')
                             .select('tipo')
-                            .eq('id_apunte', apunte.id_apunte)
-                            .eq('tipo', 'like');
+                            .eq('id_apunte', apunte.id_apunte);
 
-                        const likesCount = likesData?.length || 0;
-
-                        // Contar ratings/reviews
-                        const { data: ratingsData } = await supabase
-                            .from('rating')
-                            .select('estrellas')
-                            .eq('tipo', 'apunte')
-                            .eq('ref_id', apunte.id_apunte);
-
-                        const reviewsCount = ratingsData?.length || 0;
-                        const avgRating = reviewsCount > 0
-                            ? ratingsData.reduce((sum, r) => sum + r.estrellas, 0) / reviewsCount
-                            : 0;
+                        const likes = likesData?.filter(l => l.tipo === 'like').length || 0;
+                        const dislikes = likesData?.filter(l => l.tipo === 'dislike').length || 0;
 
                         return {
                             ...apunte,
                             signedUrl,
-                            likesCount,
-                            reviewsCount,
-                            avgRating
+                            likes,
+                            dislikes
                         };
                     })
                 );
 
-                setApuntes(apuntesConRatings);
+                setApuntes(apuntesConDatos);
             }
         } catch (err) {
             console.error('Error cargando apuntes:', err);
@@ -115,8 +99,8 @@ export default function NotesModal({ materiaId, materiaNombre, onClose }) {
             case 'fecha':
                 comparison = new Date(a.created_at) - new Date(b.created_at);
                 break;
-            case 'rating':
-                comparison = a.avgRating - b.avgRating;
+            case 'likes':
+                comparison = a.likes - b.likes;
                 break;
             case 'precio':
                 comparison = a.creditos - b.creditos;
@@ -363,26 +347,39 @@ export default function NotesModal({ materiaId, materiaNombre, onClose }) {
                                         Por {apunte.usuario?.nombre || 'Anónimo'}
                                     </div>
 
+                                    {/* Likes y dislikes */}
                                     <div style={{
                                         display: 'flex',
                                         alignItems: 'center',
-                                        justifyContent: 'space-between',
+                                        gap: 12,
+                                        fontSize: 13,
                                         paddingTop: 8,
                                         borderTop: '1px solid #f3f4f6'
                                     }}>
-                                        <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-                                            <StarDisplay rating={apunte.avgRating} size={14} />
-                                            <span style={{ fontSize: 12, color: '#6b7280' }}>
-                                                ({apunte.reviewsCount})
-                                            </span>
-                                        </div>
                                         <div style={{
-                                            fontSize: 13,
-                                            fontWeight: 600,
+                                            display: 'flex',
+                                            alignItems: 'center',
+                                            gap: 4,
                                             color: '#2563eb'
                                         }}>
-                                            {apunte.creditos} 💰
+                                            👍 <span style={{ fontWeight: 600 }}>{apunte.likes}</span>
                                         </div>
+                                        <div style={{
+                                            display: 'flex',
+                                            alignItems: 'center',
+                                            gap: 4,
+                                            color: '#ef4444'
+                                        }}>
+                                            👎 <span style={{ fontWeight: 600 }}>{apunte.dislikes}</span>
+                                        </div>
+                                    </div>
+
+                                    <div style={{
+                                        fontSize: 13,
+                                        fontWeight: 600,
+                                        color: '#2563eb'
+                                    }}>
+                                        {apunte.creditos} 💰
                                     </div>
 
                                     <div style={{ fontSize: 11, color: '#9ca3af' }}>
@@ -412,7 +409,7 @@ export default function NotesModal({ materiaId, materiaNombre, onClose }) {
                                     { key: 'nombre', label: 'Nombre' },
                                     { key: 'autor', label: 'Autor' },
                                     { key: 'fecha', label: 'Fecha' },
-                                    { key: 'rating', label: 'Rating' },
+                                    { key: 'likes', label: 'Likes' },
                                     { key: 'precio', label: 'Precio' }
                                 ].map((option) => (
                                     <button
@@ -458,8 +455,8 @@ export default function NotesModal({ materiaId, materiaNombre, onClose }) {
                                         <div>Nombre</div>
                                         <div>Autor</div>
                                         <div>Fecha</div>
-                                        <div>Rating</div>
-                                        <div>Reseñas</div>
+                                        <div>Likes</div>
+                                        <div>Dislikes</div>
                                         <div>Precio</div>
                                     </div>
 
@@ -501,14 +498,19 @@ export default function NotesModal({ materiaId, materiaNombre, onClose }) {
                                             <div style={{ fontSize: 13, color: '#6b7280' }}>
                                                 {new Date(apunte.created_at).toLocaleDateString('es-UY')}
                                             </div>
-                                            <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-                                                <StarDisplay rating={apunte.avgRating} size={14} />
-                                                <span style={{ fontSize: 13, color: '#6b7280', marginLeft: 4 }}>
-                                                    {apunte.avgRating.toFixed(1)}
-                                                </span>
+                                            <div style={{
+                                                fontSize: 14,
+                                                fontWeight: 600,
+                                                color: '#2563eb'
+                                            }}>
+                                                👍 {apunte.likes}
                                             </div>
-                                            <div style={{ fontSize: 13, color: '#6b7280' }}>
-                                                {apunte.reviewsCount}
+                                            <div style={{
+                                                fontSize: 14,
+                                                fontWeight: 600,
+                                                color: '#ef4444'
+                                            }}>
+                                                👎 {apunte.dislikes}
                                             </div>
                                             <div style={{
                                                 fontSize: 14,
@@ -613,22 +615,19 @@ export default function NotesModal({ materiaId, materiaNombre, onClose }) {
                                             }}>
                                                 <div>
                                                     <div style={{ fontSize: 12, color: '#6b7280', marginBottom: 4 }}>
-                                                        Rating promedio
+                                                        Likes
                                                     </div>
-                                                    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                                                        <StarDisplay rating={selectedNote.avgRating} size={16} />
-                                                        <span style={{ fontSize: 14, fontWeight: 600 }}>
-                                                            {selectedNote.avgRating.toFixed(1)}
-                                                        </span>
+                                                    <div style={{ fontSize: 16, fontWeight: 700, color: '#2563eb' }}>
+                                                        👍 {selectedNote.likes}
                                                     </div>
                                                 </div>
 
                                                 <div>
                                                     <div style={{ fontSize: 12, color: '#6b7280', marginBottom: 4 }}>
-                                                        Reseñas
+                                                        Dislikes
                                                     </div>
-                                                    <div style={{ fontSize: 14, fontWeight: 600 }}>
-                                                        {selectedNote.reviewsCount} reseña{selectedNote.reviewsCount !== 1 ? 's' : ''}
+                                                    <div style={{ fontSize: 16, fontWeight: 700, color: '#ef4444' }}>
+                                                        👎 {selectedNote.dislikes}
                                                     </div>
                                                 </div>
 
