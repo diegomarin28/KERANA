@@ -1058,8 +1058,16 @@ export const ApunteView = () => {
                         </div>
 
                         {isOwner && (
-                            <Button
+                            <button
                                 onClick={() => setDeleteConfirm(true)}
+                                onMouseEnter={(e) => {
+                                    e.currentTarget.style.background = '#ef4444';
+                                    e.currentTarget.style.color = '#fff';
+                                }}
+                                onMouseLeave={(e) => {
+                                    e.currentTarget.style.background = '#fff';
+                                    e.currentTarget.style.color = '#ef4444';
+                                }}
                                 style={{
                                     marginTop: 12,
                                     padding: '12px 20px',
@@ -1070,12 +1078,14 @@ export const ApunteView = () => {
                                     fontWeight: 600,
                                     cursor: 'pointer',
                                     fontSize: 14,
-                                    width: '100%'
+                                    width: '100%',
+                                    transition: 'all 0.2s ease'
                                 }}
                             >
                                 🗑️ Eliminar apunte
-                            </Button>
+                            </button>
                         )}
+
 
                         <div style={{
                             marginTop: 16,

@@ -7,14 +7,40 @@ import ApunteCard from "../components/ApunteCard";
 
 export default function Notes() {
     const [notes, setNotes] = useState([]);
+    const [currentUserId, setCurrentUserId] = useState(null);
     const [loading, setLoading] = useState(true);
     const [searchTerm, setSearchTerm] = useState('');
     const [signedUrls, setSignedUrls] = useState({});
     const navigate = useNavigate();
 
     useEffect(() => {
-        loadNotes();
+        loadUserAndNotes();
     }, []);
+
+    const loadUserAndNotes = async () => {
+        try {
+            const { data: { user } } = await supabase.auth.getUser();
+
+            if (user) {
+                const { data: usuarioData } = await supabase
+                    .from("usuario")
+                    .select("id_usuario")
+                    .eq("auth_id", user.id)
+                    .maybeSingle();
+
+
+
+                if (usuarioData) {
+                    setCurrentUserId(usuarioData.id_usuario);
+
+                }
+            }
+        } catch (err) {
+            console.error('Error cargando usuario:', err);
+        }
+
+        await loadNotes();
+    };
 
     const loadNotes = async () => {
         try {
@@ -22,6 +48,7 @@ export default function Notes() {
                 .from('apunte')
                 .select(`
                 id_apunte,
+                id_usuario,
                 titulo,
                 descripcion,
                 creditos,
@@ -145,6 +172,8 @@ export default function Notes() {
                                 ...note,
                                 signedUrl: signedUrls[note.id_apunte] || null
                             }}
+                            currentUserId={currentUserId}
+
                         />
                     ))}
                 </div>

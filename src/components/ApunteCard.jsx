@@ -2,7 +2,7 @@ import { useNavigate } from "react-router-dom";
 import { Card } from "../components/ui/Card";
 import PDFThumbnail from "../components/PDFThumbnail";
 
-export default function ApunteCard({ note }) {
+export default function ApunteCard({ note, currentUserId }) {
     const navigate = useNavigate();
 
     if (!note) return null;
@@ -92,7 +92,10 @@ export default function ApunteCard({ note }) {
                     borderTop: '1px solid #e5e7eb'
                 }}>
                     <span style={{ fontSize: 13, color: '#6b7280' }}>
-                        Por {note.usuario?.nombre || 'Anónimo'}
+                        {currentUserId && note.id_usuario === currentUserId
+                            ? <strong>Por Ti</strong>
+                            : `Por ${note.usuario?.nombre || 'Anónimo'}`
+                        }
                     </span>
                     <span style={{
                         padding: '4px 10px',
