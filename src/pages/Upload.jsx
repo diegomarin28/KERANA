@@ -5,6 +5,13 @@ import { Card } from '../components/ui/Card';
 import { Button } from '../components/ui/Button';
 import FileDrop from "../components/FileDrop";
 import { useNotificationSound } from '../hooks/useNotificationSound';
+import * as pdfjsLib from "pdfjs-dist";
+
+// Configurar worker
+pdfjsLib.GlobalWorkerOptions.workerSrc = new URL(
+    "pdfjs-dist/build/pdf.worker.min.mjs",
+    import.meta.url
+).href;
 
 export default function Upload() {
     const navigate = useNavigate();
@@ -21,11 +28,13 @@ export default function Upload() {
         agree: false
     });
     const [uploading, setUploading] = useState(false);
+    const [uploadProgress, setUploadProgress] = useState('');
     const [error, setError] = useState('');
     const [showSuccessModal, setShowSuccessModal] = useState(false);
     const dropdownRef = useRef(null);
     const { playSound } = useNotificationSound();
 
+    // ... (todo el código anterior igual hasta handleSubmit) ...
 
     const sanitizeFilename = (filename) => {
         const lastDot = filename.lastIndexOf('.');
@@ -43,12 +52,10 @@ export default function Upload() {
         return sanitized + ext.toLowerCase();
     };
 
-    // Cargar materias al inicio
     useEffect(() => {
         fetchMaterias();
     }, []);
 
-    // Detectar clicks fuera del dropdown
     useEffect(() => {
         const handleClickOutside = (event) => {
             if (dropdownRef.current && !dropdownRef.current.contains(event.target)) {
@@ -59,7 +66,6 @@ export default function Upload() {
         return () => document.removeEventListener('mousedown', handleClickOutside);
     }, []);
 
-    // Normalizar texto para búsqueda sin acentos
     const normalizeText = (text) => {
         return text
             .toLowerCase()
@@ -67,7 +73,6 @@ export default function Upload() {
             .replace(/[\u0300-\u036f]/g, '');
     };
 
-    // Filtrar materias mientras escribe
     useEffect(() => {
         if (searchTerm.trim()) {
             const normalizedSearch = normalizeText(searchTerm);
@@ -101,11 +106,8 @@ export default function Upload() {
         setShowDropdown(false);
     };
 
-
-
     const handleFileChange = (file) => {
         if (file) {
-            // Verificar que sea PDF por extensión
             const fileName = file.name.toLowerCase();
             if (!fileName.endsWith('.pdf')) {
                 setError('El archivo debe ser un PDF');
@@ -117,17 +119,48 @@ export default function Upload() {
                 return;
             }
 
-            // Sanitizar el nombre del archivo
             const sanitizedName = sanitizeFilename(file.name);
             const sanitizedFile = new File([file], sanitizedName, {
                 type: file.type,
                 lastModified: file.lastModified
             });
 
-            console.log('Archivo:', file.name, '→', sanitizedName);
-
             setFormData({ ...formData, file: sanitizedFile });
             setError('');
+        }
+    };
+
+    // 🆕 Función para generar thumbnail del PDF
+    const generateThumbnail = async (file) => {
+        try {
+            const arrayBuffer = await file.arrayBuffer();
+            const loadingTask = pdfjsLib.getDocument({ data: arrayBuffer });
+            const pdf = await loadingTask.promise;
+            const page = await pdf.getPage(1);
+
+            const viewport = page.getViewport({ scale: 1 });
+            const canvas = document.createElement("canvas");
+            const context = canvas.getContext("2d");
+
+            // Thumbnail de 300x400px
+            const scale = Math.min(300 / viewport.width, 400 / viewport.height);
+            const scaledViewport = page.getViewport({ scale });
+
+            canvas.width = scaledViewport.width;
+            canvas.height = scaledViewport.height;
+
+            await page.render({
+                canvasContext: context,
+                viewport: scaledViewport,
+            }).promise;
+
+            // Convertir canvas a Blob (imagen)
+            return new Promise((resolve) => {
+                canvas.toBlob((blob) => resolve(blob), 'image/jpeg', 0.85);
+            });
+        } catch (err) {
+            console.error("Error generando thumbnail:", err);
+            return null;
         }
     };
 
@@ -158,6 +191,7 @@ export default function Upload() {
         try {
             setLoading(true);
             setUploading(true);
+            setUploadProgress('Verificando usuario...');
 
             // Verificar autenticación
             const { data: { user }, error: authError } = await supabase.auth.getUser();
@@ -183,13 +217,19 @@ export default function Upload() {
                 return;
             }
 
-            // Subir archivo al bucket con el nombre original
             const fileName = formData.file.name;
+            const thumbnailFileName = `thumb_${fileName.replace('.pdf', '.jpg')}`;
 
+            // 1️⃣ Generar thumbnail
+            setUploadProgress('Generando vista previa...');
+            const thumbnailBlob = await generateThumbnail(formData.file);
+
+            // 2️⃣ Subir PDF
+            setUploadProgress('Subiendo PDF...');
             const { data: uploadData, error: uploadError } = await supabase.storage
                 .from('apuntes')
                 .upload(fileName, formData.file, {
-                    cacheControl: '3600',
+                    cacheControl: '31536000', // 1 año
                     upsert: false
                 });
 
@@ -198,12 +238,25 @@ export default function Upload() {
                 throw new Error('Error al subir el archivo: ' + uploadError.message);
             }
 
-            // Obtener URL pública del archivo
-            const { data: publicUrlData } = supabase.storage
-                .from('apuntes')
-                .getPublicUrl(fileName);
+            // 3️⃣ Subir thumbnail (si se generó)
+            let thumbnailPath = null;
+            if (thumbnailBlob) {
+                setUploadProgress('Subiendo vista previa...');
+                const { error: thumbError } = await supabase.storage
+                    .from('thumbnails')
+                    .upload(thumbnailFileName, thumbnailBlob, {
+                        cacheControl: '31536000',
+                        contentType: 'image/jpeg',
+                        upsert: false
+                    });
 
-            // Guardar en la tabla apuntes
+                if (!thumbError) {
+                    thumbnailPath = thumbnailFileName;
+                }
+            }
+
+            // 4️⃣ Guardar en la base de datos
+            setUploadProgress('Guardando información...');
             const { error: insertError } = await supabase
                 .from('apunte')
                 .insert([{
@@ -211,8 +264,9 @@ export default function Upload() {
                     descripcion: formData.desc.trim() || null,
                     id_materia: selectedMateria.id_materia,
                     id_usuario: usuarioData.id_usuario,
-                    file_path: fileName,  // Ruta en el bucket
+                    file_path: fileName,
                     file_name: formData.file.name,
+                    thumbnail_path: thumbnailPath, // 🆕 Guardar path del thumbnail
                     mime_type: 'pdf',
                     file_size: formData.file.size,
                     created_at: new Date().toISOString()
@@ -220,14 +274,15 @@ export default function Upload() {
 
             if (insertError) {
                 console.error('Error insertando en BD:', insertError);
-                // Si falla el insert, intentar borrar el archivo subido
+                // Si falla, limpiar archivos subidos
                 await supabase.storage.from('apuntes').remove([fileName]);
+                if (thumbnailPath) {
+                    await supabase.storage.from('thumbnails').remove([thumbnailFileName]);
+                }
                 throw new Error('Error al guardar en base de datos: ' + insertError.message);
             }
 
-            // Mostrar modal de éxito
             playSound('apunte_publicado');
-
             setShowSuccessModal(true);
 
         } catch (err) {
@@ -237,6 +292,7 @@ export default function Upload() {
         } finally {
             setLoading(false);
             setUploading(false);
+            setUploadProgress('');
         }
     };
 
@@ -244,7 +300,6 @@ export default function Upload() {
 
     return (
         <div style={{ maxWidth: 700, margin: '0 auto', padding: 20 }}>
-            {/* Modal de éxito */}
             {showSuccessModal && (
                 <div style={{
                     position: 'fixed',
@@ -278,7 +333,7 @@ export default function Upload() {
                             margin: '0 auto 24px',
                             fontSize: 40
                         }}>
-                            📝
+                            📚
                         </div>
                         <h2 style={{
                             margin: '0 0 12px 0',
@@ -515,6 +570,22 @@ export default function Upload() {
                         </label>
                     </div>
 
+                    {/* Progress indicator */}
+                    {uploadProgress && (
+                        <div style={{
+                            marginBottom: 16,
+                            padding: 12,
+                            background: '#eff6ff',
+                            border: '1px solid #bfdbfe',
+                            borderRadius: 8,
+                            color: '#1e40af',
+                            fontSize: 14,
+                            textAlign: 'center'
+                        }}>
+                            {uploadProgress}
+                        </div>
+                    )}
+
                     {/* Botones */}
                     <div style={{ display: 'flex', gap: 12 }}>
                         <Button
@@ -532,7 +603,7 @@ export default function Upload() {
                                 fontSize: 16
                             }}
                         >
-                            {uploading ? 'Subiendo archivo...' : loading ? 'Guardando...' : 'Publicar apunte'}
+                            {uploading ? uploadProgress || 'Procesando...' : 'Publicar apunte'}
                         </Button>
                         <button
                             type="button"
@@ -542,7 +613,7 @@ export default function Upload() {
                                 padding: '8px 14px',
                                 background: '#fff',
                                 color: '#374151',
-                                border: '1px solid #2563eb', // azul
+                                border: '1px solid #2563eb',
                                 borderRadius: 6,
                                 fontWeight: 500,
                                 cursor: loading ? 'not-allowed' : 'pointer',
@@ -550,17 +621,16 @@ export default function Upload() {
                                 transition: 'all 0.2s ease',
                             }}
                             onMouseEnter={(e) => {
-                                e.currentTarget.style.background = '#2563eb'; // azul
-                                e.currentTarget.style.color = '#fff'; // texto blanco
+                                e.currentTarget.style.background = '#2563eb';
+                                e.currentTarget.style.color = '#fff';
                             }}
                             onMouseLeave={(e) => {
-                                e.currentTarget.style.background = '#fff'; // vuelve blanco
-                                e.currentTarget.style.color = '#374151'; // texto gris oscuro
+                                e.currentTarget.style.background = '#fff';
+                                e.currentTarget.style.color = '#374151';
                             }}
                         >
                             Cancelar
                         </button>
-
                     </div>
                 </form>
             </Card>

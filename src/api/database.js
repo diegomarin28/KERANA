@@ -74,7 +74,7 @@ export const subjectsAPI = {
 
     async getSubjectContent(materiaId) {
         const [apuntes, profesores, mentores] = await Promise.all([
-            supabase.from('apunte').select('*').eq('id_materia', materiaId),
+            supabase.from('apunte').select('*, thumbnail_path').eq('id_materia', materiaId),
             supabase
                 .from('imparte')
                 .select(`id_profesor,profesor_curso!inner(*, usuario(*))`)
@@ -193,7 +193,8 @@ async function searchNotes(term) {
                 creditos,
                 id_usuario,
                 id_materia,
-                materia(nombre_materia)
+                materia(nombre_materia),
+                thumbnail_path
             `)
             .in('id_apunte', ids);
 
@@ -592,7 +593,7 @@ export const notesAPI = {
     async searchNotes(searchTerm) {
         const { data, error } = await supabase
             .from('apunte')
-            .select('*, materia(nombre_materia)')
+            .select('*, thumbnail_path, materia(nombre_materia)')
             .ilike('titulo', `%${searchTerm}%`)
 
         return { data, error }
@@ -601,7 +602,7 @@ export const notesAPI = {
     async getNotesBySubject(materiaId) {
         const { data, error } = await supabase
             .from('apunte')
-            .select('*')
+            .select('*, thumbnail_path')
             .eq('id_materia', materiaId)
 
         return { data, error }
@@ -1398,7 +1399,7 @@ export const publicProfileAPI = {
                 id_materia,
                 materia(nombre_materia),
                 estrellas,
-                portada_url
+                thumbnail_path
             `)
             .eq('id_usuario', userId)
             .order('created_at', { ascending: false })
@@ -1411,7 +1412,7 @@ export const publicProfileAPI = {
             descripcion: note.descripcion,
             materia_nombre: note.materia?.nombre_materia,
             estrellas: note.estrellas,
-            portada_url: note.portada_url,
+            thumbnail_path: note.thumbnail_path,
             created_at: note.created_at
         }));
 
@@ -1430,7 +1431,7 @@ export const publicProfileAPI = {
                 id_materia,
                 materia(nombre_materia),
                 estrellas,
-                portada_url
+                thumbnail_path
             `)
             .eq('id_usuario', userId)
             .order('created_at', { ascending: false });
@@ -1448,7 +1449,7 @@ export const publicProfileAPI = {
             descripcion: note.descripcion,
             materia_nombre: note.materia?.nombre_materia,
             estrellas: note.estrellas,
-            portada_url: note.portada_url,
+            thumbnail_path: note.thumbnail_path,
             created_at: note.created_at
         }));
 
@@ -1461,7 +1462,8 @@ export const publicProfileAPI = {
             .from('apunte')
             .select(`
                 id_materia,
-                materia(id_materia, nombre_materia)
+                materia(id_materia, nombre_materia),
+                thumbnail_path
             `)
             .eq('id_usuario', userId);
 

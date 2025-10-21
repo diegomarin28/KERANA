@@ -29,7 +29,8 @@ export default function Notes() {
                     created_at,
                     file_path,
                     usuario:id_usuario(nombre),
-                    materia:id_materia(nombre_materia)
+                    materia:id_materia(nombre_materia),
+                    thumbnail_path
                 `)
                 .order('created_at', { ascending: false })
                 .limit(50);
@@ -119,7 +120,8 @@ export default function Notes() {
                             key={note.id_apunte}
                             note={{
                                 ...note,
-                                signedUrl: signedUrls[note.id_apunte] || null
+                                signedUrl: signedUrls[note.id_apunte] || null,
+                                thumbnail_path: note.thumbnail_path
                             }}
                         />
                     ))}

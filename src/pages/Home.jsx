@@ -42,7 +42,8 @@ export default function Home() {
                     .select(`
                                      id_apunte, 
                                      file_path,
-                                     usuario:id_usuario(nombre)
+                                     usuario:id_usuario(nombre),
+                                     thumbnail_path
                                      `)
                     .in('id_apunte', apIds);
 
@@ -71,7 +72,8 @@ export default function Home() {
                     return {
                         ...note,
                         usuario: apunte?.usuario || { nombre: 'Anónimo' },
-                        signedUrl: urls[note.apunte_id] || null
+                        signedUrl: urls[note.apunte_id] || null,
+                        thumbnail_path: apunte?.thumbnail_path || null
                     };
                 });
 
@@ -237,7 +239,8 @@ export default function Home() {
                                                 estrellas: n.rating_promedio || 0,
                                                 usuario: { nombre: n.usuario_nombre },  // ← CAMBIO
                                                 materia: { nombre_materia: n.nombre_materia },  // ← CAMBIO
-                                                signedUrl: n.signedUrl
+                                                signedUrl: n.signedUrl,
+                                                thumbnail_path: n.thumbnail_path
                                             }}
                                         />
                                     </div>

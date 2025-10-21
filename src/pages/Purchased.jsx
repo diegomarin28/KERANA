@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import { supabase } from "../supabase";
 import { getOrCreateUserProfile } from "../api/userService";
 import { foldersAPI } from "../api/database";
@@ -25,13 +25,81 @@ export default function Purchased() {
     const [showCreateFolderModal, setShowCreateFolderModal] = useState(false);
     const [showAddNotesModal, setShowAddNotesModal] = useState(false);
     const [newFolderName, setNewFolderName] = useState("");
+    const [newFolderType, setNewFolderType] = useState("personalizada");
     const [selectedNotes, setSelectedNotes] = useState([]);
     const [targetFolder, setTargetFolder] = useState(null);
+
+    // Estados para autocompletado de materias
+    const [materias, setMaterias] = useState([]);
+    const [searchTerm, setSearchTerm] = useState("");
+    const [filteredMaterias, setFilteredMaterias] = useState([]);
+    const [selectedMateria, setSelectedMateria] = useState(null);
+    const [showDropdown, setShowDropdown] = useState(false);
+    const dropdownRef = useRef(null);
+
+    // ✅ NUEVO: Estados para filtro de apuntes
+    const [availableNotes, setAvailableNotes] = useState([]);
+    const [filterText, setFilterText] = useState("");
 
     useEffect(() => {
         loadPurchases();
         loadFolders();
+        fetchMaterias();
     }, []);
+
+    // Cerrar dropdown al hacer click fuera
+    useEffect(() => {
+        const handleClickOutside = (event) => {
+            if (dropdownRef.current && !dropdownRef.current.contains(event.target)) {
+                setShowDropdown(false);
+            }
+        };
+        document.addEventListener('mousedown', handleClickOutside);
+        return () => document.removeEventListener('mousedown', handleClickOutside);
+    }, []);
+
+    // Filtrar materias según búsqueda
+    useEffect(() => {
+        if (searchTerm.trim()) {
+            const normalizedSearch = normalizeText(searchTerm);
+            const filtered = materias.filter(m =>
+                normalizeText(m.nombre_materia).includes(normalizedSearch)
+            );
+            setFilteredMaterias(filtered);
+            setShowDropdown(true);
+        } else {
+            setFilteredMaterias([]);
+            setShowDropdown(false);
+        }
+    }, [searchTerm, materias]);
+
+    const normalizeText = (text) => {
+        return text
+            .toLowerCase()
+            .normalize('NFD')
+            .replace(/[\u0300-\u036f]/g, '');
+    };
+
+    const fetchMaterias = async () => {
+        try {
+            const { data: materiasData, error } = await supabase
+                .from('materia')
+                .select('id_materia, nombre_materia, semestre')
+                .order('nombre_materia');
+
+            if (error) throw error;
+            setMaterias(materiasData || []);
+        } catch (err) {
+            console.error('Error cargando materias:', err);
+        }
+    };
+
+    const handleMateriaSelect = (materia) => {
+        setSelectedMateria(materia);
+        setSearchTerm(materia.nombre_materia);
+        setNewFolderName(materia.nombre_materia);
+        setShowDropdown(false);
+    };
 
     const loadPurchases = async () => {
         try {
@@ -53,6 +121,7 @@ export default function Purchased() {
             if (comprasError) throw comprasError;
             if (!compras?.length) {
                 setPurchases([]);
+                setAvailableNotes([]);
                 return;
             }
 
@@ -64,6 +133,7 @@ export default function Purchased() {
                     .from("apunte")
                     .select(`
                         id_apunte, titulo, descripcion, creditos, estrellas, file_path, file_name,
+                        thumbnail_path, 
                         materia:id_materia(id_materia, nombre_materia),
                         usuario:id_usuario(nombre)
                     `)
@@ -98,11 +168,21 @@ export default function Purchased() {
                     usuario: apunte?.usuario || { nombre: "Anónimo" },
                     materia: apunte?.materia || { nombre_materia: "Sin materia" },
                     signedUrl: urls[c.apunte_id] || null,
-                    file_path: apunte?.file_path
+                    file_path: apunte?.file_path,
+                    thumbnail_path: apunte?.thumbnail_path
                 };
             });
 
             setPurchases(enriched);
+
+            // ✅ Pre-cargar availableNotes
+            setAvailableNotes(enriched.map(p => ({
+                id: p.id,
+                titulo: p.titulo,
+                descripcion: p.descripcion,
+                materia: p.materia?.nombre_materia || 'Sin materia'
+            })));
+
         } catch (err) {
             console.error('Error cargando compras:', err);
             setErrorMsg(err?.message || "Error cargando tus compras.");
@@ -111,42 +191,73 @@ export default function Purchased() {
         }
     };
 
+    // ✅ OPTIMIZADO: 2 queries en lugar de N
     const loadFolders = async () => {
         try {
-            const { data, error } = await foldersAPI.getMyFolders();
+            const { data: allFolders, error } = await foldersAPI.getMyFolders();
             if (error) throw error;
 
-            const foldersWithCount = await Promise.all(
-                (data || []).map(async (folder) => {
-                    const { data: notes } = await foldersAPI.getNotesInFolder(folder.id_carpeta);
-                    const subfolders = (data || []).filter(f => f.parent_id === folder.id_carpeta);
+            if (!allFolders?.length) {
+                setFolders([]);
+                return;
+            }
 
-                    // ✅ Calcular semestres SIEMPRE
-                    let semestres = [];
-                    if (notes?.length > 0) {
-                        const compraIds = notes.map(n => n.compra_id);
-                        const { data: compras } = await supabase
-                            .from('compra_apunte')
-                            .select(`apunte_id, apunte:apunte(materia:id_materia(semestre))`)
-                            .in('id', compraIds);
+            // ✅ Query 1: Todas las relaciones apunte-carpeta
+            const folderIds = allFolders.map(f => f.id_carpeta);
+            const { data: allNotesInFolders } = await supabase
+                .from('apunte_en_carpeta')
+                .select('carpeta_id, compra_id')
+                .in('carpeta_id', folderIds);
 
-                        const semSet = new Set();
-                        compras?.forEach(c => {
-                            const sem = c.apunte?.materia?.semestre;
-                            if (sem) semSet.add(sem);
-                        });
-                        semestres = Array.from(semSet);
-                    }
+            // ✅ Query 2: Todas las compras con sus materias
+            const compraIds = [...new Set(allNotesInFolders?.map(n => n.compra_id) || [])];
+            let comprasWithMaterias = [];
 
-                    return {
-                        ...folder,
-                        item_count: (notes?.length || 0) + subfolders.length,
-                        semestres // ← Esto es lo importante
-                    };
-                })
-            );
+            if (compraIds.length > 0) {
+                const { data } = await supabase
+                    .from('compra_apunte')
+                    .select(`
+                        id,
+                        apunte_id,
+                        apunte:apunte(
+                            materia:id_materia(semestre)
+                        )
+                    `)
+                    .in('id', compraIds);
+                comprasWithMaterias = data || [];
+            }
 
-            setFolders(foldersWithCount.filter(f => !f.parent_id));
+            // ✅ Agrupar en frontend
+            const notesPerFolder = {};
+            allNotesInFolders?.forEach(nif => {
+                if (!notesPerFolder[nif.carpeta_id]) {
+                    notesPerFolder[nif.carpeta_id] = [];
+                }
+                notesPerFolder[nif.carpeta_id].push(nif.compra_id);
+            });
+
+            // ✅ Calcular semestres por carpeta
+            const foldersWithData = allFolders.map(folder => {
+                const notesInFolder = notesPerFolder[folder.id_carpeta] || [];
+                const childFolders = allFolders.filter(f => f.parent_id === folder.id_carpeta);
+
+                // Calcular semestres
+                const semestres = new Set();
+                notesInFolder.forEach(compraId => {
+                    const compra = comprasWithMaterias.find(c => c.id === compraId);
+                    const sem = compra?.apunte?.materia?.semestre;
+                    if (sem) semestres.add(sem);
+                });
+
+                return {
+                    ...folder,
+                    item_count: notesInFolder.length + childFolders.length,
+                    semestres: Array.from(semestres)
+                };
+            });
+
+            setFolders(foldersWithData.filter(f => !f.parent_id));
+
         } catch (err) {
             console.error('Error cargando carpetas:', err);
         }
@@ -189,12 +300,21 @@ export default function Purchased() {
 
     const handleCreateFolder = async () => {
         if (!newFolderName.trim()) return;
+
+        if (newFolderType === "materia" && !selectedMateria) {
+            setErrorMsg("Debes seleccionar una materia de la lista");
+            return;
+        }
+
         try {
             setErrorMsg("");
-            const { error } = await foldersAPI.createFolder(newFolderName.trim(), 'personalizada', null, 0);
-            if (error) throw error;
+            await foldersAPI.createFolder(newFolderName.trim(), newFolderType, null, 0);
+
             setShowCreateFolderModal(false);
             setNewFolderName("");
+            setNewFolderType("personalizada");
+            setSearchTerm("");
+            setSelectedMateria(null);
             await loadFolders();
         } catch (err) {
             console.error('Error creando carpeta:', err);
@@ -212,6 +332,7 @@ export default function Purchased() {
             setShowAddNotesModal(false);
             setTargetFolder(null);
             setSelectedNotes([]);
+            setFilterText("");
             await loadFolders();
         } catch (err) {
             console.error('Error añadiendo apuntes:', err);
@@ -228,8 +349,7 @@ export default function Purchased() {
     const handleDeleteFolder = async (carpetaId) => {
         try {
             setErrorMsg("");
-            const { error } = await foldersAPI.deleteFolder(carpetaId);
-            if (error) throw error;
+            await foldersAPI.deleteFolder(carpetaId);
             await loadFolders();
         } catch (err) {
             console.error('Error eliminando carpeta:', err);
@@ -240,14 +360,20 @@ export default function Purchased() {
     const handleRenameFolder = async (carpetaId, nuevoNombre) => {
         try {
             setErrorMsg("");
-            const { error } = await foldersAPI.updateFolder(carpetaId, nuevoNombre);
-            if (error) throw error;
+            await foldersAPI.updateFolder(carpetaId, nuevoNombre);
             await loadFolders();
         } catch (err) {
             console.error('Error renombrando carpeta:', err);
             setErrorMsg("Error al renombrar carpeta");
         }
     };
+
+    // ✅ NUEVO: Filtrar apuntes disponibles
+    const filteredAvailableNotes = availableNotes.filter(note => {
+        const searchText = normalizeText(filterText);
+        return normalizeText(note.titulo).includes(searchText) ||
+            normalizeText(note.materia).includes(searchText);
+    });
 
     if (loading) {
         return (
@@ -456,13 +582,20 @@ export default function Purchased() {
                     ) : (
                         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: 20 }}>
                             {folders.map((folder) => (
-                                <FolderCard key={folder.id_carpeta} folder={folder} semestres={folder.semestres} onDelete={handleDeleteFolder} onRename={handleRenameFolder} />
+                                <FolderCard
+                                    key={folder.id_carpeta}
+                                    folder={folder}
+                                    semestres={folder.semestres}
+                                    onDelete={handleDeleteFolder}
+                                    onRename={handleRenameFolder}
+                                />
                             ))}
                         </div>
                     )}
                 </div>
             )}
 
+            {/* Modal organizar automáticamente */}
             {showOrgModal && (
                 <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(4px)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000, padding: 16 }}
                      onClick={() => setShowOrgModal(false)}>
@@ -480,49 +613,370 @@ export default function Purchased() {
                 </div>
             )}
 
+            {/* Modal crear carpeta CON TIPOS */}
             {showCreateFolderModal && (
-                <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(4px)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000, padding: 16 }}
-                     onClick={() => { setShowCreateFolderModal(false); setNewFolderName(""); }}>
-                    <Card style={{ maxWidth: 420, width: '100%', padding: 32, boxShadow: '0 20px 60px rgba(0,0,0,0.3)' }} onClick={(e) => e.stopPropagation()}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 20 }}>
-                            <div style={{ width: 48, height: 48, borderRadius: 12, background: '#2563eb', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 24 }}>📁</div>
-                            <h2 style={{ margin: 0, fontSize: 22, fontWeight: 700 }}>Nueva carpeta</h2>
+                <div
+                    style={{
+                        position: 'fixed',
+                        top: 0,
+                        left: 0,
+                        right: 0,
+                        bottom: 0,
+                        background: 'rgba(0,0,0,0.6)',
+                        backdropFilter: 'blur(4px)',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        zIndex: 1000,
+                        padding: 16
+                    }}
+                    onClick={() => {
+                        setShowCreateFolderModal(false);
+                        setNewFolderName("");
+                        setNewFolderType("personalizada");
+                        setSearchTerm("");
+                        setSelectedMateria(null);
+                    }}
+                >
+                    <Card
+                        style={{
+                            maxWidth: 480,
+                            width: '100%',
+                            padding: 32,
+                            boxShadow: '0 20px 60px rgba(0,0,0,0.3)'
+                        }}
+                        onClick={(e) => e.stopPropagation()}
+                    >
+                        <div style={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: 12,
+                            marginBottom: 20
+                        }}>
+                            <div style={{
+                                width: 48,
+                                height: 48,
+                                borderRadius: 12,
+                                background: '#2563eb',
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                fontSize: 24
+                            }}>
+                                📁
+                            </div>
+                            <h2 style={{ margin: 0, fontSize: 22, fontWeight: 700 }}>
+                                Nueva carpeta
+                            </h2>
                         </div>
-                        <p style={{ color: '#6b7280', margin: '0 0 20px 0', fontSize: 14, lineHeight: 1.5 }}>Organizá tus apuntes creando carpetas personalizadas</p>
-                        <div style={{ marginBottom: 24 }}>
-                            <label style={{ display: 'block', fontSize: 13, fontWeight: 600, color: '#374151', marginBottom: 8 }}>Nombre de la carpeta</label>
-                            <input type="text" placeholder="Ej: Mis favoritos, Exámenes finales..." value={newFolderName} onChange={(e) => setNewFolderName(e.target.value)}
-                                   onFocus={(e) => e.target.select()} onKeyPress={(e) => { if (e.key === 'Enter' && newFolderName.trim()) handleCreateFolder(); }}
-                                   style={{ width: '100%', padding: '12px 16px', border: '2px solid #e5e7eb', borderRadius: 10, fontSize: 15, outline: 'none', transition: 'all 0.2s', boxSizing: 'border-box' }} autoFocus />
+
+                        <p style={{
+                            color: '#6b7280',
+                            margin: '0 0 20px 0',
+                            fontSize: 14,
+                            lineHeight: 1.5
+                        }}>
+                            Organizá tus apuntes creando carpetas personalizadas o por materia
+                        </p>
+
+                        {/* Selector de tipo */}
+                        <div style={{ marginBottom: 20 }}>
+                            <label style={{
+                                display: 'block',
+                                fontSize: 13,
+                                fontWeight: 600,
+                                color: '#374151',
+                                marginBottom: 12
+                            }}>
+                                Tipo de carpeta
+                            </label>
+                            <div style={{ display: 'flex', gap: 12 }}>
+                                <button
+                                    type="button"
+                                    onClick={() => {
+                                        setNewFolderType("materia");
+                                        setNewFolderName("");
+                                        setSearchTerm("");
+                                        setSelectedMateria(null);
+                                    }}
+                                    style={{
+                                        flex: 1,
+                                        padding: '12px 16px',
+                                        border: newFolderType === "materia" ? '2px solid #059669' : '2px solid #e5e7eb',
+                                        borderRadius: 8,
+                                        background: newFolderType === "materia" ? '#d1fae5' : 'white',
+                                        color: newFolderType === "materia" ? '#059669' : '#6b7280',
+                                        cursor: 'pointer',
+                                        fontWeight: newFolderType === "materia" ? 600 : 400,
+                                        fontSize: 14,
+                                        transition: 'all 0.2s',
+                                        display: 'flex',
+                                        flexDirection: 'column',
+                                        alignItems: 'center',
+                                        gap: 4
+                                    }}
+                                >
+                                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                                        <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20" />
+                                        <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z" />
+                                    </svg>
+                                    Materia
+                                </button>
+                                <button
+                                    type="button"
+                                    onClick={() => {
+                                        setNewFolderType("personalizada");
+                                        setSearchTerm("");
+                                        setSelectedMateria(null);
+                                    }}
+                                    style={{
+                                        flex: 1,
+                                        padding: '12px 16px',
+                                        border: newFolderType === "personalizada" ? '2px solid #2563eb' : '2px solid #e5e7eb',
+                                        borderRadius: 8,
+                                        background: newFolderType === "personalizada" ? '#dbeafe' : 'white',
+                                        color: newFolderType === "personalizada" ? '#2563eb' : '#6b7280',
+                                        cursor: 'pointer',
+                                        fontWeight: newFolderType === "personalizada" ? 600 : 400,
+                                        fontSize: 14,
+                                        transition: 'all 0.2s',
+                                        display: 'flex',
+                                        flexDirection: 'column',
+                                        alignItems: 'center',
+                                        gap: 4
+                                    }}
+                                >
+                                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                                        <path d="M20 7h-9M14 17H5M17 3v18M7 7v10" />
+                                    </svg>
+                                    Personalizada
+                                </button>
+                            </div>
                         </div>
+
+                        {/* Input según tipo de carpeta */}
+                        {newFolderType === "materia" ? (
+                            <div style={{ marginBottom: 24, position: 'relative' }} ref={dropdownRef}>
+                                <label style={{
+                                    display: 'block',
+                                    fontSize: 13,
+                                    fontWeight: 600,
+                                    color: '#374151',
+                                    marginBottom: 8
+                                }}>
+                                    Buscar materia
+                                </label>
+                                <input
+                                    type="text"
+                                    value={searchTerm}
+                                    onChange={(e) => {
+                                        setSearchTerm(e.target.value);
+                                        setSelectedMateria(null);
+                                    }}
+                                    placeholder="Ej: Análisis Matemático, Física..."
+                                    style={{
+                                        width: '100%',
+                                        padding: '12px 16px',
+                                        border: '2px solid #e5e7eb',
+                                        borderRadius: 8,
+                                        fontSize: 15,
+                                        outline: 'none',
+                                        transition: 'all 0.2s',
+                                        boxSizing: 'border-box'
+                                    }}
+                                    autoFocus
+                                />
+                                {showDropdown && filteredMaterias.length > 0 && (
+                                    <div style={{
+                                        position: 'absolute',
+                                        top: '100%',
+                                        left: 0,
+                                        right: 0,
+                                        background: '#fff',
+                                        border: '1px solid #d1d5db',
+                                        borderRadius: 8,
+                                        marginTop: 4,
+                                        maxHeight: 200,
+                                        overflowY: 'auto',
+                                        zIndex: 100,
+                                        boxShadow: '0 4px 6px -1px rgba(0,0,0,0.1)'
+                                    }}>
+                                        {filteredMaterias.map(materia => (
+                                            <div
+                                                key={materia.id_materia}
+                                                onClick={() => handleMateriaSelect(materia)}
+                                                style={{
+                                                    padding: '12px 16px',
+                                                    cursor: 'pointer',
+                                                    borderBottom: '1px solid #f3f4f6'
+                                                }}
+                                                onMouseEnter={(e) => e.target.style.background = '#f9fafb'}
+                                                onMouseLeave={(e) => e.target.style.background = '#fff'}
+                                            >
+                                                <div style={{ fontWeight: 500 }}>{materia.nombre_materia}</div>
+                                                <div style={{ fontSize: 12, color: '#6b7280', marginTop: 2 }}>
+                                                    Semestre {materia.semestre}
+                                                </div>
+                                            </div>
+                                        ))}
+                                    </div>
+                                )}
+                            </div>
+                        ) : (
+                            <div style={{ marginBottom: 24 }}>
+                                <label style={{
+                                    display: 'block',
+                                    fontSize: 13,
+                                    fontWeight: 600,
+                                    color: '#374151',
+                                    marginBottom: 8
+                                }}>
+                                    Nombre de la carpeta
+                                </label>
+                                <input
+                                    type="text"
+                                    placeholder="Ej: Mis favoritos, Exámenes finales..."
+                                    value={newFolderName}
+                                    onChange={(e) => setNewFolderName(e.target.value)}
+                                    onFocus={(e) => e.target.select()}
+                                    onKeyPress={(e) => {
+                                        if (e.key === 'Enter' && newFolderName.trim()) {
+                                            handleCreateFolder();
+                                        }
+                                    }}
+                                    style={{
+                                        width: '100%',
+                                        padding: '12px 16px',
+                                        border: '2px solid #e5e7eb',
+                                        borderRadius: 8,
+                                        fontSize: 15,
+                                        outline: 'none',
+                                        transition: 'all 0.2s',
+                                        boxSizing: 'border-box'
+                                    }}
+                                    autoFocus
+                                />
+                            </div>
+                        )}
+
                         <div style={{ display: 'flex', gap: 12 }}>
-                            <button onClick={() => { setShowCreateFolderModal(false); setNewFolderName(""); }} style={{ flex: 1, padding: '12px 20px', background: 'white', border: '2px solid #e5e7eb', borderRadius: 10, cursor: 'pointer', fontSize: 15, fontWeight: 600, color: '#6b7280', transition: 'all 0.2s' }}>Cancelar</button>
-                            <button onClick={handleCreateFolder} disabled={!newFolderName.trim()} style={{ flex: 1, padding: '12px 20px', background: !newFolderName.trim() ? '#d1d5db' : '#2563eb', color: 'white', border: 'none', borderRadius: 10, cursor: !newFolderName.trim() ? 'not-allowed' : 'pointer', fontSize: 15, fontWeight: 600, transition: 'all 0.2s' }}>Crear carpeta</button>
+                            <button
+                                onClick={() => {
+                                    setShowCreateFolderModal(false);
+                                    setNewFolderName("");
+                                    setNewFolderType("personalizada");
+                                    setSearchTerm("");
+                                    setSelectedMateria(null);
+                                }}
+                                style={{
+                                    flex: 1,
+                                    padding: '12px 20px',
+                                    background: 'white',
+                                    border: '2px solid #e5e7eb',
+                                    borderRadius: 10,
+                                    cursor: 'pointer',
+                                    fontSize: 15,
+                                    fontWeight: 600,
+                                    color: '#6b7280',
+                                    transition: 'all 0.2s'
+                                }}
+                                onMouseEnter={(e) => e.target.style.background = '#f9fafb'}
+                                onMouseLeave={(e) => e.target.style.background = 'white'}
+                            >
+                                Cancelar
+                            </button>
+                            <button
+                                onClick={handleCreateFolder}
+                                disabled={!newFolderName.trim()}
+                                style={{
+                                    flex: 1,
+                                    padding: '12px 20px',
+                                    background: !newFolderName.trim() ? '#d1d5db' : '#2563eb',
+                                    color: 'white',
+                                    border: 'none',
+                                    borderRadius: 10,
+                                    cursor: !newFolderName.trim() ? 'not-allowed' : 'pointer',
+                                    fontSize: 15,
+                                    fontWeight: 600,
+                                    transition: 'all 0.2s'
+                                }}
+                                onMouseEnter={(e) => {
+                                    if (newFolderName.trim()) e.target.style.background = '#1d4ed8';
+                                }}
+                                onMouseLeave={(e) => {
+                                    if (newFolderName.trim()) e.target.style.background = '#2563eb';
+                                }}
+                            >
+                                Crear carpeta
+                            </button>
                         </div>
                     </Card>
                 </div>
             )}
 
+            {/* Modal añadir notas a carpeta CON FILTRO */}
             {showAddNotesModal && (
-                <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000, padding: 16, overflow: 'auto' }}
-                     onClick={() => setShowAddNotesModal(false)}>
-                    <Card style={{ maxWidth: 600, width: '100%', padding: 24, maxHeight: '80vh', overflow: 'auto' }} onClick={(e) => e.stopPropagation()}>
-                        <h2 style={{ margin: '0 0 16px 0', fontSize: 20 }}>Añadir apuntes a "{targetFolder?.nombre}"</h2>
-                        <div style={{ marginBottom: 20 }}>
-                            {purchases.map((purchase) => (
-                                <label key={purchase.id} style={{ display: 'flex', alignItems: 'center', padding: '12px', border: '1px solid #e5e7eb', borderRadius: 8, marginBottom: 8, cursor: 'pointer', background: selectedNotes.includes(purchase.id) ? '#eff6ff' : 'white', transition: 'all 0.2s' }}>
-                                    <input type="checkbox" checked={selectedNotes.includes(purchase.id)} onChange={() => toggleNoteSelection(purchase.id)} style={{ marginRight: 12 }} />
-                                    <div style={{ flex: 1 }}>
-                                        <div style={{ fontWeight: 500, marginBottom: 4 }}>{purchase.titulo}</div>
-                                        <div style={{ fontSize: 13, color: '#6b7280' }}>{purchase.materia?.nombre_materia || 'Sin materia'}</div>
-                                    </div>
-                                </label>
-                            ))}
+                <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(4px)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000, padding: 16 }}
+                     onClick={() => {
+                         setShowAddNotesModal(false);
+                         setFilterText("");
+                     }}>
+                    <Card style={{ maxWidth: 600, width: '100%', maxHeight: '80vh', display: 'flex', flexDirection: 'column', boxShadow: '0 20px 60px rgba(0,0,0,0.3)' }} onClick={(e) => e.stopPropagation()}>
+                        <div style={{ padding: 32, borderBottom: '1px solid #e5e7eb' }}>
+                            <h2 style={{ margin: '0 0 16px 0', fontSize: 20 }}>Añadir apuntes a "{targetFolder?.nombre}"</h2>
+
+                            {/* ✅ NUEVO: Input de filtro */}
+                            <input
+                                type="text"
+                                placeholder="Buscar por nombre o materia..."
+                                value={filterText}
+                                onChange={(e) => setFilterText(e.target.value)}
+                                style={{
+                                    width: '100%',
+                                    padding: '10px 16px',
+                                    border: '2px solid #e5e7eb',
+                                    borderRadius: 8,
+                                    fontSize: 14,
+                                    outline: 'none',
+                                    boxSizing: 'border-box',
+                                    transition: 'border 0.2s'
+                                }}
+                                onFocus={(e) => e.target.style.borderColor = '#2563eb'}
+                                onBlur={(e) => e.target.style.borderColor = '#e5e7eb'}
+                            />
                         </div>
-                        <div style={{ display: 'flex', gap: 12, justifyContent: 'space-between', alignItems: 'center' }}>
-                            <span style={{ fontSize: 14, color: '#6b7280' }}>{selectedNotes.length} seleccionado{selectedNotes.length !== 1 ? 's' : ''}</span>
+
+                        <div style={{ padding: 24, overflowY: 'auto', flex: 1 }}>
+                            {filteredAvailableNotes.length === 0 ? (
+                                <div style={{ textAlign: 'center', padding: '40px 20px', color: '#6b7280' }}>
+                                    <div style={{ fontSize: 48, marginBottom: 12 }}>
+                                        {filterText ? '🔍' : '📭'}
+                                    </div>
+                                    <p style={{ margin: 0, fontWeight: 500 }}>
+                                        {filterText ? 'No se encontraron resultados' : 'No hay apuntes disponibles'}
+                                    </p>
+                                </div>
+                            ) : (
+                                <div style={{ marginBottom: 20 }}>
+                                    {filteredAvailableNotes.map((note) => (
+                                        <label key={note.id} style={{ display: 'flex', alignItems: 'center', padding: '12px', border: '1px solid #e5e7eb', borderRadius: 8, marginBottom: 8, cursor: 'pointer', background: selectedNotes.includes(note.id) ? '#eff6ff' : 'white', transition: 'all 0.2s' }}>
+                                            <input type="checkbox" checked={selectedNotes.includes(note.id)} onChange={() => toggleNoteSelection(note.id)} style={{ marginRight: 12 }} />
+                                            <div style={{ flex: 1 }}>
+                                                <div style={{ fontWeight: 500, marginBottom: 4 }}>{note.titulo}</div>
+                                                <div style={{ fontSize: 13, color: '#6b7280' }}>{note.materia}</div>
+                                            </div>
+                                        </label>
+                                    ))}
+                                </div>
+                            )}
+                        </div>
+
+                        <div style={{ padding: 24, borderTop: '1px solid #e5e7eb', display: 'flex', gap: 12, justifyContent: 'space-between', alignItems: 'center' }}>
+                            <span style={{ fontSize: 14, color: '#6b7280' }}>
+                                {selectedNotes.length > 0 && `${selectedNotes.length} seleccionado${selectedNotes.length !== 1 ? 's' : ''}`}
+                            </span>
                             <div style={{ display: 'flex', gap: 12 }}>
-                                <Button variant="ghost" onClick={() => { setShowAddNotesModal(false); setSelectedNotes([]); }}>Cancelar</Button>
+                                <Button variant="ghost" onClick={() => { setShowAddNotesModal(false); setSelectedNotes([]); setFilterText(""); }}>Cancelar</Button>
                                 <Button variant="primary" onClick={handleAddNotesToFolder} disabled={selectedNotes.length === 0}>Añadir ({selectedNotes.length})</Button>
                             </div>
                         </div>

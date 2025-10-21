@@ -51,7 +51,8 @@ export default function Favorites() {
                                 id_materia,
                                 id_usuario,
                                 file_path,
-                                materia:id_materia(nombre_materia)
+                                materia:id_materia(nombre_materia),
+                                thumbnail_path
                             `)
                     .in('id_apunte', apIds);
 
@@ -97,6 +98,7 @@ export default function Favorites() {
                                 creditos: a.creditos,
                                 estrellas: a.estrellas,
                                 signedUrl: a.signedUrl,
+                                thumbnail_path: a.thumbnail_path,
                                 materia: a.materia,
                                 usuario: { nombre: userMap[a.id_usuario] || 'Anónimo' },
                                 id_usuario: a.id_usuario

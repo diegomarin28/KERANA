@@ -1,4 +1,4 @@
-// src/pages/MyPapers.jsx
+
 import { useEffect, useState } from "react";
 import { supabase } from "../supabase";
 import { Button } from "../components/ui/Button";
@@ -49,6 +49,7 @@ export default function MyPapers() {
           file_name,
           mime_type,
           file_size,
+          thumbnail_path,
           materia:materia!Apunte_id_materia_fkey (
           id_materia,
           nombre_materia
@@ -297,6 +298,7 @@ export default function MyPapers() {
                                 {/* Vista previa del PDF - 🆕 Usar signed URL */}
                                 <PDFThumbnail
                                     url={signedUrls[note.id_apunte] || null}
+                                    thumbnailPath={note.thumbnail_path}
                                     width={180}
                                     height={240}
                                 />
