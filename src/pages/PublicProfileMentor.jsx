@@ -2,7 +2,7 @@ import { useEffect, useState, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import {calendlyAPI, publicProfileAPI} from '../api/database';
 import { useSeguidores } from '../hooks/useSeguidores';
-import NoteCard from '../components/NoteCard';
+import ApunteCard from '../components/ApunteCard';
 import {supabase} from "../supabase.js";
 
 export default function PublicProfileMentor() {
@@ -27,6 +27,9 @@ export default function PublicProfileMentor() {
     const [loadingFollow, setLoadingFollow] = useState(false);
     const [showUnfollowModal, setShowUnfollowModal] = useState(false);
     const { seguirUsuario, dejarDeSeguir } = useSeguidores();
+
+    const [signedUrls, setSignedUrls] = useState({});
+
 
     const [showCalendlyModal, setShowCalendlyModal] = useState(false);
     const [calendlyUrl, setCalendlyUrl] = useState(null);
@@ -108,9 +111,14 @@ export default function PublicProfileMentor() {
                 setCalendlyUrl(finalUrl);
                 console.log('💾 DEBUG Calendly - URL guardada en estado:', finalUrl);
             }
-
             const { data: notesData } = await publicProfileAPI.getRecentNotes(userId, 4);
             setRecentNotes(notesData || []);
+
+            // Generar signed URLs para notas recientes
+            if (notesData && notesData.length > 0) {
+                await generateSignedUrls(notesData);
+            }
+
             const { data: isFollowingData } = await publicProfileAPI.isFollowing(userId);
             setSiguiendo(isFollowingData);
         } catch (error) {
@@ -121,12 +129,33 @@ export default function PublicProfileMentor() {
 
     };
 
+    const generateSignedUrls = async (notes) => {
+        const urls = {};
+        for (const note of notes) {
+            if (note.file_path) {
+                const { data: signedData, error: signedError } = await supabase.storage
+                    .from('apuntes')
+                    .createSignedUrl(note.file_path, 3600);
+
+                if (!signedError && signedData) {
+                    urls[note.id_apunte] = signedData.signedUrl;
+                }
+            }
+        }
+        setSignedUrls(prev => ({ ...prev, ...urls }));
+    };
+
     const handleVerTodos = async () => {
         setShowAllNotes(true);
         setLoadingAllNotes(true);
         try {
             const { data: allNotesData } = await publicProfileAPI.getAllNotes(profile.id_usuario);
             setAllNotes(allNotesData || []);
+
+            if (allNotesData && allNotesData.length > 0) {
+                await generateSignedUrls(allNotesData);
+            }
+
             const { data: subjectsData } = await publicProfileAPI.getUserSubjects(profile.id_usuario);
             setUserSubjects(subjectsData || []);
         } catch (error) {
@@ -142,6 +171,11 @@ export default function PublicProfileMentor() {
         try {
             const { data } = await publicProfileAPI.getAllNotes(profile.id_usuario, materiaId);
             setAllNotes(data || []);
+
+            if (data && data.length > 0) {
+                await generateSignedUrls(data);
+            }
+
         } catch (error) {
             console.error('Error filtrando apuntes:', error);
         } finally {
@@ -210,7 +244,7 @@ export default function PublicProfileMentor() {
 
     const scrollCarousel = (direction) => {
         if (carouselRef.current) {
-            const scrollAmount = 380;
+            const scrollAmount = 304;
             carouselRef.current.scrollBy({
                 left: direction === 'left' ? -scrollAmount : scrollAmount,
                 behavior: 'smooth'
@@ -464,7 +498,16 @@ export default function PublicProfileMentor() {
                                             <button onClick={() => scrollCarousel('left')} style={{ ...carouselArrowStyle, left: -20 }} onMouseEnter={(e) => e.target.style.transform = 'translateY(-50%) scale(1.1)'} onMouseLeave={(e) => e.target.style.transform = 'translateY(-50%) scale(1)'}>‹</button>
                                         )}
                                         <div ref={carouselRef} style={carouselContainerStyle}>
-                                            {recentNotes.map(note => (<div key={note.id_apunte} style={carouselItemStyle}><NoteCard note={note} /></div>))}
+                                            {recentNotes.map(note => (
+                                                <div key={note.id_apunte} style={carouselItemStyle}>
+                                                    <ApunteCard
+                                                        note={{
+                                                            ...note,
+                                                            signedUrl: signedUrls[note.id_apunte]
+                                                        }}
+                                                    />
+                                                </div>
+                                            ))}
                                         </div>
                                         {recentNotes.length > 3 && (
                                             <button onClick={() => scrollCarousel('right')} style={{ ...carouselArrowStyle, right: -20 }} onMouseEnter={(e) => e.target.style.transform = 'translateY(-50%) scale(1.1)'} onMouseLeave={(e) => e.target.style.transform = 'translateY(-50%) scale(1)'}>›</button>
@@ -505,7 +548,17 @@ export default function PublicProfileMentor() {
                                 {loadingAllNotes ? (
                                     <div style={centerStyle}><div style={spinnerStyle}></div></div>
                                 ) : allNotes.length > 0 ? (
-                                    <div style={notesGridStyle}>{allNotes.map(note => (<NoteCard key={note.id_apunte} note={note} />))}</div>
+                                    <div style={notesGridStyle}>
+                                        {allNotes.map(note => (
+                                            <ApunteCard
+                                                key={note.id_apunte}
+                                                note={{
+                                                    ...note,
+                                                    signedUrl: signedUrls[note.id_apunte]
+                                                }}
+                                            />
+                                        ))}
+                                    </div>
                                 ) : (
                                     <div style={emptyStateStyle}>
                                         <div style={emptyIconStyle}>🔍</div>
@@ -693,13 +746,12 @@ const verMasButtonStyle = { padding: '10px 20px', background: 'white', color: '#
 const backToRecentButtonStyle = { padding: '10px 20px', background: 'white', color: '#666', border: '2px solid #E5E7EB', borderRadius: 24, fontWeight: 600, fontSize: 14, cursor: 'pointer', transition: 'all 0.2s ease', display: 'flex', alignItems: 'center' };
 const carouselWrapperStyle = { position: 'relative', paddingBottom: 20 };
 const carouselContainerStyle = { display: 'flex', gap: 16, overflowX: 'auto', scrollBehavior: 'smooth', paddingBottom: 8, scrollbarWidth: 'thin', scrollbarColor: '#CBD5E1 transparent' };
-const carouselItemStyle = { minWidth: 360, flexShrink: 0 };
+const carouselItemStyle = { minWidth: 280, flexShrink: 0 };
 const carouselArrowStyle = { position: 'absolute', top: '50%', transform: 'translateY(-50%)', width: 44, height: 44, borderRadius: '50%', background: 'white', border: '2px solid #10B981', color: '#10B981', fontSize: 28, fontWeight: 'bold', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 4px 12px rgba(16, 185, 129, 0.2)', transition: 'all 0.2s ease', zIndex: 10 };
 const filtersContainerStyle = { display: 'flex', gap: 10, marginBottom: 24, flexWrap: 'wrap', alignItems: 'center', background: 'white', padding: 16, borderRadius: 8, boxShadow: '0 0 0 1px rgba(0,0,0,0.08)' };
 const filterLabelStyle = { fontSize: 14, fontWeight: 600, color: '#666', display: 'flex', alignItems: 'center' };
 const filterChipStyle = { padding: '8px 16px', borderRadius: 20, fontWeight: 600, fontSize: 13, cursor: 'pointer', transition: 'all 0.2s ease', border: '2px solid' };
-const notesGridStyle = { display: 'grid', gap: 16, gridTemplateColumns: 'repeat(auto-fill, minmax(360px, 1fr))' };
-const emptyStateStyle = { textAlign: 'center', padding: '80px 20px', background: 'white', borderRadius: 8, boxShadow: '0 0 0 1px rgba(0,0,0,0.08)' };
+const notesGridStyle = { display: 'grid', gap: 24, gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))' };const emptyStateStyle = { textAlign: 'center', padding: '80px 20px', background: 'white', borderRadius: 8, boxShadow: '0 0 0 1px rgba(0,0,0,0.08)' };
 const emptyIconStyle = { fontSize: '4rem', marginBottom: 16, opacity: 0.5 };
 const emptyTitleStyle = { margin: '0 0 8px 0', fontSize: 20, fontWeight: 700, color: '#111827' };
 const emptyDescStyle = { margin: 0, color: '#666', fontSize: 15 };

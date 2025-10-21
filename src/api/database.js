@@ -1482,45 +1482,43 @@ export const publicProfileAPI = {
         const { data, error } = await supabase
             .from('apunte')
             .select(`
-                id_apunte,
-                titulo,
-                descripcion,
-                created_at,
-                id_materia,
-                materia(nombre_materia),
-                estrellas,
-                portada_url
-            `)
+            id_apunte,
+            titulo,
+            descripcion,
+            created_at,
+            creditos,
+            file_path,
+            id_usuario,
+            id_materia,
+            usuario:id_usuario(nombre),
+            materia:id_materia(id_materia, nombre_materia),
+            estrellas,
+            portada_url
+        `)
             .eq('id_usuario', userId)
             .order('created_at', { ascending: false })
             .limit(limit);
 
-        const transformed = (data || []).map(note => ({
-            id_apunte: note.id_apunte,
-            titulo: note.titulo,
-            descripcion: note.descripcion,
-            materia_nombre: note.materia?.nombre_materia,
-            estrellas: note.estrellas,
-            portada_url: note.portada_url,
-            created_at: note.created_at
-        }));
-
-        return { data: transformed, error };
+        return { data, error };
     },
 
     async getAllNotes(userId, materiaId = null) {
         let query = supabase
             .from('apunte')
             .select(`
-                id_apunte,
-                titulo,
-                descripcion,
-                created_at,
-                id_materia,
-                materia(nombre_materia),
-                estrellas,
-                portada_url
-            `)
+            id_apunte,
+            titulo,
+            descripcion,
+            created_at,
+            creditos,
+            file_path,
+            id_usuario,
+            id_materia,
+            usuario:id_usuario(nombre),
+            materia:id_materia(id_materia, nombre_materia),
+            estrellas,
+            portada_url
+        `)
             .eq('id_usuario', userId)
             .order('created_at', { ascending: false });
 
@@ -1530,17 +1528,7 @@ export const publicProfileAPI = {
 
         const { data, error } = await query;
 
-        const transformed = (data || []).map(note => ({
-            id_apunte: note.id_apunte,
-            titulo: note.titulo,
-            descripcion: note.descripcion,
-            materia_nombre: note.materia?.nombre_materia,
-            estrellas: note.estrellas,
-            portada_url: note.portada_url,
-            created_at: note.created_at
-        }));
-
-        return { data: transformed, error };
+        return { data, error };
     },
 
     async getUserSubjects(userId) {
