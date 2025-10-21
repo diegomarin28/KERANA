@@ -2,7 +2,7 @@ import { useEffect, useState, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { publicProfileAPI } from '../api/database';
 import { useSeguidores } from '../hooks/useSeguidores';
-import NoteCard from '../components/NoteCard';
+import ApunteCard from "../components/ApunteCard.jsx";
 
 export default function PublicProfile() {
     const { username } = useParams();
@@ -425,7 +425,7 @@ export default function PublicProfile() {
                                             <div ref={carouselRef} style={carouselContainerStyle}>
                                                 {recentNotes.map(note => (
                                                     <div key={note.id_apunte} style={carouselItemStyle}>
-                                                        <NoteCard note={note} />
+                                                        <ApunteCard note={note} />
                                                     </div>
                                                 ))}
                                             </div>
@@ -512,7 +512,7 @@ export default function PublicProfile() {
                                 ) : allNotes.length > 0 ? (
                                     <div style={notesGridStyle}>
                                         {allNotes.map(note => (
-                                            <NoteCard key={note.id_apunte} note={note} />
+                                            <ApunteCard key={note.id_apunte} note={note} />
                                         ))}
                                     </div>
                                 ) : (

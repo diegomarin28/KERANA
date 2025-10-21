@@ -24,7 +24,7 @@ export default function Upload() {
     const [error, setError] = useState('');
     const [showSuccessModal, setShowSuccessModal] = useState(false);
     const dropdownRef = useRef(null);
-    const { playSound } = useNotificationSound();
+    const {playSound} = useNotificationSound();
 
 
     const sanitizeFilename = (filename) => {
@@ -83,7 +83,7 @@ export default function Upload() {
     }, [searchTerm, materias]);
 
     const fetchMaterias = async () => {
-        const { data, error } = await supabase
+        const {data, error} = await supabase
             .from('materia')
             .select('id_materia, nombre_materia, semestre')
             .order('nombre_materia');
@@ -102,8 +102,14 @@ export default function Upload() {
     };
 
 
-
     const handleFileChange = (file) => {
+        // Si file es null, limpiar el archivo
+        if (file === null) {
+            setFormData({...formData, file: null});
+            setError('');
+            return;
+        }
+
         if (file) {
             // Verificar que sea PDF por extensión
             const fileName = file.name.toLowerCase();
@@ -126,7 +132,7 @@ export default function Upload() {
 
             console.log('Archivo:', file.name, '→', sanitizedName);
 
-            setFormData({ ...formData, file: sanitizedFile });
+            setFormData({...formData, file: sanitizedFile});
             setError('');
         }
     };
@@ -160,7 +166,7 @@ export default function Upload() {
             setUploading(true);
 
             // Verificar autenticación
-            const { data: { user }, error: authError } = await supabase.auth.getUser();
+            const {data: {user}, error: authError} = await supabase.auth.getUser();
 
             if (authError || !user) {
                 setError('Debes iniciar sesión para subir apuntes');
@@ -170,7 +176,7 @@ export default function Upload() {
             }
 
             // Obtener id_usuario
-            const { data: usuarioData, error: userError } = await supabase
+            const {data: usuarioData, error: userError} = await supabase
                 .from('usuario')
                 .select('id_usuario')
                 .eq('auth_id', user.id)
@@ -186,7 +192,7 @@ export default function Upload() {
             // Subir archivo al bucket con el nombre original
             const fileName = formData.file.name;
 
-            const { data: uploadData, error: uploadError } = await supabase.storage
+            const {data: uploadData, error: uploadError} = await supabase.storage
                 .from('apuntes')
                 .upload(fileName, formData.file, {
                     cacheControl: '3600',
@@ -199,12 +205,12 @@ export default function Upload() {
             }
 
             // Obtener URL pública del archivo
-            const { data: publicUrlData } = supabase.storage
+            const {data: publicUrlData} = supabase.storage
                 .from('apuntes')
                 .getPublicUrl(fileName);
 
             // Guardar en la tabla apuntes
-            const { error: insertError } = await supabase
+            const {error: insertError} = await supabase
                 .from('apunte')
                 .insert([{
                     titulo: formData.title.trim(),
@@ -243,7 +249,7 @@ export default function Upload() {
     const valid = formData.title.trim() && selectedMateria && formData.file && formData.agree;
 
     return (
-        <div style={{ maxWidth: 700, margin: '0 auto', padding: 20 }}>
+        <div style={{maxWidth: 1000, margin: '0 auto', padding: 20}}>
             {/* Modal de éxito */}
             {showSuccessModal && (
                 <div style={{
@@ -278,7 +284,7 @@ export default function Upload() {
                             margin: '0 auto 24px',
                             fontSize: 40
                         }}>
-                            📝
+                            📚
                         </div>
                         <h2 style={{
                             margin: '0 0 12px 0',
@@ -297,7 +303,8 @@ export default function Upload() {
                             lineHeight: 1.6,
                             marginBottom: 32
                         }}>
-                            <strong style={{ color: '#374151' }}>KERANA</strong> y toda su comunidad te agradecen por compartir tu conocimiento. 🎓
+                            <strong style={{color: '#374151'}}>KERANA</strong> y toda su comunidad te agradecen por
+                            compartir tu conocimiento. 🎓
                         </p>
                         <Button
                             onClick={() => navigate('/')}
@@ -322,258 +329,270 @@ export default function Upload() {
                 </div>
             )}
 
-            <h1 style={{ marginBottom: 12 }}>Subir apunte</h1>
-            <p style={{ color: '#6b7280', marginBottom: 32 }}>
+            <h1 style={{marginBottom: 12}}>Subir apunte</h1>
+            <p style={{color: '#6b7280', marginBottom: 32}}>
                 Compartí tus apuntes con la comunidad. Completá los campos y subí el PDF.
             </p>
 
-            {error && (
-                <Card style={{
-                    background: '#fef2f2',
-                    border: '1px solid #fecaca',
-                    color: '#dc2626',
-                    padding: 16,
-                    marginBottom: 20
-                }}>
-                    {error}
-                </Card>
-            )}
-
-            <Card style={{ padding: 32 }}>
-                <form onSubmit={handleSubmit}>
-                    {/* Título */}
-                    <div style={{ marginBottom: 24 }}>
-                        <label style={{ display: 'block', marginBottom: 8, fontWeight: 600 }}>
-                            Título *
-                        </label>
-                        <input
-                            type="text"
-                            value={formData.title}
-                            onChange={(e) => setFormData({ ...formData, title: e.target.value })}
-                            placeholder="Ej: Resumen Parcial 1 - Base de Datos I"
-                            style={{
-                                width: '100%',
-                                padding: 12,
-                                border: '1px solid #d1d5db',
-                                borderRadius: 8,
-                                fontSize: 14
-                            }}
-                            disabled={loading}
-                        />
-                    </div>
-
-                    {/* Materia con dropdown autocomplete */}
-                    <div style={{ marginBottom: 24, position: 'relative' }} ref={dropdownRef}>
-                        <label style={{ display: 'block', marginBottom: 8, fontWeight: 600 }}>
-                            Materia *
-                        </label>
-                        <input
-                            type="text"
-                            value={searchTerm}
-                            onChange={(e) => {
-                                setSearchTerm(e.target.value);
-                                setSelectedMateria(null);
-                            }}
-                            onFocus={() => {
-                                if (searchTerm.trim()) {
-                                    setShowDropdown(true);
-                                }
-                            }}
-                            placeholder="Ej: Análisis Matemático"
-                            style={{
-                                width: '100%',
-                                padding: 12,
-                                border: '1px solid #d1d5db',
-                                borderRadius: 8,
-                                fontSize: 14
-                            }}
-                            disabled={loading}
-                            autoComplete="off"
-                        />
-
-                        {showDropdown && filteredMaterias.length > 0 && (
-                            <div style={{
-                                position: 'absolute',
-                                top: '100%',
-                                left: 0,
-                                right: 0,
-                                background: '#fff',
-                                border: '1px solid #d1d5db',
-                                borderRadius: 8,
-                                marginTop: 4,
-                                maxHeight: 200,
-                                overflowY: 'auto',
-                                zIndex: 100,
-                                boxShadow: '0 4px 6px -1px rgba(0,0,0,0.1)'
-                            }}>
-                                {filteredMaterias.map(materia => (
-                                    <div
-                                        key={materia.id_materia}
-                                        onClick={() => handleMateriaSelect(materia)}
-                                        style={{
-                                            padding: '12px 16px',
-                                            cursor: 'pointer',
-                                            borderBottom: '1px solid #f3f4f6',
-                                            transition: 'background 0.15s'
-                                        }}
-                                        onMouseEnter={(e) => e.currentTarget.style.background = '#f9fafb'}
-                                        onMouseLeave={(e) => e.currentTarget.style.background = '#fff'}
-                                    >
-                                        <div style={{ fontWeight: 500, fontSize: 14 }}>
-                                            {materia.nombre_materia}
-                                        </div>
-                                    </div>
-                                ))}
-                            </div>
-                        )}
-
-                        {showDropdown && searchTerm.trim() && filteredMaterias.length === 0 && (
-                            <div style={{
-                                position: 'absolute',
-                                top: '100%',
-                                left: 0,
-                                right: 0,
-                                background: '#fff',
-                                border: '1px solid #d1d5db',
-                                borderRadius: 8,
-                                marginTop: 4,
-                                padding: 16,
-                                zIndex: 100,
-                                color: '#6b7280',
-                                fontSize: 14,
-                                boxShadow: '0 4px 6px -1px rgba(0,0,0,0.1)'
-                            }}>
-                                No se encontraron materias con "{searchTerm}"
-                            </div>
-                        )}
-
-                        {selectedMateria && (
-                            <div style={{
-                                marginTop: 8,
-                                fontSize: 14,
-                                color: '#059669',
-                                display: 'flex',
-                                alignItems: 'center',
-                                gap: 6
-                            }}>
-                                ✓ Materia seleccionada
-                            </div>
-                        )}
-                    </div>
-
-                    {/* Descripción */}
-                    <div style={{ marginBottom: 24 }}>
-                        <label style={{ display: 'block', marginBottom: 8, fontWeight: 600 }}>
-                            Descripción
-                        </label>
-                        <textarea
-                            value={formData.desc}
-                            onChange={(e) => setFormData({ ...formData, desc: e.target.value })}
-                            placeholder="Describí brevemente el contenido del apunte..."
-                            rows={4}
-                            style={{
-                                width: '100%',
-                                padding: 12,
-                                border: '1px solid #d1d5db',
-                                borderRadius: 8,
-                                fontSize: 14,
-                                resize: 'vertical',
-                                fontFamily: 'inherit'
-                            }}
-                            disabled={loading}
-                        />
-                    </div>
-
-                    {/* Archivo PDF */}
-                    <div style={{ marginBottom: 24 }}>
-                        <label style={{ display: 'block', marginBottom: 8, fontWeight: 600 }}>
-                            Archivo PDF *
-                        </label>
-                        <FileDrop
-                            file={formData.file}
-                            onFileSelected={handleFileChange}
-                        />
-                    </div>
-
-                    {/* Checkbox de confirmación */}
-                    <div style={{ marginBottom: 32 }}>
-                        <label style={{
-                            display: 'flex',
-                            alignItems: 'start',
-                            gap: 8,
-                            cursor: 'pointer',
-                            fontSize: 14
+            <div style={{display: 'flex', gap: 20}}>
+                {/* Formulario - Izquierda */}
+                <div style={{width: 700}}>
+                    {error && (
+                        <Card style={{
+                            background: '#fef2f2',
+                            border: '1px solid #fecaca',
+                            color: '#dc2626',
+                            padding: 16,
+                            marginBottom: 20
                         }}>
-                            <input
-                                type="checkbox"
-                                checked={formData.agree}
-                                onChange={(e) => setFormData({ ...formData, agree: e.target.checked })}
-                                disabled={loading}
-                                style={{ marginTop: 2 }}
-                            />
-                            <span><strong>Confirmo que tengo derecho a compartir este apunte.</strong></span>
-                        </label>
-                    </div>
+                            {error}
+                        </Card>
+                    )}
 
-                    {/* Botones */}
-                    <div style={{ display: 'flex', gap: 12 }}>
-                        <Button
-                            type="submit"
-                            disabled={!valid || loading}
-                            style={{
-                                flex: 1,
-                                padding: 14,
-                                background: (!valid || loading) ? '#9ca3af' : '#2563eb',
-                                color: '#fff',
-                                border: 'none',
-                                borderRadius: 8,
-                                fontWeight: 600,
-                                cursor: (!valid || loading) ? 'not-allowed' : 'pointer',
-                                fontSize: 16
-                            }}
-                        >
-                            {uploading ? 'Subiendo archivo...' : loading ? 'Guardando...' : 'Publicar apunte'}
-                        </Button>
-                        <button
-                            type="button"
-                            onClick={() => navigate(-1)}
-                            disabled={loading}
-                            style={{
-                                padding: '8px 14px',
-                                background: '#fff',
-                                color: '#374151',
-                                border: '1px solid #2563eb', // azul
-                                borderRadius: 6,
-                                fontWeight: 500,
-                                cursor: loading ? 'not-allowed' : 'pointer',
-                                fontSize: 14,
-                                transition: 'all 0.2s ease',
-                            }}
-                            onMouseEnter={(e) => {
-                                e.currentTarget.style.background = '#2563eb'; // azul
-                                e.currentTarget.style.color = '#fff'; // texto blanco
-                            }}
-                            onMouseLeave={(e) => {
-                                e.currentTarget.style.background = '#fff'; // vuelve blanco
-                                e.currentTarget.style.color = '#374151'; // texto gris oscuro
-                            }}
-                        >
-                            Cancelar
-                        </button>
+                    <Card style={{padding: 32}}>
+                        <form onSubmit={handleSubmit}>
+                            {/* Título */}
+                            <div style={{marginBottom: 24}}>
+                                <label style={{display: 'block', marginBottom: 8, fontWeight: 600}}>
+                                    Título *
+                                </label>
+                                <input
+                                    type="text"
+                                    value={formData.title}
+                                    onChange={(e) => setFormData({...formData, title: e.target.value})}
+                                    placeholder="Ej: Resumen Parcial 1 - Base de Datos I"
+                                    style={{
+                                        width: '100%',
+                                        padding: 12,
+                                        border: '1px solid #d1d5db',
+                                        borderRadius: 8,
+                                        fontSize: 14
+                                    }}
+                                    disabled={loading}
+                                />
+                            </div>
 
-                    </div>
-                </form>
-            </Card>
+                            {/* Materia con dropdown autocomplete */}
+                            <div style={{marginBottom: 24, position: 'relative'}} ref={dropdownRef}>
+                                <label style={{display: 'block', marginBottom: 8, fontWeight: 600}}>
+                                    Materia *
+                                </label>
+                                <input
+                                    type="text"
+                                    value={searchTerm}
+                                    onChange={(e) => {
+                                        setSearchTerm(e.target.value);
+                                        setSelectedMateria(null);
+                                    }}
+                                    onFocus={() => {
+                                        if (searchTerm.trim()) {
+                                            setShowDropdown(true);
+                                        }
+                                    }}
+                                    placeholder="Ej: Análisis Matemático"
+                                    style={{
+                                        width: '100%',
+                                        padding: 12,
+                                        border: '1px solid #d1d5db',
+                                        borderRadius: 8,
+                                        fontSize: 14
+                                    }}
+                                    disabled={loading}
+                                    autoComplete="off"
+                                />
 
-            {/* Card de consejos */}
-            <Card style={{ marginTop: 20, padding: 20, background: '#f0f9ff', border: '1px solid #bfdbfe' }}>
-                <h3 style={{ margin: '0 0 8px 0', color: '#1e40af' }}>Consejos</h3>
-                <ul style={{ margin: 0, paddingLeft: 20, color: '#1e3a8a' }}>
-                    <li>Usá un título descriptivo que facilite la búsqueda</li>
-                    <li>Verificá que el PDF esté completo y legible</li>
-                    <li>Máximo 20MB por archivo</li>
-                </ul>
-            </Card>
+                                {showDropdown && filteredMaterias.length > 0 && (
+                                    <div style={{
+                                        position: 'absolute',
+                                        top: '100%',
+                                        left: 0,
+                                        right: 0,
+                                        background: '#fff',
+                                        border: '1px solid #d1d5db',
+                                        borderRadius: 8,
+                                        marginTop: 4,
+                                        maxHeight: 200,
+                                        overflowY: 'auto',
+                                        zIndex: 100,
+                                        boxShadow: '0 4px 6px -1px rgba(0,0,0,0.1)'
+                                    }}>
+                                        {filteredMaterias.map(materia => (
+                                            <div
+                                                key={materia.id_materia}
+                                                onClick={() => handleMateriaSelect(materia)}
+                                                style={{
+                                                    padding: '12px 16px',
+                                                    cursor: 'pointer',
+                                                    borderBottom: '1px solid #f3f4f6',
+                                                    transition: 'background 0.15s'
+                                                }}
+                                                onMouseEnter={(e) => e.currentTarget.style.background = '#f9fafb'}
+                                                onMouseLeave={(e) => e.currentTarget.style.background = '#fff'}
+                                            >
+                                                <div style={{fontWeight: 500, fontSize: 14}}>
+                                                    {materia.nombre_materia}
+                                                </div>
+                                            </div>
+                                        ))}
+                                    </div>
+                                )}
+
+                                {showDropdown && searchTerm.trim() && filteredMaterias.length === 0 && (
+                                    <div style={{
+                                        position: 'absolute',
+                                        top: '100%',
+                                        left: 0,
+                                        right: 0,
+                                        background: '#fff',
+                                        border: '1px solid #d1d5db',
+                                        borderRadius: 8,
+                                        marginTop: 4,
+                                        padding: 16,
+                                        zIndex: 100,
+                                        color: '#6b7280',
+                                        fontSize: 14,
+                                        boxShadow: '0 4px 6px -1px rgba(0,0,0,0.1)'
+                                    }}>
+                                        No se encontraron materias con "{searchTerm}"
+                                    </div>
+                                )}
+
+                                {selectedMateria && (
+                                    <div style={{
+                                        marginTop: 8,
+                                        fontSize: 14,
+                                        color: '#059669',
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        gap: 6
+                                    }}>
+                                        ✓ Materia seleccionada
+                                    </div>
+                                )}
+                            </div>
+
+                            {/* Descripción */}
+                            <div style={{marginBottom: 24}}>
+                                <label style={{display: 'block', marginBottom: 8, fontWeight: 600}}>
+                                    Descripción
+                                </label>
+                                <textarea
+                                    value={formData.desc}
+                                    onChange={(e) => setFormData({...formData, desc: e.target.value})}
+                                    placeholder="Describí brevemente el contenido del apunte..."
+                                    rows={4}
+                                    style={{
+                                        width: '100%',
+                                        padding: 12,
+                                        border: '1px solid #d1d5db',
+                                        borderRadius: 8,
+                                        fontSize: 14,
+                                        resize: 'vertical',
+                                        fontFamily: 'inherit'
+                                    }}
+                                    disabled={loading}
+                                />
+                            </div>
+
+                            {/* Archivo PDF */}
+                            <div style={{marginBottom: 24}}>
+                                <label style={{display: 'block', marginBottom: 8, fontWeight: 600}}>
+                                    Archivo PDF *
+                                </label>
+                                <FileDrop
+                                    file={formData.file}
+                                    onFileSelected={handleFileChange}
+                                />
+                            </div>
+
+                            {/* Checkbox de confirmación */}
+                            <div style={{marginBottom: 32}}>
+                                <label style={{
+                                    display: 'flex',
+                                    alignItems: 'start',
+                                    gap: 8,
+                                    cursor: 'pointer',
+                                    fontSize: 14
+                                }}>
+                                    <input
+                                        type="checkbox"
+                                        checked={formData.agree}
+                                        onChange={(e) => setFormData({...formData, agree: e.target.checked})}
+                                        disabled={loading}
+                                        style={{marginTop: 2}}
+                                    />
+                                    <span><strong>Confirmo que tengo derecho a compartir este apunte.</strong></span>
+                                </label>
+                            </div>
+
+                            {/* Botones */}
+                            <div style={{display: 'flex', gap: 12}}>
+                                <Button
+                                    type="submit"
+                                    disabled={!valid || loading}
+                                    style={{
+                                        flex: 1,
+                                        padding: 14,
+                                        background: (!valid || loading) ? '#9ca3af' : '#2563eb',
+                                        color: '#fff',
+                                        border: 'none',
+                                        borderRadius: 8,
+                                        fontWeight: 600,
+                                        cursor: (!valid || loading) ? 'not-allowed' : 'pointer',
+                                        fontSize: 16
+                                    }}
+                                >
+                                    {uploading ? 'Subiendo archivo...' : loading ? 'Guardando...' : 'Publicar apunte'}
+                                </Button>
+                                <button
+                                    type="button"
+                                    onClick={() => navigate(-1)}
+                                    disabled={loading}
+                                    style={{
+                                        padding: '8px 14px',
+                                        background: '#fff',
+                                        color: '#374151',
+                                        border: '1px solid #2563eb',
+                                        borderRadius: 6,
+                                        fontWeight: 500,
+                                        cursor: loading ? 'not-allowed' : 'pointer',
+                                        fontSize: 14,
+                                        transition: 'all 0.2s ease',
+                                    }}
+                                    onMouseEnter={(e) => {
+                                        e.currentTarget.style.background = '#2563eb';
+                                        e.currentTarget.style.color = '#fff';
+                                    }}
+                                    onMouseLeave={(e) => {
+                                        e.currentTarget.style.background = '#fff';
+                                        e.currentTarget.style.color = '#374151';
+                                    }}
+                                >
+                                    Cancelar
+                                </button>
+                            </div>
+                        </form>
+                    </Card>
+                </div>
+
+                {/* Card de consejos - Derecha */}
+                <div style={{width: 260}}>
+                    <Card style={{
+                        padding: 20,
+                        background: '#f0f9ff',
+                        border: '1px solid #bfdbfe',
+                        position: 'sticky',
+                        top: 20
+                    }}>
+                        <h3 style={{margin: '0 0 12px 0', color: '#1e40af', fontSize: 16}}>💡 Consejos</h3>
+                        <ul style={{margin: 0, paddingLeft: 20, color: '#1e3a8a', fontSize: 13, lineHeight: 1.6}}>
+                            <li style={{marginBottom: 8}}>Usá un título descriptivo que facilite la búsqueda</li>
+                            <li style={{marginBottom: 8}}>Verificá que el PDF esté completo y legible</li>
+                            <li>Máximo 20MB por archivo</li>
+                        </ul>
+                    </Card>
+                </div>
+            </div>
         </div>
     );
 }

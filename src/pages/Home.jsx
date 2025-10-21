@@ -16,6 +16,7 @@ const heroBackground = {
 }[HERO_BG];
 
 export default function Home() {
+    const [currentUserId, setCurrentUserId] = useState(null);
     const [reveal, setReveal] = useState(false);
     const [scrollProg, setScrollProg] = useState(0);
 
@@ -32,6 +33,22 @@ export default function Home() {
         (async () => {
             try {
                 setLoadingTop(true);
+
+                // 1. Cargar usuario actual
+                const { data: { user } } = await supabase.auth.getUser();
+                if (user && mounted) {
+                    const { data: usuarioData } = await supabase
+                        .from("usuario")
+                        .select("id_usuario")
+                        .eq("auth_id", user.id)
+                        .maybeSingle();
+
+                    if (usuarioData && mounted) {
+                        setCurrentUserId(usuarioData.id_usuario);
+                    }
+                }
+
+                // 2. Cargar top apuntes
                 const { data, error } = await supabase.rpc("top_apuntes_best", { limit_count: 8 });
                 if (error) throw error;
 
@@ -40,10 +57,10 @@ export default function Home() {
                 const { data: apuntes, error: apError } = await supabase
                     .from('apunte')
                     .select(`
-                    id_apunte, 
-                    file_path,
-                    usuario:id_usuario(nombre)
-                `)
+                id_apunte, 
+                file_path,
+                usuario:id_usuario(nombre)
+            `)
                     .in('id_apunte', apIds);
 
                 if (apError) throw apError;
@@ -246,6 +263,7 @@ export default function Home() {
                                         <ApunteCard
                                             note={{
                                                 id_apunte: n.apunte_id,
+                                                id_usuario: n.id_usuario,
                                                 titulo: n.titulo,
                                                 descripcion: n.descripcion || '',
                                                 creditos: n.creditos,
@@ -255,6 +273,7 @@ export default function Home() {
                                                 signedUrl: n.signedUrl,
                                                 likes_count: n.likes_count  // ← NUEVO
                                             }}
+                                            currentUserId={currentUserId}
                                         />
                                     </div>
                                 ))}
