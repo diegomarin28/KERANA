@@ -175,6 +175,7 @@ async function searchProfessors(term) {
     }
 }
 
+
 async function searchSubjects(term) {
     const q = (term || "").trim();
     if (!q) return { data: [], error: null };
@@ -1020,7 +1021,6 @@ export const ratingsAPI = {
         return { data, error };
     }
 }
-
 // ==========================================
 // 👨‍🏫 PROFESORES
 // ==========================================
@@ -1482,45 +1482,43 @@ export const publicProfileAPI = {
         const { data, error } = await supabase
             .from('apunte')
             .select(`
-                id_apunte,
-                titulo,
-                descripcion,
-                created_at,
-                id_materia,
-                materia(nombre_materia),
-                estrellas,
-                portada_url
-            `)
+            id_apunte,
+            titulo,
+            descripcion,
+            created_at,
+            creditos,
+            file_path,
+            id_usuario,
+            id_materia,
+            usuario:id_usuario(nombre),
+            materia:id_materia(id_materia, nombre_materia),
+            estrellas,
+            portada_url
+        `)
             .eq('id_usuario', userId)
             .order('created_at', { ascending: false })
             .limit(limit);
 
-        const transformed = (data || []).map(note => ({
-            id_apunte: note.id_apunte,
-            titulo: note.titulo,
-            descripcion: note.descripcion,
-            materia_nombre: note.materia?.nombre_materia,
-            estrellas: note.estrellas,
-            portada_url: note.portada_url,
-            created_at: note.created_at
-        }));
-
-        return { data: transformed, error };
+        return { data, error };
     },
 
     async getAllNotes(userId, materiaId = null) {
         let query = supabase
             .from('apunte')
             .select(`
-                id_apunte,
-                titulo,
-                descripcion,
-                created_at,
-                id_materia,
-                materia(nombre_materia),
-                estrellas,
-                portada_url
-            `)
+            id_apunte,
+            titulo,
+            descripcion,
+            created_at,
+            creditos,
+            file_path,
+            id_usuario,
+            id_materia,
+            usuario:id_usuario(nombre),
+            materia:id_materia(id_materia, nombre_materia),
+            estrellas,
+            portada_url
+        `)
             .eq('id_usuario', userId)
             .order('created_at', { ascending: false });
 
@@ -1530,17 +1528,7 @@ export const publicProfileAPI = {
 
         const { data, error } = await query;
 
-        const transformed = (data || []).map(note => ({
-            id_apunte: note.id_apunte,
-            titulo: note.titulo,
-            descripcion: note.descripcion,
-            materia_nombre: note.materia?.nombre_materia,
-            estrellas: note.estrellas,
-            portada_url: note.portada_url,
-            created_at: note.created_at
-        }));
-
-        return { data: transformed, error };
+        return { data, error };
     },
 
     async getUserSubjects(userId) {
@@ -1758,21 +1746,19 @@ export const foldersAPI = {
     },
 
     async autoOrganize() {
-        const {data: {user}} = await supabase.auth.getUser()
-        if (!user) return {data: null, error: 'No hay usuario logueado'}
+        const { data: { user } } = await supabase.auth.getUser()
+        if (!user) return { data: null, error: 'No hay usuario logueado' }
 
-        const {data: usuarioData} = await supabase
+        const { data: usuarioData } = await supabase
             .from('usuario')
             .select('id_usuario')
             .eq('auth_id', user.id)
             .single()
 
-        if (!usuarioData) return {data: null, error: 'Usuario no encontrado'}
+        if (!usuarioData) return { data: null, error: 'Usuario no encontrado' }
 
         try {
-
-            // 1. Obtener todas las compras del usuario
-            const {data: compras, error: comprasError} = await supabase
+            const { data: compras, error: comprasError } = await supabase
                 .from('compra_apunte')
                 .select(`
                 id,
@@ -1793,7 +1779,7 @@ export const foldersAPI = {
             }
 
             if (!compras || compras.length === 0) {
-                return {data: {carpetasCreadas: 0}, error: null}
+                return { data: { carpetasCreadas: 0 }, error: null }
             }
 
             const estructura = {}
@@ -1829,11 +1815,10 @@ export const foldersAPI = {
             const carpetasCreadas = []
 
             for (const [nombreSemestre, materias] of Object.entries(estructura)) {
+                console.log(`✅ Creando carpeta: "${nombreSemestre}"`)
 
-                // Crear carpeta de semestre
-                const {data: carpetaSemestre} = await this.createFolder(
-                    nombreSemestre, // ← Ya tiene "Semestre 3" en el nombre
-
+                const { data: carpetaSemestre, error: errorSemestre } = await this.createFolder(
+                    nombreSemestre,
                     'semestre',
                     null,
                     0
@@ -1850,7 +1835,7 @@ export const foldersAPI = {
                 console.log(`✅ Carpeta creada: ${carpetaSemestre.nombre} (ID: ${carpetaSemestre.id_carpeta})`)
 
                 for (const [nombreMateria, datos] of Object.entries(materias)) {
-                    const {data: carpetaMateria} = await this.createFolder(
+                    const { data: carpetaMateria } = await this.createFolder(
                         nombreMateria,
                         'materia',
                         carpetaSemestre.id_carpeta,
@@ -1878,64 +1863,60 @@ export const foldersAPI = {
             }
 
         } catch (error) {
-
-            console.error('Error en organización automática:', error)
-            return {data: null, error}
-
-        }
-
-// ==========================================
-// 📅 CALENDLY INTEGRATION
-// ==========================================
-        export const calendlyAPI = {
-            // Guardar URL de Calendly del mentor
-            async saveCalendlyUrl(url) {
-                const {data: {user}} = await supabase.auth.getUser()
-                if (!user) return {data: null, error: 'No hay usuario logueado'}
-
-                // Actualizar directamente usando auth_id
-                const {data, error} = await supabase
-                    .from('usuario')
-                    .update({calendly_url: url})
-                    .eq('auth_id', user.id)  // ⬅️ Usar auth_id directamente
-                    .select()
-                    .single()
-
-                return {data, error}
-            },
-
-            // Obtener mi URL de Calendly
-            async getMyCalendlyUrl() {
-                const {data: {user}} = await supabase.auth.getUser()
-                if (!user) return {data: null, error: 'No hay usuario logueado'}
-
-                const {data: usuarioData} = await supabase
-                    .from('usuario')
-                    .select('calendly_url')
-                    .eq('auth_id', user.id)
-                    .single()
-
-                if (!usuarioData) return {data: null, error: 'Usuario no encontrado'}
-
-                return {data: usuarioData.calendly_url, error: null}
-            },
-
-            // Obtener URL de Calendly de un mentor específico (para estudiantes)
-            async getMentorCalendlyUrl(mentorId) {
-                const {data, error} = await supabase
-                    .from('mentor')
-                    .select(`
-                id_mentor,
-                usuario!inner(calendly_url)
-            `)
-                    .eq('id_mentor', mentorId)
-                    .single()
-
-                if (error) return {data: null, error}
-
-                return {data: data?.usuario?.calendly_url, error: null}
-            }
+            console.error('❌ Error en organización automática:', error)
+            return { data: null, error }
         }
     }
 }
+// ==========================================
+// 📅 CALENDLY INTEGRATION
+// ==========================================
+export const calendlyAPI = {
+    // Guardar URL de Calendly del mentor
+    async saveCalendlyUrl(url) {
+        const { data: { user } } = await supabase.auth.getUser()
+        if (!user) return { data: null, error: 'No hay usuario logueado' }
 
+        // Actualizar directamente usando auth_id
+        const { data, error } = await supabase
+            .from('usuario')
+            .update({ calendly_url: url })
+            .eq('auth_id', user.id)  // ⬅️ Usar auth_id directamente
+            .select()
+            .single()
+
+        return { data, error }
+    },
+
+    // Obtener mi URL de Calendly
+    async getMyCalendlyUrl() {
+        const { data: { user } } = await supabase.auth.getUser()
+        if (!user) return { data: null, error: 'No hay usuario logueado' }
+
+        const { data: usuarioData } = await supabase
+            .from('usuario')
+            .select('calendly_url')
+            .eq('auth_id', user.id)
+            .single()
+
+        if (!usuarioData) return { data: null, error: 'Usuario no encontrado' }
+
+        return { data: usuarioData.calendly_url, error: null }
+    },
+
+    // Obtener URL de Calendly de un mentor específico (para estudiantes)
+    async getMentorCalendlyUrl(mentorId) {
+        const { data, error } = await supabase
+            .from('mentor')
+            .select(`
+                id_mentor,
+                usuario!inner(calendly_url)
+            `)
+            .eq('id_mentor', mentorId)
+            .single()
+
+        if (error) return { data: null, error }
+
+        return { data: data?.usuario?.calendly_url, error: null }
+    }
+}
