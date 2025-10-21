@@ -13,7 +13,7 @@ export default function Purchased() {
     const location = useLocation();
 
     const params = new URLSearchParams(location.search);
-    const initialTab = params.get('tab') || 'purchases';
+    const initialTab = params.get("tab") || "purchases";
 
     const [activeTab, setActiveTab] = useState(initialTab);
     const [purchases, setPurchases] = useState([]);
@@ -29,7 +29,7 @@ export default function Purchased() {
     const [selectedNotes, setSelectedNotes] = useState([]);
     const [targetFolder, setTargetFolder] = useState(null);
 
-    // Estados para autocompletado de materias
+    // Autocomplete materias
     const [materias, setMaterias] = useState([]);
     const [searchTerm, setSearchTerm] = useState("");
     const [filteredMaterias, setFilteredMaterias] = useState([]);
@@ -37,7 +37,7 @@ export default function Purchased() {
     const [showDropdown, setShowDropdown] = useState(false);
     const dropdownRef = useRef(null);
 
-    // ✅ NUEVO: Estados para filtro de apuntes
+    // Filtro de apuntes para modal "añadir a carpeta"
     const [availableNotes, setAvailableNotes] = useState([]);
     const [filterText, setFilterText] = useState("");
 
@@ -45,6 +45,7 @@ export default function Purchased() {
         loadPurchases();
         loadFolders();
         fetchMaterias();
+        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []);
 
     // Cerrar dropdown al hacer click fuera
@@ -54,15 +55,15 @@ export default function Purchased() {
                 setShowDropdown(false);
             }
         };
-        document.addEventListener('mousedown', handleClickOutside);
-        return () => document.removeEventListener('mousedown', handleClickOutside);
+        document.addEventListener("mousedown", handleClickOutside);
+        return () => document.removeEventListener("mousedown", handleClickOutside);
     }, []);
 
     // Filtrar materias según búsqueda
     useEffect(() => {
         if (searchTerm.trim()) {
             const normalizedSearch = normalizeText(searchTerm);
-            const filtered = materias.filter(m =>
+            const filtered = materias.filter((m) =>
                 normalizeText(m.nombre_materia).includes(normalizedSearch)
             );
             setFilteredMaterias(filtered);
@@ -73,24 +74,20 @@ export default function Purchased() {
         }
     }, [searchTerm, materias]);
 
-    const normalizeText = (text) => {
-        return text
-            .toLowerCase()
-            .normalize('NFD')
-            .replace(/[\u0300-\u036f]/g, '');
-    };
+    const normalizeText = (text) =>
+        text.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
 
     const fetchMaterias = async () => {
         try {
             const { data: materiasData, error } = await supabase
-                .from('materia')
-                .select('id_materia, nombre_materia, semestre')
-                .order('nombre_materia');
+                .from("materia")
+                .select("id_materia, nombre_materia, semestre")
+                .order("nombre_materia");
 
             if (error) throw error;
             setMaterias(materiasData || []);
         } catch (err) {
-            console.error('Error cargando materias:', err);
+            console.error("Error cargando materias:", err);
         }
     };
 
@@ -125,38 +122,51 @@ export default function Purchased() {
                 return;
             }
 
-            const apIds = compras.map(c => c.apunte_id).filter(Boolean);
-            let apuntes = [];
-
-            if (apIds.length) {
-                const { data: apData, error: apErr } = await supabase
-                    .from("apunte")
-                    .select(`
-                        id_apunte, titulo, descripcion, creditos, estrellas, file_path, file_name,
-                        thumbnail_path, 
-                        materia:id_materia(id_materia, nombre_materia),
-                        usuario:id_usuario(nombre)
-                    `)
-                    .in("id_apunte", apIds);
-
-                if (apErr) throw apErr;
-                apuntes = apData || [];
+            const apIds = compras.map((c) => c.apunte_id).filter(Boolean);
+            if (apIds.length === 0) {
+                setPurchases([]);
+                setAvailableNotes([]);
+                return;
             }
 
-            const urls = {};
-            if (apuntes.length > 0) {
-                for (const apunte of apuntes) {
-                    if (apunte.file_path) {
-                        const { data: signedData } = await supabase.storage
-                            .from('apuntes')
-                            .createSignedUrl(apunte.file_path, 3600);
-                        if (signedData) urls[apunte.id_apunte] = signedData.signedUrl;
-                    }
-                }
-            }
+            // Traer apuntes de las compras
+            const { data: apData, error: apErr } = await supabase
+                .from("apunte")
+                .select(
+                    `
+          id_apunte,
+          titulo,
+          descripcion,
+          creditos,
+          estrellas,
+          file_path,
+          file_name,
+          thumbnail_path,
+          created_at,
+          materia:id_materia(id_materia, nombre_materia),
+          usuario:id_usuario(nombre)
+        `
+                )
+                .in("id_apunte", apIds)
+                .order("created_at", { ascending: false });
 
-            const mapApunte = new Map(apuntes.map(a => [a.id_apunte, a]));
-            const enriched = compras.map(c => {
+            if (apErr) throw apErr;
+            const apuntes = apData || [];
+
+            // Signed URLs en paralelo
+            const urlsArray = await Promise.all(
+                apuntes.map(async (ap) => {
+                    if (!ap.file_path) return [ap.id_apunte, null];
+                    const { data: signedData } = await supabase.storage
+                        .from("apuntes")
+                        .createSignedUrl(ap.file_path, 3600);
+                    return [ap.id_apunte, signedData?.signedUrl || null];
+                })
+            );
+            const urls = Object.fromEntries(urlsArray);
+
+            const mapApunte = new Map(apuntes.map((a) => [a.id_apunte, a]));
+            const enriched = compras.map((c) => {
                 const apunte = mapApunte.get(c.apunte_id);
                 return {
                     ...c,
@@ -168,30 +178,32 @@ export default function Purchased() {
                     usuario: apunte?.usuario || { nombre: "Anónimo" },
                     materia: apunte?.materia || { nombre_materia: "Sin materia" },
                     signedUrl: urls[c.apunte_id] || null,
-                    file_path: apunte?.file_path,
-                    thumbnail_path: apunte?.thumbnail_path
+                    file_path: apunte?.file_path || null,
+                    thumbnail_path: apunte?.thumbnail_path || null,
+                    created_at: apunte?.created_at || null
                 };
             });
 
             setPurchases(enriched);
 
-            // ✅ Pre-cargar availableNotes
-            setAvailableNotes(enriched.map(p => ({
-                id: p.id,
-                titulo: p.titulo,
-                descripcion: p.descripcion,
-                materia: p.materia?.nombre_materia || 'Sin materia'
-            })));
-
+            // Pre-cargar availableNotes (para modal)
+            setAvailableNotes(
+                enriched.map((p) => ({
+                    id: p.id, // id de la compra
+                    titulo: p.titulo,
+                    descripcion: p.descripcion,
+                    materia: p.materia?.nombre_materia || "Sin materia"
+                }))
+            );
         } catch (err) {
-            console.error('Error cargando compras:', err);
+            console.error("Error cargando compras:", err);
             setErrorMsg(err?.message || "Error cargando tus compras.");
         } finally {
             setLoading(false);
         }
     };
 
-    // ✅ OPTIMIZADO: 2 queries en lugar de N
+    // 2 queries en lugar de N
     const loadFolders = async () => {
         try {
             const { data: allFolders, error } = await foldersAPI.getMyFolders();
@@ -202,49 +214,50 @@ export default function Purchased() {
                 return;
             }
 
-            // ✅ Query 1: Todas las relaciones apunte-carpeta
-            const folderIds = allFolders.map(f => f.id_carpeta);
+            // Relación apunte-carpeta
+            const folderIds = allFolders.map((f) => f.id_carpeta);
             const { data: allNotesInFolders } = await supabase
-                .from('apunte_en_carpeta')
-                .select('carpeta_id, compra_id')
-                .in('carpeta_id', folderIds);
+                .from("apunte_en_carpeta")
+                .select("carpeta_id, compra_id")
+                .in("carpeta_id", folderIds);
 
-            // ✅ Query 2: Todas las compras con sus materias
-            const compraIds = [...new Set(allNotesInFolders?.map(n => n.compra_id) || [])];
+            // Traer compras vinculadas (para calcular semestres)
+            const compraIds = [...new Set(allNotesInFolders?.map((n) => n.compra_id) || [])];
             let comprasWithMaterias = [];
 
             if (compraIds.length > 0) {
                 const { data } = await supabase
-                    .from('compra_apunte')
-                    .select(`
-                        id,
-                        apunte_id,
-                        apunte:apunte(
-                            materia:id_materia(semestre)
-                        )
-                    `)
-                    .in('id', compraIds);
+                    .from("compra_apunte")
+                    .select(
+                        `
+            id,
+            apunte_id,
+            apunte:apunte(
+              materia:id_materia(semestre)
+            )
+          `
+                    )
+                    .in("id", compraIds);
                 comprasWithMaterias = data || [];
             }
 
-            // ✅ Agrupar en frontend
+            // Agrupar en frontend
             const notesPerFolder = {};
-            allNotesInFolders?.forEach(nif => {
+            allNotesInFolders?.forEach((nif) => {
                 if (!notesPerFolder[nif.carpeta_id]) {
                     notesPerFolder[nif.carpeta_id] = [];
                 }
                 notesPerFolder[nif.carpeta_id].push(nif.compra_id);
             });
 
-            // ✅ Calcular semestres por carpeta
-            const foldersWithData = allFolders.map(folder => {
+            // Calcular semestres por carpeta
+            const foldersWithData = allFolders.map((folder) => {
                 const notesInFolder = notesPerFolder[folder.id_carpeta] || [];
-                const childFolders = allFolders.filter(f => f.parent_id === folder.id_carpeta);
+                const childFolders = allFolders.filter((f) => f.parent_id === folder.id_carpeta);
 
-                // Calcular semestres
                 const semestres = new Set();
-                notesInFolder.forEach(compraId => {
-                    const compra = comprasWithMaterias.find(c => c.id === compraId);
+                notesInFolder.forEach((compraId) => {
+                    const compra = comprasWithMaterias.find((c) => c.id === compraId);
                     const sem = compra?.apunte?.materia?.semestre;
                     if (sem) semestres.add(sem);
                 });
@@ -256,10 +269,9 @@ export default function Purchased() {
                 };
             });
 
-            setFolders(foldersWithData.filter(f => !f.parent_id));
-
+            setFolders(foldersWithData.filter((f) => !f.parent_id));
         } catch (err) {
-            console.error('Error cargando carpetas:', err);
+            console.error("Error cargando carpetas:", err);
         }
     };
 
@@ -273,7 +285,7 @@ export default function Purchased() {
             if (error) throw error;
             await loadFolders();
         } catch (err) {
-            console.error('Error organizando:', err);
+            console.error("Error organizando:", err);
             setErrorMsg(err?.message || "Error al organizar automáticamente");
         } finally {
             setOrganizing(false);
@@ -291,7 +303,7 @@ export default function Purchased() {
             }
             await loadFolders();
         } catch (err) {
-            console.error('Error eliminando carpetas:', err);
+            console.error("Error eliminando carpetas:", err);
             setErrorMsg("Error al eliminar carpetas");
         } finally {
             setOrganizing(false);
@@ -317,7 +329,7 @@ export default function Purchased() {
             setSelectedMateria(null);
             await loadFolders();
         } catch (err) {
-            console.error('Error creando carpeta:', err);
+            console.error("Error creando carpeta:", err);
             setErrorMsg("Error al crear carpeta");
         }
     };
@@ -335,14 +347,14 @@ export default function Purchased() {
             setFilterText("");
             await loadFolders();
         } catch (err) {
-            console.error('Error añadiendo apuntes:', err);
+            console.error("Error añadiendo apuntes:", err);
             setErrorMsg("Error al añadir apuntes a la carpeta");
         }
     };
 
     const toggleNoteSelection = (compraId) => {
-        setSelectedNotes(prev =>
-            prev.includes(compraId) ? prev.filter(id => id !== compraId) : [...prev, compraId]
+        setSelectedNotes((prev) =>
+            prev.includes(compraId) ? prev.filter((id) => id !== compraId) : [...prev, compraId]
         );
     };
 
@@ -352,7 +364,7 @@ export default function Purchased() {
             await foldersAPI.deleteFolder(carpetaId);
             await loadFolders();
         } catch (err) {
-            console.error('Error eliminando carpeta:', err);
+            console.error("Error eliminando carpeta:", err);
             setErrorMsg("Error al eliminar carpeta");
         }
     };
@@ -363,22 +375,42 @@ export default function Purchased() {
             await foldersAPI.updateFolder(carpetaId, nuevoNombre);
             await loadFolders();
         } catch (err) {
-            console.error('Error renombrando carpeta:', err);
+            console.error("Error renombrando carpeta:", err);
             setErrorMsg("Error al renombrar carpeta");
         }
     };
 
-    // ✅ NUEVO: Filtrar apuntes disponibles
-    const filteredAvailableNotes = availableNotes.filter(note => {
+    // Filtrar apuntes disponibles
+    const filteredAvailableNotes = availableNotes.filter((note) => {
         const searchText = normalizeText(filterText);
-        return normalizeText(note.titulo).includes(searchText) ||
-            normalizeText(note.materia).includes(searchText);
+        return (
+            normalizeText(note.titulo).includes(searchText) ||
+            normalizeText(note.materia).includes(searchText)
+        );
     });
 
     if (loading) {
         return (
-            <div style={{ minHeight: "60vh", display: "flex", alignItems: "center", justifyContent: "center", flexDirection: "column", gap: 16 }}>
-                <div style={{ width: 40, height: 40, border: "3px solid #f3f4f6", borderTop: "3px solid #2563eb", borderRadius: "50%", animation: "spin 1s linear infinite" }} />
+            <div
+                style={{
+                    minHeight: "60vh",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    flexDirection: "column",
+                    gap: 16
+                }}
+            >
+                <div
+                    style={{
+                        width: 40,
+                        height: 40,
+                        border: "3px solid #f3f4f6",
+                        borderTop: "3px solid #2563eb",
+                        borderRadius: "50%",
+                        animation: "spin 1s linear infinite"
+                    }}
+                />
                 <p style={{ color: "#6b7280", margin: 0 }}>Cargando tus compras…</p>
             </div>
         );
@@ -389,38 +421,70 @@ export default function Purchased() {
             <header style={{ marginBottom: 24 }}>
                 <h1 style={{ margin: "0 0 8px 0" }}>Mis compras</h1>
                 <p style={{ color: "#6b7280", margin: 0 }}>
-                    {purchases.length} compra{purchases.length !== 1 ? "s" : ""} realizada{purchases.length !== 1 ? "s" : ""}
+                    {purchases.length} compra{purchases.length !== 1 ? "s" : ""} realizada
+                    {purchases.length !== 1 ? "s" : ""}
                 </p>
             </header>
 
-            <div style={{ display: 'flex', gap: 8, borderBottom: '2px solid #e5e7eb', marginBottom: 24 }}>
-                {['purchases', 'folders'].map(tab => (
+            <div
+                style={{
+                    display: "flex",
+                    gap: 8,
+                    borderBottom: "2px solid #e5e7eb",
+                    marginBottom: 24
+                }}
+            >
+                {["purchases", "folders"].map((tab) => (
                     <button
                         key={tab}
                         onClick={() => setActiveTab(tab)}
                         style={{
-                            padding: '12px 24px',
-                            background: 'none',
-                            border: 'none',
-                            borderBottom: activeTab === tab ? '2px solid #2563eb' : '2px solid transparent',
-                            color: activeTab === tab ? '#2563eb' : '#6b7280',
+                            padding: "12px 24px",
+                            background: "none",
+                            border: "none",
+                            borderBottom:
+                                activeTab === tab ? "2px solid #2563eb" : "2px solid transparent",
+                            color: activeTab === tab ? "#2563eb" : "#6b7280",
                             fontWeight: activeTab === tab ? 600 : 400,
-                            cursor: 'pointer',
+                            cursor: "pointer",
                             fontSize: 15,
                             marginBottom: -2,
-                            transition: 'all 0.2s'
+                            transition: "all 0.2s"
                         }}
                     >
-                        {tab === 'purchases' ? 'Todas las compras' : 'Mis carpetas'}
+                        {tab === "purchases" ? "Todas las compras" : "Mis carpetas"}
                     </button>
                 ))}
             </div>
 
             {errorMsg && (
-                <Card style={{ background: "#fef2f2", border: "1px solid #fecaca", color: "#991b1b", padding: "16px 20px", marginBottom: 20 }}>
-                    <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12 }}>
+                <Card
+                    style={{
+                        background: "#fef2f2",
+                        border: "1px solid #fecaca",
+                        color: "#991b1b",
+                        padding: "16px 20px",
+                        marginBottom: 20
+                    }}
+                >
+                    <div
+                        style={{
+                            display: "flex",
+                            alignItems: "center",
+                            justifyContent: "space-between",
+                            gap: 12
+                        }}
+                    >
                         <span>{errorMsg}</span>
-                        <Button variant="ghost" onClick={() => { loadPurchases(); loadFolders(); }}>Reintentar</Button>
+                        <Button
+                            variant="ghost"
+                            onClick={() => {
+                                loadPurchases();
+                                loadFolders();
+                            }}
+                        >
+                            Reintentar
+                        </Button>
                     </div>
                 </Card>
             )}
@@ -430,38 +494,50 @@ export default function Purchased() {
                     <Card style={{ textAlign: "center", padding: "48px 24px", background: "#fafafa" }}>
                         <div style={{ fontSize: 48, marginBottom: 16 }}>🧾</div>
                         <h3 style={{ margin: "0 0 12px 0", color: "#374151" }}>Todavía no compraste nada</h3>
-                        <p style={{ color: "#6b7280", margin: "0 0 24px 0" }}>Explorá apuntes y materiales creados por otros estudiantes.</p>
-                        <Button variant="primary" onClick={() => navigate('/notes')}>Ir a explorar apuntes</Button>
+                        <p style={{ color: "#6b7280", margin: "0 0 24px 0" }}>
+                            Explorá apuntes y materiales creados por otros estudiantes.
+                        </p>
+                        <Button variant="primary" onClick={() => navigate("/notes")}>
+                            Ir a explorar apuntes
+                        </Button>
                     </Card>
                 ) : (
-                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: 20 }}>
-                        {purchases.map((purchase) => <ApunteCard key={purchase.id} note={purchase} />)}
+                    <div
+                        style={{
+                            display: "grid",
+                            gridTemplateColumns: "repeat(auto-fill, minmax(280px, 1fr))",
+                            gap: 20
+                        }}
+                    >
+                        {purchases.map((purchase) => (
+                            <ApunteCard key={purchase.id} note={purchase} />
+                        ))}
                     </div>
                 )
             ) : (
                 <div>
-                    <div style={{ display: 'flex', gap: 12, marginBottom: 24, flexWrap: 'wrap' }}>
+                    <div style={{ display: "flex", gap: 12, marginBottom: 24, flexWrap: "wrap" }}>
                         <button
                             onClick={() => setShowCreateFolderModal(true)}
                             style={{
-                                display: 'flex',
-                                alignItems: 'center',
+                                display: "flex",
+                                alignItems: "center",
                                 gap: 8,
-                                padding: '10px 18px',
+                                padding: "10px 18px",
                                 borderRadius: 8,
                                 fontWeight: 500,
                                 fontSize: 14,
-                                background: 'white',
-                                border: '2px solid #e5e7eb',
-                                color: '#374151',
-                                cursor: 'pointer',
-                                transition: 'all 0.2s'
+                                background: "white",
+                                border: "2px solid #e5e7eb",
+                                color: "#374151",
+                                cursor: "pointer",
+                                transition: "all 0.2s"
                             }}
-                            onMouseEnter={(e) => e.target.style.background = '#f9fafb'}
-                            onMouseLeave={(e) => e.target.style.background = 'white'}
+                            onMouseEnter={(e) => (e.target.style.background = "#f9fafb")}
+                            onMouseLeave={(e) => (e.target.style.background = "white")}
                         >
                             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
-                                <path d="M12 5v14M5 12h14"/>
+                                <path d="M12 5v14M5 12h14" />
                             </svg>
                             Crear carpeta
                         </button>
@@ -471,44 +547,46 @@ export default function Purchased() {
                                 onClick={() => setShowOrgModal(true)}
                                 disabled={organizing}
                                 style={{
-                                    display: 'flex',
-                                    alignItems: 'center',
+                                    display: "flex",
+                                    alignItems: "center",
                                     gap: 8,
-                                    background: organizing ? '#9ca3af' : '#2563eb',
-                                    color: 'white',
-                                    border: 'none',
-                                    padding: '10px 18px',
+                                    background: organizing ? "#9ca3af" : "#2563eb",
+                                    color: "white",
+                                    border: "none",
+                                    padding: "10px 18px",
                                     borderRadius: 8,
                                     fontWeight: 500,
                                     fontSize: 14,
-                                    cursor: organizing ? 'not-allowed' : 'pointer',
-                                    transition: 'all 0.2s'
+                                    cursor: organizing ? "not-allowed" : "pointer",
+                                    transition: "all 0.2s"
                                 }}
                                 onMouseEnter={(e) => {
-                                    if (!organizing) e.target.style.background = '#1d4ed8';
+                                    if (!organizing) e.target.style.background = "#1d4ed8";
                                 }}
                                 onMouseLeave={(e) => {
-                                    if (!organizing) e.target.style.background = '#2563eb';
+                                    if (!organizing) e.target.style.background = "#2563eb";
                                 }}
                             >
                                 {organizing ? (
                                     <>
-                                        <div style={{
-                                            width: 14,
-                                            height: 14,
-                                            border: '2px solid white',
-                                            borderTop: '2px solid transparent',
-                                            borderRadius: '50%',
-                                            animation: 'spin 1s linear infinite'
-                                        }} />
+                                        <div
+                                            style={{
+                                                width: 14,
+                                                height: 14,
+                                                border: "2px solid white",
+                                                borderTop: "2px solid transparent",
+                                                borderRadius: "50%",
+                                                animation: "spin 1s linear infinite"
+                                            }}
+                                        />
                                         Organizando...
                                     </>
                                 ) : (
                                     <>
                                         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                                            <circle cx="12" cy="12" r="10"/>
-                                            <circle cx="12" cy="12" r="3"/>
-                                            <path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83"/>
+                                            <circle cx="12" cy="12" r="10" />
+                                            <circle cx="12" cy="12" r="3" />
+                                            <path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83" />
                                         </svg>
                                         Organizar automáticamente
                                     </>
@@ -521,49 +599,51 @@ export default function Purchased() {
                                 onClick={handleDeleteAllFolders}
                                 disabled={organizing}
                                 style={{
-                                    display: 'flex',
-                                    alignItems: 'center',
+                                    display: "flex",
+                                    alignItems: "center",
                                     gap: 8,
-                                    padding: '10px 18px',
+                                    padding: "10px 18px",
                                     borderRadius: 8,
                                     fontWeight: 500,
                                     fontSize: 14,
-                                    background: 'white',
-                                    border: '2px solid #fecaca',
-                                    color: '#dc2626',
-                                    cursor: organizing ? 'not-allowed' : 'pointer',
+                                    background: "white",
+                                    border: "2px solid #fecaca",
+                                    color: "#dc2626",
+                                    cursor: organizing ? "not-allowed" : "pointer",
                                     opacity: organizing ? 0.6 : 1,
-                                    transition: 'all 0.2s'
+                                    transition: "all 0.2s"
                                 }}
                                 onMouseEnter={(e) => {
                                     if (!organizing) {
-                                        e.target.style.background = '#fef2f2';
-                                        e.target.style.borderColor = '#fca5a5';
+                                        e.target.style.background = "#fef2f2";
+                                        e.target.style.borderColor = "#fca5a5";
                                     }
                                 }}
                                 onMouseLeave={(e) => {
                                     if (!organizing) {
-                                        e.target.style.background = 'white';
-                                        e.target.style.borderColor = '#fecaca';
+                                        e.target.style.background = "white";
+                                        e.target.style.borderColor = "#fecaca";
                                     }
                                 }}
                             >
                                 {organizing ? (
                                     <>
-                                        <div style={{
-                                            width: 14,
-                                            height: 14,
-                                            border: '2px solid #dc2626',
-                                            borderTop: '2px solid transparent',
-                                            borderRadius: '50%',
-                                            animation: 'spin 1s linear infinite'
-                                        }} />
+                                        <div
+                                            style={{
+                                                width: 14,
+                                                height: 14,
+                                                border: "2px solid #dc2626",
+                                                borderTop: "2px solid transparent",
+                                                borderRadius: "50%",
+                                                animation: "spin 1s linear infinite"
+                                            }}
+                                        />
                                         Borrando...
                                     </>
                                 ) : (
                                     <>
                                         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                                            <path d="M3 6h18M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2"/>
+                                            <path d="M3 6h18M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2" />
                                         </svg>
                                         Borrar todas las carpetas
                                     </>
@@ -576,11 +656,18 @@ export default function Purchased() {
                         <Card style={{ textAlign: "center", padding: "48px 24px", background: "#fafafa" }}>
                             <div style={{ fontSize: 48, marginBottom: 16 }}>📁</div>
                             <h3 style={{ margin: "0 0 12px 0", color: "#374151" }}>No tenés carpetas todavía</h3>
-                            <p style={{ color: "#6b7280", margin: "0 0 24px 0" }}>Organizá tus compras automáticamente o creá carpetas personalizadas.
+                            <p style={{ color: "#6b7280", margin: "0 0 24px 0" }}>
+                                Organizá tus compras automáticamente o creá carpetas personalizadas.
                             </p>
                         </Card>
                     ) : (
-                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: 20 }}>
+                        <div
+                            style={{
+                                display: "grid",
+                                gridTemplateColumns: "repeat(auto-fill, minmax(280px, 1fr))",
+                                gap: 20
+                            }}
+                        >
                             {folders.map((folder) => (
                                 <FolderCard
                                     key={folder.id_carpeta}
@@ -597,36 +684,100 @@ export default function Purchased() {
 
             {/* Modal organizar automáticamente */}
             {showOrgModal && (
-                <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(4px)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000, padding: 16 }}
-                     onClick={() => setShowOrgModal(false)}>
-                    <Card style={{ maxWidth: 480, width: '100%', padding: 32, boxShadow: '0 20px 60px rgba(0,0,0,0.3)' }} onClick={(e) => e.stopPropagation()}>
-                        <div style={{ width: 56, height: 56, borderRadius: 14, background: '#2563eb', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 28, marginBottom: 20 }}>🤖</div>
-                        <h2 style={{ margin: '0 0 12px 0', fontSize: 22, fontWeight: 700 }}>Organizar automáticamente</h2>
-                        <p style={{ color: '#6b7280', margin: '0 0 24px 0', lineHeight: 1.6, fontSize: 15 }}>
+                <div
+                    style={{
+                        position: "fixed",
+                        top: 0,
+                        left: 0,
+                        right: 0,
+                        bottom: 0,
+                        background: "rgba(0,0,0,0.6)",
+                        backdropFilter: "blur(4px)",
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        zIndex: 1000,
+                        padding: 16
+                    }}
+                    onClick={() => setShowOrgModal(false)}
+                >
+                    <Card
+                        style={{ maxWidth: 480, width: "100%", padding: 32, boxShadow: "0 20px 60px rgba(0,0,0,0.3)" }}
+                        onClick={(e) => e.stopPropagation()}
+                    >
+                        <div
+                            style={{
+                                width: 56,
+                                height: 56,
+                                borderRadius: 14,
+                                background: "#2563eb",
+                                display: "flex",
+                                alignItems: "center",
+                                justifyContent: "center",
+                                fontSize: 28,
+                                marginBottom: 20
+                            }}
+                        >
+                            🤖
+                        </div>
+                        <h2 style={{ margin: "0 0 12px 0", fontSize: 22, fontWeight: 700 }}>Organizar automáticamente</h2>
+                        <p style={{ color: "#6b7280", margin: "0 0 24px 0", lineHeight: 1.6, fontSize: 15 }}>
                             Voy a crear carpetas por semestre y materia automáticamente, organizando todos tus apuntes.
                         </p>
-                        <div style={{ display: 'flex', gap: 12 }}>
-                            <button onClick={() => setShowOrgModal(false)} style={{ flex: 1, padding: '12px 20px', background: 'white', border: '2px solid #e5e7eb', borderRadius: 10, cursor: 'pointer', fontSize: 15, fontWeight: 600, color: '#6b7280', transition: 'all 0.2s' }}>Cancelar</button>
-                            <button onClick={handleOrganize} style={{ flex: 1, padding: '12px 20px', background: '#2563eb', color: 'white', border: 'none', borderRadius: 10, cursor: 'pointer', fontSize: 15, fontWeight: 600, transition: 'all 0.2s' }}>Organizar</button>
+                        <div style={{ display: "flex", gap: 12 }}>
+                            <button
+                                onClick={() => setShowOrgModal(false)}
+                                style={{
+                                    flex: 1,
+                                    padding: "12px 20px",
+                                    background: "white",
+                                    border: "2px solid #e5e7eb",
+                                    borderRadius: 10,
+                                    cursor: "pointer",
+                                    fontSize: 15,
+                                    fontWeight: 600,
+                                    color: "#6b7280",
+                                    transition: "all 0.2s"
+                                }}
+                            >
+                                Cancelar
+                            </button>
+                            <button
+                                onClick={handleOrganize}
+                                style={{
+                                    flex: 1,
+                                    padding: "12px 20px",
+                                    background: "#2563eb",
+                                    color: "white",
+                                    border: "none",
+                                    borderRadius: 10,
+                                    cursor: "pointer",
+                                    fontSize: 15,
+                                    fontWeight: 600,
+                                    transition: "all 0.2s"
+                                }}
+                            >
+                                Organizar
+                            </button>
                         </div>
                     </Card>
                 </div>
             )}
 
-            {/* Modal crear carpeta CON TIPOS */}
+            {/* Modal crear carpeta */}
             {showCreateFolderModal && (
                 <div
                     style={{
-                        position: 'fixed',
+                        position: "fixed",
                         top: 0,
                         left: 0,
                         right: 0,
                         bottom: 0,
-                        background: 'rgba(0,0,0,0.6)',
-                        backdropFilter: 'blur(4px)',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
+                        background: "rgba(0,0,0,0.6)",
+                        backdropFilter: "blur(4px)",
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "center",
                         zIndex: 1000,
                         padding: 16
                     }}
@@ -639,58 +790,45 @@ export default function Purchased() {
                     }}
                 >
                     <Card
-                        style={{
-                            maxWidth: 480,
-                            width: '100%',
-                            padding: 32,
-                            boxShadow: '0 20px 60px rgba(0,0,0,0.3)'
-                        }}
+                        style={{ maxWidth: 480, width: "100%", padding: 32, boxShadow: "0 20px 60px rgba(0,0,0,0.3)" }}
                         onClick={(e) => e.stopPropagation()}
                     >
-                        <div style={{
-                            display: 'flex',
-                            alignItems: 'center',
-                            gap: 12,
-                            marginBottom: 20
-                        }}>
-                            <div style={{
-                                width: 48,
-                                height: 48,
-                                borderRadius: 12,
-                                background: '#2563eb',
-                                display: 'flex',
-                                alignItems: 'center',
-                                justifyContent: 'center',
-                                fontSize: 24
-                            }}>
+                        <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 20 }}>
+                            <div
+                                style={{
+                                    width: 48,
+                                    height: 48,
+                                    borderRadius: 12,
+                                    background: "#2563eb",
+                                    display: "flex",
+                                    alignItems: "center",
+                                    justifyContent: "center",
+                                    fontSize: 24
+                                }}
+                            >
                                 📁
                             </div>
-                            <h2 style={{ margin: 0, fontSize: 22, fontWeight: 700 }}>
-                                Nueva carpeta
-                            </h2>
+                            <h2 style={{ margin: 0, fontSize: 22, fontWeight: 700 }}>Nueva carpeta</h2>
                         </div>
 
-                        <p style={{
-                            color: '#6b7280',
-                            margin: '0 0 20px 0',
-                            fontSize: 14,
-                            lineHeight: 1.5
-                        }}>
+                        <p style={{ color: "#6b7280", margin: "0 0 20px 0", fontSize: 14, lineHeight: 1.5 }}>
                             Organizá tus apuntes creando carpetas personalizadas o por materia
                         </p>
 
                         {/* Selector de tipo */}
                         <div style={{ marginBottom: 20 }}>
-                            <label style={{
-                                display: 'block',
-                                fontSize: 13,
-                                fontWeight: 600,
-                                color: '#374151',
-                                marginBottom: 12
-                            }}>
+                            <label
+                                style={{
+                                    display: "block",
+                                    fontSize: 13,
+                                    fontWeight: 600,
+                                    color: "#374151",
+                                    marginBottom: 12
+                                }}
+                            >
                                 Tipo de carpeta
                             </label>
-                            <div style={{ display: 'flex', gap: 12 }}>
+                            <div style={{ display: "flex", gap: 12 }}>
                                 <button
                                     type="button"
                                     onClick={() => {
@@ -701,18 +839,18 @@ export default function Purchased() {
                                     }}
                                     style={{
                                         flex: 1,
-                                        padding: '12px 16px',
-                                        border: newFolderType === "materia" ? '2px solid #059669' : '2px solid #e5e7eb',
+                                        padding: "12px 16px",
+                                        border: newFolderType === "materia" ? "2px solid #059669" : "2px solid #e5e7eb",
                                         borderRadius: 8,
-                                        background: newFolderType === "materia" ? '#d1fae5' : 'white',
-                                        color: newFolderType === "materia" ? '#059669' : '#6b7280',
-                                        cursor: 'pointer',
+                                        background: newFolderType === "materia" ? "#d1fae5" : "white",
+                                        color: newFolderType === "materia" ? "#059669" : "#6b7280",
+                                        cursor: "pointer",
                                         fontWeight: newFolderType === "materia" ? 600 : 400,
                                         fontSize: 14,
-                                        transition: 'all 0.2s',
-                                        display: 'flex',
-                                        flexDirection: 'column',
-                                        alignItems: 'center',
+                                        transition: "all 0.2s",
+                                        display: "flex",
+                                        flexDirection: "column",
+                                        alignItems: "center",
                                         gap: 4
                                     }}
                                 >
@@ -731,18 +869,19 @@ export default function Purchased() {
                                     }}
                                     style={{
                                         flex: 1,
-                                        padding: '12px 16px',
-                                        border: newFolderType === "personalizada" ? '2px solid #2563eb' : '2px solid #e5e7eb',
+                                        padding: "12px 16px",
+                                        border:
+                                            newFolderType === "personalizada" ? "2px solid #2563eb" : "2px solid #e5e7eb",
                                         borderRadius: 8,
-                                        background: newFolderType === "personalizada" ? '#dbeafe' : 'white',
-                                        color: newFolderType === "personalizada" ? '#2563eb' : '#6b7280',
-                                        cursor: 'pointer',
+                                        background: newFolderType === "personalizada" ? "#dbeafe" : "white",
+                                        color: newFolderType === "personalizada" ? "#2563eb" : "#6b7280",
+                                        cursor: "pointer",
                                         fontWeight: newFolderType === "personalizada" ? 600 : 400,
                                         fontSize: 14,
-                                        transition: 'all 0.2s',
-                                        display: 'flex',
-                                        flexDirection: 'column',
-                                        alignItems: 'center',
+                                        transition: "all 0.2s",
+                                        display: "flex",
+                                        flexDirection: "column",
+                                        alignItems: "center",
                                         gap: 4
                                     }}
                                 >
@@ -754,16 +893,18 @@ export default function Purchased() {
                             </div>
                         </div>
 
-                        {/* Input según tipo de carpeta */}
+                        {/* Input según tipo */}
                         {newFolderType === "materia" ? (
-                            <div style={{ marginBottom: 24, position: 'relative' }} ref={dropdownRef}>
-                                <label style={{
-                                    display: 'block',
-                                    fontSize: 13,
-                                    fontWeight: 600,
-                                    color: '#374151',
-                                    marginBottom: 8
-                                }}>
+                            <div style={{ marginBottom: 24, position: "relative" }} ref={dropdownRef}>
+                                <label
+                                    style={{
+                                        display: "block",
+                                        fontSize: 13,
+                                        fontWeight: 600,
+                                        color: "#374151",
+                                        marginBottom: 8
+                                    }}
+                                >
                                     Buscar materia
                                 </label>
                                 <input
@@ -775,46 +916,48 @@ export default function Purchased() {
                                     }}
                                     placeholder="Ej: Análisis Matemático, Física..."
                                     style={{
-                                        width: '100%',
-                                        padding: '12px 16px',
-                                        border: '2px solid #e5e7eb',
+                                        width: "100%",
+                                        padding: "12px 16px",
+                                        border: "2px solid #e5e7eb",
                                         borderRadius: 8,
                                         fontSize: 15,
-                                        outline: 'none',
-                                        transition: 'all 0.2s',
-                                        boxSizing: 'border-box'
+                                        outline: "none",
+                                        transition: "all 0.2s",
+                                        boxSizing: "border-box"
                                     }}
                                     autoFocus
                                 />
                                 {showDropdown && filteredMaterias.length > 0 && (
-                                    <div style={{
-                                        position: 'absolute',
-                                        top: '100%',
-                                        left: 0,
-                                        right: 0,
-                                        background: '#fff',
-                                        border: '1px solid #d1d5db',
-                                        borderRadius: 8,
-                                        marginTop: 4,
-                                        maxHeight: 200,
-                                        overflowY: 'auto',
-                                        zIndex: 100,
-                                        boxShadow: '0 4px 6px -1px rgba(0,0,0,0.1)'
-                                    }}>
-                                        {filteredMaterias.map(materia => (
+                                    <div
+                                        style={{
+                                            position: "absolute",
+                                            top: "100%",
+                                            left: 0,
+                                            right: 0,
+                                            background: "#fff",
+                                            border: "1px solid #d1d5db",
+                                            borderRadius: 8,
+                                            marginTop: 4,
+                                            maxHeight: 200,
+                                            overflowY: "auto",
+                                            zIndex: 100,
+                                            boxShadow: "0 4px 6px -1px rgba(0,0,0,0.1)"
+                                        }}
+                                    >
+                                        {filteredMaterias.map((materia) => (
                                             <div
                                                 key={materia.id_materia}
                                                 onClick={() => handleMateriaSelect(materia)}
                                                 style={{
-                                                    padding: '12px 16px',
-                                                    cursor: 'pointer',
-                                                    borderBottom: '1px solid #f3f4f6'
+                                                    padding: "12px 16px",
+                                                    cursor: "pointer",
+                                                    borderBottom: "1px solid #f3f4f6"
                                                 }}
-                                                onMouseEnter={(e) => e.target.style.background = '#f9fafb'}
-                                                onMouseLeave={(e) => e.target.style.background = '#fff'}
+                                                onMouseEnter={(e) => (e.target.style.background = "#f9fafb")}
+                                                onMouseLeave={(e) => (e.target.style.background = "#fff")}
                                             >
                                                 <div style={{ fontWeight: 500 }}>{materia.nombre_materia}</div>
-                                                <div style={{ fontSize: 12, color: '#6b7280', marginTop: 2 }}>
+                                                <div style={{ fontSize: 12, color: "#6b7280", marginTop: 2 }}>
                                                     Semestre {materia.semestre}
                                                 </div>
                                             </div>
@@ -824,13 +967,15 @@ export default function Purchased() {
                             </div>
                         ) : (
                             <div style={{ marginBottom: 24 }}>
-                                <label style={{
-                                    display: 'block',
-                                    fontSize: 13,
-                                    fontWeight: 600,
-                                    color: '#374151',
-                                    marginBottom: 8
-                                }}>
+                                <label
+                                    style={{
+                                        display: "block",
+                                        fontSize: 13,
+                                        fontWeight: 600,
+                                        color: "#374151",
+                                        marginBottom: 8
+                                    }}
+                                >
                                     Nombre de la carpeta
                                 </label>
                                 <input
@@ -840,26 +985,26 @@ export default function Purchased() {
                                     onChange={(e) => setNewFolderName(e.target.value)}
                                     onFocus={(e) => e.target.select()}
                                     onKeyPress={(e) => {
-                                        if (e.key === 'Enter' && newFolderName.trim()) {
+                                        if (e.key === "Enter" && newFolderName.trim()) {
                                             handleCreateFolder();
                                         }
                                     }}
                                     style={{
-                                        width: '100%',
-                                        padding: '12px 16px',
-                                        border: '2px solid #e5e7eb',
+                                        width: "100%",
+                                        padding: "12px 16px",
+                                        border: "2px solid #e5e7eb",
                                         borderRadius: 8,
                                         fontSize: 15,
-                                        outline: 'none',
-                                        transition: 'all 0.2s',
-                                        boxSizing: 'border-box'
+                                        outline: "none",
+                                        transition: "all 0.2s",
+                                        boxSizing: "border-box"
                                     }}
                                     autoFocus
                                 />
                             </div>
                         )}
 
-                        <div style={{ display: 'flex', gap: 12 }}>
+                        <div style={{ display: "flex", gap: 12 }}>
                             <button
                                 onClick={() => {
                                     setShowCreateFolderModal(false);
@@ -870,18 +1015,18 @@ export default function Purchased() {
                                 }}
                                 style={{
                                     flex: 1,
-                                    padding: '12px 20px',
-                                    background: 'white',
-                                    border: '2px solid #e5e7eb',
+                                    padding: "12px 20px",
+                                    background: "white",
+                                    border: "2px solid #e5e7eb",
                                     borderRadius: 10,
-                                    cursor: 'pointer',
+                                    cursor: "pointer",
                                     fontSize: 15,
                                     fontWeight: 600,
-                                    color: '#6b7280',
-                                    transition: 'all 0.2s'
+                                    color: "#6b7280",
+                                    transition: "all 0.2s"
                                 }}
-                                onMouseEnter={(e) => e.target.style.background = '#f9fafb'}
-                                onMouseLeave={(e) => e.target.style.background = 'white'}
+                                onMouseEnter={(e) => (e.target.style.background = "#f9fafb")}
+                                onMouseLeave={(e) => (e.target.style.background = "white")}
                             >
                                 Cancelar
                             </button>
@@ -890,21 +1035,21 @@ export default function Purchased() {
                                 disabled={!newFolderName.trim()}
                                 style={{
                                     flex: 1,
-                                    padding: '12px 20px',
-                                    background: !newFolderName.trim() ? '#d1d5db' : '#2563eb',
-                                    color: 'white',
-                                    border: 'none',
+                                    padding: "12px 20px",
+                                    background: !newFolderName.trim() ? "#d1d5db" : "#2563eb",
+                                    color: "white",
+                                    border: "none",
                                     borderRadius: 10,
-                                    cursor: !newFolderName.trim() ? 'not-allowed' : 'pointer',
+                                    cursor: !newFolderName.trim() ? "not-allowed" : "pointer",
                                     fontSize: 15,
                                     fontWeight: 600,
-                                    transition: 'all 0.2s'
+                                    transition: "all 0.2s"
                                 }}
                                 onMouseEnter={(e) => {
-                                    if (newFolderName.trim()) e.target.style.background = '#1d4ed8';
+                                    if (newFolderName.trim()) e.target.style.background = "#1d4ed8";
                                 }}
                                 onMouseLeave={(e) => {
-                                    if (newFolderName.trim()) e.target.style.background = '#2563eb';
+                                    if (newFolderName.trim()) e.target.style.background = "#2563eb";
                                 }}
                             >
                                 Crear carpeta
@@ -914,56 +1059,100 @@ export default function Purchased() {
                 </div>
             )}
 
-            {/* Modal añadir notas a carpeta CON FILTRO */}
+            {/* Modal añadir notas a carpeta */}
             {showAddNotesModal && (
-                <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(4px)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000, padding: 16 }}
-                     onClick={() => {
-                         setShowAddNotesModal(false);
-                         setFilterText("");
-                     }}>
-                    <Card style={{ maxWidth: 600, width: '100%', maxHeight: '80vh', display: 'flex', flexDirection: 'column', boxShadow: '0 20px 60px rgba(0,0,0,0.3)' }} onClick={(e) => e.stopPropagation()}>
-                        <div style={{ padding: 32, borderBottom: '1px solid #e5e7eb' }}>
-                            <h2 style={{ margin: '0 0 16px 0', fontSize: 20 }}>Añadir apuntes a "{targetFolder?.nombre}"</h2>
+                <div
+                    style={{
+                        position: "fixed",
+                        top: 0,
+                        left: 0,
+                        right: 0,
+                        bottom: 0,
+                        background: "rgba(0,0,0,0.6)",
+                        backdropFilter: "blur(4px)",
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        zIndex: 1000,
+                        padding: 16
+                    }}
+                    onClick={() => {
+                        setShowAddNotesModal(false);
+                        setFilterText("");
+                    }}
+                >
+                    <Card
+                        style={{
+                            maxWidth: 600,
+                            width: "100%",
+                            maxHeight: "80vh",
+                            display: "flex",
+                            flexDirection: "column",
+                            boxShadow: "0 20px 60px rgba(0,0,0,0.3)"
+                        }}
+                        onClick={(e) => e.stopPropagation()}
+                    >
+                        <div style={{ padding: 32, borderBottom: "1px solid #e5e7eb" }}>
+                            <h2 style={{ margin: "0 0 16px 0", fontSize: 20 }}>
+                                Añadir apuntes a "{targetFolder?.nombre}"
+                            </h2>
 
-                            {/* ✅ NUEVO: Input de filtro */}
                             <input
                                 type="text"
                                 placeholder="Buscar por nombre o materia..."
                                 value={filterText}
                                 onChange={(e) => setFilterText(e.target.value)}
                                 style={{
-                                    width: '100%',
-                                    padding: '10px 16px',
-                                    border: '2px solid #e5e7eb',
+                                    width: "100%",
+                                    padding: "10px 16px",
+                                    border: "2px solid #e5e7eb",
                                     borderRadius: 8,
                                     fontSize: 14,
-                                    outline: 'none',
-                                    boxSizing: 'border-box',
-                                    transition: 'border 0.2s'
+                                    outline: "none",
+                                    boxSizing: "border-box",
+                                    transition: "border 0.2s"
                                 }}
-                                onFocus={(e) => e.target.style.borderColor = '#2563eb'}
-                                onBlur={(e) => e.target.style.borderColor = '#e5e7eb'}
+                                onFocus={(e) => (e.target.style.borderColor = "#2563eb")}
+                                onBlur={(e) => (e.target.style.borderColor = "#e5e7eb")}
                             />
                         </div>
 
-                        <div style={{ padding: 24, overflowY: 'auto', flex: 1 }}>
+                        <div style={{ padding: 24, overflowY: "auto", flex: 1 }}>
                             {filteredAvailableNotes.length === 0 ? (
-                                <div style={{ textAlign: 'center', padding: '40px 20px', color: '#6b7280' }}>
+                                <div style={{ textAlign: "center", padding: "40px 20px", color: "#6b7280" }}>
                                     <div style={{ fontSize: 48, marginBottom: 12 }}>
-                                        {filterText ? '🔍' : '📭'}
+                                        {filterText ? "🔍" : "📭"}
                                     </div>
                                     <p style={{ margin: 0, fontWeight: 500 }}>
-                                        {filterText ? 'No se encontraron resultados' : 'No hay apuntes disponibles'}
+                                        {filterText ? "No se encontraron resultados" : "No hay apuntes disponibles"}
                                     </p>
                                 </div>
                             ) : (
                                 <div style={{ marginBottom: 20 }}>
                                     {filteredAvailableNotes.map((note) => (
-                                        <label key={note.id} style={{ display: 'flex', alignItems: 'center', padding: '12px', border: '1px solid #e5e7eb', borderRadius: 8, marginBottom: 8, cursor: 'pointer', background: selectedNotes.includes(note.id) ? '#eff6ff' : 'white', transition: 'all 0.2s' }}>
-                                            <input type="checkbox" checked={selectedNotes.includes(note.id)} onChange={() => toggleNoteSelection(note.id)} style={{ marginRight: 12 }} />
+                                        <label
+                                            key={note.id}
+                                            style={{
+                                                display: "flex",
+                                                alignItems: "center",
+                                                padding: "12px",
+                                                border: "1px solid #e5e7eb",
+                                                borderRadius: 8,
+                                                marginBottom: 8,
+                                                cursor: "pointer",
+                                                background: selectedNotes.includes(note.id) ? "#eff6ff" : "white",
+                                                transition: "all 0.2s"
+                                            }}
+                                        >
+                                            <input
+                                                type="checkbox"
+                                                checked={selectedNotes.includes(note.id)}
+                                                onChange={() => toggleNoteSelection(note.id)}
+                                                style={{ marginRight: 12 }}
+                                            />
                                             <div style={{ flex: 1 }}>
                                                 <div style={{ fontWeight: 500, marginBottom: 4 }}>{note.titulo}</div>
-                                                <div style={{ fontSize: 13, color: '#6b7280' }}>{note.materia}</div>
+                                                <div style={{ fontSize: 13, color: "#6b7280" }}>{note.materia}</div>
                                             </div>
                                         </label>
                                     ))}
@@ -971,13 +1160,38 @@ export default function Purchased() {
                             )}
                         </div>
 
-                        <div style={{ padding: 24, borderTop: '1px solid #e5e7eb', display: 'flex', gap: 12, justifyContent: 'space-between', alignItems: 'center' }}>
-                            <span style={{ fontSize: 14, color: '#6b7280' }}>
-                                {selectedNotes.length > 0 && `${selectedNotes.length} seleccionado${selectedNotes.length !== 1 ? 's' : ''}`}
-                            </span>
-                            <div style={{ display: 'flex', gap: 12 }}>
-                                <Button variant="ghost" onClick={() => { setShowAddNotesModal(false); setSelectedNotes([]); setFilterText(""); }}>Cancelar</Button>
-                                <Button variant="primary" onClick={handleAddNotesToFolder} disabled={selectedNotes.length === 0}>Añadir ({selectedNotes.length})</Button>
+                        <div
+                            style={{
+                                padding: 24,
+                                borderTop: "1px solid #e5e7eb",
+                                display: "flex",
+                                gap: 12,
+                                justifyContent: "space-between",
+                                alignItems: "center"
+                            }}
+                        >
+              <span style={{ fontSize: 14, color: "#6b7280" }}>
+                {selectedNotes.length > 0 &&
+                    `${selectedNotes.length} seleccionado${selectedNotes.length !== 1 ? "s" : ""}`}
+              </span>
+                            <div style={{ display: "flex", gap: 12 }}>
+                                <Button
+                                    variant="ghost"
+                                    onClick={() => {
+                                        setShowAddNotesModal(false);
+                                        setSelectedNotes([]);
+                                        setFilterText("");
+                                    }}
+                                >
+                                    Cancelar
+                                </Button>
+                                <Button
+                                    variant="primary"
+                                    onClick={handleAddNotesToFolder}
+                                    disabled={selectedNotes.length === 0}
+                                >
+                                    Añadir ({selectedNotes.length})
+                                </Button>
                             </div>
                         </div>
                     </Card>
