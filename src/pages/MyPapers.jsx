@@ -1,9 +1,9 @@
-// src/pages/MyPapers.jsx
 import { useEffect, useState } from "react";
 import { supabase } from "../supabase";
 import { Button } from "../components/ui/Button";
 import { Card } from "../components/ui/Card";
 import ApunteCard from "../components/ApunteCard";
+import PDFThumbnail from "../components/PDFThumbnail"; // si no existe, no importa, puedo ayudarte a generarlo
 
 export default function MyPapers() {
     const [notes, setNotes] = useState([]);
@@ -11,6 +11,7 @@ export default function MyPapers() {
     const [error, setError] = useState(null);
     const [signedUrls, setSignedUrls] = useState({});
     const [currentUserId, setCurrentUserId] = useState(null);
+    const [deletingId, setDeletingId] = useState(null);
 
     useEffect(() => { loadNotes(); }, []);
 
@@ -26,7 +27,6 @@ export default function MyPapers() {
                 return;
             }
 
-            // Obtener el id_usuario
             const { data: usuarioData, error: usuarioError } = await supabase
                 .from("usuario")
                 .select("id_usuario, nombre")
@@ -41,66 +41,62 @@ export default function MyPapers() {
 
             setCurrentUserId(usuarioData.id_usuario);
 
-            // Cargar apuntes del usuario
+            // ✅ Tu lógica de thumbnail_path + datos ampliados de Kerana
             const { data, error: notesError } = await supabase
-                .from('apunte')
+                .from("apunte")
                 .select(`
-                    id_apunte,
-                    id_usuario,
-                    titulo,
-                    descripcion,
-                    creditos,
-                    created_at,
-                    file_path,
-                    usuario:id_usuario(nombre),
-                    materia:id_materia(nombre_materia)
-                `)
+          id_apunte,
+          id_usuario,
+          titulo,
+          descripcion,
+          creditos,
+          estrellas,
+          created_at,
+          id_materia,
+          file_path,
+          file_name,
+          mime_type,
+          file_size,
+          thumbnail_path,
+          usuario:id_usuario(nombre),
+          materia:id_materia(nombre_materia)
+        `)
                 .eq("id_usuario", usuarioData.id_usuario)
-                .order('created_at', { ascending: false });
+                .order("created_at", { ascending: false });
 
             if (notesError) throw notesError;
 
-            // Contar likes por apunte
+            // likes
             const apIds = (data || []).map(n => n.id_apunte);
             let likesCountMap = {};
-
             if (apIds.length > 0) {
-                const { data: likesData, error: likesError } = await supabase
-                    .from('likes')
-                    .select('id_apunte')
-                    .eq('tipo', 'like')
-                    .in('id_apunte', apIds);
+                const { data: likesData } = await supabase
+                    .from("likes")
+                    .select("id_apunte")
+                    .eq("tipo", "like")
+                    .in("id_apunte", apIds);
 
-                if (likesError) {
-                    console.error('Error cargando likes:', likesError);
-                } else {
-                    // Crear un mapa de conteo de likes
-                    likesData?.forEach(like => {
-                        likesCountMap[like.id_apunte] = (likesCountMap[like.id_apunte] || 0) + 1;
-                    });
-                }
+                likesData?.forEach(like => {
+                    likesCountMap[like.id_apunte] = (likesCountMap[like.id_apunte] || 0) + 1;
+                });
             }
 
-            // Agregar likes_count a cada apunte
             const notesWithLikes = (data || []).map(note => ({
                 ...note,
-                likes_count: likesCountMap[note.id_apunte] || 0
+                likes_count: likesCountMap[note.id_apunte] || 0,
             }));
 
             setNotes(notesWithLikes);
 
-            // Generar signed URLs para todos los apuntes
+            // signed URLs
             if (data && data.length > 0) {
                 const urls = {};
                 for (const note of data) {
                     if (note.file_path) {
-                        const { data: signedData, error: signedError } = await supabase.storage
-                            .from('apuntes')
+                        const { data: signedData } = await supabase.storage
+                            .from("apuntes")
                             .createSignedUrl(note.file_path, 3600);
-
-                        if (!signedError && signedData) {
-                            urls[note.id_apunte] = signedData.signedUrl;
-                        }
+                        if (signedData) urls[note.id_apunte] = signedData.signedUrl;
                     }
                 }
                 setSignedUrls(urls);
@@ -109,6 +105,40 @@ export default function MyPapers() {
             setError(err.message || "Error cargando tus apuntes");
         } finally {
             setLoading(false);
+        }
+    };
+
+    const handleDownload = async (note) => {
+        try {
+            if (!note.file_path) return;
+            const { data, error } = await supabase.storage
+                .from("apuntes")
+                .download(note.file_path);
+            if (error) throw error;
+
+            const url = URL.createObjectURL(data);
+            const a = document.createElement("a");
+            a.href = url;
+            a.download = note.file_name || "apunte.pdf";
+            a.click();
+            URL.revokeObjectURL(url);
+        } catch (err) {
+            console.error("Error al descargar:", err);
+            alert("Error al descargar el apunte");
+        }
+    };
+
+    const handleDelete = async (id_apunte) => {
+        if (!window.confirm("¿Seguro que querés eliminar este apunte?")) return;
+        try {
+            setDeletingId(id_apunte);
+            await supabase.from("apunte").delete().eq("id_apunte", id_apunte);
+            setNotes(prev => prev.filter(n => n.id_apunte !== id_apunte));
+        } catch (err) {
+            console.error(err);
+            alert("Error eliminando el apunte");
+        } finally {
+            setDeletingId(null);
         }
     };
 
@@ -162,14 +192,60 @@ export default function MyPapers() {
                     gap: 24
                 }}>
                     {notes.map((note) => (
-                        <ApunteCard
-                            key={note.id_apunte}
-                            note={{
-                                ...note,
-                                signedUrl: signedUrls[note.id_apunte]
-                            }}
-                            currentUserId={currentUserId}
-                        />
+                        <Card key={note.id_apunte} style={{
+                            padding: 0,
+                            border: "1px solid #e5e7eb",
+                            borderRadius: 12,
+                            background: "#fff",
+                            transition: "all 0.2s ease",
+                            overflow: "hidden"
+                        }}>
+                            <div style={{ display: "flex", gap: 0 }}>
+                                <PDFThumbnail
+                                    url={signedUrls[note.id_apunte] || null}
+                                    thumbnailPath={note.thumbnail_path}
+                                    width={180}
+                                    height={240}
+                                />
+                                <div style={{ flex: 1, padding: 20, display: "flex", flexDirection: "column" }}>
+                                    <div style={{ flex: 1 }}>
+                                        <h3 style={{ margin: "0 0 8px 0", color: "#111827", fontSize: 18 }}>
+                                            {note.titulo || "Apunte sin título"}
+                                        </h3>
+
+                                        {note.materia?.nombre_materia && (
+                                            <p style={{ color: "#2563eb", fontSize: 14, marginBottom: 4 }}>
+                                                {note.materia.nombre_materia}
+                                            </p>
+                                        )}
+
+                                        <p style={{ color: "#6b7280", margin: "0 0 12px 0", fontSize: 14 }}>
+                                            {note.descripcion || "Sin descripción"}
+                                        </p>
+
+                                        <div style={{ display: "flex", gap: 12, fontSize: 12, color: "#9ca3af" }}>
+                                            <span>⭐ {note.estrellas || 0}</span>
+                                            <span>💬 {note.likes_count || 0}</span>
+                                            <span>📅 {new Date(note.created_at).toLocaleDateString()}</span>
+                                        </div>
+                                    </div>
+
+                                    <div style={{ display: "flex", gap: 8, marginTop: 16 }}>
+                                        <Button variant="primary" onClick={() => handleDownload(note)}>
+                                            Descargar
+                                        </Button>
+                                        <Button
+                                            variant="ghost"
+                                            onClick={() => handleDelete(note.id_apunte)}
+                                            disabled={deletingId === note.id_apunte}
+                                            style={{ color: "#ef4444", borderColor: "#ef4444" }}
+                                        >
+                                            {deletingId === note.id_apunte ? "Eliminando..." : "Eliminar"}
+                                        </Button>
+                                    </div>
+                                </div>
+                            </div>
+                        </Card>
                     ))}
                 </div>
             )}

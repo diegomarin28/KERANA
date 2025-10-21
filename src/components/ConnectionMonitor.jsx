@@ -9,11 +9,11 @@ export function ConnectionMonitor() {
     return (
         <div style={{
             position: 'fixed',
-            top: 0,
+            bottom: 0,  // ✅ Ahora abajo
             left: 0,
             right: 0,
             zIndex: 99999,
-            animation: 'slideDown 0.3s ease-out'
+            animation: 'slideUp 0.3s ease-out'  // ✅ Animación desde abajo
         }}>
             {errorType === 'offline' && (
                 <div style={{

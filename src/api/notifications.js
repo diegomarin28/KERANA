@@ -7,31 +7,8 @@ export const notificationsAPI = {
      */
     async obtenerMisNotificaciones(limit = 50) {
         try {
-            const { data: miId } = await supabase.rpc('obtener_usuario_actual_id');
-            if (!miId) {
-                return { data: [], error: 'No autenticado' };
-            }
-
             const { data, error } = await supabase
-                .from('notificaciones')
-                .select(`
-          id,
-          tipo,
-          emisor_id,
-          relacion_id,
-          mensaje,
-          leida,
-          creado_en,
-          emisor:usuario!notificaciones_emisor_id_fkey(
-            id_usuario,
-            nombre,
-            username,
-            foto
-          )
-        `)
-                .eq('usuario_id', miId)
-                .order('creado_en', { ascending: false })
-                .limit(limit);
+                .rpc('obtener_mis_notificaciones_con_seguimiento', { limite: limit });
 
             if (error) {
                 console.error('[notificationsAPI] Error obteniendo notificaciones:', error);

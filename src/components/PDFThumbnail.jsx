@@ -1,61 +1,44 @@
 import { useState, useEffect } from "react";
-import * as pdfjsLib from "pdfjs-dist";
 import { supabase } from "../supabase";
 
-
-// 🧩 Configurar correctamente el worker para Vite
-pdfjsLib.GlobalWorkerOptions.workerSrc = new URL(
-    "pdfjs-dist/build/pdf.worker.min.mjs",
-    import.meta.url
-).href;
-
-export default function PDFThumbnail({ url, width = 180, height = 240 }) {
+export default function PDFThumbnail({
+                                         url,
+                                         thumbnailPath, // 🆕 Recibe el path del thumbnail pre-generado
+                                         width = 180,
+                                         height = 240
+                                     }) {
     const [thumbnail, setThumbnail] = useState(null);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(false);
 
     useEffect(() => {
-        if (url) generateThumbnail();
-        else {
-            setLoading(false);
-            setError(true);
-        }
-        // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [url]);
+        loadThumbnail();
+    }, [thumbnailPath, url]);
 
-    const generateThumbnail = async () => {
+    const loadThumbnail = async () => {
         try {
             setLoading(true);
             setError(false);
 
-            const loadingTask = pdfjsLib.getDocument({
-                url,
-                withCredentials: false,
-                isEvalSupported: false,
-            });
+            // Si tenemos thumbnail pre-generado, usarlo
+            if (thumbnailPath) {
+                const { data } = supabase.storage
+                    .from('thumbnails')
+                    .getPublicUrl(thumbnailPath);
 
-            const pdf = await loadingTask.promise;
-            const page = await pdf.getPage(1);
+                if (data?.publicUrl) {
+                    setThumbnail(data.publicUrl);
+                    setLoading(false);
+                    return;
+                }
+            }
 
-            const viewport = page.getViewport({ scale: 1 });
-            const canvas = document.createElement("canvas");
-            const context = canvas.getContext("2d");
-
-            const scale = Math.min(width / viewport.width, height / viewport.height);
-            const scaledViewport = page.getViewport({ scale });
-
-            canvas.width = scaledViewport.width;
-            canvas.height = scaledViewport.height;
-
-            await page.render({
-                canvasContext: context,
-                viewport: scaledViewport,
-            }).promise;
-
-            setThumbnail(canvas.toDataURL());
+            // Si no hay thumbnail, mostrar placeholder
+            // (ya no generamos thumbnail on-the-fly para ahorrar Egress)
             setLoading(false);
+
         } catch (err) {
-            console.error("Error generando thumbnail:", err);
+            console.error("Error cargando thumbnail:", err);
             setError(true);
             setLoading(false);
         }
@@ -72,6 +55,7 @@ export default function PDFThumbnail({ url, width = 180, height = 240 }) {
                     alignItems: "center",
                     justifyContent: "center",
                     flexShrink: 0,
+                    borderRadius: 8,
                 }}
             >
                 <div
@@ -100,9 +84,24 @@ export default function PDFThumbnail({ url, width = 180, height = 240 }) {
                     justifyContent: "center",
                     color: "#fff",
                     flexShrink: 0,
+                    borderRadius: 8,
                 }}
             >
-                <div style={{ fontSize: 48 }}>📄</div>
+                <div style={{
+                    display: 'flex',
+                    flexDirection: 'column',
+                    alignItems: 'center',
+                    gap: 8
+                }}>
+                    <div style={{ fontSize: 48 }}>📄</div>
+                    <div style={{
+                        fontSize: 12,
+                        fontWeight: 600,
+                        opacity: 0.9
+                    }}>
+                        PDF
+                    </div>
+                </div>
             </div>
         );
     }
@@ -115,6 +114,7 @@ export default function PDFThumbnail({ url, width = 180, height = 240 }) {
                 flexShrink: 0,
                 overflow: "hidden",
                 background: "#f9fafb",
+                borderRadius: 8,
             }}
         >
             <img
@@ -126,6 +126,7 @@ export default function PDFThumbnail({ url, width = 180, height = 240 }) {
                     objectFit: "cover",
                     display: "block",
                 }}
+                loading="lazy"
             />
         </div>
     );

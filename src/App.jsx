@@ -56,6 +56,9 @@ import PrivacyBanner from './components/PrivacyBanner';
 import { NotificationProvider } from "./components/NotificationProvider";
 import { NotificationsProvider } from './contexts/NotificationsContext';
 import NotificationsRealtimeSubscriber from "./components/NotificationsRealtimeSubscriber";
+import { useMentorOnboarding } from './hooks/useMentorOnboarding';
+import { MentorOnboardingModal } from './components/MentorOnboardingModal';
+import { MentorWelcomeModal } from './components/MentorWelcomeModal';
 
 
 
@@ -149,7 +152,7 @@ function AppRoutes() {
 
                     {/* Mentoría */}
                     <Route path="/mentor/calendar" element={<MyCalendar />} />
-                    <Route path="/mentor/courses" element={<IAmMentor />} />
+                    <Route path="/mentor/courses" element={<AuthGuard requireAuth={true}><IAmMentor /></AuthGuard>} />
                     <Route path="/mentor/students" element={<MyStudents />} />
                     <Route path="/mentor/my-mentorships" element={<AuthGuard requireAuth={true}><MyMentorships /></AuthGuard>} />
 
@@ -223,6 +226,7 @@ function AppRoutes() {
 
 export default function App() {
     const { credits, seguidores, siguiendo, apuntes, loading: loadingStats } = useSidebarStats();
+    const { showModal, loading: loadingOnboarding, completeOnboarding } = useMentorOnboarding();
 
     return (
         <BrowserRouter>
@@ -232,6 +236,10 @@ export default function App() {
                         <NotificationsRealtimeSubscriber />
                         <PrivacyBanner />
                         <ConnectionMonitor />
+                        <MentorOnboardingModal
+                            open={showModal}
+                            onComplete={completeOnboarding}
+                        />
                         <AppRoutes />
                     </NotificationsProvider>
                 </NotificationProvider>

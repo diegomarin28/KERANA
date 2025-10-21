@@ -37,7 +37,7 @@ export async function exportUserData() {
         // Obtener apuntes subidos
         const { data: apuntes } = await supabase
             .from('apunte')
-            .select('*')
+            .select('*, thumbnail_path')
             .eq('id_usuario', perfil.id_usuario);
 
         // Obtener favoritos de apuntes

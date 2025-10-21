@@ -31,6 +31,7 @@ export default function ApunteCard({ note, currentUserId }) {
             {/* Vista previa del PDF - igual que Notes */}
             <PDFThumbnail
                 url={note.signedUrl || null}
+                thumbnailPath={note.thumbnail_path}
                 width={280}
                 height={160}
             />

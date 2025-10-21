@@ -28,12 +28,7 @@ export default function Notes() {
                     .eq("auth_id", user.id)
                     .maybeSingle();
 
-
-
-                if (usuarioData) {
-                    setCurrentUserId(usuarioData.id_usuario);
-
-                }
+                if (usuarioData) setCurrentUserId(usuarioData.id_usuario);
             }
         } catch (err) {
             console.error('Error cargando usuario:', err);
@@ -47,48 +42,47 @@ export default function Notes() {
             const { data, error } = await supabase
                 .from('apunte')
                 .select(`
-                id_apunte,
-                id_usuario,
-                titulo,
-                descripcion,
-                creditos,
-                created_at,
-                file_path,
-                usuario:id_usuario(nombre),
-                materia:id_materia(nombre_materia)
-            `)
+          id_apunte,
+          id_usuario,
+          titulo,
+          descripcion,
+          creditos,
+          estrellas,
+          created_at,
+          file_path,
+          usuario:id_usuario(nombre),
+          materia:id_materia(nombre_materia),
+          thumbnail_path
+        `)
                 .order('created_at', { ascending: false })
                 .limit(50);
 
             if (error) throw error;
 
-            // Contar likes por apunte
+            // Contar likes
             const apIds = (data || []).map(n => n.id_apunte);
-            const { data: likesData, error: likesError } = await supabase
-                .from('likes')
-                .select('id_apunte')
-                .eq('tipo', 'like')
-                .in('id_apunte', apIds);
+            let likesCountMap = {};
+            if (apIds.length > 0) {
+                const { data: likesData, error: likesError } = await supabase
+                    .from('likes')
+                    .select('id_apunte')
+                    .eq('tipo', 'like')
+                    .in('id_apunte', apIds);
+                if (likesError) console.error('Error cargando likes:', likesError);
 
-            if (likesError) {
-                console.error('Error cargando likes:', likesError);
+                likesData?.forEach(like => {
+                    likesCountMap[like.id_apunte] = (likesCountMap[like.id_apunte] || 0) + 1;
+                });
             }
 
-            // Crear un mapa de conteo de likes
-            const likesCountMap = {};
-            likesData?.forEach(like => {
-                likesCountMap[like.id_apunte] = (likesCountMap[like.id_apunte] || 0) + 1;
-            });
-
-            // Agregar likes_count a cada apunte
             const notesWithLikes = (data || []).map(note => ({
                 ...note,
-                likes_count: likesCountMap[note.id_apunte] || 0
+                likes_count: likesCountMap[note.id_apunte] || 0,
             }));
 
             setNotes(notesWithLikes);
 
-            // Generar signed URLs para todos los apuntes
+            // Signed URLs
             if (data && data.length > 0) {
                 const urls = {};
                 for (const note of data) {
@@ -96,10 +90,7 @@ export default function Notes() {
                         const { data: signedData, error: signedError } = await supabase.storage
                             .from('apuntes')
                             .createSignedUrl(note.file_path, 3600);
-
-                        if (!signedError && signedData) {
-                            urls[note.id_apunte] = signedData.signedUrl;
-                        }
+                        if (!signedError && signedData) urls[note.id_apunte] = signedData.signedUrl;
                     }
                 }
                 setSignedUrls(urls);
@@ -170,10 +161,10 @@ export default function Notes() {
                             key={note.id_apunte}
                             note={{
                                 ...note,
-                                signedUrl: signedUrls[note.id_apunte] || null
+                                signedUrl: signedUrls[note.id_apunte] || null,
+                                thumbnail_path: note.thumbnail_path
                             }}
                             currentUserId={currentUserId}
-
                         />
                     ))}
                 </div>

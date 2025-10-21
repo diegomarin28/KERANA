@@ -82,7 +82,8 @@ export const ApunteView = () => {
                     id_usuario,
                     created_at,
                     materia:id_materia(nombre_materia),
-                    usuario:id_usuario(nombre, foto)
+                    usuario:id_usuario(nombre, foto),
+                    thumbnail_path
                 `)
                 .eq('id_apunte', id)
                 .single();
@@ -728,6 +729,7 @@ export const ApunteView = () => {
                     <div style={{ flexShrink: 0 }}>
                         <PDFThumbnail
                             url={signedUrl}
+                            thumbnailPath={apunte?.thumbnail_path} // ← Agregar esto
                             width={250}
                             height={350}
                         />
