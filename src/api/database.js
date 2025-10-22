@@ -1812,7 +1812,6 @@ export const foldersAPI = {
                 const semestreNombre = `Semestre ${semestreNum}`
                 const nombreMateria = materia.nombre_materia
 
-                console.log(`📂 Procesando: ${semestreNombre} → ${nombreMateria}`)
 
                 if (!estructura[semestreNombre]) {
                     estructura[semestreNombre] = {}
@@ -1827,31 +1826,39 @@ export const foldersAPI = {
                 estructura[semestreNombre][nombreMateria].compras.push(compra.id)
             })
 
-            console.log('📊 Estructura generada:', estructura)
 
             const carpetasCreadas = []
+            const carpetasExistentes = {} // ✅ NUEVO: Cache de carpetas creadas
 
             for (const [nombreSemestre, materias] of Object.entries(estructura)) {
-                console.log(`✅ Creando carpeta: "${nombreSemestre}"`)
 
-                const { data: carpetaSemestre, error: errorSemestre } = await this.createFolder(
-                    nombreSemestre,
-                    'semestre',
-                    null,
-                    0
-                )
+                // ✅ NUEVO: Verificar si ya existe una carpeta con ese nombre
+                let carpetaSemestre = carpetasExistentes[nombreSemestre]
 
-                if (errorSemestre) {
-                    console.error(`❌ Error creando carpeta semestre "${nombreSemestre}":`, errorSemestre)
-                    continue
+                if (!carpetaSemestre) {
+                    const { data, error: errorSemestre } = await this.createFolder(
+                        nombreSemestre,
+                        'semestre',
+                        null,
+                        0
+                    )
+
+                    if (errorSemestre) {
+                        console.error(`❌ Error creando carpeta semestre "${nombreSemestre}":`, errorSemestre)
+                        continue
+                    }
+
+                    carpetaSemestre = data
+                    carpetasExistentes[nombreSemestre] = data // ✅ Cachear
+                    carpetasCreadas.push(data)
+                } else {
+                    console.log(`ℹ️ Carpeta "${nombreSemestre}" ya existe, reutilizando`)
                 }
 
                 if (!carpetaSemestre) continue
 
-                carpetasCreadas.push(carpetaSemestre)
-                console.log(`✅ Carpeta creada: ${carpetaSemestre.nombre} (ID: ${carpetaSemestre.id_carpeta})`)
-
                 for (const [nombreMateria, datos] of Object.entries(materias)) {
+
                     const { data: carpetaMateria } = await this.createFolder(
                         nombreMateria,
                         'materia',
@@ -1863,13 +1870,13 @@ export const foldersAPI = {
 
                     carpetasCreadas.push(carpetaMateria)
 
+                    // Agregar apuntes tanto a materia como a semestre
                     for (const compraId of datos.compras) {
                         await this.addNoteToFolder(carpetaMateria.id_carpeta, compraId)
                     }
                 }
             }
 
-            console.log(`✅ Organización completa. ${carpetasCreadas.length} carpetas creadas.`)
 
             return {
                 data: {

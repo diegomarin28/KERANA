@@ -9,6 +9,7 @@ export default function NotificationBadge() {
     const [shouldAnimate, setShouldAnimate] = useState(false);
     const [showUnfollowConfirm, setShowUnfollowConfirm] = useState(null);
     const dropdownRef = useRef(null);
+    const [followingStates, setFollowingStates] = useState({});
     const navigate = useNavigate();
     const prevUnreadCount = useRef(0);
     const autoMarkTimerRef = useRef(null);
@@ -88,6 +89,45 @@ export default function NotificationBadge() {
         }
     }, [isOpen]);
 
+    useEffect(() => {
+        const states = {};
+        notificaciones.forEach(notif => {
+            if (notif.tipo === 'nuevo_seguidor' && notif.emisor_id) {
+                states[notif.emisor_id] = notif.ya_lo_sigo;
+            }
+        });
+        setFollowingStates(states);
+    }, [notificaciones]);
+
+    const handleFollowBack = async (e, notif) => {
+        e.stopPropagation();
+
+        if (!notif.emisor_id) return;
+
+        const result = await seguirUsuario(notif.emisor_id);
+        if (result.success) {
+            // ✅ Actualizar solo el estado local
+            setFollowingStates(prev => ({
+                ...prev,
+                [notif.emisor_id]: true
+            }));
+        }
+    };
+
+    const handleConfirmUnfollow = async () => {
+        if (!showUnfollowConfirm) return;
+
+        const result = await dejarDeSeguir(showUnfollowConfirm.emisor_id);
+        if (result.success) {
+            // ✅ Actualizar solo el estado local
+            setFollowingStates(prev => ({
+                ...prev,
+                [showUnfollowConfirm.emisor_id]: false
+            }));
+        }
+        setShowUnfollowConfirm(null);
+    };
+
     const handleNotificationClick = async (e, notif) => {
         e.stopPropagation();
 
@@ -103,29 +143,14 @@ export default function NotificationBadge() {
         }
     };
 
-    const handleFollowBack = async (e, notif) => {
-        e.stopPropagation();
 
-        if (!notif.emisor_id) return;
-
-        await seguirUsuario(notif.emisor_id);
-        // Re-cargar notificaciones para actualizar ya_lo_sigo
-        // El context se encargará de esto automáticamente
-    };
 
     const handleShowUnfollowModal = (e, notif) => {
         e.stopPropagation();
         setShowUnfollowConfirm(notif);
     };
 
-    const handleConfirmUnfollow = async () => {
-        if (!showUnfollowConfirm) return;
 
-        await dejarDeSeguir(showUnfollowConfirm.emisor_id);
-        setShowUnfollowConfirm(null);
-        // Re-cargar notificaciones para actualizar ya_lo_sigo
-        // El context se encargará de esto automáticamente
-    };
 
     const handleCancelUnfollow = () => {
         setShowUnfollowConfirm(null);
@@ -305,7 +330,7 @@ export default function NotificationBadge() {
                         ) : (
                             recentNotifications.map((notif) => {
                                 const isFollowerNotif = notif.tipo === 'nuevo_seguidor';
-                                const isFollowing = notif.ya_lo_sigo;
+                                const isFollowing = followingStates[notif.emisor_id];
 
                                 return (
                                     <div

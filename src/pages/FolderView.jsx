@@ -141,20 +141,22 @@ export default function FolderView() {
             const { data: compras } = await supabase
                 .from("compra_apunte")
                 .select(`
-                    id,
-                    apunte_id,
-                    apunte:apunte(
-                        id_apunte,
-                        titulo,
-                        descripcion,
-                        materia:id_materia(nombre_materia)
-                    )
-                `)
+                id,
+                apunte_id,
+                apunte:apunte(
+                    id_apunte,
+                    titulo,
+                    descripcion,
+                    materia:id_materia(nombre_materia)
+                )
+            `)
                 .eq("comprador_id", profile.id_usuario);
 
+            // ✅ Obtener apuntes que YA están en esta carpeta
             const { data: notesInFolder } = await foldersAPI.getNotesInFolder(parseInt(id));
             const idsEnCarpeta = new Set(notesInFolder?.map(n => n.compra_id) || []);
 
+            // ✅ Filtrar solo los que NO están en la carpeta
             const available = (compras || [])
                 .filter(c => !idsEnCarpeta.has(c.id))
                 .map(c => ({
@@ -183,37 +185,63 @@ export default function FolderView() {
         if (selectedNotes.length === 0) return;
 
         try {
+            // Agregar apuntes
             for (const compraId of selectedNotes) {
                 await foldersAPI.addNoteToFolder(parseInt(id), compraId);
             }
 
-            if (folder?.tipo === 'semestre') {
-                const { data: notesInFolder } = await foldersAPI.getNotesInFolder(parseInt(id));
+// ✅ Recalcular semestres (incluyendo subcarpetas)
+            const { data: allFolders } = await foldersAPI.getMyFolders();
 
-                if (notesInFolder?.length > 0) {
-                    const compraIds = notesInFolder.map(n => n.compra_id);
+// Función recursiva para obtener todos los apuntes
+            const getAllNotesRecursive = async (folderId) => {
+                const { data: directNotes } = await foldersAPI.getNotesInFolder(folderId);
+                const childFolders = allFolders.filter(f => f.parent_id === folderId);
 
-                    const { data: compras } = await supabase
-                        .from('compra_apunte')
-                        .select(`
-                            id,
-                            apunte_id,
-                            apunte:apunte(
-                                materia:id_materia(semestre)
-                            )
-                        `)
-                        .in('id', compraIds);
+                let allCompraIds = directNotes?.map(n => n.compra_id) || [];
 
-                    const semestres = new Set();
-                    compras?.forEach(c => {
-                        const sem = c.apunte?.materia?.semestre;
-                        if (sem) semestres.add(sem);
-                    });
+                for (const child of childFolders) {
+                    const childNotes = await getAllNotesRecursive(child.id_carpeta);
+                    allCompraIds = [...allCompraIds, ...childNotes];
+                }
 
-                    if (semestres.size > 1) {
-                        const semestresList = Array.from(semestres).sort((a, b) => parseInt(a) - parseInt(b));
+                return allCompraIds;
+            };
+
+            const allCompraIds = await getAllNotesRecursive(parseInt(id));
+
+            if (allCompraIds.length > 0) {
+                const { data: compras } = await supabase
+                    .from('compra_apunte')
+                    .select(`
+            id,
+            apunte_id,
+            apunte:apunte(
+                materia:id_materia(semestre)
+            )
+        `)
+                    .in('id', allCompraIds);
+
+                const semestres = new Set();
+                compras?.forEach(c => {
+                    const sem = c.apunte?.materia?.semestre;
+                    if (sem) semestres.add(sem.toString());
+                });
+
+                console.log('📊 Semestres calculados recursivamente:', Array.from(semestres));
+
+                // ✅ Si la carpeta es de tipo 'semestre' Y tiene múltiples semestres
+                if (folder?.tipo === 'semestre' && semestres.size > 0) {
+                    const semestresList = Array.from(semestres).sort((a, b) => parseInt(a) - parseInt(b));
+
+                    if (semestresList.length > 1) {
                         const nuevoNombre = `Semestre ${semestresList.join(' y ')}`;
                         await foldersAPI.updateFolder(parseInt(id), nuevoNombre);
+                        console.log('✅ Nombre actualizado a:', nuevoNombre);
+                    } else if (semestresList.length === 1) {
+                        const nuevoNombre = `Semestre ${semestresList[0]}`;
+                        await foldersAPI.updateFolder(parseInt(id), nuevoNombre);
+                        console.log('✅ Nombre restaurado a:', nuevoNombre);
                     }
                 }
             }
@@ -221,8 +249,9 @@ export default function FolderView() {
             setShowAddNotesModal(false);
             setSelectedNotes([]);
             setFilterText("");
-            loadFolderContent();
-            loadAvailableNotes(); // ✅ Recargar disponibles
+
+            await loadFolderContent();
+            await loadAvailableNotes();
 
         } catch (err) {
             console.error('Error añadiendo apuntes:', err);
@@ -441,12 +470,28 @@ export default function FolderView() {
                 );
             } else if (draggedItem.type === 'note') {
                 const compraId = draggedItem.compra_id;
+
+                // ✅ Verificar si ya existe en la carpeta destino
+                const { data: existsCheck } = await supabase
+                    .from('apunte_en_carpeta')
+                    .select('id')
+                    .eq('carpeta_id', targetFolder.id_carpeta)
+                    .eq('compra_id', compraId)
+                    .maybeSingle();
+
+                // Solo agregar si NO existe
+                if (!existsCheck) {
+                    await foldersAPI.addNoteToFolder(targetFolder.id_carpeta, compraId);
+                } else {
+                    console.log('⚠️ Apunte ya existe en la carpeta destino');
+                }
+
+                // Remover de carpeta actual
                 await foldersAPI.removeNoteFromFolder(parseInt(id), compraId);
-                await foldersAPI.addNoteToFolder(targetFolder.id_carpeta, compraId);
             }
 
             loadFolderContent();
-            loadAvailableNotes(); // ✅ Actualizar disponibles
+            loadAvailableNotes();
         } catch (err) {
             console.error('Error moviendo item:', err);
             setErrorMsg("Error al mover el elemento");
@@ -547,20 +592,109 @@ export default function FolderView() {
                 </div>
 
                 <div style={{ display: 'flex', gap: 12 }}>
-                    <Button
-                        variant="secondary"
+                    <button
                         onClick={() => setShowCreateFolderModal(true)}
-                        style={{ display: 'flex', alignItems: 'center', gap: 8 }}
+                        style={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            gap: 8,
+                            padding: '9px 18px',
+                            borderRadius: 8,
+                            fontWeight: 600,
+                            fontSize: 14,
+                            background: 'white',
+                            border: '1px solid #dbdbdb',
+                            color: '#262626',
+                            cursor: 'pointer',
+                            transition: 'all 0.15s ease',
+                            minHeight: 38
+                        }}
+                        onMouseEnter={(e) => {
+                            e.currentTarget.style.background = '#fafafa';
+                            e.currentTarget.style.borderColor = '#a8a8a8';
+                        }}
+                        onMouseLeave={(e) => {
+                            e.currentTarget.style.background = 'white';
+                            e.currentTarget.style.borderColor = '#dbdbdb';
+                        }}
+                        onMouseDown={(e) => {
+                            e.currentTarget.style.transform = 'scale(0.98)';
+                        }}
+                        onMouseUp={(e) => {
+                            e.currentTarget.style.transform = 'scale(1)';
+                        }}
                     >
-                        ➕ Crear subcarpeta
-                    </Button>
-                    <Button
-                        variant="primary"
+                        <svg
+                            width="16"
+                            height="16"
+                            viewBox="0 0 24 24"
+                            fill="none"
+                            stroke="currentColor"
+                            strokeWidth="2.5"
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            style={{ flexShrink: 0 }}
+                        >
+                            <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/>
+                            <line x1="12" y1="11" x2="12" y2="17"/>
+                            <line x1="9" y1="14" x2="15" y2="14"/>
+                        </svg>
+                        <span>Crear subcarpeta</span>
+                    </button>
+
+                    <button
                         onClick={() => setShowAddNotesModal(true)}
-                        style={{ display: 'flex', alignItems: 'center', gap: 8 }}
+                        style={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            gap: 8,
+                            padding: '9px 18px',
+                            borderRadius: 8,
+                            fontWeight: 600,
+                            fontSize: 14,
+                            background: '#0095f6',
+                            border: 'none',
+                            color: 'white',
+                            cursor: 'pointer',
+                            transition: 'all 0.15s ease',
+                            minHeight: 38,
+                            boxShadow: '0 1px 2px rgba(0, 149, 246, 0.15)'
+                        }}
+                        onMouseEnter={(e) => {
+                            e.currentTarget.style.background = '#1877f2';
+                            e.currentTarget.style.boxShadow = '0 2px 4px rgba(0, 149, 246, 0.25)';
+                        }}
+                        onMouseLeave={(e) => {
+                            e.currentTarget.style.background = '#0095f6';
+                            e.currentTarget.style.boxShadow = '0 1px 2px rgba(0, 149, 246, 0.15)';
+                        }}
+                        onMouseDown={(e) => {
+                            e.currentTarget.style.transform = 'scale(0.98)';
+                        }}
+                        onMouseUp={(e) => {
+                            e.currentTarget.style.transform = 'scale(1)';
+                        }}
                     >
-                        ➕ Añadir apuntes
-                    </Button>
+                        <svg
+                            width="16"
+                            height="16"
+                            viewBox="0 0 24 24"
+                            fill="none"
+                            stroke="currentColor"
+                            strokeWidth="2.5"
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            style={{ flexShrink: 0 }}
+                        >
+                            <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+                            <polyline points="14 2 14 8 20 8"/>
+                            <line x1="12" y1="11" x2="12" y2="17"/>
+                            <line x1="9" y1="14" x2="15" y2="14"/>
+                        </svg>
+                        <span>Añadir apuntes</span>
+                    </button>
                 </div>
             </div>
 
@@ -583,13 +717,110 @@ export default function FolderView() {
                     <p style={{ color: "#6b7280", margin: "0 0 24px 0" }}>
                         Arrastrá apuntes o carpetas aquí, o usá los botones de arriba.
                     </p>
-                    <div style={{ display: 'flex', gap: 12, justifyContent: 'center' }}>
-                        <Button variant="secondary" onClick={() => setShowCreateFolderModal(true)}>
-                            Crear subcarpeta
-                        </Button>
-                        <Button variant="primary" onClick={() => setShowAddNotesModal(true)}>
-                            Añadir apuntes
-                        </Button>
+                    <div style={{ display: 'flex', gap: 12 }}>
+                        <button
+                            onClick={() => setShowCreateFolderModal(true)}
+                            style={{
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                gap: 8,
+                                padding: '10px 20px',
+                                borderRadius: 8,
+                                fontWeight: 600,
+                                fontSize: 14,
+                                background: 'white',
+                                border: '1px solid #dbdbdb',
+                                color: '#262626',
+                                cursor: 'pointer',
+                                transition: 'all 0.15s ease',
+                                minHeight: 40
+                            }}
+                            onMouseEnter={(e) => {
+                                e.currentTarget.style.background = '#fafafa';
+                                e.currentTarget.style.borderColor = '#a8a8a8';
+                            }}
+                            onMouseLeave={(e) => {
+                                e.currentTarget.style.background = 'white';
+                                e.currentTarget.style.borderColor = '#dbdbdb';
+                            }}
+                            onMouseDown={(e) => {
+                                e.currentTarget.style.transform = 'scale(0.98)';
+                            }}
+                            onMouseUp={(e) => {
+                                e.currentTarget.style.transform = 'scale(1)';
+                            }}
+                        >
+                            <svg
+                                width="18"
+                                height="18"
+                                viewBox="0 0 24 24"
+                                fill="none"
+                                stroke="currentColor"
+                                strokeWidth="2.5"
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                                style={{ flexShrink: 0 }}
+                            >
+                                <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/>
+                                <line x1="12" y1="11" x2="12" y2="17"/>
+                                <line x1="9" y1="14" x2="15" y2="14"/>
+                            </svg>
+                            <span>Crear subcarpeta</span>
+                        </button>
+
+                        <button
+                            onClick={() => setShowAddNotesModal(true)}
+                            style={{
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                gap: 8,
+                                padding: '10px 20px',
+                                borderRadius: 8,
+                                fontWeight: 600,
+                                fontSize: 14,
+                                background: '#0095f6',
+                                border: 'none',
+                                color: 'white',
+                                cursor: 'pointer',
+                                transition: 'all 0.15s ease',
+                                minHeight: 40,
+                                boxShadow: '0 1px 3px rgba(0, 149, 246, 0.2)'
+                            }}
+                            onMouseEnter={(e) => {
+                                e.currentTarget.style.background = '#1877f2';
+                                e.currentTarget.style.boxShadow = '0 2px 6px rgba(0, 149, 246, 0.3)';
+                            }}
+                            onMouseLeave={(e) => {
+                                e.currentTarget.style.background = '#0095f6';
+                                e.currentTarget.style.boxShadow = '0 1px 3px rgba(0, 149, 246, 0.2)';
+                            }}
+                            onMouseDown={(e) => {
+                                e.currentTarget.style.transform = 'scale(0.98)';
+                            }}
+                            onMouseUp={(e) => {
+                                e.currentTarget.style.transform = 'scale(1)';
+                            }}
+                        >
+                            <svg
+                                width="18"
+                                height="18"
+                                viewBox="0 0 24 24"
+                                fill="none"
+                                stroke="currentColor"
+                                strokeWidth="2.5"
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                                style={{ flexShrink: 0 }}
+                            >
+                                <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+                                <polyline points="14 2 14 8 20 8"/>
+                                <line x1="12" y1="11" x2="12" y2="17"/>
+                                <line x1="9" y1="14" x2="15" y2="14"/>
+                            </svg>
+                            <span>Añadir apuntes</span>
+                        </button>
                     </div>
                 </Card>
             ) : (
