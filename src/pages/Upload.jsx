@@ -484,11 +484,28 @@ export default function Upload() {
                                 </Button>
                                 <button
                                     type="button"
-                                    onClick={() => navigate(-1)}
-                                    disabled={loading}
+                                    onClick={(e) => {
+                                        e.stopPropagation();
+                                        onFileSelected(null);
+                                    }}
                                     style={{
-                                        padding: '8px 14px', background: '#fff', color: '#374151',
-                                        border: '1px solid #2563eb', borderRadius: 6, fontWeight: 500
+                                        background: '#fecaca',
+                                        color: '#dc2626',
+                                        border: 'none',
+                                        borderRadius: 6,
+                                        padding: '8px 12px',
+                                        cursor: 'pointer',
+                                        fontWeight: 600,
+                                        fontSize: 13,
+                                        transition: 'all 0.2s'
+                                    }}
+                                    onMouseEnter={(e) => {
+                                        e.currentTarget.style.background = '#ef4444';
+                                        e.currentTarget.style.color = '#fff';
+                                    }}
+                                    onMouseLeave={(e) => {
+                                        e.currentTarget.style.background = '#fecaca';
+                                        e.currentTarget.style.color = '#dc2626';
                                     }}
                                 >
                                     Cancelar

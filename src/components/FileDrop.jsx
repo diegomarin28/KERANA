@@ -100,12 +100,18 @@ export default function FileDrop({ file, onFileSelected }) {
                     gap: 12
                 }}>
                     <div style={{ fontSize: 32 }}>✅</div>
-                    <div style={{ flex: 1 }}>
+                    <div style={{
+                        flex: 1,
+                        minWidth: 0  // ← AGREGAR ESTA LÍNEA
+                    }}>
                         <div style={{
                             fontWeight: 600,
                             color: '#166534',
                             fontSize: 14,
-                            marginBottom: 4
+                            marginBottom: 4,
+                            overflow: 'hidden',           // ← AGREGAR
+                            textOverflow: 'ellipsis',     // ← AGREGAR
+                            whiteSpace: 'nowrap'
                         }}>
                             {file.name}
                         </div>
