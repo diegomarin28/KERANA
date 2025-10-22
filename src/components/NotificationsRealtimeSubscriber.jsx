@@ -109,6 +109,11 @@ export default function NotificationsRealtimeSubscriber() {
                 const checkForNewNotifications = async () => {
                     if (cancelled) return;
 
+                    if (!isOnlineRef.current) {
+                        console.log('⏸️ Polling pausado (sin conexión)');
+                        return;
+                    }
+
                     try {
                         // Buscar notificaciones nuevas desde el último check
                         const { data: nuevasNotifs, error } = await supabase

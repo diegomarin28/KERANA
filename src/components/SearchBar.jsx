@@ -1,6 +1,17 @@
 import { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { supabase } from '../supabase';
+import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
+import {
+    faSearch,
+    faBookOpen,
+    faChalkboardTeacher,
+    faFileAlt,
+    faUser,
+    faGraduationCap,
+    faClock,
+    faTimes
+} from '@fortawesome/free-solid-svg-icons';
 
 export default function SearchBar() {
     const [q, setQ] = useState("");
@@ -13,7 +24,25 @@ export default function SearchBar() {
         catch { return []; }
     });
     const wrapRef = useRef(null);
+    const inputRef = useRef(null);
     const navigate = useNavigate();
+
+    // Mapeo de iconos Font Awesome
+    const iconMap = {
+        'materia': faBookOpen,
+        'profesor': faChalkboardTeacher,
+        'apunte': faFileAlt,
+        'usuario': faUser,
+        'mentor': faGraduationCap,
+    };
+
+    const colorMap = {
+        'materia': '#64748b',
+        'profesor': '#64748b',
+        'apunte': '#64748b',
+        'usuario': '#64748b',
+        'mentor': '#10b981',
+    };
 
     // Obtener el ID del usuario actual al montar
     useEffect(() => {
@@ -60,7 +89,6 @@ export default function SearchBar() {
                             type: 'materia',
                             id: m.id_materia,
                             text: m.nombre_materia,
-                            icon: '📖'
                         });
                     });
                 }
@@ -75,7 +103,6 @@ export default function SearchBar() {
                             type: 'profesor',
                             id: p.id_profesor,
                             text: p.profesor_nombre,
-                            icon: '👨‍🏫'
                         });
                     });
                 }
@@ -90,12 +117,11 @@ export default function SearchBar() {
                             type: 'apunte',
                             id: a.id_apunte,
                             text: a.titulo,
-                            icon: '📄'
                         });
                     });
                 }
 
-                // Buscar usuarios (prioridad 4) - FILTRADO POR USUARIO ACTUAL
+                // Buscar usuarios (prioridad 4)
                 const { data: usuarios, error: usuariosError } = await supabase
                     .rpc('buscar_usuarios_sin_tildes', {
                         termino: term,
@@ -109,14 +135,13 @@ export default function SearchBar() {
                             id: u.id_usuario,
                             text: u.nombre,
                             username: u.username,
-                            icon: '👤',
                             correo: u.correo,
                             foto: u.foto
                         });
                     });
                 }
 
-                // Buscar mentores (prioridad 5) - FILTRADO POR USUARIO ACTUAL
+                // Buscar mentores (prioridad 5)
                 const { data: mentores, error: mentoresError } = await supabase
                     .rpc('buscar_mentores_sin_tildes', {
                         termino: term,
@@ -130,7 +155,6 @@ export default function SearchBar() {
                             id: m.id_mentor,
                             text: m.nombre,
                             username: m.username,
-                            icon: '🎓',
                             foto: m.foto
                         });
                     });
@@ -173,13 +197,14 @@ export default function SearchBar() {
         if (!term) return;
         saveRecent(term);
         navigate(`/search?q=${encodeURIComponent(term)}`);
+        setOpen(false);
     };
 
     const goToSuggestion = (suggestion) => {
         saveRecent(suggestion.text);
         setOpen(false);
+        setQ("");
 
-        // Ruteo según tipo
         if (suggestion.type === 'usuario') {
             navigate(`/user/${suggestion.username}`);
         } else if (suggestion.type === 'mentor') {
@@ -193,6 +218,7 @@ export default function SearchBar() {
         setQ(term);
         saveRecent(term);
         navigate(`/search?q=${encodeURIComponent(term)}`);
+        setOpen(false);
     };
 
     const showRecent = !q.trim() && recent.length > 0;
@@ -200,41 +226,59 @@ export default function SearchBar() {
     const showNoResults = q.trim() && !loading && suggestions.length === 0;
 
     const renderSuggestionContent = (suggestion) => {
+        const icon = iconMap[suggestion.type];
+        const color = colorMap[suggestion.type];
+
         if (suggestion.type === 'usuario' || suggestion.type === 'mentor') {
             return (
-                <div style={{ display: 'flex', alignItems: 'center', gap: 10, width: '100%' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 12, width: '100%' }}>
                     {suggestion.foto ? (
                         <img
                             src={suggestion.foto}
                             alt={suggestion.text}
                             style={{
-                                width: 24,
-                                height: 24,
+                                width: 36,
+                                height: 36,
                                 borderRadius: '50%',
-                                objectFit: 'cover'
+                                objectFit: 'cover',
+                                border: '2px solid #f1f5f9',
                             }}
                         />
                     ) : (
                         <div style={{
-                            width: 24,
-                            height: 24,
+                            width: 36,
+                            height: 36,
                             borderRadius: '50%',
-                            background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-                            color: '#fff',
+                            background: `${color}15`,
+                            color: color,
                             display: 'flex',
                             alignItems: 'center',
                             justifyContent: 'center',
-                            fontSize: 12,
-                            fontWeight: 700
+                            fontSize: 14,
+                            fontWeight: 600,
+                            border: `2px solid ${color}30`,
                         }}>
-                            {(suggestion.text?.[0] || 'U').toUpperCase()}
+                            <FontAwesomeIcon icon={icon} />
                         </div>
                     )}
-                    <div style={{ flex: 1 }}>
-                        <div style={{ fontSize: 15, color: "#111827", fontWeight: 500 }}>
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                        <div style={{
+                            fontSize: 14,
+                            color: "#0f172a",
+                            fontWeight: 600,
+                            whiteSpace: 'nowrap',
+                            overflow: 'hidden',
+                            textOverflow: 'ellipsis',
+                        }}>
                             {suggestion.text}
                         </div>
-                        <div style={{ fontSize: 12, color: "#6b7280" }}>
+                        <div style={{
+                            fontSize: 12,
+                            color: "#94a3b8",
+                            whiteSpace: 'nowrap',
+                            overflow: 'hidden',
+                            textOverflow: 'ellipsis',
+                        }}>
                             @{suggestion.username}
                         </div>
                     </div>
@@ -242,9 +286,30 @@ export default function SearchBar() {
             );
         } else {
             return (
-                <div style={{ display: 'flex', alignItems: 'center', gap: 10, width: '100%' }}>
-                    <span style={{ fontSize: 18 }}>{suggestion.icon}</span>
-                    <span style={{ flex: 1, fontSize: 15, color: "#111827" }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 12, width: '100%' }}>
+                    <div style={{
+                        width: 36,
+                        height: 36,
+                        borderRadius: '10px',
+                        background: `${color}10`,
+                        color: color,
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        fontSize: 14,
+                        flexShrink: 0,
+                    }}>
+                        <FontAwesomeIcon icon={icon} />
+                    </div>
+                    <span style={{
+                        flex: 1,
+                        fontSize: 14,
+                        color: "#0f172a",
+                        fontWeight: 500,
+                        whiteSpace: 'nowrap',
+                        overflow: 'hidden',
+                        textOverflow: 'ellipsis',
+                    }}>
                         {suggestion.text}
                     </span>
                 </div>
@@ -264,40 +329,97 @@ export default function SearchBar() {
             <form
                 onSubmit={onSearch}
                 style={{
-                    display: "grid",
-                    gridTemplateColumns: "1fr auto",
-                    gap: 0,
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 10,
                     background: "#fff",
-                    borderRadius: open ? "16px 16px 0 0" : "9999px",
-                    padding: 6,
-                    boxShadow: "0 10px 24px rgba(0,0,0,.10)",
-                    border: "1px solid #e5e7eb",
+                    borderRadius: open ? "32px 32px 0 0" : "32px",
+                    padding: "8px 10px 8px 24px",
+                    boxShadow: open
+                        ? "0 20px 60px rgba(0,0,0,0.15)"
+                        : "0 10px 40px rgba(0,0,0,0.12)",
+                    border: `2px solid ${open ? '#2563eb' : 'transparent'}`,
+                    transition: "all 0.3s cubic-bezier(0.4, 0, 0.2, 1)",
                 }}
             >
+                <FontAwesomeIcon
+                    icon={faSearch}
+                    style={{
+                        color: open ? '#2563eb' : '#94a3b8',
+                        fontSize: 18,
+                        transition: 'color 0.3s ease',
+                    }}
+                />
                 <input
+                    ref={inputRef}
                     onFocus={() => setOpen(true)}
                     value={q}
                     onChange={(e) => setQ(e.target.value)}
-                    placeholder="Buscá profesores, cursos, mentores, apuntes, usuarios…"
+                    placeholder="Buscar profesores, cursos, mentores, apuntes..."
                     style={{
                         border: "none",
                         outline: "none",
-                        padding: "12px 16px",
-                        borderRadius: 9999,
-                        fontSize: 16,
+                        padding: "14px 12px",
+                        flex: 1,
+                        fontSize: 15,
+                        color: '#0f172a',
+                        background: 'transparent',
+                        fontWeight: 500,
                     }}
                 />
+                {q && (
+                    <button
+                        type="button"
+                        onClick={() => {
+                            setQ("");
+                            inputRef.current?.focus();
+                        }}
+                        style={{
+                            width: 28,
+                            height: 28,
+                            borderRadius: '50%',
+                            border: 'none',
+                            background: '#f1f5f9',
+                            color: '#64748b',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            cursor: 'pointer',
+                            transition: 'all 0.2s ease',
+                        }}
+                        onMouseEnter={(e) => {
+                            e.currentTarget.style.background = '#fee2e2';
+                            e.currentTarget.style.color = '#ef4444';
+                        }}
+                        onMouseLeave={(e) => {
+                            e.currentTarget.style.background = '#f1f5f9';
+                            e.currentTarget.style.color = '#64748b';
+                        }}
+                    >
+                        <FontAwesomeIcon icon={faTimes} style={{ fontSize: 13 }} />
+                    </button>
+                )}
                 <button
                     type="submit"
                     style={{
-                        padding: "0 18px",
-                        height: 44,
-                        borderRadius: 9999,
-                        border: "1px solid #1e40af",
+                        padding: "12px 24px",
+                        height: 48,
+                        borderRadius: 24,
+                        border: "none",
                         background: "#2563eb",
                         color: "#fff",
-                        fontWeight: 700,
+                        fontWeight: 600,
+                        fontSize: 14,
                         cursor: "pointer",
+                        transition: "all 0.2s ease",
+                    }}
+                    onMouseEnter={(e) => {
+                        e.currentTarget.style.background = "#1d4ed8";
+                        e.currentTarget.style.transform = "scale(1.02)";
+                    }}
+                    onMouseLeave={(e) => {
+                        e.currentTarget.style.background = "#2563eb";
+                        e.currentTarget.style.transform = "scale(1)";
                     }}
                 >
                     Buscar
@@ -312,14 +434,15 @@ export default function SearchBar() {
                         right: 0,
                         top: "100%",
                         background: "#fff",
-                        border: "1px solid #e5e7eb",
+                        border: "2px solid #2563eb",
                         borderTop: "none",
-                        borderRadius: "0 0 16px 16px",
-                        boxShadow: "0 16px 32px rgba(0,0,0,.12)",
+                        borderRadius: "0 0 32px 32px",
+                        boxShadow: "0 20px 60px rgba(0,0,0,0.15)",
                         overflow: "hidden",
-                        maxHeight: "400px",
+                        maxHeight: "420px",
                         overflowY: "auto",
-                        zIndex: 50
+                        zIndex: 999999,
+                        animation: "slideDown 0.2s cubic-bezier(0.16, 1, 0.3, 1)",
                     }}
                 >
                     <ul style={{ listStyle: "none", margin: 0, padding: 0 }}>
@@ -327,42 +450,33 @@ export default function SearchBar() {
                             <li
                                 key={`${s.type}-${s.id}`}
                                 style={{
-                                    borderBottom: idx < suggestions.length - 1 ? "1px solid #f3f4f6" : "none",
-                                    transition: "all 0.2s ease",
-                                    cursor: "pointer"
+                                    borderBottom: idx < suggestions.length - 1 ? '1px solid #f3f4f6' : 'none',
+                                    transition: "all 0.15s ease",
+                                    cursor: "pointer",
                                 }}
                                 onMouseEnter={(e) => {
-                                    e.currentTarget.style.background = "linear-gradient(90deg, rgba(37, 99, 235, 0.06) 0%, rgba(37, 99, 235, 0.04) 50%, rgba(37, 99, 235, 0.06) 100%)";
-                                    e.currentTarget.style.borderLeft = "3px solid #2563eb";
-                                    e.currentTarget.style.paddingLeft = "11px";
+                                    e.currentTarget.style.background = '#f8fafc';
                                 }}
                                 onMouseLeave={(e) => {
-                                    e.currentTarget.style.background = "transparent";
-                                    e.currentTarget.style.borderLeft = "none";
-                                    e.currentTarget.style.paddingLeft = "0";
+                                    e.currentTarget.style.background = 'transparent';
                                 }}
                                 onClick={() => goToSuggestion(s)}
                             >
                                 <div style={{
                                     display: "flex",
                                     alignItems: "center",
-                                    gap: 10,
-                                    padding: "12px 14px",
-                                    textAlign: "left",
-                                    width: '100%',
-                                    position: 'relative'
+                                    justifyContent: "space-between",
+                                    gap: 12,
+                                    padding: "12px 20px",
                                 }}>
                                     {renderSuggestionContent(s)}
                                     <span style={{
                                         fontSize: 10,
-                                        color: "#9ca3af",
+                                        color: '#94a3b8',
                                         textTransform: "uppercase",
-                                        fontWeight: 600,
-                                        position: 'absolute',
-                                        right: '35px',
-                                        textAlign: 'right',
+                                        fontWeight: 700,
+                                        letterSpacing: '0.5px',
                                         flexShrink: 0,
-                                        whiteSpace: 'nowrap'
                                     }}>
                                         {s.type}
                                     </span>
@@ -370,128 +484,166 @@ export default function SearchBar() {
                             </li>
                         ))}
 
-                        {showRecent && recent.map((r) => (
-                            <li
-                                key={r}
-                                style={{
-                                    borderBottom: "1px solid #f3f4f6",
-                                    transition: "all 0.2s ease",
-                                }}
-                                onMouseEnter={(e) => {
-                                    e.currentTarget.style.background = "linear-gradient(90deg, rgba(37, 99, 235, 0.06) 0%, rgba(37, 99, 235, 0.04) 50%, rgba(37, 99, 235, 0.06) 100%)";
-                                    e.currentTarget.style.borderLeft = "3px solid #2563eb";
-                                    e.currentTarget.style.paddingLeft = "11px";
-                                    const svg = e.currentTarget.querySelector('svg');
-                                    if (svg) svg.style.color = "#2563eb";
-                                }}
-                                onMouseLeave={(e) => {
-                                    e.currentTarget.style.background = "transparent";
-                                    e.currentTarget.style.borderLeft = "none";
-                                    e.currentTarget.style.paddingLeft = "0";
-                                    const svg = e.currentTarget.querySelector('svg');
-                                    if (svg) svg.style.color = "#9ca3af";
-                                }}
-                            >
-                                <div style={{
-                                    display: "flex",
-                                    alignItems: "center",
-                                    justifyContent: "space-between",
-                                    gap: 10,
-                                    padding: "12px 14px",
-                                }}>
-                                    <button
-                                        onClick={() => handleRecentSearch(r)}
-                                        style={{
-                                            display: "flex",
-                                            alignItems: "center",
-                                            gap: 8,
-                                            flex: "1 1 auto",
-                                            border: "none",
-                                            background: "transparent",
-                                            cursor: "pointer",
-                                            padding: 0,
-                                            color: "#111827",
-                                            fontSize: 15,
-                                        }}
-                                    >
-                                        <svg
-                                            xmlns="http://www.w3.org/2000/svg"
-                                            fill="none"
-                                            viewBox="0 0 24 24"
-                                            strokeWidth={1.5}
-                                            stroke="currentColor"
-                                            style={{
-                                                width: 18,
-                                                height: 18,
-                                                color: "#9ca3af",
-                                                transition: "all 0.2s ease",
-                                            }}
-                                        >
-                                            <path
-                                                strokeLinecap="round"
-                                                strokeLinejoin="round"
-                                                d="M12 6v6l4 2m6-2a10 10 0 11-20 0 10 10 0 0120 0z"
-                                            />
-                                        </svg>
-                                        {r}
-                                    </button>
+                        {showRecent && (
+                            <>
 
-                                    <button
-                                        type="button"
-                                        onClick={(e) => {
-                                            e.stopPropagation();
-                                            removeRecent(r);
-                                        }}
+                                {recent.map((r, idx) => (
+                                    <li
+                                        key={r}
                                         style={{
-                                            border: "1px solid #e5e7eb",
-                                            background: "#fff",
-                                            color: "#9ca3af",
-                                            borderRadius: 8,
-                                            width: 28,
-                                            height: 28,
-                                            cursor: "pointer",
-                                            fontSize: 16,
-                                            transition: "all 0.2s ease",
+                                            borderBottom: idx < recent.length - 1 ? '1px solid #f3f4f6' : 'none',
+                                            transition: "all 0.15s ease",
                                         }}
                                         onMouseEnter={(e) => {
-                                            e.target.style.color = "#ef4444";
-                                            e.target.style.borderColor = "#ef4444";
+                                            e.currentTarget.style.background = '#f8fafc';
                                         }}
                                         onMouseLeave={(e) => {
-                                            e.target.style.color = "#9ca3af";
-                                            e.target.style.borderColor = "#e5e7eb";
+                                            e.currentTarget.style.background = 'transparent';
                                         }}
                                     >
-                                        ×
-                                    </button>
-                                </div>
-                            </li>
-                        ))}
+                                        <div style={{
+                                            display: "flex",
+                                            alignItems: "center",
+                                            justifyContent: "space-between",
+                                            gap: 12,
+                                            padding: "10px 20px",
+                                        }}>
+                                            <button
+                                                onClick={() => handleRecentSearch(r)}
+                                                style={{
+                                                    display: "flex",
+                                                    alignItems: "center",
+                                                    gap: 10,
+                                                    flex: 1,
+                                                    border: "none",
+                                                    background: "transparent",
+                                                    cursor: "pointer",
+                                                    padding: 0,
+                                                    color: "#0f172a",
+                                                    fontSize: 14,
+                                                    fontWeight: 500,
+                                                    textAlign: 'left',
+                                                }}
+                                            >
+                                                <FontAwesomeIcon
+                                                    icon={faClock}
+                                                    style={{
+                                                        color: '#94a3b8',
+                                                        fontSize: 13,
+                                                    }}
+                                                />
+                                                {r}
+                                            </button>
+
+                                            <button
+                                                type="button"
+                                                onClick={(e) => {
+                                                    e.stopPropagation();
+                                                    removeRecent(r);
+                                                }}
+                                                style={{
+                                                    width: 26,
+                                                    height: 26,
+                                                    borderRadius: '50%',
+                                                    border: 'none',
+                                                    background: 'transparent',
+                                                    color: '#94a3b8',
+                                                    cursor: 'pointer',
+                                                    display: 'flex',
+                                                    alignItems: 'center',
+                                                    justifyContent: 'center',
+                                                    transition: "all 0.2s ease",
+                                                    flexShrink: 0,
+                                                }}
+                                                onMouseEnter={(e) => {
+                                                    e.currentTarget.style.background = '#fee2e2';
+                                                    e.currentTarget.style.color = '#ef4444';
+                                                }}
+                                                onMouseLeave={(e) => {
+                                                    e.currentTarget.style.background = 'transparent';
+                                                    e.currentTarget.style.color = '#94a3b8';
+                                                }}
+                                            >
+                                                <FontAwesomeIcon icon={faTimes} style={{ fontSize: 12 }} />
+                                            </button>
+                                        </div>
+                                    </li>
+                                ))}
+                            </>
+                        )}
                     </ul>
 
                     {loading && (
                         <div style={{
-                            padding: 16,
+                            padding: '20px 16px',
                             textAlign: "center",
-                            color: '#9ca3af',
-                            fontSize: 14
+                            color: '#64748b',
+                            fontSize: 13,
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            gap: 10,
                         }}>
+                            <div style={{
+                                width: 14,
+                                height: 14,
+                                border: '2px solid #e5e7eb',
+                                borderTop: '2px solid #2563eb',
+                                borderRadius: '50%',
+                                animation: 'spin 0.8s linear infinite',
+                            }} />
                             Buscando...
                         </div>
                     )}
 
                     {showNoResults && (
                         <div style={{
-                            padding: 16,
+                            padding: '28px 16px',
                             textAlign: "center",
-                            color: '#9ca3af',
-                            fontSize: 14
                         }}>
-                            No se encontraron resultados para "{q}"
+                            <div style={{
+                                width: 44,
+                                height: 44,
+                                borderRadius: '50%',
+                                background: '#f1f5f9',
+                                color: '#94a3b8',
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                margin: '0 auto 10px',
+                                fontSize: 18,
+                            }}>
+                                <FontAwesomeIcon icon={faSearch} />
+                            </div>
+                            <div style={{
+                                color: '#64748b',
+                                fontSize: 13,
+                                fontWeight: 500,
+                            }}>
+                                No se encontraron resultados para <strong>"{q}"</strong>
+                            </div>
                         </div>
                     )}
                 </div>
             )}
+
+            <style>{`
+                @keyframes slideDown {
+                    from {
+                        opacity: 0;
+                        transform: translateY(-12px) scale(0.96);
+                    }
+                    to {
+                        opacity: 1;
+                        transform: translateY(0) scale(1);
+                    }
+                }
+                
+                @keyframes spin {
+                    from { transform: rotate(0deg); }
+                    to { transform: rotate(360deg); }
+                }
+            `}</style>
         </div>
     );
 }

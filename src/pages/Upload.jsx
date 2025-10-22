@@ -227,7 +227,7 @@ export default function Upload() {
             if (thumbnailBlob) {
                 setUploadProgress('Subiendo vista previa...');
                 const { error: thumbError } = await supabase.storage
-                    .from('thumbnail')
+                    .from('thumbnails')
                     .upload(thumbnailFileName, thumbnailBlob, {
                         cacheControl: '31536000',
                         contentType: 'image/jpeg',
@@ -263,7 +263,7 @@ export default function Upload() {
                 // cleanup
                 await supabase.storage.from('apuntes').remove([fileName]).catch(() => {});
                 if (thumbnailPath) {
-                    await supabase.storage.from('thumbnail').remove([thumbnailFileName]).catch(() => {});
+                    await supabase.storage.from('thumbnails').remove([thumbnailFileName]).catch(() => {});
                 }
                 throw new Error('Error al guardar en base de datos: ' + insertError.message);
             }
