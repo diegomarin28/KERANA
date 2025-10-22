@@ -43,16 +43,17 @@ export default function Favorites() {
                 const { data: apuntes, error: apuntesError } = await supabase
                     .from('apunte')
                     .select(`
-            id_apunte,
-            titulo,
-            descripcion,
-            creditos,
-            estrellas,
-            id_materia,
-            id_usuario,
-            file_path,
-            materia:id_materia(nombre_materia)
-        `)
+                               id_apunte,
+                                titulo,
+                                descripcion,
+                                creditos,
+                                estrellas,
+                                id_materia,
+                                id_usuario,
+                                file_path,
+                                materia:id_materia(nombre_materia),
+                                thumbnail_path
+                            `)
                     .in('id_apunte', apIds);
 
                 if (apuntesError) {
@@ -114,6 +115,7 @@ export default function Favorites() {
                                 descripcion: a.descripcion,
                                 creditos: a.creditos,
                                 signedUrl: a.signedUrl,
+                                thumbnail_path: a.thumbnail_path,
                                 materia: a.materia,
                                 usuario: { nombre: userMap[a.id_usuario] || 'Anónimo' },
                                 id_usuario: a.id_usuario,

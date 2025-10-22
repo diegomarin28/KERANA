@@ -16,6 +16,7 @@ const heroBackground = {
 }[HERO_BG];
 
 export default function Home() {
+    const [currentUserId, setCurrentUserId] = useState(null);
     const [reveal, setReveal] = useState(false);
     const [scrollProg, setScrollProg] = useState(0);
 
@@ -32,28 +33,46 @@ export default function Home() {
         (async () => {
             try {
                 setLoadingTop(true);
+
+                // 1. Cargar usuario actual
+                const { data: { user } } = await supabase.auth.getUser();
+                if (user && mounted) {
+                    const { data: usuarioData } = await supabase
+                        .from("usuario")
+                        .select("id_usuario")
+                        .eq("auth_id", user.id)
+                        .maybeSingle();
+
+                    if (usuarioData && mounted) {
+                        setCurrentUserId(usuarioData.id_usuario);
+                    }
+                }
+
+                // 2. Cargar top apuntes
                 const { data, error } = await supabase.rpc("top_apuntes_best", { limit_count: 8 });
                 if (error) throw error;
 
-                // Obtener file_path de cada apunte
+                // Obtener metadatos de cada apunte (incluye thumbnail_path y materia)
                 const apIds = data.map(d => d.apunte_id);
                 const { data: apuntes, error: apError } = await supabase
-                    .from('apunte')
+                    .from("apunte")
                     .select(`
-                    id_apunte, 
-                    file_path,
-                    usuario:id_usuario(nombre)
-                `)
-                    .in('id_apunte', apIds);
+            id_apunte,
+            file_path,
+            usuario:id_usuario(nombre),
+            materia(nombre_materia),
+            thumbnail_path
+          `)
+                    .in("id_apunte", apIds);
 
                 if (apError) throw apError;
 
                 // Contar likes por apunte
                 const { data: likesData, error: likesError } = await supabase
-                    .from('likes')
-                    .select('id_apunte')
-                    .eq('tipo', 'like')
-                    .in('id_apunte', apIds);
+                    .from("likes")
+                    .select("id_apunte")
+                    .eq("tipo", "like")
+                    .in("id_apunte", apIds);
 
                 if (likesError) throw likesError;
 
@@ -65,13 +84,13 @@ export default function Home() {
 
                 const filePathMap = new Map(apuntes.map(a => [a.id_apunte, a.file_path]));
 
-                // Generar signed URLs
+                // Generar signed URLs (apuntes)
                 const urls = {};
                 for (const note of data) {
                     const filePath = filePathMap.get(note.apunte_id);
                     if (filePath) {
                         const { data: signedData, error: signedError } = await supabase.storage
-                            .from('apuntes')
+                            .from("apuntes")
                             .createSignedUrl(filePath, 3600);
 
                         if (!signedError && signedData) {
@@ -80,13 +99,16 @@ export default function Home() {
                     }
                 }
 
+                // Merge: mantenemos likes_count + thumbnail_path + usuario/materia desde la tabla apunte
                 const notesWithUrls = data.map(note => {
                     const apunte = apuntes.find(a => a.id_apunte === note.apunte_id);
                     return {
                         ...note,
-                        usuario: apunte?.usuario || { nombre: 'Anónimo' },
+                        usuario: apunte?.usuario || { nombre: "Anónimo" },
+                        materia: apunte?.materia || null,
                         signedUrl: urls[note.apunte_id] || null,
-                        likes_count: likesCountMap[note.apunte_id] || 0
+                        likes_count: likesCountMap[note.apunte_id] || 0,
+                        thumbnail_path: apunte?.thumbnail_path || null,
                     };
                 });
 
@@ -178,11 +200,11 @@ export default function Home() {
                         </p>
 
                         {/*
-                          Parámetros conservadores:
-                          - Páginas típicas por apunte: 20
-                          - Agua por hoja: 0.15 L/hoja (fabricación y procesado)
-                          - CO2 por hoja: 1.2 g/hoja (impresión hogareña + transporte mínimo)
-                        */}
+              Parámetros conservadores:
+              - Páginas típicas por apunte: 20
+              - Agua por hoja: 0.15 L/hoja (fabricación y procesado)
+              - CO2 por hoja: 1.2 g/hoja (impresión hogareña + transporte mínimo)
+            */}
                         <EcoStats
                             pagesPerNote={20}
                             waterPerSheetL={0.15}
@@ -234,67 +256,43 @@ export default function Home() {
                                     justifyItems: "center",
                                 }}
                             >
-                                {topNotes.slice(0,8).map((n) => (
-                                    <div
-                                        key={n.apunte_id}
-                                        style={{
-                                            width: "100%",
-                                            maxWidth: 230,
-                                            aspectRatio: "4 / 5",
-                                        }}
-                                    >
-                                        <ApunteCard
-                                            note={{
-                                                id_apunte: n.apunte_id,
-                                                titulo: n.titulo,
-                                                descripcion: n.descripcion || '',
-                                                creditos: n.creditos,
-//                                                estrellas: n.rating_promedio || 0,
-                                                usuario: { nombre: n.usuario_nombre },  // ← CAMBIO
-                                                materia: { nombre_materia: n.nombre_materia },  // ← CAMBIO
-                                                signedUrl: n.signedUrl,
-                                                likes_count: n.likes_count  // ← NUEVO
+                                {topNotes.slice(0, 8).map((n) => {
+                                    // buscamos el apunte enriquecido correspondiente (ya vienen mergeados en n)
+                                    const usuario = n.usuario || { nombre: "Anónimo" };
+                                    const materia = n.materia || null;
+
+                                    return (
+                                        <div
+                                            key={n.apunte_id}
+                                            style={{
+                                                width: "100%",
+                                                maxWidth: 230,
+                                                aspectRatio: "4 / 5",
                                             }}
-                                        />
-                                    </div>
-                                ))}
+                                        >
+                                            <ApunteCard
+                                                note={{
+                                                    id_apunte: n.apunte_id,
+                                                    id_usuario: n.id_usuario,
+                                                    titulo: n.titulo,
+                                                    descripcion: n.descripcion || "",
+                                                    creditos: n.creditos,
+                                                    // estrellas: n.rating_promedio || 0, // si tu card lo usa, reactivá
+                                                    usuario,                         // ← del join a usuario
+                                                    materia,                         // ← del join a materia
+                                                    signedUrl: n.signedUrl,
+                                                    likes_count: n.likes_count,      // ← mantenido
+                                                    thumbnail_path: n.thumbnail_path // ← mantenido
+                                                }}
+                                                currentUserId={currentUserId}
+                                            />
+                                        </div>
+                                    );
+                                })}
                             </div>
                         )}
                     </div>
                 </section>
-
-
-
-                {/* Destacados */} {/*
-                <section style={{ padding: "56px 16px" }}>
-                    <div style={{ width: "min(1080px, 92vw)", margin: "0 auto" }}>
-                        <h2>Material destacado</h2>
-                        <p style={{ color: "#6b7280" }}>Últimos apuntes de la comunidad.</p>
-                        <div
-                            style={{
-                                marginTop: 20,
-                                display: "grid",
-                                gridTemplateColumns: "repeat(auto-fill, minmax(260px, 1fr))",
-                                gap: 16,
-                            }}
-                        >
-                            {[1, 2, 3, 4, 5, 6].map((k) => (
-                                <Card key={k}>
-                                    <div
-                                        style={{ height: 120, background: "#f3f4f6", borderRadius: 8 }}
-                                    />
-                                    <h3 style={{ margin: "12px 0 6px", fontSize: 16 }}>
-                                        Apunte #{k}
-                                    </h3>
-                                    <p style={{ color: "#6b7280", fontSize: 14, margin: 0 }}>
-                                        Descripción breve del recurso.
-                                    </p>
-                                </Card>
-                            ))}
-                        </div>
-                    </div>
-                </section>
-                */}
 
                 {/* Footer */}
                 <section
@@ -335,18 +333,13 @@ export default function Home() {
                     </div>
                 </section>
                 <style>{`
-    @keyframes shimmer {
-        0% {
-            background-position: -200% 0;
-        }
-        100% {
-            background-position: 200% 0;
-        }
-    }
-`}</style>
+          @keyframes shimmer {
+            0% { background-position: -200% 0; }
+            100% { background-position: 200% 0; }
+          }
+        `}</style>
             </main>
         </div>
-
     );
 }
 
@@ -476,7 +469,7 @@ function FooterCol({ title, items }) {
                             style={{ color: "rgba(255,255,255,.9)", textDecoration: "none" }}
                             onMouseEnter={(e) => (e.currentTarget.style.textDecoration = "underline")}
                             onMouseLeave={(e) => (e.currentTarget.style.textDecoration = "none")}
-                            >
+                        >
                             {item.label}
                         </Link>
                     </li>
@@ -485,6 +478,7 @@ function FooterCol({ title, items }) {
         </div>
     );
 }
+
 function SkeletonCard() {
     return (
         <div

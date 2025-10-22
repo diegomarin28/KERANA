@@ -1,19 +1,17 @@
-// src/pages/MyPapers.jsx
 import { useEffect, useState } from "react";
 import { supabase } from "../supabase";
 import { Button } from "../components/ui/Button";
 import { Card } from "../components/ui/Card";
-import { Chip } from "../components/ui/Chip";
-import PDFThumbnail from '../components/PDFThumbnail.jsx';
-
+import ApunteCard from "../components/ApunteCard";
+import PDFThumbnail from "../components/PDFThumbnail"; // si no existe, no importa, puedo ayudarte a generarlo
 
 export default function MyPapers() {
     const [notes, setNotes] = useState([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
+    const [signedUrls, setSignedUrls] = useState({});
+    const [currentUserId, setCurrentUserId] = useState(null);
     const [deletingId, setDeletingId] = useState(null);
-    const [deleteConfirm, setDeleteConfirm] = useState(null);
-    const [signedUrls, setSignedUrls] = useState({}); // 🆕 Estado para las signed URLs
 
     useEffect(() => { loadNotes(); }, []);
 
@@ -24,21 +22,31 @@ export default function MyPapers() {
 
             const { data: { user }, error: userError } = await supabase.auth.getUser();
             if (userError) throw userError;
-            if (!user) { setError("Debes iniciar sesión para ver tus apuntes"); return; }
+            if (!user) {
+                setError("Debes iniciar sesión para ver tus apuntes");
+                return;
+            }
 
-            // ✅ RLS: select por auth_id
             const { data: usuarioData, error: usuarioError } = await supabase
                 .from("usuario")
                 .select("id_usuario, nombre")
                 .eq("auth_id", user.id)
                 .maybeSingle();
-            if (usuarioError) throw usuarioError;
-            if (!usuarioData) { setError("No se encontró tu perfil de usuario"); return; }
 
+            if (usuarioError) throw usuarioError;
+            if (!usuarioData) {
+                setError("No se encontró tu perfil de usuario");
+                return;
+            }
+
+            setCurrentUserId(usuarioData.id_usuario);
+
+            // ✅ Tu lógica de thumbnail_path + datos ampliados de Kerana
             const { data, error: notesError } = await supabase
                 .from("apunte")
                 .select(`
           id_apunte,
+          id_usuario,
           titulo,
           descripcion,
           creditos,
@@ -49,29 +57,46 @@ export default function MyPapers() {
           file_name,
           mime_type,
           file_size,
-          materia:materia!Apunte_id_materia_fkey (
-          id_materia,
-          nombre_materia
-         )
+          thumbnail_path,
+          usuario:id_usuario(nombre),
+          materia:id_materia(nombre_materia)
         `)
                 .eq("id_usuario", usuarioData.id_usuario)
                 .order("created_at", { ascending: false });
+
             if (notesError) throw notesError;
 
-            setNotes(data || []);
+            // likes
+            const apIds = (data || []).map(n => n.id_apunte);
+            let likesCountMap = {};
+            if (apIds.length > 0) {
+                const { data: likesData } = await supabase
+                    .from("likes")
+                    .select("id_apunte")
+                    .eq("tipo", "like")
+                    .in("id_apunte", apIds);
 
-            // 🆕 Generar signed URLs para todos los apuntes
+                likesData?.forEach(like => {
+                    likesCountMap[like.id_apunte] = (likesCountMap[like.id_apunte] || 0) + 1;
+                });
+            }
+
+            const notesWithLikes = (data || []).map(note => ({
+                ...note,
+                likes_count: likesCountMap[note.id_apunte] || 0,
+            }));
+
+            setNotes(notesWithLikes);
+
+            // signed URLs
             if (data && data.length > 0) {
                 const urls = {};
                 for (const note of data) {
                     if (note.file_path) {
-                        const { data: signedData, error: signedError } = await supabase.storage
-                            .from('apuntes')
-                            .createSignedUrl(note.file_path, 3600); // Válida por 1 hora
-
-                        if (!signedError && signedData) {
-                            urls[note.id_apunte] = signedData.signedUrl;
-                        }
+                        const { data: signedData } = await supabase.storage
+                            .from("apuntes")
+                            .createSignedUrl(note.file_path, 3600);
+                        if (signedData) urls[note.id_apunte] = signedData.signedUrl;
                     }
                 }
                 setSignedUrls(urls);
@@ -83,85 +108,37 @@ export default function MyPapers() {
         }
     };
 
-    const handleDelete = async (noteId) => {
+    const handleDownload = async (note) => {
         try {
-            setDeletingId(noteId);
+            if (!note.file_path) return;
+            const { data, error } = await supabase.storage
+                .from("apuntes")
+                .download(note.file_path);
+            if (error) throw error;
 
-            // Buscar el apunte para obtener el file_path
-            const noteToDelete = notes.find(n => n.id_apunte === noteId);
-
-            if (noteToDelete?.file_path) {
-                // Eliminar archivo del bucket
-                const { error: storageError } = await supabase.storage
-                    .from('apuntes')
-                    .remove([noteToDelete.file_path]);
-
-                if (storageError) {
-                    console.error('Error eliminando archivo del storage:', storageError);
-                    // Continuar aunque falle el storage
-                }
-            }
-
-            // Eliminar registro de la base de datos
-            const { error: dbError } = await supabase
-                .from("apunte")
-                .delete()
-                .eq("id_apunte", noteId);
-
-            if (dbError) throw dbError;
-
-            // Actualizar la lista local
-            setNotes((prev) => prev.filter((note) => note.id_apunte !== noteId));
-            // 🆕 Limpiar la signed URL del estado
-            setSignedUrls((prev) => {
-                const updated = { ...prev };
-                delete updated[noteId];
-                return updated;
-            });
-            setDeleteConfirm(null);
-
+            const url = URL.createObjectURL(data);
+            const a = document.createElement("a");
+            a.href = url;
+            a.download = note.file_name || "apunte.pdf";
+            a.click();
+            URL.revokeObjectURL(url);
         } catch (err) {
-            alert("Error eliminando apunte: " + (err.message || err));
-        } finally {
-            setDeletingId(null);
+            console.error("Error al descargar:", err);
+            alert("Error al descargar el apunte");
         }
     };
 
-    const handleDownload = async (note) => {
-        if (!note?.file_path) {
-            alert("No hay archivo disponible para descargar");
-            return;
-        }
-
+    const handleDelete = async (id_apunte) => {
+        if (!window.confirm("¿Seguro que querés eliminar este apunte?")) return;
         try {
-            // 🆕 Generar signed URL para descargar
-            const { data: signedData, error: signedError } = await supabase.storage
-                .from('apuntes')
-                .createSignedUrl(note.file_path, 60); // Válida por 1 minuto para descarga
-
-            if (signedError || !signedData) {
-                alert("Error al obtener el archivo");
-                return;
-            }
-
-            // Descargar el archivo
-            const response = await fetch(signedData.signedUrl);
-            const blob = await response.blob();
-            const url = window.URL.createObjectURL(blob);
-
-            // Crear un enlace temporal y hacer clic en él
-            const a = document.createElement('a');
-            a.href = url;
-            a.download = note.file_name || note.titulo + '.pdf';
-            document.body.appendChild(a);
-            a.click();
-
-            // Limpiar
-            window.URL.revokeObjectURL(url);
-            document.body.removeChild(a);
-        } catch (error) {
-            console.error('Error descargando archivo:', error);
-            alert("Error al descargar el archivo");
+            setDeletingId(id_apunte);
+            await supabase.from("apunte").delete().eq("id_apunte", id_apunte);
+            setNotes(prev => prev.filter(n => n.id_apunte !== id_apunte));
+        } catch (err) {
+            console.error(err);
+            alert("Error eliminando el apunte");
+        } finally {
+            setDeletingId(null);
         }
     };
 
@@ -175,96 +152,7 @@ export default function MyPapers() {
     }
 
     return (
-        <div style={{ width: "min(800px, 92vw)", margin: "0 auto", padding: "32px 0" }}>
-            {deleteConfirm && (
-                <div style={{
-                    position: 'fixed',
-                    top: 0,
-                    left: 0,
-                    right: 0,
-                    bottom: 0,
-                    background: 'rgba(0, 0, 0, 0.6)',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    zIndex: 1000,
-                    backdropFilter: 'blur(4px)'
-                }}>
-                    <Card style={{
-                        maxWidth: 450,
-                        padding: 32,
-                        background: '#fff',
-                        boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1)',
-                        border: '2px solid #ef4444'
-                    }}>
-                        <div style={{
-                            width: 64,
-                            height: 64,
-                            background: '#fee2e2',
-                            borderRadius: '50%',
-                            margin: '0 auto 20px',
-                            fontSize: 32,
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'center',
-                        }}>
-                            ⚠️
-                        </div>
-                        <h3 style={{
-                            margin: '0 0 12px 0',
-                            fontSize: 22,
-                            fontWeight: 700,
-                            color: '#991b1b',
-                            textAlign: 'center'
-                        }}>
-                            ¿Eliminar apunte?
-                        </h3>
-                        <p style={{
-                            color: '#6b7280',
-                            fontSize: 15,
-                            lineHeight: 1.6,
-                            marginBottom: 24,
-                            textAlign: 'center'
-                        }}>
-                            Esta acción no se puede deshacer. El archivo se eliminará permanentemente del sistema.
-                        </p>
-                        <div style={{ display: 'flex', gap: 12 }}>
-                            <Button
-                                onClick={() => setDeleteConfirm(null)}
-                                style={{
-                                    flex: 1,
-                                    padding: '12px 24px',
-                                    background: '#fff',
-                                    color: '#374151',
-                                    border: '1px solid #d1d5db',
-                                    borderRadius: 8,
-                                    fontWeight: 600,
-                                    cursor: 'pointer'
-                                }}
-                            >
-                                Cancelar
-                            </Button>
-                            <Button
-                                onClick={() => handleDelete(deleteConfirm)}
-                                disabled={deletingId === deleteConfirm}
-                                style={{
-                                    flex: 1,
-                                    padding: '12px 24px',
-                                    background: '#ef4444',
-                                    color: '#fff',
-                                    border: 'none',
-                                    borderRadius: 8,
-                                    fontWeight: 600,
-                                    cursor: deletingId === deleteConfirm ? 'not-allowed' : 'pointer',
-                                    opacity: deletingId === deleteConfirm ? 0.6 : 1
-                                }}
-                            >
-                                {deletingId === deleteConfirm ? 'Eliminando...' : 'Eliminar'}
-                            </Button>
-                        </div>
-                    </Card>
-                </div>
-            )}
+        <div style={{ width: "min(1200px, 92vw)", margin: "0 auto", padding: "32px 0" }}>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 24 }}>
                 <div>
                     <h1 style={{ margin: "0 0 8px 0" }}>Mis Apuntes</h1>
@@ -272,13 +160,17 @@ export default function MyPapers() {
                         {notes.length} apunte{notes.length !== 1 ? "s" : ""} subido{notes.length !== 1 ? "s" : ""}
                     </p>
                 </div>
-                <Button variant="primary" onClick={() => (window.location.href = "/upload")}>Subir apunte</Button>
+                <Button variant="primary" onClick={() => (window.location.href = "/upload")}>
+                    Subir apunte
+                </Button>
             </div>
 
             {error && (
                 <Card style={{ background: "#fef2f2", border: "1px solid #fecaca", color: "#991b1b", padding: "16px 20px", marginBottom: 20 }}>
                     <p style={{ margin: 0 }}>{error}</p>
-                    <Button variant="ghost" onClick={loadNotes} style={{ marginTop: 12 }}>Reintentar</Button>
+                    <Button variant="ghost" onClick={loadNotes} style={{ marginTop: 12 }}>
+                        Reintentar
+                    </Button>
                 </Card>
             )}
 
@@ -286,52 +178,67 @@ export default function MyPapers() {
                 <Card style={{ textAlign: "center", padding: "48px 24px", background: "#fafafa" }}>
                     <div style={{ fontSize: 48, marginBottom: 16 }}>📚</div>
                     <h3 style={{ margin: "0 0 12px 0", color: "#374151" }}>No tenés apuntes todavía</h3>
-                    <p style={{ color: "#6b7280", margin: "0 0 24px 0" }}>Comenzá a compartir tus conocimientos con la comunidad</p>
-                    <Button variant="primary" onClick={() => (window.location.href = "/upload")}>Subir mi primer apunte</Button>
+                    <p style={{ color: "#6b7280", margin: "0 0 24px 0" }}>
+                        Comenzá a compartir tus conocimientos con la comunidad
+                    </p>
+                    <Button variant="primary" onClick={() => (window.location.href = "/upload")}>
+                        Subir mi primer apunte
+                    </Button>
                 </Card>
             ) : (
-                <div style={{ display: "grid", gap: 16 }}>
+                <div style={{
+                    display: "grid",
+                    gridTemplateColumns: "repeat(auto-fill, minmax(280px, 1fr))",
+                    gap: 24
+                }}>
                     {notes.map((note) => (
-                        <Card key={note.id_apunte} style={{ padding: 0, border: "1px solid #e5e7eb", borderRadius: 12, background: "#fff", transition: "all 0.2s ease", overflow: "hidden" }}>
+                        <Card key={note.id_apunte} style={{
+                            padding: 0,
+                            border: "1px solid #e5e7eb",
+                            borderRadius: 12,
+                            background: "#fff",
+                            transition: "all 0.2s ease",
+                            overflow: "hidden"
+                        }}>
                             <div style={{ display: "flex", gap: 0 }}>
-                                {/* Vista previa del PDF - 🆕 Usar signed URL */}
                                 <PDFThumbnail
                                     url={signedUrls[note.id_apunte] || null}
+                                    thumbnailPath={note.thumbnail_path}
                                     width={180}
                                     height={240}
                                 />
-                                {/* Contenido */}
                                 <div style={{ flex: 1, padding: 20, display: "flex", flexDirection: "column" }}>
                                     <div style={{ flex: 1 }}>
-                                        <h3 style={{ margin: "0 0 8px 0", color: "#111827", fontSize: 18 }}>{note.titulo || "Apunte sin título"}</h3>
+                                        <h3 style={{ margin: "0 0 8px 0", color: "#111827", fontSize: 18 }}>
+                                            {note.titulo || "Apunte sin título"}
+                                        </h3>
 
-                                        <div style={{ display: "flex", gap: 8, alignItems: "center", marginBottom: 12, flexWrap: "wrap" }}>
-                                            {note.materia?.nombre_materia && <Chip tone="blue">{note.materia.nombre_materia}</Chip>}
-                                            <Chip tone="green">{note.creditos || 0} créditos</Chip>
-                                            {note.mime_type && <Chip tone="gray">{note.mime_type}</Chip>}
-                                        </div>
-
-                                        {note.descripcion && (
-                                            <p style={{ color: "#6b7280", margin: "0 0 12px 0", fontSize: 14, lineHeight: 1.5 }}>{note.descripcion}</p>
+                                        {note.materia?.nombre_materia && (
+                                            <p style={{ color: "#2563eb", fontSize: 14, marginBottom: 4 }}>
+                                                {note.materia.nombre_materia}
+                                            </p>
                                         )}
 
+                                        <p style={{ color: "#6b7280", margin: "0 0 12px 0", fontSize: 14 }}>
+                                            {note.descripcion || "Sin descripción"}
+                                        </p>
+
                                         <div style={{ display: "flex", gap: 12, fontSize: 12, color: "#9ca3af" }}>
-                                            <span>Subido: {new Date(note.created_at).toLocaleDateString()}</span>
-                                            {note.file_size && (
-                                                <span>• {note.file_size > 1024 * 1024
-                                                    ? (note.file_size / (1024 * 1024)).toFixed(2) + ' MB'
-                                                    : Math.round(note.file_size / 1024) + ' KB'
-                                                }</span>
-                                            )}
+                                            <span>⭐ {note.estrellas || 0}</span>
+                                            <span>💬 {note.likes_count || 0}</span>
+                                            <span>📅 {new Date(note.created_at).toLocaleDateString()}</span>
                                         </div>
                                     </div>
 
                                     <div style={{ display: "flex", gap: 8, marginTop: 16 }}>
-                                        <Button variant="primary" onClick={() => handleDownload(note)} disabled={!note.file_path}>Descargar</Button>
-                                        <Button variant="ghost"
-                                                onClick={() => setDeleteConfirm(note.id_apunte)}
-                                                disabled={deletingId === note.id_apunte}
-                                                style={{ color: "#ef4444", borderColor: "#ef4444" }}
+                                        <Button variant="primary" onClick={() => handleDownload(note)}>
+                                            Descargar
+                                        </Button>
+                                        <Button
+                                            variant="ghost"
+                                            onClick={() => handleDelete(note.id_apunte)}
+                                            disabled={deletingId === note.id_apunte}
+                                            style={{ color: "#ef4444", borderColor: "#ef4444" }}
                                         >
                                             {deletingId === note.id_apunte ? "Eliminando..." : "Eliminar"}
                                         </Button>

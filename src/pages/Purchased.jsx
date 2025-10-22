@@ -1,15 +1,21 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import { supabase } from "../supabase";
 import { getOrCreateUserProfile } from "../api/userService";
 import { foldersAPI } from "../api/database";
 import { Button } from "../components/ui/Button";
 import { Card } from "../components/ui/Card";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useLocation } from "react-router-dom";
 import ApunteCard from "../components/ApunteCard";
 import { FolderCard } from "../components/FolderCard";
 
 export default function Purchased() {
-    const [activeTab, setActiveTab] = useState("purchases");
+    const navigate = useNavigate();
+    const location = useLocation();
+
+    const params = new URLSearchParams(location.search);
+    const initialTab = params.get("tab") || "purchases";
+
+    const [activeTab, setActiveTab] = useState(initialTab);
     const [purchases, setPurchases] = useState([]);
     const [folders, setFolders] = useState([]);
     const [loading, setLoading] = useState(true);
@@ -19,16 +25,78 @@ export default function Purchased() {
     const [showCreateFolderModal, setShowCreateFolderModal] = useState(false);
     const [showAddNotesModal, setShowAddNotesModal] = useState(false);
     const [newFolderName, setNewFolderName] = useState("");
+    const [newFolderType, setNewFolderType] = useState("personalizada");
     const [selectedNotes, setSelectedNotes] = useState([]);
     const [targetFolder, setTargetFolder] = useState(null);
-    const [lastOrgSnapshot, setLastOrgSnapshot] = useState(null);
-    const [hasOrganized, setHasOrganized] = useState(false);
-    const navigate = useNavigate();
+
+    // Autocomplete materias
+    const [materias, setMaterias] = useState([]);
+    const [searchTerm, setSearchTerm] = useState("");
+    const [filteredMaterias, setFilteredMaterias] = useState([]);
+    const [selectedMateria, setSelectedMateria] = useState(null);
+    const [showDropdown, setShowDropdown] = useState(false);
+    const dropdownRef = useRef(null);
+
+    // Filtro de apuntes para modal "añadir a carpeta"
+    const [availableNotes, setAvailableNotes] = useState([]);
+    const [filterText, setFilterText] = useState("");
 
     useEffect(() => {
         loadPurchases();
         loadFolders();
+        fetchMaterias();
+        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []);
+
+    // Cerrar dropdown al hacer click fuera
+    useEffect(() => {
+        const handleClickOutside = (event) => {
+            if (dropdownRef.current && !dropdownRef.current.contains(event.target)) {
+                setShowDropdown(false);
+            }
+        };
+        document.addEventListener("mousedown", handleClickOutside);
+        return () => document.removeEventListener("mousedown", handleClickOutside);
+    }, []);
+
+    // Filtrar materias según búsqueda
+    useEffect(() => {
+        if (searchTerm.trim()) {
+            const normalizedSearch = normalizeText(searchTerm);
+            const filtered = materias.filter((m) =>
+                normalizeText(m.nombre_materia).includes(normalizedSearch)
+            );
+            setFilteredMaterias(filtered);
+            setShowDropdown(true);
+        } else {
+            setFilteredMaterias([]);
+            setShowDropdown(false);
+        }
+    }, [searchTerm, materias]);
+
+    const normalizeText = (text) =>
+        text.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+
+    const fetchMaterias = async () => {
+        try {
+            const { data: materiasData, error } = await supabase
+                .from("materia")
+                .select("id_materia, nombre_materia, semestre")
+                .order("nombre_materia");
+
+            if (error) throw error;
+            setMaterias(materiasData || []);
+        } catch (err) {
+            console.error("Error cargando materias:", err);
+        }
+    };
+
+    const handleMateriaSelect = (materia) => {
+        setSelectedMateria(materia);
+        setSearchTerm(materia.nombre_materia);
+        setNewFolderName(materia.nombre_materia);
+        setShowDropdown(false);
+    };
 
     const loadPurchases = async () => {
         try {
@@ -43,83 +111,62 @@ export default function Purchased() {
 
             const { data: compras, error: comprasError } = await supabase
                 .from("compra_apunte")
-                .select(`
-                id,
-                apunte_id,
-                comprador_id,
-                creado_en
-            `)
+                .select(`id, apunte_id, comprador_id, creado_en`)
                 .eq("comprador_id", profile.id_usuario)
                 .order("creado_en", { ascending: false });
 
             if (comprasError) throw comprasError;
-
             if (!compras?.length) {
                 setPurchases([]);
+                setAvailableNotes([]);
                 return;
             }
 
-            const apIds = compras.map(c => c.apunte_id).filter(Boolean);
-
-            let apuntes = [];
-            if (apIds.length) {
-                const { data: apData, error: apErr } = await supabase
-                    .from("apunte")
-                    .select(`
-                    id_apunte,
-                    titulo,
-                    descripcion,
-                    creditos,
-                    estrellas,
-                    file_path,
-                    file_name,
-                    materia:id_materia(
-                        id_materia,
-                        nombre_materia
-                    ),
-                    usuario:id_usuario(nombre)
-                `)
-                    .in("id_apunte", apIds);
-
-                if (apErr) throw apErr;
-                apuntes = apData || [];
+            const apIds = compras.map((c) => c.apunte_id).filter(Boolean);
+            if (apIds.length === 0) {
+                setPurchases([]);
+                setAvailableNotes([]);
+                return;
             }
 
-            // Contar likes por apunte
-            const { data: likesData, error: likesError } = await supabase
-                .from('likes')
-                .select('id_apunte')
-                .eq('tipo', 'like')
-                .in('id_apunte', apIds);
+            // Traer apuntes de las compras
+            const { data: apData, error: apErr } = await supabase
+                .from("apunte")
+                .select(
+                    `
+          id_apunte,
+          titulo,
+          descripcion,
+          creditos,
+          estrellas,
+          file_path,
+          file_name,
+          thumbnail_path,
+          created_at,
+          materia:id_materia(id_materia, nombre_materia),
+          usuario:id_usuario(nombre)
+        `
+                )
+                .in("id_apunte", apIds)
+                .order("created_at", { ascending: false });
 
-            if (likesError) {
-                console.error('Error cargando likes:', likesError);
-            }
+            if (apErr) throw apErr;
+            const apuntes = apData || [];
 
-            // Crear un mapa de conteo de likes
-            const likesCountMap = {};
-            likesData?.forEach(like => {
-                likesCountMap[like.id_apunte] = (likesCountMap[like.id_apunte] || 0) + 1;
-            });
+            // Signed URLs en paralelo
+            const urlsArray = await Promise.all(
+                apuntes.map(async (ap) => {
+                    if (!ap.file_path) return [ap.id_apunte, null];
+                    const { data: signedData } = await supabase.storage
+                        .from("apuntes")
+                        .createSignedUrl(ap.file_path, 3600);
+                    return [ap.id_apunte, signedData?.signedUrl || null];
+                })
+            );
+            const urls = Object.fromEntries(urlsArray);
 
-            const urls = {};
-            if (apuntes.length > 0) {
-                for (const apunte of apuntes) {
-                    if (apunte.file_path) {
-                        const { data: signedData, error: signedError } = await supabase.storage
-                            .from('apuntes')
-                            .createSignedUrl(apunte.file_path, 3600);
-
-                        if (!signedError && signedData) {
-                            urls[apunte.id_apunte] = signedData.signedUrl;
-                        }
-                    }
-                }
-            }
-
-            const mapApunte = new Map(apuntes.map(a => [a.id_apunte, a]));
-
-            const enriched = compras.map(c => {
+            const mapApunte = new Map(apuntes.map((a) => [a.id_apunte, a]));
+            const enriched = compras.map((c) => {
                 const apunte = mapApunte.get(c.apunte_id);
                 return {
                     ...c,
@@ -131,67 +178,100 @@ export default function Purchased() {
                     usuario: apunte?.usuario || { nombre: "Anónimo" },
                     materia: apunte?.materia || { nombre_materia: "Sin materia" },
                     signedUrl: urls[c.apunte_id] || null,
-                    file_path: apunte?.file_path,
-                    likes_count: likesCountMap[c.apunte_id] || 0  // ← NUEVO
+                    file_path: apunte?.file_path || null,
+                    thumbnail_path: apunte?.thumbnail_path || null,
+                    created_at: apunte?.created_at || null
                 };
             });
 
             setPurchases(enriched);
+
+            // Pre-cargar availableNotes (para modal)
+            setAvailableNotes(
+                enriched.map((p) => ({
+                    id: p.id, // id de la compra
+                    titulo: p.titulo,
+                    descripcion: p.descripcion,
+                    materia: p.materia?.nombre_materia || "Sin materia"
+                }))
+            );
         } catch (err) {
-            console.error('Error cargando compras:', err);
+            console.error("Error cargando compras:", err);
             setErrorMsg(err?.message || "Error cargando tus compras.");
         } finally {
             setLoading(false);
         }
     };
 
+    // 2 queries en lugar de N
     const loadFolders = async () => {
         try {
-            const { data, error } = await foldersAPI.getMyFolders();
+            const { data: allFolders, error } = await foldersAPI.getMyFolders();
             if (error) throw error;
 
-            const foldersWithCount = await Promise.all(
-                (data || []).map(async (folder) => {
-                    const { data: notes } = await foldersAPI.getNotesInFolder(folder.id_carpeta);
-                    const subfolders = (data || []).filter(f => f.parent_id === folder.id_carpeta);
+            if (!allFolders?.length) {
+                setFolders([]);
+                return;
+            }
 
-                    // ✅ NUEVO: Calcular semestres únicos
-                    let semestres = [];
-                    if (folder.tipo === 'semestre' && notes?.length > 0) {
-                        const compraIds = notes.map(n => n.compra_id);
+            // Relación apunte-carpeta
+            const folderIds = allFolders.map((f) => f.id_carpeta);
+            const { data: allNotesInFolders } = await supabase
+                .from("apunte_en_carpeta")
+                .select("carpeta_id, compra_id")
+                .in("carpeta_id", folderIds);
 
-                        const { data: compras } = await supabase
-                            .from('compra_apunte')
-                            .select(`
-                            apunte_id,
-                            apunte:apunte(
-                                materia:id_materia(semestre)
-                            )
-                        `)
-                            .in('id', compraIds);
+            // Traer compras vinculadas (para calcular semestres)
+            const compraIds = [...new Set(allNotesInFolders?.map((n) => n.compra_id) || [])];
+            let comprasWithMaterias = [];
 
-                        const semSet = new Set();
-                        compras?.forEach(c => {
-                            const sem = c.apunte?.materia?.semestre;
-                            if (sem) semSet.add(sem);
-                        });
+            if (compraIds.length > 0) {
+                const { data } = await supabase
+                    .from("compra_apunte")
+                    .select(
+                        `
+            id,
+            apunte_id,
+            apunte:apunte(
+              materia:id_materia(semestre)
+            )
+          `
+                    )
+                    .in("id", compraIds);
+                comprasWithMaterias = data || [];
+            }
 
-                        semestres = Array.from(semSet);
-                    }
+            // Agrupar en frontend
+            const notesPerFolder = {};
+            allNotesInFolders?.forEach((nif) => {
+                if (!notesPerFolder[nif.carpeta_id]) {
+                    notesPerFolder[nif.carpeta_id] = [];
+                }
+                notesPerFolder[nif.carpeta_id].push(nif.compra_id);
+            });
 
-                    return {
-                        ...folder,
-                        item_count: (notes?.length || 0) + subfolders.length,
-                        semestres // ✅ NUEVO
-                    };
-                })
-            );
+            // Calcular semestres por carpeta
+            const foldersWithData = allFolders.map((folder) => {
+                const notesInFolder = notesPerFolder[folder.id_carpeta] || [];
+                const childFolders = allFolders.filter((f) => f.parent_id === folder.id_carpeta);
 
-            const rootFolders = foldersWithCount.filter(f => !f.parent_id);
-            setFolders(rootFolders);
+                const semestres = new Set();
+                notesInFolder.forEach((compraId) => {
+                    const compra = comprasWithMaterias.find((c) => c.id === compraId);
+                    const sem = compra?.apunte?.materia?.semestre;
+                    if (sem) semestres.add(sem);
+                });
 
+                return {
+                    ...folder,
+                    item_count: notesInFolder.length + childFolders.length,
+                    semestres: Array.from(semestres)
+                };
+            });
+
+            setFolders(foldersWithData.filter((f) => !f.parent_id));
         } catch (err) {
-            console.error('Error cargando carpetas:', err);
+            console.error("Error cargando carpetas:", err);
         }
     };
 
@@ -201,58 +281,30 @@ export default function Purchased() {
             setShowOrgModal(false);
             setErrorMsg("");
 
-            // Guardar snapshot ANTES de organizar
-            const { data: currentFolders } = await foldersAPI.getMyFolders();
-            const { data: currentRelations } = await supabase
-                .from('apunte_en_carpeta')
-                .select('*');
-
-            setLastOrgSnapshot({
-                folders: currentFolders || [],
-                relations: currentRelations || []
-            });
-
-            const { data, error } = await foldersAPI.autoOrganize();
-
+            const { error } = await foldersAPI.autoOrganize();
             if (error) throw error;
-
-            setHasOrganized(true);
             await loadFolders();
-
         } catch (err) {
-            console.error('Error organizando:', err);
+            console.error("Error organizando:", err);
             setErrorMsg(err?.message || "Error al organizar automáticamente");
         } finally {
             setOrganizing(false);
         }
     };
 
-    const handleUndoOrganization = async () => {
-        if (!lastOrgSnapshot) return;
-
+    const handleDeleteAllFolders = async () => {
         try {
             setOrganizing(true);
             setErrorMsg("");
 
-            // Obtener carpetas actuales
-            const { data: currentFolders } = await foldersAPI.getMyFolders();
-
-            // Eliminar solo las carpetas que NO existían en el snapshot
-            const snapshotIds = new Set(lastOrgSnapshot.folders.map(f => f.id_carpeta));
-
-            for (const folder of currentFolders || []) {
-                if (!snapshotIds.has(folder.id_carpeta)) {
-                    await foldersAPI.deleteFolder(folder.id_carpeta);
-                }
+            const { data: allFolders } = await foldersAPI.getMyFolders();
+            for (const folder of allFolders || []) {
+                await foldersAPI.deleteFolder(folder.id_carpeta);
             }
-
-            setLastOrgSnapshot(null);
-            setHasOrganized(false);
             await loadFolders();
-
         } catch (err) {
-            console.error('Error deshaciendo:', err);
-            setErrorMsg("Error al deshacer la organización");
+            console.error("Error eliminando carpetas:", err);
+            setErrorMsg("Error al eliminar carpetas");
         } finally {
             setOrganizing(false);
         }
@@ -261,77 +313,58 @@ export default function Purchased() {
     const handleCreateFolder = async () => {
         if (!newFolderName.trim()) return;
 
+        if (newFolderType === "materia" && !selectedMateria) {
+            setErrorMsg("Debes seleccionar una materia de la lista");
+            return;
+        }
+
         try {
             setErrorMsg("");
-            const { data, error } = await foldersAPI.createFolder(
-                newFolderName.trim(),
-                'personalizada',
-                null,
-                0
-            );
-
-            if (error) throw error;
+            await foldersAPI.createFolder(newFolderName.trim(), newFolderType, null, 0);
 
             setShowCreateFolderModal(false);
             setNewFolderName("");
+            setNewFolderType("personalizada");
+            setSearchTerm("");
+            setSelectedMateria(null);
             await loadFolders();
-
-            // ✅ NUEVO: Si el nombre era "Nueva carpeta", abrir para editar
-            if (newFolderName.trim().toLowerCase() === 'nueva carpeta' && data) {
-                // Trigger editar en la carpeta recién creada
-                // (esto requeriría pasar un callback o estado adicional)
-            }
-
         } catch (err) {
-            console.error('Error creando carpeta:', err);
+            console.error("Error creando carpeta:", err);
             setErrorMsg("Error al crear carpeta");
         }
     };
 
-    const handleOpenAddNotes = (folder) => {
-        setTargetFolder(folder);
-        setSelectedNotes([]);
-        setShowAddNotesModal(true);
-    };
-
     const handleAddNotesToFolder = async () => {
         if (!targetFolder || selectedNotes.length === 0) return;
-
         try {
             setErrorMsg("");
-
             for (const compraId of selectedNotes) {
                 await foldersAPI.addNoteToFolder(targetFolder.id_carpeta, compraId);
             }
-
             setShowAddNotesModal(false);
             setTargetFolder(null);
             setSelectedNotes([]);
+            setFilterText("");
             await loadFolders();
-
         } catch (err) {
-            console.error('Error añadiendo apuntes:', err);
+            console.error("Error añadiendo apuntes:", err);
             setErrorMsg("Error al añadir apuntes a la carpeta");
         }
     };
 
     const toggleNoteSelection = (compraId) => {
-        setSelectedNotes(prev =>
-            prev.includes(compraId)
-                ? prev.filter(id => id !== compraId)
-                : [...prev, compraId]
+        setSelectedNotes((prev) =>
+            prev.includes(compraId) ? prev.filter((id) => id !== compraId) : [...prev, compraId]
         );
     };
-
 
     const handleDeleteFolder = async (carpetaId) => {
         try {
             setErrorMsg("");
-            const { error } = await foldersAPI.deleteFolder(carpetaId);
-            if (error) throw error;
+            await foldersAPI.deleteFolder(carpetaId);
             await loadFolders();
         } catch (err) {
-            console.error('Error eliminando carpeta:', err);
+            console.error("Error eliminando carpeta:", err);
             setErrorMsg("Error al eliminar carpeta");
         }
     };
@@ -339,26 +372,45 @@ export default function Purchased() {
     const handleRenameFolder = async (carpetaId, nuevoNombre) => {
         try {
             setErrorMsg("");
-            const { error } = await foldersAPI.updateFolder(carpetaId, nuevoNombre);
-            if (error) throw error;
+            await foldersAPI.updateFolder(carpetaId, nuevoNombre);
             await loadFolders();
         } catch (err) {
-            console.error('Error renombrando carpeta:', err);
+            console.error("Error renombrando carpeta:", err);
             setErrorMsg("Error al renombrar carpeta");
         }
     };
 
+    // Filtrar apuntes disponibles
+    const filteredAvailableNotes = availableNotes.filter((note) => {
+        const searchText = normalizeText(filterText);
+        return (
+            normalizeText(note.titulo).includes(searchText) ||
+            normalizeText(note.materia).includes(searchText)
+        );
+    });
+
     if (loading) {
         return (
-            <div style={{
-                minHeight: "60vh", display: "flex", alignItems: "center",
-                justifyContent: "center", flexDirection: "column", gap: 16
-            }}>
-                <div style={{
-                    width: 40, height: 40, border: "3px solid #f3f4f6",
-                    borderTop: "3px solid #2563eb", borderRadius: "50%",
-                    animation: "spin 1s linear infinite"
-                }} />
+            <div
+                style={{
+                    minHeight: "60vh",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    flexDirection: "column",
+                    gap: 16
+                }}
+            >
+                <div
+                    style={{
+                        width: 40,
+                        height: 40,
+                        border: "3px solid #f3f4f6",
+                        borderTop: "3px solid #2563eb",
+                        borderRadius: "50%",
+                        animation: "spin 1s linear infinite"
+                    }}
+                />
                 <p style={{ color: "#6b7280", margin: 0 }}>Cargando tus compras…</p>
             </div>
         );
@@ -369,72 +421,74 @@ export default function Purchased() {
             <header style={{ marginBottom: 24 }}>
                 <h1 style={{ margin: "0 0 8px 0" }}>Mis compras</h1>
                 <p style={{ color: "#6b7280", margin: 0 }}>
-                    {purchases.length} compra{purchases.length !== 1 ? "s" : ""} realizada{purchases.length !== 1 ? "s" : ""}
+                    {purchases.length} compra{purchases.length !== 1 ? "s" : ""} realizada
+                    {purchases.length !== 1 ? "s" : ""}
                 </p>
             </header>
 
-            {/* Tabs */}
-            <div style={{
-                display: 'flex',
-                gap: 8,
-                borderBottom: '2px solid #e5e7eb',
-                marginBottom: 24
-            }}>
-                <button
-                    onClick={() => setActiveTab("purchases")}
-                    style={{
-                        padding: '12px 24px',
-                        background: 'none',
-                        border: 'none',
-                        borderBottom: activeTab === "purchases" ? '2px solid #2563eb' : '2px solid transparent',
-                        color: activeTab === "purchases" ? '#2563eb' : '#6b7280',
-                        fontWeight: activeTab === "purchases" ? 600 : 400,
-                        cursor: 'pointer',
-                        fontSize: 15,
-                        marginBottom: -2,
-                        transition: 'all 0.2s'
-                    }}
-                >
-                    Todas las compras
-                </button>
-                <button
-                    onClick={() => setActiveTab("folders")}
-                    style={{
-                        padding: '12px 24px',
-                        background: 'none',
-                        border: 'none',
-                        borderBottom: activeTab === "folders" ? '2px solid #2563eb' : '2px solid transparent',
-                        color: activeTab === "folders" ? '#2563eb' : '#6b7280',
-                        fontWeight: activeTab === "folders" ? 600 : 400,
-                        cursor: 'pointer',
-                        fontSize: 15,
-                        marginBottom: -2,
-                        transition: 'all 0.2s'
-                    }}
-                >
-                    Mis carpetas
-                </button>
+            <div
+                style={{
+                    display: "flex",
+                    gap: 8,
+                    borderBottom: "2px solid #e5e7eb",
+                    marginBottom: 24
+                }}
+            >
+                {["purchases", "folders"].map((tab) => (
+                    <button
+                        key={tab}
+                        onClick={() => setActiveTab(tab)}
+                        style={{
+                            padding: "12px 24px",
+                            background: "none",
+                            border: "none",
+                            borderBottom:
+                                activeTab === tab ? "2px solid #2563eb" : "2px solid transparent",
+                            color: activeTab === tab ? "#2563eb" : "#6b7280",
+                            fontWeight: activeTab === tab ? 600 : 400,
+                            cursor: "pointer",
+                            fontSize: 15,
+                            marginBottom: -2,
+                            transition: "all 0.2s"
+                        }}
+                    >
+                        {tab === "purchases" ? "Todas las compras" : "Mis carpetas"}
+                    </button>
+                ))}
             </div>
 
             {errorMsg && (
-                <Card style={{
-                    background: "#fef2f2",
-                    border: "1px solid #fecaca",
-                    color: "#991b1b",
-                    padding: "16px 20px",
-                    marginBottom: 20
-                }}>
-                    <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12 }}>
+                <Card
+                    style={{
+                        background: "#fef2f2",
+                        border: "1px solid #fecaca",
+                        color: "#991b1b",
+                        padding: "16px 20px",
+                        marginBottom: 20
+                    }}
+                >
+                    <div
+                        style={{
+                            display: "flex",
+                            alignItems: "center",
+                            justifyContent: "space-between",
+                            gap: 12
+                        }}
+                    >
                         <span>{errorMsg}</span>
-                        <Button variant="ghost" onClick={() => {
-                            loadPurchases();
-                            loadFolders();
-                        }}>Reintentar</Button>
+                        <Button
+                            variant="ghost"
+                            onClick={() => {
+                                loadPurchases();
+                                loadFolders();
+                            }}
+                        >
+                            Reintentar
+                        </Button>
                     </div>
                 </Card>
             )}
 
-            {/* Contenido según tab activo */}
             {activeTab === "purchases" ? (
                 purchases.length === 0 ? (
                     <Card style={{ textAlign: "center", padding: "48px 24px", background: "#fafafa" }}>
@@ -443,79 +497,161 @@ export default function Purchased() {
                         <p style={{ color: "#6b7280", margin: "0 0 24px 0" }}>
                             Explorá apuntes y materiales creados por otros estudiantes.
                         </p>
-                        <Button variant="primary" onClick={() => navigate('/notes')}>Ir a explorar apuntes</Button>
+                        <Button variant="primary" onClick={() => navigate("/notes")}>
+                            Ir a explorar apuntes
+                        </Button>
                     </Card>
                 ) : (
-                    <div style={{
-                        display: 'grid',
-                        gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))',
-                        gap: 20
-                    }}>
+                    <div
+                        style={{
+                            display: "grid",
+                            gridTemplateColumns: "repeat(auto-fill, minmax(280px, 1fr))",
+                            gap: 20
+                        }}
+                    >
                         {purchases.map((purchase) => (
-                            <ApunteCard
-                                key={purchase.id}
-                                note={purchase}
-                            />
+                            <ApunteCard key={purchase.id} note={purchase} />
                         ))}
                     </div>
                 )
             ) : (
                 <div>
-                    {/* Botones de acción */}
-                    <div style={{
-                        display: 'flex',
-                        gap: 12,
-                        marginBottom: 24,
-                        flexWrap: 'wrap'
-                    }}>
-                        <Button
-                            variant="secondary"
+                    <div style={{ display: "flex", gap: 12, marginBottom: 24, flexWrap: "wrap" }}>
+                        <button
                             onClick={() => setShowCreateFolderModal(true)}
-                            style={{ display: 'flex', alignItems: 'center', gap: 8 }}
+                            style={{
+                                display: "flex",
+                                alignItems: "center",
+                                gap: 8,
+                                padding: "10px 18px",
+                                borderRadius: 8,
+                                fontWeight: 500,
+                                fontSize: 14,
+                                background: "white",
+                                border: "2px solid #e5e7eb",
+                                color: "#374151",
+                                cursor: "pointer",
+                                transition: "all 0.2s"
+                            }}
+                            onMouseEnter={(e) => (e.target.style.background = "#f9fafb")}
+                            onMouseLeave={(e) => (e.target.style.background = "white")}
                         >
-                            ➕ Crear carpeta
-                        </Button>
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+                                <path d="M12 5v14M5 12h14" />
+                            </svg>
+                            Crear carpeta
+                        </button>
 
-                        {!hasOrganized && (
-                            <Button
-                                variant="primary"
+                        {folders.length === 0 && purchases.length > 0 && (
+                            <button
                                 onClick={() => setShowOrgModal(true)}
-                                disabled={organizing || purchases.length === 0}
-                                style={{ display: 'flex', alignItems: 'center', gap: 8 }}
+                                disabled={organizing}
+                                style={{
+                                    display: "flex",
+                                    alignItems: "center",
+                                    gap: 8,
+                                    background: organizing ? "#9ca3af" : "#2563eb",
+                                    color: "white",
+                                    border: "none",
+                                    padding: "10px 18px",
+                                    borderRadius: 8,
+                                    fontWeight: 500,
+                                    fontSize: 14,
+                                    cursor: organizing ? "not-allowed" : "pointer",
+                                    transition: "all 0.2s"
+                                }}
+                                onMouseEnter={(e) => {
+                                    if (!organizing) e.target.style.background = "#1d4ed8";
+                                }}
+                                onMouseLeave={(e) => {
+                                    if (!organizing) e.target.style.background = "#2563eb";
+                                }}
                             >
                                 {organizing ? (
                                     <>
-                                        <div style={{
-                                            width: 'calc(100% - 24px)',
-                                            height: 16,
-                                            border: "2px solid white",
-                                            borderTop: "2px solid transparent",
-                                            borderRadius: "50%",
-                                            animation: "spin 1s linear infinite",
-                                            boxSizing: 'border-box'
-                                        }} />
+                                        <div
+                                            style={{
+                                                width: 14,
+                                                height: 14,
+                                                border: "2px solid white",
+                                                borderTop: "2px solid transparent",
+                                                borderRadius: "50%",
+                                                animation: "spin 1s linear infinite"
+                                            }}
+                                        />
                                         Organizando...
                                     </>
                                 ) : (
                                     <>
-                                        🤖 Organizar con IA
+                                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                                            <circle cx="12" cy="12" r="10" />
+                                            <circle cx="12" cy="12" r="3" />
+                                            <path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83" />
+                                        </svg>
+                                        Organizar automáticamente
                                     </>
                                 )}
-                            </Button>
+                            </button>
                         )}
 
-                        {hasOrganized && lastOrgSnapshot && (
-                            <Button
-                                variant="secondary"
-                                onClick={handleUndoOrganization}
+                        {folders.length > 0 && (
+                            <button
+                                onClick={handleDeleteAllFolders}
                                 disabled={organizing}
+                                style={{
+                                    display: "flex",
+                                    alignItems: "center",
+                                    gap: 8,
+                                    padding: "10px 18px",
+                                    borderRadius: 8,
+                                    fontWeight: 500,
+                                    fontSize: 14,
+                                    background: "white",
+                                    border: "2px solid #fecaca",
+                                    color: "#dc2626",
+                                    cursor: organizing ? "not-allowed" : "pointer",
+                                    opacity: organizing ? 0.6 : 1,
+                                    transition: "all 0.2s"
+                                }}
+                                onMouseEnter={(e) => {
+                                    if (!organizing) {
+                                        e.target.style.background = "#fef2f2";
+                                        e.target.style.borderColor = "#fca5a5";
+                                    }
+                                }}
+                                onMouseLeave={(e) => {
+                                    if (!organizing) {
+                                        e.target.style.background = "white";
+                                        e.target.style.borderColor = "#fecaca";
+                                    }
+                                }}
                             >
-                                ↩️ Deshacer organización
-                            </Button>
+                                {organizing ? (
+                                    <>
+                                        <div
+                                            style={{
+                                                width: 14,
+                                                height: 14,
+                                                border: "2px solid #dc2626",
+                                                borderTop: "2px solid transparent",
+                                                borderRadius: "50%",
+                                                animation: "spin 1s linear infinite"
+                                            }}
+                                        />
+                                        Borrando...
+                                    </>
+                                ) : (
+                                    <>
+                                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                                            <path d="M3 6h18M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2" />
+                                        </svg>
+                                        Borrar todas las carpetas
+                                    </>
+                                )}
+                            </button>
                         )}
                     </div>
 
-                    {/* Grid de carpetas */}
                     {folders.length === 0 ? (
                         <Card style={{ textAlign: "center", padding: "48px 24px", background: "#fafafa" }}>
                             <div style={{ fontSize: 48, marginBottom: 16 }}>📁</div>
@@ -523,18 +659,15 @@ export default function Purchased() {
                             <p style={{ color: "#6b7280", margin: "0 0 24px 0" }}>
                                 Organizá tus compras automáticamente o creá carpetas personalizadas.
                             </p>
-                            {purchases.length > 0 && (
-                                <Button variant="primary" onClick={() => setShowOrgModal(true)}>
-                                    🤖 Organizar con IA
-                                </Button>
-                            )}
                         </Card>
                     ) : (
-                        <div style={{
-                            display: 'grid',
-                            gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))',
-                            gap: 20
-                        }}>
+                        <div
+                            style={{
+                                display: "grid",
+                                gridTemplateColumns: "repeat(auto-fill, minmax(280px, 1fr))",
+                                gap: 20
+                            }}
+                        >
                             {folders.map((folder) => (
                                 <FolderCard
                                     key={folder.id_carpeta}
@@ -549,47 +682,83 @@ export default function Purchased() {
                 </div>
             )}
 
-            {/* Modal organizar con IA */}
+            {/* Modal organizar automáticamente */}
             {showOrgModal && (
-                <div style={{
-                    position: 'fixed',
-                    top: 0,
-                    left: 0,
-                    right: 0,
-                    bottom: 0,
-                    background: 'rgba(0,0,0,0.5)',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    zIndex: 1000,
-                    padding: 16
-                }} onClick={() => setShowOrgModal(false)}>
-                    <Card style={{
-                        maxWidth: 480,
-                        width: '100%',
-                        padding: 24
-                    }} onClick={(e) => e.stopPropagation()}>
-                        <h2 style={{ margin: '0 0 12px 0', fontSize: 20 }}>
-                            Organizar automáticamente
-                        </h2>
-                        <p style={{ color: '#6b7280', margin: '0 0 20px 0', lineHeight: 1.6 }}>
-                            Esto va a crear carpetas por semestre y materia automáticamente, organizando todos tus apuntes.
-                            <br /><br />
-                            Podés deshacer esta acción después si no te gusta cómo quedó.
+                <div
+                    style={{
+                        position: "fixed",
+                        top: 0,
+                        left: 0,
+                        right: 0,
+                        bottom: 0,
+                        background: "rgba(0,0,0,0.6)",
+                        backdropFilter: "blur(4px)",
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        zIndex: 1000,
+                        padding: 16
+                    }}
+                    onClick={() => setShowOrgModal(false)}
+                >
+                    <Card
+                        style={{ maxWidth: 480, width: "100%", padding: 32, boxShadow: "0 20px 60px rgba(0,0,0,0.3)" }}
+                        onClick={(e) => e.stopPropagation()}
+                    >
+                        <div
+                            style={{
+                                width: 56,
+                                height: 56,
+                                borderRadius: 14,
+                                background: "#2563eb",
+                                display: "flex",
+                                alignItems: "center",
+                                justifyContent: "center",
+                                fontSize: 28,
+                                marginBottom: 20
+                            }}
+                        >
+                            🤖
+                        </div>
+                        <h2 style={{ margin: "0 0 12px 0", fontSize: 22, fontWeight: 700 }}>Organizar automáticamente</h2>
+                        <p style={{ color: "#6b7280", margin: "0 0 24px 0", lineHeight: 1.6, fontSize: 15 }}>
+                            Voy a crear carpetas por semestre y materia automáticamente, organizando todos tus apuntes.
                         </p>
-                        <div style={{ display: 'flex', gap: 12, justifyContent: 'flex-end' }}>
-                            <Button
-                                variant="ghost"
+                        <div style={{ display: "flex", gap: 12 }}>
+                            <button
                                 onClick={() => setShowOrgModal(false)}
+                                style={{
+                                    flex: 1,
+                                    padding: "12px 20px",
+                                    background: "white",
+                                    border: "2px solid #e5e7eb",
+                                    borderRadius: 10,
+                                    cursor: "pointer",
+                                    fontSize: 15,
+                                    fontWeight: 600,
+                                    color: "#6b7280",
+                                    transition: "all 0.2s"
+                                }}
                             >
                                 Cancelar
-                            </Button>
-                            <Button
-                                variant="primary"
+                            </button>
+                            <button
                                 onClick={handleOrganize}
+                                style={{
+                                    flex: 1,
+                                    padding: "12px 20px",
+                                    background: "#2563eb",
+                                    color: "white",
+                                    border: "none",
+                                    borderRadius: 10,
+                                    cursor: "pointer",
+                                    fontSize: 15,
+                                    fontWeight: 600,
+                                    transition: "all 0.2s"
+                                }}
                             >
                                 Organizar
-                            </Button>
+                            </button>
                         </div>
                     </Card>
                 </div>
@@ -597,137 +766,421 @@ export default function Purchased() {
 
             {/* Modal crear carpeta */}
             {showCreateFolderModal && (
-                <div style={{
-                    position: 'fixed',
-                    top: 0,
-                    left: 0,
-                    right: 0,
-                    bottom: 0,
-                    background: 'rgba(0,0,0,0.5)',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    zIndex: 1000,
-                    padding: 16
-                }} onClick={() => setShowCreateFolderModal(false)}>
-                    <Card style={{
-                        maxWidth: 400,
-                        width: '100%',
-                        padding: 24
-                    }} onClick={(e) => e.stopPropagation()}>
-                        <h2 style={{ margin: '0 0 16px 0', fontSize: 20 }}>
-                            Crear carpeta
-                        </h2>
-                        <input
-                            type="text"
-                            placeholder="Nombre de la carpeta"
-                            value={newFolderName}
-                            onChange={(e) => setNewFolderName(e.target.value)}
-                            onKeyPress={(e) => {
-                                if (e.key === 'Enter') handleCreateFolder();
-                            }}
-                            style={{
-                                width: '100%',
-                                padding: '10px 12px',
-                                border: '1px solid #d1d5db',
-                                borderRadius: 8,
-                                fontSize: 14,
-                                marginBottom: 20,
-                                outline: 'none'
-                            }}
-                            autoFocus
-                        />
-                        <div style={{ display: 'flex', gap: 12, justifyContent: 'flex-end' }}>
-                            <Button
-                                variant="ghost"
+                <div
+                    style={{
+                        position: "fixed",
+                        top: 0,
+                        left: 0,
+                        right: 0,
+                        bottom: 0,
+                        background: "rgba(0,0,0,0.6)",
+                        backdropFilter: "blur(4px)",
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        zIndex: 1000,
+                        padding: 16
+                    }}
+                    onClick={() => {
+                        setShowCreateFolderModal(false);
+                        setNewFolderName("");
+                        setNewFolderType("personalizada");
+                        setSearchTerm("");
+                        setSelectedMateria(null);
+                    }}
+                >
+                    <Card
+                        style={{ maxWidth: 480, width: "100%", padding: 32, boxShadow: "0 20px 60px rgba(0,0,0,0.3)" }}
+                        onClick={(e) => e.stopPropagation()}
+                    >
+                        <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 20 }}>
+                            <div
+                                style={{
+                                    width: 48,
+                                    height: 48,
+                                    borderRadius: 12,
+                                    background: "#2563eb",
+                                    display: "flex",
+                                    alignItems: "center",
+                                    justifyContent: "center",
+                                    fontSize: 24
+                                }}
+                            >
+                                📁
+                            </div>
+                            <h2 style={{ margin: 0, fontSize: 22, fontWeight: 700 }}>Nueva carpeta</h2>
+                        </div>
+
+                        <p style={{ color: "#6b7280", margin: "0 0 20px 0", fontSize: 14, lineHeight: 1.5 }}>
+                            Organizá tus apuntes creando carpetas personalizadas o por materia
+                        </p>
+
+                        {/* Selector de tipo */}
+                        <div style={{ marginBottom: 20 }}>
+                            <label
+                                style={{
+                                    display: "block",
+                                    fontSize: 13,
+                                    fontWeight: 600,
+                                    color: "#374151",
+                                    marginBottom: 12
+                                }}
+                            >
+                                Tipo de carpeta
+                            </label>
+                            <div style={{ display: "flex", gap: 12 }}>
+                                <button
+                                    type="button"
+                                    onClick={() => {
+                                        setNewFolderType("materia");
+                                        setNewFolderName("");
+                                        setSearchTerm("");
+                                        setSelectedMateria(null);
+                                    }}
+                                    style={{
+                                        flex: 1,
+                                        padding: "12px 16px",
+                                        border: newFolderType === "materia" ? "2px solid #059669" : "2px solid #e5e7eb",
+                                        borderRadius: 8,
+                                        background: newFolderType === "materia" ? "#d1fae5" : "white",
+                                        color: newFolderType === "materia" ? "#059669" : "#6b7280",
+                                        cursor: "pointer",
+                                        fontWeight: newFolderType === "materia" ? 600 : 400,
+                                        fontSize: 14,
+                                        transition: "all 0.2s",
+                                        display: "flex",
+                                        flexDirection: "column",
+                                        alignItems: "center",
+                                        gap: 4
+                                    }}
+                                >
+                                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                                        <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20" />
+                                        <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z" />
+                                    </svg>
+                                    Materia
+                                </button>
+                                <button
+                                    type="button"
+                                    onClick={() => {
+                                        setNewFolderType("personalizada");
+                                        setSearchTerm("");
+                                        setSelectedMateria(null);
+                                    }}
+                                    style={{
+                                        flex: 1,
+                                        padding: "12px 16px",
+                                        border:
+                                            newFolderType === "personalizada" ? "2px solid #2563eb" : "2px solid #e5e7eb",
+                                        borderRadius: 8,
+                                        background: newFolderType === "personalizada" ? "#dbeafe" : "white",
+                                        color: newFolderType === "personalizada" ? "#2563eb" : "#6b7280",
+                                        cursor: "pointer",
+                                        fontWeight: newFolderType === "personalizada" ? 600 : 400,
+                                        fontSize: 14,
+                                        transition: "all 0.2s",
+                                        display: "flex",
+                                        flexDirection: "column",
+                                        alignItems: "center",
+                                        gap: 4
+                                    }}
+                                >
+                                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                                        <path d="M20 7h-9M14 17H5M17 3v18M7 7v10" />
+                                    </svg>
+                                    Personalizada
+                                </button>
+                            </div>
+                        </div>
+
+                        {/* Input según tipo */}
+                        {newFolderType === "materia" ? (
+                            <div style={{ marginBottom: 24, position: "relative" }} ref={dropdownRef}>
+                                <label
+                                    style={{
+                                        display: "block",
+                                        fontSize: 13,
+                                        fontWeight: 600,
+                                        color: "#374151",
+                                        marginBottom: 8
+                                    }}
+                                >
+                                    Buscar materia
+                                </label>
+                                <input
+                                    type="text"
+                                    value={searchTerm}
+                                    onChange={(e) => {
+                                        setSearchTerm(e.target.value);
+                                        setSelectedMateria(null);
+                                    }}
+                                    placeholder="Ej: Análisis Matemático, Física..."
+                                    style={{
+                                        width: "100%",
+                                        padding: "12px 16px",
+                                        border: "2px solid #e5e7eb",
+                                        borderRadius: 8,
+                                        fontSize: 15,
+                                        outline: "none",
+                                        transition: "all 0.2s",
+                                        boxSizing: "border-box"
+                                    }}
+                                    autoFocus
+                                />
+                                {showDropdown && filteredMaterias.length > 0 && (
+                                    <div
+                                        style={{
+                                            position: "absolute",
+                                            top: "100%",
+                                            left: 0,
+                                            right: 0,
+                                            background: "#fff",
+                                            border: "1px solid #d1d5db",
+                                            borderRadius: 8,
+                                            marginTop: 4,
+                                            maxHeight: 200,
+                                            overflowY: "auto",
+                                            zIndex: 100,
+                                            boxShadow: "0 4px 6px -1px rgba(0,0,0,0.1)"
+                                        }}
+                                    >
+                                        {filteredMaterias.map((materia) => (
+                                            <div
+                                                key={materia.id_materia}
+                                                onClick={() => handleMateriaSelect(materia)}
+                                                style={{
+                                                    padding: "12px 16px",
+                                                    cursor: "pointer",
+                                                    borderBottom: "1px solid #f3f4f6"
+                                                }}
+                                                onMouseEnter={(e) => (e.target.style.background = "#f9fafb")}
+                                                onMouseLeave={(e) => (e.target.style.background = "#fff")}
+                                            >
+                                                <div style={{ fontWeight: 500 }}>{materia.nombre_materia}</div>
+                                                <div style={{ fontSize: 12, color: "#6b7280", marginTop: 2 }}>
+                                                    Semestre {materia.semestre}
+                                                </div>
+                                            </div>
+                                        ))}
+                                    </div>
+                                )}
+                            </div>
+                        ) : (
+                            <div style={{ marginBottom: 24 }}>
+                                <label
+                                    style={{
+                                        display: "block",
+                                        fontSize: 13,
+                                        fontWeight: 600,
+                                        color: "#374151",
+                                        marginBottom: 8
+                                    }}
+                                >
+                                    Nombre de la carpeta
+                                </label>
+                                <input
+                                    type="text"
+                                    placeholder="Ej: Mis favoritos, Exámenes finales..."
+                                    value={newFolderName}
+                                    onChange={(e) => setNewFolderName(e.target.value)}
+                                    onFocus={(e) => e.target.select()}
+                                    onKeyPress={(e) => {
+                                        if (e.key === "Enter" && newFolderName.trim()) {
+                                            handleCreateFolder();
+                                        }
+                                    }}
+                                    style={{
+                                        width: "100%",
+                                        padding: "12px 16px",
+                                        border: "2px solid #e5e7eb",
+                                        borderRadius: 8,
+                                        fontSize: 15,
+                                        outline: "none",
+                                        transition: "all 0.2s",
+                                        boxSizing: "border-box"
+                                    }}
+                                    autoFocus
+                                />
+                            </div>
+                        )}
+
+                        <div style={{ display: "flex", gap: 12 }}>
+                            <button
                                 onClick={() => {
                                     setShowCreateFolderModal(false);
                                     setNewFolderName("");
+                                    setNewFolderType("personalizada");
+                                    setSearchTerm("");
+                                    setSelectedMateria(null);
                                 }}
+                                style={{
+                                    flex: 1,
+                                    padding: "12px 20px",
+                                    background: "white",
+                                    border: "2px solid #e5e7eb",
+                                    borderRadius: 10,
+                                    cursor: "pointer",
+                                    fontSize: 15,
+                                    fontWeight: 600,
+                                    color: "#6b7280",
+                                    transition: "all 0.2s"
+                                }}
+                                onMouseEnter={(e) => (e.target.style.background = "#f9fafb")}
+                                onMouseLeave={(e) => (e.target.style.background = "white")}
                             >
                                 Cancelar
-                            </Button>
-                            <Button
-                                variant="primary"
+                            </button>
+                            <button
                                 onClick={handleCreateFolder}
                                 disabled={!newFolderName.trim()}
+                                style={{
+                                    flex: 1,
+                                    padding: "12px 20px",
+                                    background: !newFolderName.trim() ? "#d1d5db" : "#2563eb",
+                                    color: "white",
+                                    border: "none",
+                                    borderRadius: 10,
+                                    cursor: !newFolderName.trim() ? "not-allowed" : "pointer",
+                                    fontSize: 15,
+                                    fontWeight: 600,
+                                    transition: "all 0.2s"
+                                }}
+                                onMouseEnter={(e) => {
+                                    if (newFolderName.trim()) e.target.style.background = "#1d4ed8";
+                                }}
+                                onMouseLeave={(e) => {
+                                    if (newFolderName.trim()) e.target.style.background = "#2563eb";
+                                }}
                             >
-                                Crear
-                            </Button>
+                                Crear carpeta
+                            </button>
                         </div>
                     </Card>
                 </div>
             )}
 
-            {/* Modal añadir apuntes */}
+            {/* Modal añadir notas a carpeta */}
             {showAddNotesModal && (
-                <div style={{
-                    position: 'fixed',
-                    top: 0,
-                    left: 0,
-                    right: 0,
-                    bottom: 0,
-                    background: 'rgba(0,0,0,0.5)',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    zIndex: 1000,
-                    padding: 16,
-                    overflow: 'auto'
-                }} onClick={() => setShowAddNotesModal(false)}>
-                    <Card style={{
-                        maxWidth: 600,
-                        width: '100%',
-                        padding: 24,
-                        maxHeight: '80vh',
-                        overflow: 'auto'
-                    }} onClick={(e) => e.stopPropagation()}>
-                        <h2 style={{ margin: '0 0 16px 0', fontSize: 20 }}>
-                            Añadir apuntes a "{targetFolder?.nombre}"
-                        </h2>
-                        <div style={{ marginBottom: 20 }}>
-                            {purchases.map((purchase) => (
-                                <label
-                                    key={purchase.id}
-                                    style={{
-                                        display: 'flex',
-                                        alignItems: 'center',
-                                        padding: '12px',
-                                        border: '1px solid #e5e7eb',
-                                        borderRadius: 8,
-                                        marginBottom: 8,
-                                        cursor: 'pointer',
-                                        background: selectedNotes.includes(purchase.id) ? '#eff6ff' : 'white',
-                                        transition: 'all 0.2s'
-                                    }}
-                                >
-                                    <input
-                                        type="checkbox"
-                                        checked={selectedNotes.includes(purchase.id)}
-                                        onChange={() => toggleNoteSelection(purchase.id)}
-                                        style={{ marginRight: 12 }}
-                                    />
-                                    <div style={{ flex: 1 }}>
-                                        <div style={{ fontWeight: 500, marginBottom: 4 }}>
-                                            {purchase.titulo}
-                                        </div>
-                                        <div style={{ fontSize: 13, color: '#6b7280' }}>
-                                            {purchase.materia?.nombre_materia || 'Sin materia'}
-                                        </div>
-                                    </div>
-                                </label>
-                            ))}
+                <div
+                    style={{
+                        position: "fixed",
+                        top: 0,
+                        left: 0,
+                        right: 0,
+                        bottom: 0,
+                        background: "rgba(0,0,0,0.6)",
+                        backdropFilter: "blur(4px)",
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        zIndex: 1000,
+                        padding: 16
+                    }}
+                    onClick={() => {
+                        setShowAddNotesModal(false);
+                        setFilterText("");
+                    }}
+                >
+                    <Card
+                        style={{
+                            maxWidth: 600,
+                            width: "100%",
+                            maxHeight: "80vh",
+                            display: "flex",
+                            flexDirection: "column",
+                            boxShadow: "0 20px 60px rgba(0,0,0,0.3)"
+                        }}
+                        onClick={(e) => e.stopPropagation()}
+                    >
+                        <div style={{ padding: 32, borderBottom: "1px solid #e5e7eb" }}>
+                            <h2 style={{ margin: "0 0 16px 0", fontSize: 20 }}>
+                                Añadir apuntes a "{targetFolder?.nombre}"
+                            </h2>
+
+                            <input
+                                type="text"
+                                placeholder="Buscar por nombre o materia..."
+                                value={filterText}
+                                onChange={(e) => setFilterText(e.target.value)}
+                                style={{
+                                    width: "100%",
+                                    padding: "10px 16px",
+                                    border: "2px solid #e5e7eb",
+                                    borderRadius: 8,
+                                    fontSize: 14,
+                                    outline: "none",
+                                    boxSizing: "border-box",
+                                    transition: "border 0.2s"
+                                }}
+                                onFocus={(e) => (e.target.style.borderColor = "#2563eb")}
+                                onBlur={(e) => (e.target.style.borderColor = "#e5e7eb")}
+                            />
                         </div>
-                        <div style={{ display: 'flex', gap: 12, justifyContent: 'space-between', alignItems: 'center' }}>
-                            <span style={{ fontSize: 14, color: '#6b7280' }}>
-                                {selectedNotes.length} seleccionado{selectedNotes.length !== 1 ? 's' : ''}
-                            </span>
-                            <div style={{ display: 'flex', gap: 12 }}>
+
+                        <div style={{ padding: 24, overflowY: "auto", flex: 1 }}>
+                            {filteredAvailableNotes.length === 0 ? (
+                                <div style={{ textAlign: "center", padding: "40px 20px", color: "#6b7280" }}>
+                                    <div style={{ fontSize: 48, marginBottom: 12 }}>
+                                        {filterText ? "🔍" : "📭"}
+                                    </div>
+                                    <p style={{ margin: 0, fontWeight: 500 }}>
+                                        {filterText ? "No se encontraron resultados" : "No hay apuntes disponibles"}
+                                    </p>
+                                </div>
+                            ) : (
+                                <div style={{ marginBottom: 20 }}>
+                                    {filteredAvailableNotes.map((note) => (
+                                        <label
+                                            key={note.id}
+                                            style={{
+                                                display: "flex",
+                                                alignItems: "center",
+                                                padding: "12px",
+                                                border: "1px solid #e5e7eb",
+                                                borderRadius: 8,
+                                                marginBottom: 8,
+                                                cursor: "pointer",
+                                                background: selectedNotes.includes(note.id) ? "#eff6ff" : "white",
+                                                transition: "all 0.2s"
+                                            }}
+                                        >
+                                            <input
+                                                type="checkbox"
+                                                checked={selectedNotes.includes(note.id)}
+                                                onChange={() => toggleNoteSelection(note.id)}
+                                                style={{ marginRight: 12 }}
+                                            />
+                                            <div style={{ flex: 1 }}>
+                                                <div style={{ fontWeight: 500, marginBottom: 4 }}>{note.titulo}</div>
+                                                <div style={{ fontSize: 13, color: "#6b7280" }}>{note.materia}</div>
+                                            </div>
+                                        </label>
+                                    ))}
+                                </div>
+                            )}
+                        </div>
+
+                        <div
+                            style={{
+                                padding: 24,
+                                borderTop: "1px solid #e5e7eb",
+                                display: "flex",
+                                gap: 12,
+                                justifyContent: "space-between",
+                                alignItems: "center"
+                            }}
+                        >
+              <span style={{ fontSize: 14, color: "#6b7280" }}>
+                {selectedNotes.length > 0 &&
+                    `${selectedNotes.length} seleccionado${selectedNotes.length !== 1 ? "s" : ""}`}
+              </span>
+                            <div style={{ display: "flex", gap: 12 }}>
                                 <Button
                                     variant="ghost"
                                     onClick={() => {
                                         setShowAddNotesModal(false);
                                         setSelectedNotes([]);
+                                        setFilterText("");
                                     }}
                                 >
                                     Cancelar

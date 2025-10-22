@@ -40,13 +40,12 @@ export const useMentorStatus = (autoCheck = true) => {
             // 3️⃣ Buscar todos los mentores asociados al usuario
             const { data: mentores, error: mentorErr } = await supabase
                 .from('mentor')
-                .select('id_mentor, estrellas_mentor, contacto, descripcion, fecha_inicio')
+                .select('id_mentor, estrellas_mentor, contacto, descripcion, fecha_inicio, usuario:usuario (calendly_url)')
                 .eq('id_usuario', usuarioData.id_usuario)
 
-            console.log('🔍 Mentores encontrados:', mentores)
+            console.log('🎓 Mentores del usuario:', mentores)
 
             if (mentorErr || !mentores || mentores.length === 0) {
-                console.log('❌ No hay registros de mentor')
                 setIsMentor(false)
                 setMentorData([])
                 return
@@ -62,8 +61,7 @@ export const useMentorStatus = (autoCheck = true) => {
                             id_materia,
                             materia (
                                 id_materia,
-                                nombre_materia,
-                                semestre
+                                nombre_materia
                             )
                         `)
                         .eq('id_mentor', mentor.id_mentor)
@@ -73,27 +71,13 @@ export const useMentorStatus = (autoCheck = true) => {
                         return { ...mentor, mentor_materia: [] }
                     }
 
-                    console.log(`📚 Materias del mentor ${mentor.id_mentor}:`, mm)
                     return { ...mentor, mentor_materia: mm || [] }
                 })
             )
 
-            console.log('🎓 Todos los mentores con materias:', allMentores)
-
-            // 5️⃣ VALIDAR: Solo es mentor si tiene AL MENOS UNA materia
-            const tieneMaterias = allMentores.some(m => m.mentor_materia.length > 0)
-
-            console.log('✅ Tiene materias activas?', tieneMaterias)
-
-            if (tieneMaterias) {
-                setIsMentor(true)
-                setMentorData(allMentores)
-                console.log('✅ Usuario ES MENTOR con materias activas')
-            } else {
-                setIsMentor(false)
-                setMentorData([])
-                console.log('⚠️ Usuario tiene registro de mentor pero SIN materias activas')
-            }
+            // 5️⃣ Actualizar estado
+            setIsMentor(true)
+            setMentorData(allMentores)
         } catch (err) {
             console.error('❌ Error general en useMentorStatus:', err)
             setIsMentor(false)

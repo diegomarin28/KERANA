@@ -74,7 +74,7 @@ export const subjectsAPI = {
 
     async getSubjectContent(materiaId) {
         const [apuntes, profesores, mentores] = await Promise.all([
-            supabase.from('apunte').select('*').eq('id_materia', materiaId),
+            supabase.from('apunte').select('*, thumbnail_path').eq('id_materia', materiaId),
             supabase
                 .from('imparte')
                 .select(`id_profesor,profesor_curso!inner(*, usuario(*))`)
@@ -223,20 +223,21 @@ async function searchNotes(term) {
         // 2️⃣ Obtenemos los IDs encontrados
         const ids = apuntes.map(a => a.id_apunte);
 
-        // 3️⃣ Traemos toda la info de esos apuntes
+        // 3️⃣ Traemos toda la info de esos apuntes (con thumbnail_path)
         const { data: apuntesCompletos, error: errorCompleto } = await supabase
             .from('apunte')
             .select(`
-        id_apunte,
-        titulo,
-        descripcion,
-        file_path,
-        estrellas,
-        creditos,
-        id_usuario,
-        id_materia,
-        materia(nombre_materia)
-    `)
+                id_apunte,
+                titulo,
+                descripcion,
+                file_path,
+                estrellas,
+                creditos,
+                id_usuario,
+                id_materia,
+                materia(nombre_materia),
+                thumbnail_path
+            `)
             .in('id_apunte', ids);
 
         if (errorCompleto) {
@@ -271,7 +272,7 @@ async function searchNotes(term) {
 
         const userMap = new Map(usuarios?.map(u => [u.id_usuario, u.nombre]) || []);
 
-        // 5️⃣ Generar signed URLs y transformar
+        // 5️⃣ Transformar
         const transformed = [];
         for (const a of (apuntesCompletos || [])) {
             let signedUrl = null;
@@ -297,7 +298,8 @@ async function searchNotes(term) {
                 signedUrl: signedUrl,
                 materia: a.materia,
                 usuario: { nombre: userMap.get(a.id_usuario) || 'Anónimo' },
-                likes_count: likesCountMap[a.id_apunte] || 0
+                likes_count: likesCountMap[a.id_apunte] || 0,
+                thumbnail_path: a.thumbnail_path || null
             });
         }
 
@@ -383,7 +385,7 @@ async function searchMentors(term) {
         const { data, error } = await supabase
             .rpc('buscar_mentores_sin_tildes', { termino: q });
 
-        if (error) return { data: [], error };
+        if (error) return { data, error };
 
         // Obtener los id_usuario de cada mentor
         const mentorIds = (data || []).map(m => m.id_mentor);
@@ -653,7 +655,7 @@ export const notesAPI = {
     async searchNotes(searchTerm) {
         const { data, error } = await supabase
             .from('apunte')
-            .select('*, materia(nombre_materia)')
+            .select('*, thumbnail_path, materia(nombre_materia)')
             .ilike('titulo', `%${searchTerm}%`)
 
         return { data, error }
@@ -662,7 +664,7 @@ export const notesAPI = {
     async getNotesBySubject(materiaId) {
         const { data, error } = await supabase
             .from('apunte')
-            .select('*')
+            .select('*, thumbnail_path')
             .eq('id_materia', materiaId)
 
         return { data, error }
@@ -1482,43 +1484,46 @@ export const publicProfileAPI = {
         const { data, error } = await supabase
             .from('apunte')
             .select(`
-            id_apunte,
-            titulo,
-            descripcion,
-            created_at,
-            creditos,
-            file_path,
-            id_usuario,
-            id_materia,
-            usuario:id_usuario(nombre),
-            materia:id_materia(id_materia, nombre_materia),
-            estrellas,
-            portada_url
-        `)
+                id_apunte,
+                titulo,
+                descripcion,
+                created_at,
+                id_materia,
+                materia(nombre_materia),
+                estrellas,
+                thumbnail_path
+            `)
             .eq('id_usuario', userId)
             .order('created_at', { ascending: false })
             .limit(limit);
 
-        return { data, error };
+        // Transformar para que funcione con NoteCard
+        const transformed = (data || []).map(note => ({
+            id_apunte: note.id_apunte,
+            titulo: note.titulo,
+            descripcion: note.descripcion,
+            materia_nombre: note.materia?.nombre_materia,
+            estrellas: note.estrellas,
+            thumbnail_path: note.thumbnail_path,
+            created_at: note.created_at
+        }));
+
+        return { data: transformed, error };
     },
 
     async getAllNotes(userId, materiaId = null) {
         let query = supabase
             .from('apunte')
             .select(`
-            id_apunte,
-            titulo,
-            descripcion,
-            created_at,
-            creditos,
-            file_path,
-            id_usuario,
-            id_materia,
-            usuario:id_usuario(nombre),
-            materia:id_materia(id_materia, nombre_materia),
-            estrellas,
-            portada_url
-        `)
+                id_apunte,
+                titulo,
+                descripcion,
+                created_at,
+                id_materia,
+                materia(nombre_materia),
+                estrellas,
+                thumbnail_path
+            `)
             .eq('id_usuario', userId)
             .order('created_at', { ascending: false });
 
@@ -1528,7 +1533,18 @@ export const publicProfileAPI = {
 
         const { data, error } = await query;
 
-        return { data, error };
+        // Transformar para que funcione con NoteCard
+        const transformed = (data || []).map(note => ({
+            id_apunte: note.id_apunte,
+            titulo: note.titulo,
+            descripcion: note.descripcion,
+            materia_nombre: note.materia?.nombre_materia,
+            estrellas: note.estrellas,
+            thumbnail_path: note.thumbnail_path,
+            created_at: note.created_at
+        }));
+
+        return { data: transformed, error };
     },
 
     async getUserSubjects(userId) {
@@ -1536,7 +1552,8 @@ export const publicProfileAPI = {
             .from('apunte')
             .select(`
                 id_materia,
-                materia(id_materia, nombre_materia)
+                materia(id_materia, nombre_materia),
+                thumbnail_path
             `)
             .eq('id_usuario', userId);
 

@@ -7,7 +7,7 @@ import { useSeguidores } from '../hooks/useSeguidores';
 export default function NotificationBadge() {
     const [isOpen, setIsOpen] = useState(false);
     const [shouldAnimate, setShouldAnimate] = useState(false);
-    const [followingStates, setFollowingStates] = useState({});
+    const [showUnfollowConfirm, setShowUnfollowConfirm] = useState(null);
     const dropdownRef = useRef(null);
     const navigate = useNavigate();
     const prevUnreadCount = useRef(0);
@@ -22,7 +22,7 @@ export default function NotificationBadge() {
         eliminarNotificacion,
     } = useNotificationsContext();
 
-    const { seguirUsuario, verificarSiSigue } = useSeguidores();
+    const { seguirUsuario, dejarDeSeguir } = useSeguidores();
 
     // Tab badge para título del navegador
     useTabBadge(unreadCount);
@@ -36,14 +36,14 @@ export default function NotificationBadge() {
         prevUnreadCount.current = unreadCount;
     }, [unreadCount]);
 
-    // 🚪 Cerrar automáticamente si no hay notificaciones
+    // Cerrar automáticamente si no hay notificaciones
     useEffect(() => {
         if (isOpen && notificaciones.length === 0) {
             setIsOpen(false);
         }
     }, [notificaciones.length, isOpen]);
 
-    // 🕐 Auto-marcar como leídas después de 15s con modal abierto
+    //Auto-marcar como leídas después de 15s con modal abierto
     useEffect(() => {
         if (isOpen && unreadCount > 0) {
             autoMarkTimerRef.current = setTimeout(() => {
@@ -63,26 +63,6 @@ export default function NotificationBadge() {
             }
         };
     }, [isOpen, unreadCount, marcarTodasLeidas]);
-
-    // ✅ Verificar estado de seguimiento INMEDIATAMENTE cuando llegan notificaciones
-    useEffect(() => {
-        const checkFollowingStates = async () => {
-            const states = {};
-            const promises = notificaciones
-                .filter(notif => notif.tipo === 'nuevo_seguidor' && notif.emisor_id)
-                .map(async (notif) => {
-                    const result = await verificarSiSigue(notif.emisor_id);
-                    states[notif.emisor_id] = result.sigue;
-                });
-
-            await Promise.all(promises);
-            setFollowingStates(states);
-        };
-
-        if (notificaciones.length > 0) {
-            checkFollowingStates();
-        }
-    }, [notificaciones, verificarSiSigue]);
 
     // Cerrar con ESC
     useEffect(() => {
@@ -128,14 +108,27 @@ export default function NotificationBadge() {
 
         if (!notif.emisor_id) return;
 
-        const result = await seguirUsuario(notif.emisor_id);
-        if (result.success) {
-            // Actualizar estado local
-            setFollowingStates(prev => ({
-                ...prev,
-                [notif.emisor_id]: true
-            }));
-        }
+        await seguirUsuario(notif.emisor_id);
+        // Re-cargar notificaciones para actualizar ya_lo_sigo
+        // El context se encargará de esto automáticamente
+    };
+
+    const handleShowUnfollowModal = (e, notif) => {
+        e.stopPropagation();
+        setShowUnfollowConfirm(notif);
+    };
+
+    const handleConfirmUnfollow = async () => {
+        if (!showUnfollowConfirm) return;
+
+        await dejarDeSeguir(showUnfollowConfirm.emisor_id);
+        setShowUnfollowConfirm(null);
+        // Re-cargar notificaciones para actualizar ya_lo_sigo
+        // El context se encargará de esto automáticamente
+    };
+
+    const handleCancelUnfollow = () => {
+        setShowUnfollowConfirm(null);
     };
 
     const handleDelete = async (e, notifId) => {
@@ -312,7 +305,7 @@ export default function NotificationBadge() {
                         ) : (
                             recentNotifications.map((notif) => {
                                 const isFollowerNotif = notif.tipo === 'nuevo_seguidor';
-                                const isFollowing = followingStates[notif.emisor_id];
+                                const isFollowing = notif.ya_lo_sigo;
 
                                 return (
                                     <div
@@ -376,7 +369,7 @@ export default function NotificationBadge() {
                                                     lineHeight: 1.4,
                                                     fontWeight: notif.leida ? 400 : 600,
                                                 }}>
-                                                    <strong>{notif.emisor?.nombre || 'Alguien'}</strong> {notif.mensaje}{' '}
+                                                    <strong>{notif.emisor?.nombre || 'Alguien'}</strong> comenzó a seguirte.{' '}
                                                     <span style={{
                                                         fontSize: 11,
                                                         color: '#94a3b8',
@@ -387,55 +380,84 @@ export default function NotificationBadge() {
                                                 </p>
                                             </div>
 
-                                            {/* Botón Seguir o Estado */}
+                                            {/* Botón Seguir/Siguiendo - COLORES INSTAGRAM */}
                                             {isFollowerNotif && !isFollowing && (
                                                 <button
                                                     onClick={(e) => handleFollowBack(e, notif)}
                                                     style={{
-                                                        padding: '6px 20px',
-                                                        fontSize: 13,
+                                                        padding: '7px 18px',
+                                                        fontSize: 14,
                                                         fontWeight: 600,
                                                         color: '#fff',
-                                                        background: '#2563eb',
+                                                        background: '#0095f6',
                                                         border: 'none',
-                                                        borderRadius: 6,
+                                                        borderRadius: 8,
                                                         cursor: 'pointer',
-                                                        transition: 'all 0.2s ease',
+                                                        transition: 'all 0.15s cubic-bezier(0.4, 0, 0.2, 1)',
                                                         whiteSpace: 'nowrap',
                                                         flexShrink: 0,
                                                     }}
                                                     onMouseEnter={(e) => {
-                                                        e.target.style.background = '#1d4ed8';
+                                                        e.target.style.background = '#1877f2';
+                                                        e.target.style.transform = 'scale(1.02)';
                                                     }}
                                                     onMouseLeave={(e) => {
-                                                        e.target.style.background = '#2563eb';
+                                                        e.target.style.background = '#0095f6';
+                                                        e.target.style.transform = 'scale(1)';
+                                                    }}
+                                                    onMouseDown={(e) => {
+                                                        e.target.style.transform = 'scale(0.98)';
+                                                    }}
+                                                    onMouseUp={(e) => {
+                                                        e.target.style.transform = 'scale(1.02)';
                                                     }}
                                                 >
                                                     Seguir
                                                 </button>
                                             )}
                                             {isFollowerNotif && isFollowing && (
-                                                <span style={{
-                                                    padding: '6px 20px',
-                                                    fontSize: 13,
-                                                    color: '#6b7280',
-                                                    fontWeight: 600,
-                                                    background: '#f3f4f6',
-                                                    borderRadius: 6,
-                                                    whiteSpace: 'nowrap',
-                                                    flexShrink: 0,
-                                                }}>
+                                                <button
+                                                    onClick={(e) => handleShowUnfollowModal(e, notif)}
+                                                    style={{
+                                                        padding: '7px 18px',
+                                                        fontSize: 14,
+                                                        fontWeight: 600,
+                                                        color: '#000',
+                                                        background: '#efefef',
+                                                        border: 'none',
+                                                        borderRadius: 8,
+                                                        whiteSpace: 'nowrap',
+                                                        flexShrink: 0,
+                                                        cursor: 'pointer',
+                                                        transition: 'all 0.15s cubic-bezier(0.4, 0, 0.2, 1)',
+                                                    }}
+                                                    onMouseEnter={(e) => {
+                                                        e.target.style.background = '#dbdbdb';
+                                                        e.target.style.transform = 'scale(1.02)';
+                                                    }}
+                                                    onMouseLeave={(e) => {
+                                                        e.target.style.background = '#efefef';
+                                                        e.target.style.transform = 'scale(1)';
+                                                    }}
+                                                    onMouseDown={(e) => {
+                                                        e.target.style.transform = 'scale(0.98)';
+                                                    }}
+                                                    onMouseUp={(e) => {
+                                                        e.target.style.transform = 'scale(1.02)';
+                                                    }}
+                                                >
                                                     Siguiendo
-                                                </span>
+                                                </button>
                                             )}
                                         </div>
 
-                                        {/* Botón eliminar - arriba a la derecha */}
+                                        {/* Botón eliminar - centro vertical derecha */}
                                         <button
                                             onClick={(e) => handleDelete(e, notif.id)}
                                             style={{
                                                 position: 'absolute',
-                                                top: 8,
+                                                top: '50%',
+                                                transform: 'translateY(-50%)',
                                                 right: 8,
                                                 width: 20,
                                                 height: 20,
@@ -464,16 +486,17 @@ export default function NotificationBadge() {
                                             ×
                                         </button>
 
-                                        {/* Indicador no leída */}
+                                        {/* Indicador no leída - AZUL INSTAGRAM */}
                                         {!notif.leida && (
                                             <div style={{
                                                 position: 'absolute',
-                                                top: 12,
+                                                top: '50%',
+                                                transform: 'translateY(-50%)',
                                                 right: 34,
                                                 width: 8,
                                                 height: 8,
                                                 borderRadius: '50%',
-                                                background: '#2563eb',
+                                                background: '#0095f6',
                                             }} />
                                         )}
                                     </div>
@@ -540,6 +563,112 @@ export default function NotificationBadge() {
                     )}
                 </div>
             )}
+
+            {/* Modal de confirmación para dejar de seguir */}
+            {showUnfollowConfirm && (
+                <div
+                    onClick={handleCancelUnfollow}
+                    style={{
+                        position: 'fixed',
+                        inset: 0,
+                        background: 'rgba(0, 0, 0, 0.5)',
+                        backdropFilter: 'blur(4px)',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        zIndex: 10000,
+                        animation: 'fadeIn 0.2s ease',
+                    }}
+                >
+                    <div
+                        onClick={(e) => e.stopPropagation()}
+                        style={{
+                            background: '#ffffff',
+                            borderRadius: 16,
+                            padding: 24,
+                            maxWidth: 380,
+                            width: '90%',
+                            boxShadow: '0 20px 60px rgba(0, 0, 0, 0.3)',
+                            animation: 'scaleIn 0.2s cubic-bezier(0.16, 1, 0.3, 1)',
+                        }}
+                    >
+                        <h3 style={{
+                            margin: '0 0 12px 0',
+                            fontSize: 18,
+                            fontWeight: 700,
+                            color: '#0f172a',
+                        }}>
+                            ¿Dejar de seguir a {showUnfollowConfirm.emisor?.nombre}?
+                        </h3>
+                        <p style={{
+                            margin: '0 0 20px 0',
+                            fontSize: 14,
+                            lineHeight: 1.5,
+                            color: '#64748b',
+                        }}>
+                            Dejarás de ver sus publicaciones en tu feed.
+                        </p>
+                        <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end' }}>
+                            <button
+                                onClick={handleCancelUnfollow}
+                                style={{
+                                    padding: '10px 20px',
+                                    borderRadius: 8,
+                                    border: 'none',
+                                    background: '#efefef',
+                                    color: '#000',
+                                    fontWeight: 600,
+                                    fontSize: 14,
+                                    cursor: 'pointer',
+                                    transition: 'all 0.15s cubic-bezier(0.4, 0, 0.2, 1)',
+                                }}
+                                onMouseEnter={(e) => {
+                                    e.target.style.background = '#dbdbdb';
+                                }}
+                                onMouseLeave={(e) => {
+                                    e.target.style.background = '#efefef';
+                                }}
+                                onMouseDown={(e) => {
+                                    e.target.style.transform = 'scale(0.98)';
+                                }}
+                                onMouseUp={(e) => {
+                                    e.target.style.transform = 'scale(1)';
+                                }}
+                            >
+                                Cancelar
+                            </button>
+                            <button
+                                onClick={handleConfirmUnfollow}
+                                style={{
+                                    padding: '10px 20px',
+                                    borderRadius: 8,
+                                    border: 'none',
+                                    background: '#ed4956',
+                                    color: '#ffffff',
+                                    fontWeight: 600,
+                                    fontSize: 14,
+                                    cursor: 'pointer',
+                                    transition: 'all 0.15s cubic-bezier(0.4, 0, 0.2, 1)',
+                                }}
+                                onMouseEnter={(e) => {
+                                    e.target.style.background = '#c92a37';
+                                }}
+                                onMouseLeave={(e) => {
+                                    e.target.style.background = '#ed4956';
+                                }}
+                                onMouseDown={(e) => {
+                                    e.target.style.transform = 'scale(0.98)';
+                                }}
+                                onMouseUp={(e) => {
+                                    e.target.style.transform = 'scale(1)';
+                                }}
+                            >
+                                Dejar de seguir
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
     );
 }
@@ -583,6 +712,20 @@ if (typeof document !== 'undefined' && !document.getElementById('notification-an
       0%, 100% { transform: scale(1); }
       25% { transform: scale(1.15) rotate(-5deg); }
       75% { transform: scale(1.05) rotate(5deg); }
+    }
+    @keyframes fadeIn {
+      from { opacity: 0; }
+      to { opacity: 1; }
+    }
+    @keyframes scaleIn {
+      from {
+        opacity: 0;
+        transform: scale(0.95);
+      }
+      to {
+        opacity: 1;
+        transform: scale(1);
+      }
     }
     .badge-bounce {
       animation: badge-bounce 0.6s ease-out;

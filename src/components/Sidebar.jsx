@@ -215,7 +215,7 @@ export default function Sidebar({
                     {isMentor && !mentorLoading && (
                         <>
                             <Group title="Panel de Mentor" />
-                            <MenuLink icon="📚" label="Mis Mentorías" onClick={() => go("/mentor/courses")} />
+                            <MenuLink icon="📚" label="Soy Mentor" onClick={() => go("/mentor/courses")} />
                             <MenuLink icon="👥" label="Mis Alumnos" onClick={() => go("/mentor/students")} />
                             <MenuLink icon="📅" label="Mi Calendario" onClick={() => go("/mentor/calendar")} />
                         </>

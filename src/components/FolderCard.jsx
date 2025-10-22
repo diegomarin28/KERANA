@@ -293,11 +293,11 @@ export function FolderCard({ folder, semestres, onDragStart, onDragOver, onDrop,
                         marginBottom: 8,
                         flexWrap: 'wrap'
                     }}>
-                        {/* Badge dinámico - PRIORIDAD: semestres calculados */}
+                        {/* Badge dinámico - NUEVA LÓGICA */}
                         {(() => {
-                            // 🎯 PRIORIDAD 1: Si tiene semestres calculados dinámicamente
+                            // 🎯 PRIORIDAD 1: Si tiene semestres calculados dinámicamente (PARA TODAS LAS CARPETAS)
                             if (semestres && semestres.length > 0) {
-                                const sortedSems = semestres.sort((a, b) => parseInt(a) - parseInt(b));
+                                const sortedSems = [...semestres].sort((a, b) => parseInt(a) - parseInt(b));
                                 return (
                                     <span style={{
                                         padding: '4px 10px',
@@ -307,12 +307,12 @@ export function FolderCard({ folder, semestres, onDragStart, onDragOver, onDrop,
                                         fontSize: 12,
                                         fontWeight: 600
                                     }}>
-                        Semestre {sortedSems.join(', ')}
-                    </span>
+                                        Semestre {sortedSems.join(', ')}
+                                    </span>
                                 );
                             }
 
-                            // 🎯 PRIORIDAD 2: Si es carpeta de semestre, extraer del nombre
+                            // 🎯 PRIORIDAD 2: Si es carpeta de semestre (sin apuntes), extraer del nombre
                             if (folder.tipo === 'semestre' && folder.nombre) {
                                 const match = folder.nombre.match(/Semestre (\d+)/);
                                 if (match) {
@@ -325,8 +325,8 @@ export function FolderCard({ folder, semestres, onDragStart, onDragOver, onDrop,
                                             fontSize: 12,
                                             fontWeight: 600
                                         }}>
-                            Semestre {match[1]}
-                        </span>
+                                            Semestre {match[1]}
+                                        </span>
                                     );
                                 }
                             }
@@ -342,25 +342,13 @@ export function FolderCard({ folder, semestres, onDragStart, onDragOver, onDrop,
                                         fontSize: 12,
                                         fontWeight: 500
                                     }}>
-                        Materia
-                    </span>
+                                        Materia
+                                    </span>
                                 );
                             }
 
-                            // 🎯 DEFAULT: Carpeta personalizada
-                            return (
-                                <span style={{
-                                    padding: '4px 10px',
-                                    background: '#f3f4f6',
-                                    color: '#6b7280',
-                                    borderRadius: 12,
-                                    fontSize: 12,
-                                    fontWeight: 500,
-                                    textTransform: 'capitalize'
-                                }}>
-                    Personalizada
-                </span>
-                            );
+                            // 🎯 DEFAULT: No mostrar badge si es personalizada sin apuntes
+                            return null;
                         })()}
                     </div>
 
