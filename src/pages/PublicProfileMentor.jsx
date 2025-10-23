@@ -29,6 +29,9 @@ export default function PublicProfileMentor() {
     const { seguirUsuario, dejarDeSeguir } = useSeguidores();
 
     const [signedUrls, setSignedUrls] = useState({});
+    const [isFavoriteMentor, setIsFavoriteMentor] = useState(false);
+    const [loadingFavorite, setLoadingFavorite] = useState(false);
+
 
 
     const [showCalendlyModal, setShowCalendlyModal] = useState(false);
@@ -121,6 +124,33 @@ export default function PublicProfileMentor() {
 
             const { data: isFollowingData } = await publicProfileAPI.isFollowing(userId);
             setSiguiendo(isFollowingData);
+
+            // Verificar si el mentor está en favoritos
+            if (mentorData?.id_mentor) {
+                const { data: { user } } = await supabase.auth.getUser();
+                if (user) {
+                    const { data: usuarioData } = await supabase
+                        .from('usuario')
+                        .select('id_usuario')
+                        .eq('auth_id', user.id)
+                        .single();
+
+                    if (usuarioData) {
+                        const { data: favoritoData, error: favoritoError } = await supabase
+                            .from('mentor_fav')
+                            .select('id_usuario, id_mentor')
+                            .eq('id_usuario', usuarioData.id_usuario)
+                            .eq('id_mentor', mentorData.id_mentor)
+                            .maybeSingle();
+
+                        if (favoritoError) {
+                            console.error('Error verificando favorito mentor:', favoritoError);
+                        }
+                        setIsFavoriteMentor(!!favoritoData);
+                    }
+                }
+            }
+
         } catch (error) {
             console.error('Error cargando datos del perfil:', error);
         } finally {
@@ -240,6 +270,68 @@ export default function PublicProfileMentor() {
         navigator.clipboard.writeText(window.location.href);
         setShowShareTooltip(true);
         setTimeout(() => setShowShareTooltip(false), 2000);
+    };
+
+    const handleFavoriteMentor = async () => {
+        if (!profile || !mentorInfo) return;
+
+        try {
+            setLoadingFavorite(true);
+
+            const { data: { user } } = await supabase.auth.getUser();
+            if (!user) {
+                alert('Debes iniciar sesión para guardar favoritos');
+                return;
+            }
+
+            const { data: usuarioData, error: usuarioError } = await supabase
+                .from('usuario')
+                .select('id_usuario')
+                .eq('auth_id', user.id)
+                .single();
+
+            if (usuarioError || !usuarioData) {
+                alert('Error al obtener tu perfil');
+                return;
+            }
+
+            if (isFavoriteMentor) {
+                // Quitar de favoritos
+                const { error } = await supabase
+                    .from('mentor_fav')
+                    .delete()
+                    .match({
+                        id_usuario: usuarioData.id_usuario,
+                        id_mentor: mentorInfo.id_mentor
+                    });
+
+                if (error) throw error;
+                setIsFavoriteMentor(false);
+            } else {
+                // Agregar a favoritos
+                const { error } = await supabase
+                    .from('mentor_fav')
+                    .insert({
+                        id_usuario: usuarioData.id_usuario,
+                        id_mentor: mentorInfo.id_mentor
+                    });
+
+                if (error) {
+                    if (error.code === '23505') {
+                        setIsFavoriteMentor(true);
+                    } else {
+                        throw error;
+                    }
+                } else {
+                    setIsFavoriteMentor(true);
+                }
+            }
+        } catch (error) {
+            console.error('Error al manejar favorito:', error);
+            alert('Error al guardar favorito: ' + (error.message || ''));
+        } finally {
+            setLoadingFavorite(false);
+        }
     };
 
     const scrollCarousel = (direction) => {
@@ -377,9 +469,48 @@ export default function PublicProfileMentor() {
                                     {loadingFollow ? <div style={buttonSpinnerStyle}></div> : siguiendo ? (
                                         <><svg style={{ width: 16, height: 16, marginRight: 6 }} fill="currentColor" viewBox="0 0 20 20"><path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd"></path></svg>Siguiendo</>
                                     ) : (
-                                        <><svg style={{ width: 16, height: 16, marginRight: 6 }} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" /></svg>Seguir</>
+                                        <><svg style={{ width: 16, height: 16, marginRight: 6 }} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+                                        </svg>Seguir</>
                                     )}
                                 </button>
+
+                                <button
+                                    onClick={handleFavoriteMentor}
+                                    disabled={loadingFavorite}
+                                    style={{
+                                        width: 40,
+                                        height: 40,
+                                        borderRadius: '50%',
+                                        border: '2px solid #10B981',
+                                        background: 'white',
+                                        cursor: loadingFavorite ? 'not-allowed' : 'pointer',
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        justifyContent: 'center',
+                                        transition: 'all 0.2s ease',
+                                        boxShadow: '0 1px 4px rgba(0,0,0,0.1)',
+                                        opacity: loadingFavorite ? 0.6 : 1
+                                    }}
+                                    title={isFavoriteMentor ? "Quitar de favoritos" : "Agregar a favoritos"}
+                                    onMouseEnter={(e) => !loadingFavorite && (e.currentTarget.style.transform = 'scale(1.05)')}
+                                    onMouseLeave={(e) => !loadingFavorite && (e.currentTarget.style.transform = 'scale(1)')}
+                                >
+                                    <svg
+                                        width="20"
+                                        height="20"
+                                        viewBox="0 0 24 24"
+                                        fill={isFavoriteMentor ? '#10B981' : 'none'}
+                                        stroke="#10B981"
+                                        strokeWidth="2"
+                                        strokeLinecap="round"
+                                        strokeLinejoin="round"
+                                    >
+                                        <path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z" />
+                                    </svg>
+                                </button>
+
+
+
                                 <div style={{ position: 'relative' }}>
                                     <button onClick={handleShare} style={shareButtonStyle} title="Compartir perfil">
                                         <svg style={{ width: 18, height: 18 }} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.368 2.684 3 3 0 00-5.368-2.684z" /></svg>
