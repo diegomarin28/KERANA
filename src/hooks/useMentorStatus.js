@@ -40,7 +40,7 @@ export const useMentorStatus = (autoCheck = true) => {
             // 3️⃣ Buscar todos los mentores asociados al usuario
             const { data: mentores, error: mentorErr } = await supabase
                 .from('mentor')
-                .select('id_mentor, estrellas_mentor, contacto, descripcion, fecha_inicio, usuario:usuario (calendly_url)')
+                .select('id_mentor, estrellas_mentor, contacto, descripcion, fecha_inicio, usuario:id_usuario(calendly_url)')
                 .eq('id_usuario', usuarioData.id_usuario)
 
             console.log('🎓 Mentores del usuario:', mentores)

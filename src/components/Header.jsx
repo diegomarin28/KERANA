@@ -12,6 +12,15 @@ import { useAvatar } from '../contexts/AvatarContext';
 import { LogoutConfirmModal } from '../components/LogoutConfirmModal';
 import { useSidebarStats } from '../hooks/useSidebarStats';
 import { useMentorStatus } from '../hooks/useMentorStatus';
+import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
+import {
+    faUser,
+    faBookmark,
+    faDownload,
+    faCreditCard,
+    faQuestionCircle,
+    faCog,
+} from '@fortawesome/free-solid-svg-icons';
 
 export default function Header() {
     const [menuOpen, setMenuOpen] = useState(false);
@@ -37,15 +46,10 @@ export default function Header() {
     const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
     const { credits, seguidores, siguiendo, apuntes } = useSidebarStats();
     const headerStats = useSidebarStats();
-
-    // 🎓 Verificar si es mentor (se carga al inicio)
     const { isMentor, loading: mentorLoading } = useMentorStatus(true);
-
 
     const openAuthModal = () => setAuthOpen(true);
     const closeAuthModal = () => setAuthOpen(false);
-
-
 
     useEffect(() => {
         const onStorage = (e) => {
@@ -74,7 +78,6 @@ export default function Header() {
         setDisplayName(computeDisplayName());
     }, [userProfile, user, nameCache, usernameCache]);
 
-    // Cargar contadores de seguidores
     useEffect(() => {
         if (userProfile?.id_usuario) {
             loadFollowStats();
@@ -107,25 +110,18 @@ export default function Header() {
         setAvatarMenuOpen(false);
     };
 
-// Mantené el useEffect principal de initializeAuth como está (sin comentar nada)
-
     useEffect(() => {
         let mounted = true;
 
         const initializeAuth = async () => {
-
             try {
                 const { data: { session }, error } = await supabase.auth.getSession();
-
-
                 if (error) {
                     console.warn("[auth] getSession error:", error);
                     return;
                 }
-
                 if (session?.user && mounted) {
                     setUser(session.user);
-                    // Traer perfil en paralelo
                     await loadUserProfile(session.user);
                 }
             } catch (err) {
@@ -136,10 +132,7 @@ export default function Header() {
         initializeAuth();
 
         const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, session) => {
-
-
             if (!mounted) return;
-
             if (session?.user) {
                 setUser(session.user);
                 closeAuthModal();
@@ -158,36 +151,13 @@ export default function Header() {
         };
     }, []);
 
-// AHORA AGREGÁ ESTE useEffect SEPARADO para cuando el usuario cambia
-// (para recargar el avatar cuando cambias de cuenta o después de editar perfil)
     useEffect(() => {
         if (user && userProfile === null) {
-            // Solo carga si no tenemos perfil aún
             loadUserProfile();
         }
     }, [user]);
 
-// Y mantené este para detectar actualizaciones externas de perfil
-    useEffect(() => {
-        const onStorage = (e) => {
-            if (e.key === 'kerana_profile_updated' && user?.id) {
-                loadUserProfile();
-            }
-        };
-        window.addEventListener('storage', onStorage);
-        return () => window.removeEventListener('storage', onStorage);
-    }, [user?.id]);
-
-// Y este que ya tenías:
-    useEffect(() => {
-        if (user?.id) {
-            loadUserProfile();
-        }
-    }, [location.pathname, updateTrigger]);
-
-// Modifica loadUserProfile para manejar ambos casos:
     const loadUserProfile = async (authUser = null) => {
-
         const userToUse = authUser || user;
         if (!userToUse) {
             setUserProfile(null);
@@ -196,8 +166,6 @@ export default function Header() {
         }
 
         const { data, error } = await fetchUserProfile();
-
-
         if (error) {
             console.warn("[Header] Error cargando perfil:", error);
             return;
@@ -286,15 +254,15 @@ export default function Header() {
             signBorder: "#e5e7eb",
         }
         : {
-            headerBg: "#1b2e3a",
-            headerText: "#ffffff",
+            headerBg: "#fff",
+            headerText: "#13346b",
             border: "transparent",
             pillBg: "#ffffff",
-            pillText: "#1e40af",
-            pillBorder: "#1e40af",
+            pillText: "#13346b",
+            pillBorder: "#13346b",
             signBg: "#ffffff",
-            signText: "#1e40af",
-            signBorder: "#1e40af",
+            signText: "#13346b",
+            signBorder: "#13346b",
         };
 
     const pillReset = { all: "unset", display: "inline-block", cursor: "pointer" };
@@ -308,6 +276,7 @@ export default function Header() {
         border: `1px solid ${TOKENS.pillBorder}`,
         color: TOKENS.pillText,
         fontWeight: 600,
+        fontFamily: 'Inter, sans-serif',
         textDecoration: "none",
         whiteSpace: "nowrap",
         minWidth: 125,
@@ -385,6 +354,7 @@ export default function Header() {
         border: `1px solid ${TOKENS.signBorder}`,
         fontWeight: 700,
         fontSize: 14,
+        fontFamily: 'Inter, sans-serif',
         cursor: "pointer",
         transition: "all 0.3s ease",
         transform: "translateY(0px)",
@@ -415,11 +385,7 @@ export default function Header() {
     function getAppAvatarSrc(raw) {
         const url = (raw || "").trim();
         if (!url) return "";
-
-        // Aceptar cualquier URL HTTP/HTTPS válida
         const isValidUrl = /^https?:\/\/.+/.test(url);
-
-
         return isValidUrl ? url : "";
     }
 
@@ -437,7 +403,6 @@ export default function Header() {
         outline: "none",
         transition: "all 0.2s ease",
     };
-
 
     return (
         <>
@@ -480,6 +445,7 @@ export default function Header() {
                                 fontSize: 20,
                                 color: TOKENS.headerText,
                                 letterSpacing: "0.5px",
+                                fontFamily: 'Inter, sans-serif',
                             }}
                             aria-label="Ir al inicio"
                         >
@@ -495,7 +461,6 @@ export default function Header() {
                         flexWrap: "wrap",
                     }}>
                         {mentorLoading ? (
-                            // Skeleton con shimmer de las 3 burbujas
                             <>
                                 <span style={{
                                     ...pillBox,
@@ -517,8 +482,8 @@ export default function Header() {
                                     pointerEvents: 'none',
                                     border: '1px solid #13346b'
                                 }}>
-                                ¡Quiero ser Mentor!
-                            </span>
+                                    ¡Quiero ser Mentor!
+                                </span>
                                 <span style={{
                                     ...pillBox,
                                     background: 'linear-gradient(90deg, rgba(255,255,255,0.1) 0%, rgba(255,255,255,0.2) 50%, rgba(255,255,255,0.1) 100%)',
@@ -528,8 +493,8 @@ export default function Header() {
                                     pointerEvents: 'none',
                                     border: '1px solid #13346b'
                                 }}>
-                ¡Hacé tu reseña!
-            </span>
+                                    ¡Hacé tu reseña!
+                                </span>
                             </>
                         ) : (
                             <>
@@ -572,18 +537,7 @@ export default function Header() {
                                         e.currentTarget.style.transform = "scale(1)";
                                     }}
                                 >
-                                    <svg
-                                        width="18"
-                                        height="18"
-                                        viewBox="0 0 24 24"
-                                        fill="none"
-                                        stroke="currentColor"
-                                        strokeWidth="2"
-                                        strokeLinecap="round"
-                                        strokeLinejoin="round"
-                                    >
-                                        <path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z" />
-                                    </svg>
+                                    <FontAwesomeIcon icon={faBookmark} style={{ fontSize: 16 }} />
                                 </button>
 
                                 <NotificationBadge />
@@ -645,6 +599,7 @@ export default function Header() {
                                                         placeItems: "center",
                                                         fontWeight: 800,
                                                         fontSize: 16,
+                                                        fontFamily: 'Inter, sans-serif',
                                                     }}
                                                 >
                                                     {(displayName?.[0] || "U").toUpperCase()}
@@ -689,11 +644,11 @@ export default function Header() {
                                                 }}
                                             />
 
-                                            {/* Header mejorado con gradiente */}
+                                            {/* Header mejorado */}
                                             <div style={{
-                                                background: "linear-gradient(135deg, #3b82f6 0%, #1e40af 100%)",
+                                                background: "#f8fafc",
                                                 padding: "20px",
-                                                color: "#fff",
+                                                borderBottom: "1px solid #e2e8f0",
                                             }}>
                                                 <div style={{
                                                     display: "flex",
@@ -713,8 +668,8 @@ export default function Header() {
                                                                     height: 52,
                                                                     borderRadius: "50%",
                                                                     objectFit: "cover",
-                                                                    border: "3px solid rgba(255,255,255,0.3)",
-                                                                    boxShadow: "0 4px 12px rgba(0,0,0,0.15)",
+                                                                    border: "3px solid #fff",
+                                                                    boxShadow: "0 4px 12px rgba(0,0,0,0.1)",
                                                                 }}
                                                             />
                                                         ) : (
@@ -723,14 +678,15 @@ export default function Header() {
                                                                     width: 52,
                                                                     height: 52,
                                                                     borderRadius: "50%",
-                                                                    background: "rgba(255,255,255,0.2)",
-                                                                    border: "3px solid rgba(255,255,255,0.3)",
+                                                                    background: "linear-gradient(135deg, #3b82f6 0%, #1e40af 100%)",
+                                                                    border: "3px solid #fff",
                                                                     color: "#fff",
                                                                     display: "grid",
                                                                     placeItems: "center",
                                                                     fontWeight: 800,
                                                                     fontSize: 20,
-                                                                    boxShadow: "0 4px 12px rgba(0,0,0,0.15)",
+                                                                    boxShadow: "0 4px 12px rgba(0,0,0,0.1)",
+                                                                    fontFamily: 'Inter, sans-serif',
                                                                 }}
                                                             >
                                                                 {(displayName?.[0] || "U").toUpperCase()}
@@ -745,15 +701,18 @@ export default function Header() {
                                                             overflow: "hidden",
                                                             textOverflow: "ellipsis",
                                                             marginBottom: 4,
+                                                            fontFamily: 'Inter, sans-serif',
+                                                            color: '#0f172a',
                                                         }}>
                                                             {displayName}
                                                         </div>
                                                         <div style={{
                                                             fontSize: 13,
-                                                            opacity: 0.9,
+                                                            color: '#64748b',
                                                             whiteSpace: "nowrap",
                                                             overflow: "hidden",
                                                             textOverflow: "ellipsis",
+                                                            fontFamily: 'Inter, sans-serif',
                                                         }}>
                                                             {userProfile?.username ? `@${userProfile.username}` : user?.email}
                                                         </div>
@@ -765,25 +724,45 @@ export default function Header() {
                                                     display: "flex",
                                                     gap: 20,
                                                     paddingTop: 12,
-                                                    borderTop: "1px solid rgba(255,255,255,0.2)",
+                                                    borderTop: "1px solid #e2e8f0",
                                                 }}>
                                                     <div style={{ flex: 1, textAlign: "center" }}>
-                                                        <div style={{ fontSize: 20, fontWeight: 700, marginBottom: 2 }}>
+                                                        <div style={{
+                                                            fontSize: 20,
+                                                            fontWeight: 700,
+                                                            marginBottom: 2,
+                                                            fontFamily: 'Inter, sans-serif',
+                                                            color: '#0f172a',
+                                                        }}>
                                                             {headerStats.seguidores}
                                                         </div>
-                                                        <div style={{ fontSize: 12, opacity: 0.85 }}>
+                                                        <div style={{
+                                                            fontSize: 12,
+                                                            color: '#64748b',
+                                                            fontFamily: 'Inter, sans-serif',
+                                                        }}>
                                                             Seguidores
                                                         </div>
                                                     </div>
                                                     <div style={{
                                                         width: 1,
-                                                        background: "rgba(255,255,255,0.2)",
+                                                        background: "#e2e8f0",
                                                     }} />
                                                     <div style={{ flex: 1, textAlign: "center" }}>
-                                                        <div style={{ fontSize: 20, fontWeight: 700, marginBottom: 2 }}>
+                                                        <div style={{
+                                                            fontSize: 20,
+                                                            fontWeight: 700,
+                                                            marginBottom: 2,
+                                                            fontFamily: 'Inter, sans-serif',
+                                                            color: '#0f172a',
+                                                        }}>
                                                             {headerStats.siguiendo}
                                                         </div>
-                                                        <div style={{ fontSize: 12, opacity: 0.85 }}>
+                                                        <div style={{
+                                                            fontSize: 12,
+                                                            color: '#64748b',
+                                                            fontFamily: 'Inter, sans-serif',
+                                                        }}>
                                                             Siguiendo
                                                         </div>
                                                     </div>
@@ -793,17 +772,17 @@ export default function Header() {
                                             {/* Menu items */}
                                             <div style={{ padding: "8px" }}>
                                                 <MenuItem
-                                                    icon={<UserIcon />}
+                                                    icon={<FontAwesomeIcon icon={faUser} />}
                                                     label="Mi perfil"
                                                     onClick={() => go("/profile")}
                                                 />
                                                 <MenuItem
-                                                    icon={<DownloadIcon />}
+                                                    icon={<FontAwesomeIcon icon={faDownload} />}
                                                     label="Descargas"
                                                     onClick={() => go("/purchased")}
                                                 />
                                                 <MenuItem
-                                                    icon={<SettingsIcon />}
+                                                    icon={<FontAwesomeIcon icon={faCog} />}
                                                     label="Ajustes"
                                                     onClick={() => go("/settings")}
                                                 />
@@ -815,7 +794,7 @@ export default function Header() {
                                                 }} />
 
                                                 <MenuItem
-                                                    icon={<CreditIcon />}
+                                                    icon={<FontAwesomeIcon icon={faCreditCard} />}
                                                     label="Mis créditos"
                                                     badge={userProfile?.creditos || 0}
                                                     onClick={() => go("/credits")}
@@ -828,7 +807,7 @@ export default function Header() {
                                                 }} />
 
                                                 <MenuItem
-                                                    icon={<HelpIcon />}
+                                                    icon={<FontAwesomeIcon icon={faQuestionCircle} />}
                                                     label="Ayuda"
                                                     onClick={() => go("/help-center")}
                                                 />
@@ -857,6 +836,7 @@ export default function Header() {
                                                         background: "rgba(220,38,38,0.08)",
                                                         border: "1px solid rgba(220,38,38,0.15)",
                                                         transition: "all .15s ease",
+                                                        fontFamily: 'Inter, sans-serif',
                                                     }}
                                                     onMouseEnter={(e) => {
                                                         e.currentTarget.style.background = "rgba(220,38,38,0.12)";
@@ -873,7 +853,6 @@ export default function Header() {
                                         </div>
                                     )}
                                 </div>
-
                             </>
                         )}
                     </div>
@@ -882,15 +861,13 @@ export default function Header() {
 
             <div style={{ height: 64 }} />
 
-
-
             <Sidebar
                 open={menuOpen}
                 onClose={() => setMenuOpen(false)}
                 isAuthenticated={!!user}
                 stats={{ credits, seguidores, siguiendo, apuntes }}
-                isMentor={isMentor}  // ← AGREGAR ESTA LÍNEA
-                mentorLoading={mentorLoading}  // ← Y ESTA
+                isMentor={isMentor}
+                mentorLoading={mentorLoading}
                 user={
                     user
                         ? {
@@ -922,62 +899,31 @@ export default function Header() {
                     setAvatarMenuOpen(false);
                 }}
             />
-            <style>{`
-    @keyframes dropdownSlide {
-        from {
-            opacity: 0;
-            transform: translateY(-12px) scale(0.96);
-        }
-        to {
-            opacity: 1;
-            transform: translateY(0) scale(1);
-        }
-    }
-    
-    @keyframes shimmer {
-        0% {
-            background-position: -200% 0;
-        }
-        100% {
-            background-position: 200% 0;
-        }
-    }
-    
-    @keyframes pulse {
-        0%, 100% {
-            opacity: 0.3;
-        }
-        50% {
-            opacity: 0.6;
-        }
-    }
-`}</style>
 
             <style>{`
-    @keyframes dropdownSlide {
-        from {
-            opacity: 0;
-            transform: translateY(-12px) scale(0.96);
-        }
-        to {
-            opacity: 1;
-            transform: translateY(0) scale(1);
-        }
-    }
-    
-    @keyframes shimmer {
-        0% {
-            background-position: -200% 0;
-        }
-        100% {
-            background-position: 200% 0;
-        }
-    }
-`}</style>
+                @keyframes dropdownSlide {
+                    from {
+                        opacity: 0;
+                        transform: translateY(-12px) scale(0.96);
+                    }
+                    to {
+                        opacity: 1;
+                        transform: translateY(0) scale(1);
+                    }
+                }
+                
+                @keyframes shimmer {
+                    0% {
+                        background-position: -200% 0;
+                    }
+                    100% {
+                        background-position: 200% 0;
+                    }
+                }
+            `}</style>
         </>
     );
 }
-
 
 // Componente MenuItem mejorado
 function MenuItem({ icon, label, badge, onClick }) {
@@ -999,6 +945,7 @@ function MenuItem({ icon, label, badge, onClick }) {
                 color: "#334155",
                 transition: "all .12s ease",
                 position: "relative",
+                fontFamily: 'Inter, sans-serif',
             }}
             onMouseEnter={(e) => {
                 e.currentTarget.style.background = "#f8fafc";
@@ -1018,13 +965,15 @@ function MenuItem({ icon, label, badge, onClick }) {
                 alignItems: "center",
                 justifyContent: "center",
                 flexShrink: 0,
+                color: '#64748b',
+                fontSize: 16,
             }}>
                 {icon}
             </div>
             <span style={{ flex: 1, textAlign: "left" }}>{label}</span>
             {badge !== undefined && (
                 <span style={{
-                    background: "linear-gradient(135deg, #3b82f6 0%, #1e40af 100%)",
+                    background: "#2563eb",
                     color: "#fff",
                     fontSize: 12,
                     fontWeight: 700,
@@ -1032,6 +981,7 @@ function MenuItem({ icon, label, badge, onClick }) {
                     borderRadius: 6,
                     minWidth: 24,
                     textAlign: "center",
+                    fontFamily: 'Inter, sans-serif',
                 }}>
                     {badge}
                 </span>
@@ -1039,59 +989,3 @@ function MenuItem({ icon, label, badge, onClick }) {
         </button>
     );
 }
-
-// Iconos SVG optimizados
-function UserIcon() {
-    return (
-        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-            <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
-            <circle cx="12" cy="7" r="4" />
-        </svg>
-    );
-}
-
-function BookmarkIcon() {
-    return (
-        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-            <path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z" />
-        </svg>
-    );
-}
-
-function DownloadIcon() {
-    return (
-        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
-            <polyline points="7 10 12 15 17 10" />
-            <line x1="12" y1="15" x2="12" y2="3" />
-        </svg>
-    );
-}
-
-function CreditIcon() {
-    return (
-        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-            <rect x="1" y="4" width="22" height="16" rx="2" ry="2" />
-            <line x1="1" y1="10" x2="23" y2="10" />
-        </svg>
-    );
-}
-
-function HelpIcon() {
-    return (
-        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-            <circle cx="12" cy="12" r="10" />
-            <path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3" />
-            <line x1="12" y1="17" x2="12.01" y2="17" />
-        </svg>
-    );
-}
-function SettingsIcon() {
-    return (
-        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-            <path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z" />
-        </svg>
-    );
-}
-
-

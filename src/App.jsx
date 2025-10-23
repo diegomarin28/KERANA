@@ -31,7 +31,7 @@ const Notes = lazy(() => import("./pages/Notes"));
 const AuthCallback = lazy(() => import("./pages/AuthCallback"));
 const HowItWorks = lazy(() => import("./pages/HowItWorks"));
 const Suggestions = lazy(() => import("./pages/Suggestions"));
-const AmbientalImpact = lazy(() => import("./pages/AmbientalImpact"));
+const AmbientalImpact = lazy(() => import('./pages/AmbientalImpact').then(m => ({ default: m.AmbientalImpact })));
 const Subjects = lazy(() => import("./pages/Subjects"));
 const Purchased = lazy(() => import("./pages/Purchased"));
 const EditProfile = lazy(() => import("./pages/EditProfile"));
