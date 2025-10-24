@@ -5,7 +5,6 @@ const NotificationContext = createContext(null);
 export const useNotifications = () => {
     const context = useContext(NotificationContext);
     if (!context) {
-        // En lugar de throw, retornar funciones dummy
         console.warn('useNotifications usado fuera de NotificationProvider');
         return {
             notifications: [],
@@ -85,7 +84,7 @@ const NotificationContainer = () => {
         <div
             style={{
                 position: 'fixed',
-                top: 80, // Debajo del header
+                top: 80,
                 right: 20,
                 zIndex: 9999,
                 display: 'flex',
@@ -107,6 +106,32 @@ const NotificationContainer = () => {
 };
 
 const NotificationItem = ({ notification, onClose }) => {
+    // 🔗 Función para navegar al perfil
+    const handleClick = (e) => {
+        console.log('🖱️ Click en notificación:', {
+            username: notification.username,
+            url: notification.url,
+            notification
+        });
+
+        if (notification.username) {
+            window.location.href = `/user/${notification.username}`;
+        } else if (notification.url) {
+            window.location.href = notification.url;
+        } else {
+            console.log('❌ No hay username ni url para navegar');
+        }
+    };
+
+    const isClickable = !!(notification.username || notification.url);
+
+    console.log('🔍 NotificationItem render:', {
+        username: notification.username,
+        url: notification.url,
+        isClickable,
+        title: notification.title
+    });
+
     const getStyles = (type) => {
         const baseStyle = {
             padding: '16px 20px',
@@ -122,6 +147,8 @@ const NotificationItem = ({ notification, onClose }) => {
             backdropFilter: 'blur(12px)',
             border: '1px solid rgba(255,255,255,0.2)',
             position: 'relative',
+            cursor: isClickable ? 'pointer' : 'default',
+            transition: 'transform 0.2s ease, box-shadow 0.2s ease',
         };
 
         const typeStyles = {
@@ -146,11 +173,83 @@ const NotificationItem = ({ notification, onClose }) => {
         return { ...baseStyle, ...(typeStyles[type] || typeStyles.info) };
     };
 
+    // 🎨 FUNCIÓN PARA FORMATEAR EL MENSAJE - OPCIÓN 1
+    const renderMessage = () => {
+        // Si viene username y nombre separados (desde NotificationsRealtimeSubscriber)
+        if (notification.username && notification.title) {
+            return (
+                <>
+                    <div style={{
+                        fontWeight: '700',
+                        fontSize: '15px',
+                        marginBottom: '4px',
+                    }}>
+                        {notification.title}
+                    </div>
+                    <div style={{
+                        fontSize: '13px',
+                        opacity: 0.85,
+                        marginBottom: '4px',
+                    }}>
+                        @{notification.username}
+                    </div>
+                    <div style={{
+                        fontSize: '14px',
+                        lineHeight: '1.5',
+                        opacity: 0.95,
+                    }}>
+                        {notification.message}
+                    </div>
+                </>
+            );
+        }
+
+        // Formato tradicional con title y message
+        return (
+            <>
+                {notification.title && (
+                    <div style={{
+                        fontWeight: '700',
+                        marginBottom: '6px',
+                        fontSize: '15px',
+                    }}>
+                        {notification.title}
+                    </div>
+                )}
+                <div style={{
+                    fontSize: '14px',
+                    lineHeight: '1.5',
+                    opacity: 0.95,
+                }}>
+                    {notification.message}
+                </div>
+            </>
+        );
+    };
+
     return (
-        <div style={getStyles(notification.type)}>
+        <div
+            style={getStyles(notification.type)}
+            onClick={isClickable ? handleClick : undefined}
+            onMouseEnter={(e) => {
+                if (isClickable) {
+                    e.currentTarget.style.transform = 'translateY(-2px)';
+                    e.currentTarget.style.boxShadow = '0 12px 32px rgba(0, 0, 0, 0.2)';
+                }
+            }}
+            onMouseLeave={(e) => {
+                if (isClickable) {
+                    e.currentTarget.style.transform = 'translateY(0)';
+                    e.currentTarget.style.boxShadow = '0 8px 24px rgba(0, 0, 0, 0.15)';
+                }
+            }}
+        >
             {/* Botón X para cerrar */}
             <button
-                onClick={onClose}
+                onClick={(e) => {
+                    e.stopPropagation(); // ✅ Evitar que abra el perfil al cerrar
+                    onClose();
+                }}
                 style={{
                     position: 'absolute',
                     top: 8,
@@ -182,23 +281,24 @@ const NotificationItem = ({ notification, onClose }) => {
                 ×
             </button>
 
+            {/* Avatar (si existe) */}
+            {notification.avatar && (
+                <img
+                    src={notification.avatar}
+                    alt="Avatar"
+                    style={{
+                        width: 48,
+                        height: 48,
+                        borderRadius: '50%',
+                        objectFit: 'cover',
+                        border: '2px solid rgba(255,255,255,0.3)',
+                        flexShrink: 0,
+                    }}
+                />
+            )}
+
             <div style={{ flex: 1, paddingRight: 20 }}>
-                {notification.title && (
-                    <div style={{
-                        fontWeight: '700',
-                        marginBottom: '6px',
-                        fontSize: '15px',
-                    }}>
-                        {notification.title}
-                    </div>
-                )}
-                <div style={{
-                    fontSize: '14px',
-                    lineHeight: '1.5',
-                    opacity: 0.95,
-                }}>
-                    {notification.message}
-                </div>
+                {renderMessage()}
 
                 {/* Botón de acción */}
                 {notification.action && (

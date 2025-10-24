@@ -46,6 +46,8 @@ const Profile = lazy(() => import('./pages/Profile.jsx'));
 const FollowersPage = lazy(() => import('./pages/FollowersPage.jsx'));
 const FolderView = lazy(() => import("./pages/FolderView"));
 const PublicProfileMentor = lazy(() => import("./pages/PublicProfileMentor"));
+const Credits = lazy(() => import("./pages/Credits"));
+
 
 // Componentes cargados inmediatamente
 import { useSidebarStats } from './hooks/useSidebarStats';
@@ -59,6 +61,8 @@ import NotificationsRealtimeSubscriber from "./components/NotificationsRealtimeS
 import { useMentorOnboarding } from './hooks/useMentorOnboarding';
 import { MentorOnboardingModal } from './components/MentorOnboardingModal';
 import { MentorWelcomeModal } from './components/MentorWelcomeModal';
+import CreditsSuccess from './pages/CreditsSuccess';
+import CreditsFailure from './pages/CreditsFailure';
 
 
 
@@ -180,6 +184,10 @@ function AppRoutes() {
                     <Route path="/purchased/folder/:id" element={<AuthGuard requireAuth={true}><FolderView /></AuthGuard>} />
                     <Route path="/favorites" element={<AuthGuard requireAuth={true}><Favorites /></AuthGuard>} />
                     <Route path="/my_papers" element={<AuthGuard requireAuth={true}><MyPapers /></AuthGuard>} />
+                    <Route path="/credits" element={<Credits />} />
+                    <Route path="/credits/success" element={<CreditsSuccess />} />
+                    <Route path="/credits/failure" element={<CreditsFailure />} />
+                    <Route path="/credits/pending" element={<CreditsFailure />} />
 
                     {/* Varios */}
                     <Route path="/equipo" element={<Equipo />} />
