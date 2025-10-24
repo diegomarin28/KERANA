@@ -1484,46 +1484,71 @@ export const publicProfileAPI = {
         const { data, error } = await supabase
             .from('apunte')
             .select(`
-                id_apunte,
-                titulo,
-                descripcion,
-                created_at,
-                id_materia,
-                materia(nombre_materia),
-                estrellas,
-                thumbnail_path
-            `)
+            id_apunte,
+            id_usuario,
+            titulo,
+            descripcion,
+            creditos,
+            estrellas,
+            created_at,
+            file_path,
+            thumbnail_path,
+            id_materia,
+            usuario:id_usuario(nombre),
+            materia:id_materia(nombre_materia)
+        `)
             .eq('id_usuario', userId)
             .order('created_at', { ascending: false })
             .limit(limit);
 
-        // Transformar para que funcione con NoteCard
-        const transformed = (data || []).map(note => ({
-            id_apunte: note.id_apunte,
-            titulo: note.titulo,
-            descripcion: note.descripcion,
-            materia_nombre: note.materia?.nombre_materia,
-            estrellas: note.estrellas,
-            thumbnail_path: note.thumbnail_path,
-            created_at: note.created_at
+        if (error) return { data: null, error };
+
+        // Contar likes para cada apunte
+        const apIds = (data || []).map(n => n.id_apunte);
+        let likesCountMap = {};
+
+        if (apIds.length > 0) {
+            const { data: likesData, error: likesError } = await supabase
+                .from('likes')
+                .select('id_apunte')
+                .eq('tipo', 'like')
+                .in('id_apunte', apIds);
+
+            if (likesError) {
+                console.error('Error cargando likes:', likesError);
+            }
+
+            likesData?.forEach(like => {
+                likesCountMap[like.id_apunte] = (likesCountMap[like.id_apunte] || 0) + 1;
+            });
+        }
+
+        // Agregar likes_count a cada apunte
+        const notesWithLikes = (data || []).map(note => ({
+            ...note,
+            likes_count: likesCountMap[note.id_apunte] || 0
         }));
 
-        return { data: transformed, error };
+        return { data: notesWithLikes, error: null };
     },
 
     async getAllNotes(userId, materiaId = null) {
         let query = supabase
             .from('apunte')
             .select(`
-                id_apunte,
-                titulo,
-                descripcion,
-                created_at,
-                id_materia,
-                materia(nombre_materia),
-                estrellas,
-                thumbnail_path
-            `)
+            id_apunte,
+            id_usuario,
+            titulo,
+            descripcion,
+            creditos,
+            estrellas,
+            created_at,
+            file_path,
+            thumbnail_path,
+            id_materia,
+            usuario:id_usuario(nombre),
+            materia:id_materia(nombre_materia)
+        `)
             .eq('id_usuario', userId)
             .order('created_at', { ascending: false });
 
@@ -1533,18 +1558,35 @@ export const publicProfileAPI = {
 
         const { data, error } = await query;
 
-        // Transformar para que funcione con NoteCard
-        const transformed = (data || []).map(note => ({
-            id_apunte: note.id_apunte,
-            titulo: note.titulo,
-            descripcion: note.descripcion,
-            materia_nombre: note.materia?.nombre_materia,
-            estrellas: note.estrellas,
-            thumbnail_path: note.thumbnail_path,
-            created_at: note.created_at
+        if (error) return { data: null, error };
+
+        // Contar likes para cada apunte
+        const apIds = (data || []).map(n => n.id_apunte);
+        let likesCountMap = {};
+
+        if (apIds.length > 0) {
+            const { data: likesData, error: likesError } = await supabase
+                .from('likes')
+                .select('id_apunte')
+                .eq('tipo', 'like')
+                .in('id_apunte', apIds);
+
+            if (likesError) {
+                console.error('Error cargando likes:', likesError);
+            }
+
+            likesData?.forEach(like => {
+                likesCountMap[like.id_apunte] = (likesCountMap[like.id_apunte] || 0) + 1;
+            });
+        }
+
+        // Agregar likes_count a cada apunte
+        const notesWithLikes = (data || []).map(note => ({
+            ...note,
+            likes_count: likesCountMap[note.id_apunte] || 0
         }));
 
-        return { data: transformed, error };
+        return { data: notesWithLikes, error: null };
     },
 
     async getUserSubjects(userId) {
