@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '../../supabase';
+import { mentorAPI } from '../../api/database';
 import { Card } from '../../components/ui/Card';
 import { Button } from '../../components/ui/Button';
 import { useMentorPayment } from '../../hooks/useMentorPayment';
@@ -27,6 +28,7 @@ const LOCALIDADES = {
 export default function IAmMentor() {
     const [activeTab, setActiveTab] = useState('materias');
     const [mentorships, setMentorships] = useState([]);
+    const [mentorData, setMentorData] = useState(null);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState('');
     const [showWelcome, setShowWelcome] = useState(false);
@@ -61,18 +63,28 @@ export default function IAmMentor() {
     }, [mentorData]);
 
     useEffect(() => {
-        if (paymentData?.mp_email) {
-            setPagoForm({ mpEmail: paymentData.mp_email });
-        }
-    }, [paymentData]);
+        fetchMyMentorships();
+    }, []);
 
-    const fetchMentorDetails = async () => {
-        if (!mentorData?.id_mentor) return;
-
+    const fetchMyMentorships = async () => {
         try {
             setLoading(true);
 
-            const { data: fullMentor, error: fullMentorError } = await supabase
+            const { data: mentorDataResult, error: mentorError } = await mentorAPI.getMyMentorStatus();
+
+            console.log('🔍 DEBUG - Mentor Data:', mentorDataResult);
+
+            if (mentorError || !mentorDataResult) {
+                console.log('❌ No hay mentor data o error:', mentorError);
+                setMentorships([]);
+                setLoading(false);
+                return;
+            }
+
+            setMentorData(mentorDataResult);
+
+            // Cargar datos del mentor completos
+            const { data: fullMentor } = await supabase
                 .from('mentor')
                 .select('*')
                 .eq('id_mentor', mentorData.id_mentor)
@@ -118,22 +130,17 @@ export default function IAmMentor() {
             const { data: sesiones, error } = await supabase
                 .from('mentor_sesion')
                 .select(`
-                    id_sesion,
-                    fecha_hora,
-                    duracion_minutos,
-                    estado,
-                    precio,
-                    notas_alumno,
-                    alumno:id_alumno(nombre, foto),
-                    materia:id_materia(nombre_materia)
-                `)
-                .eq('id_mentor', mentorData.id_mentor)
-                .in('estado', ['pendiente', 'confirmada'])
-                .gte('fecha_hora', new Date().toISOString())
-                .order('fecha_hora', { ascending: true })
-                .limit(10);
+                id,
+                id_materia,
+                materia(id_materia, nombre_materia, semestre)
+            `)
+                .eq('id_mentor', mentorDataResult.id_mentor);
 
-            if (error) throw error;
+            console.log('🔍 DEBUG - Materias Query Result:', { data, error: fetchError });
+            console.log('🔍 DEBUG - ID Mentor usado:', mentorDataResult.id_mentor);
+
+            if (fetchError) throw fetchError;
+            setMentorships(data || []);
 
             setProximasSesiones(sesiones || []);
         } catch (err) {
@@ -142,12 +149,6 @@ export default function IAmMentor() {
             setLoadingSesiones(false);
         }
     };
-
-    useEffect(() => {
-        if (activeTab === 'proximas' && mentorData?.id_mentor) {
-            fetchProximasSesiones();
-        }
-    }, [activeTab, mentorData]);
 
     const handleRemoveMentorship = async (mentorshipId, materiaName) => {
         if (!confirm(`¿Estás seguro que querés dejar de ser mentor de ${materiaName}?`)) {
@@ -163,7 +164,7 @@ export default function IAmMentor() {
             if (error) throw error;
 
             setMentorships(prev => prev.filter(m => m.id !== mentorshipId));
-            setSuccessModal({ open: true, message: 'Te diste de baja exitosamente' });
+            alert('Te diste de baja exitosamente');
 
         } catch (err) {
             console.error('Error eliminando mentoría:', err);
@@ -189,11 +190,35 @@ export default function IAmMentor() {
 
             if (error) throw error;
 
-            setSuccessModal({ open: true, message: 'Configuración guardada exitosamente' });
+            alert('✅ Configuración guardada exitosamente');
 
         } catch (err) {
             console.error('Error guardando config:', err);
             alert('Error al guardar configuración');
+        } finally {
+            setSaving(false);
+        }
+    };
+
+    const handleSavePerfil = async () => {
+        try {
+            setSaving(true);
+
+            const { error } = await supabase
+                .from('mentor')
+                .update({
+                    linkedin: perfilForm.linkedin,
+                    bio: perfilForm.bio
+                })
+                .eq('id_mentor', mentorData.id_mentor);
+
+            if (error) throw error;
+
+            alert('✅ Perfil actualizado exitosamente');
+
+        } catch (err) {
+            console.error('Error guardando perfil:', err);
+            alert('Error al guardar perfil');
         } finally {
             setSaving(false);
         }
@@ -211,7 +236,7 @@ export default function IAmMentor() {
             const result = await savePaymentData({ mpEmail: pagoForm.mpEmail });
 
             if (result.success) {
-                setSuccessModal({ open: true, message: 'Método de pago configurado. ¡Ya podés recibir solicitudes de clases!' });
+                alert('✅ Método de pago configurado. ¡Ya podés recibir solicitudes de clases!');
             } else {
                 alert('Error al guardar método de pago: ' + result.error);
             }
@@ -227,36 +252,16 @@ export default function IAmMentor() {
     const handleCloseWelcome = async () => {
         setShowWelcome(false);
 
+        // Marcar bienvenida como vista
         if (mentorData) {
-            try {
-                const { error } = await supabase
-                    .from('mentor')
-                    .update({ onboarding_bienvenida_vista: true })
-                    .eq('id_mentor', mentorData.id_mentor);
-
-                if (error) {
-                    console.error('Error marcando bienvenida como vista:', error);
-                }
-            } catch (err) {
-                console.error('Error en handleCloseWelcome:', err);
-            }
+            await supabase
+                .from('mentor')
+                .update({ onboarding_bienvenida_vista: true })
+                .eq('id_mentor', mentorData.id_mentor);
         }
     };
 
-    const formatFecha = (fechaStr) => {
-        const fecha = new Date(fechaStr);
-        const opciones = {
-            weekday: 'long',
-            year: 'numeric',
-            month: 'long',
-            day: 'numeric',
-            hour: '2-digit',
-            minute: '2-digit'
-        };
-        return fecha.toLocaleDateString('es-UY', opciones);
-    };
-
-    if (mentorLoading || loading) {
+    if (loading) {
         return (
             <div style={pageStyle}>
                 <div style={centerStyle}>
@@ -267,7 +272,7 @@ export default function IAmMentor() {
         );
     }
 
-    if (!isMentor || !mentorData) {
+    if (!mentorData) {
         return (
             <div style={pageStyle}>
                 <div style={containerStyle}>
@@ -293,6 +298,7 @@ export default function IAmMentor() {
                     </div>
                 </div>
 
+                {/* Banner si no tiene pago configurado */}
                 {!hasPaymentConfigured && (
                     <div style={warningBannerStyle}>
                         <span style={{ fontSize: 20 }}>⚠️</span>
@@ -317,6 +323,7 @@ export default function IAmMentor() {
                     </Card>
                 )}
 
+                {/* Tabs */}
                 <div style={tabsContainerStyle}>
                     <button
                         onClick={() => setActiveTab('materias')}
@@ -329,16 +336,6 @@ export default function IAmMentor() {
                         📚 Materias
                     </button>
                     <button
-                        onClick={() => setActiveTab('proximas')}
-                        style={{
-                            ...tabButtonStyle,
-                            background: activeTab === 'proximas' ? '#10B981' : 'transparent',
-                            color: activeTab === 'proximas' ? 'white' : '#6B7280'
-                        }}
-                    >
-                        📅 Próximas Mentorías
-                    </button>
-                    <button
                         onClick={() => setActiveTab('config')}
                         style={{
                             ...tabButtonStyle,
@@ -347,6 +344,16 @@ export default function IAmMentor() {
                         }}
                     >
                         ⚙️ Configuración
+                    </button>
+                    <button
+                        onClick={() => setActiveTab('perfil')}
+                        style={{
+                            ...tabButtonStyle,
+                            background: activeTab === 'perfil' ? '#10B981' : 'transparent',
+                            color: activeTab === 'perfil' ? 'white' : '#6B7280'
+                        }}
+                    >
+                        👤 Perfil Público
                     </button>
                     <button
                         onClick={() => setActiveTab('pago')}
@@ -371,6 +378,7 @@ export default function IAmMentor() {
                     </button>
                 </div>
 
+                {/* Contenido de tabs */}
                 <div style={{ marginTop: 24 }}>
                     {activeTab === 'materias' && (
                         <div>
@@ -419,103 +427,6 @@ export default function IAmMentor() {
                         </div>
                     )}
 
-                    {activeTab === 'proximas' && (
-                        <div>
-                            <h2 style={sectionTitleStyle}>Próximas Mentorías</h2>
-                            <p style={sectionSubtitleStyle}>Sesiones confirmadas y pendientes</p>
-
-                            {loadingSesiones ? (
-                                <div style={centerStyle}>
-                                    <div style={spinnerStyle}></div>
-                                </div>
-                            ) : proximasSesiones.length === 0 ? (
-                                <Card style={{ padding: 40, textAlign: 'center', marginTop: 20 }}>
-                                    <div style={{ fontSize: 48, marginBottom: 16 }}>📅</div>
-                                    <h3 style={{ margin: '0 0 12px 0' }}>No tenés mentorías programadas</h3>
-                                    <p style={{ color: '#6b7280', margin: 0 }}>
-                                        Cuando los alumnos agenden clases, aparecerán aquí
-                                    </p>
-                                </Card>
-                            ) : (
-                                <div style={{ display: 'grid', gap: 16, marginTop: 20 }}>
-                                    {proximasSesiones.map(sesion => (
-                                        <Card key={sesion.id_sesion} style={{ padding: 20 }}>
-                                            <div style={{ display: 'flex', gap: 16, alignItems: 'flex-start' }}>
-                                                {sesion.alumno?.foto ? (
-                                                    <img
-                                                        src={sesion.alumno.foto}
-                                                        alt={sesion.alumno.nombre}
-                                                        style={{
-                                                            width: 48,
-                                                            height: 48,
-                                                            borderRadius: '50%',
-                                                            objectFit: 'cover'
-                                                        }}
-                                                    />
-                                                ) : (
-                                                    <div style={{
-                                                        width: 48,
-                                                        height: 48,
-                                                        borderRadius: '50%',
-                                                        background: '#10B981',
-                                                        display: 'flex',
-                                                        alignItems: 'center',
-                                                        justifyContent: 'center',
-                                                        color: 'white',
-                                                        fontWeight: 700,
-                                                        fontSize: 18
-                                                    }}>
-                                                        {sesion.alumno?.nombre?.[0] || '?'}
-                                                    </div>
-                                                )}
-                                                <div style={{ flex: 1 }}>
-                                                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 8 }}>
-                                                        <div>
-                                                            <h3 style={{ margin: '0 0 4px 0', fontSize: 16, fontWeight: 600 }}>
-                                                                {sesion.alumno?.nombre || 'Alumno'}
-                                                            </h3>
-                                                            <p style={{ margin: '0 0 4px 0', color: '#10B981', fontSize: 14, fontWeight: 600 }}>
-                                                                {sesion.materia?.nombre_materia || 'Materia'}
-                                                            </p>
-                                                        </div>
-                                                        <span style={{
-                                                            padding: '4px 12px',
-                                                            background: sesion.estado === 'confirmada' ? '#D1FAE5' : '#FEF3C7',
-                                                            color: sesion.estado === 'confirmada' ? '#065F46' : '#92400E',
-                                                            borderRadius: 12,
-                                                            fontSize: 12,
-                                                            fontWeight: 600
-                                                        }}>
-                                                            {sesion.estado === 'confirmada' ? '✓ Confirmada' : '⏳ Pendiente'}
-                                                        </span>
-                                                    </div>
-                                                    <div style={{ fontSize: 14, color: '#6b7280', marginBottom: 8 }}>
-                                                        📅 {formatFecha(sesion.fecha_hora)}
-                                                    </div>
-                                                    <div style={{ fontSize: 14, color: '#6b7280' }}>
-                                                        ⏱️ Duración: {sesion.duracion_minutos} minutos · 💰 ${sesion.precio}
-                                                    </div>
-                                                    {sesion.notas_alumno && (
-                                                        <div style={{
-                                                            marginTop: 12,
-                                                            padding: 12,
-                                                            background: '#F9FAFB',
-                                                            borderRadius: 8,
-                                                            fontSize: 13,
-                                                            color: '#374151'
-                                                        }}>
-                                                            <strong>Nota del alumno:</strong> {sesion.notas_alumno}
-                                                        </div>
-                                                    )}
-                                                </div>
-                                            </div>
-                                        </Card>
-                                    ))}
-                                </div>
-                            )}
-                        </div>
-                    )}
-
                     {activeTab === 'config' && (
                         <div>
                             <h2 style={sectionTitleStyle}>Configuración de Mentorías</h2>
@@ -523,6 +434,7 @@ export default function IAmMentor() {
 
                             <Card style={{ padding: 24, marginTop: 20 }}>
                                 <div style={formStyle}>
+                                    {/* Max alumnos */}
                                     <div style={fieldStyle}>
                                         <label style={labelStyle}>Cantidad máxima de alumnos por clase</label>
                                         <div style={{ display: 'flex', gap: 12 }}>
@@ -542,6 +454,7 @@ export default function IAmMentor() {
                                         </div>
                                     </div>
 
+                                    {/* Localidad */}
                                     <div style={fieldStyle}>
                                         <label style={labelStyle}>Localidad</label>
                                         <select
@@ -563,6 +476,7 @@ export default function IAmMentor() {
                                         </select>
                                     </div>
 
+                                    {/* Tipo de clases */}
                                     <div style={fieldStyle}>
                                         <label style={labelStyle}>Tipo de clases</label>
                                         <label style={checkboxLabelStyle}>
@@ -583,6 +497,7 @@ export default function IAmMentor() {
                                         </label>
                                     </div>
 
+                                    {/* Lugar presencial */}
                                     {configForm.aceptaPresencial && (
                                         <>
                                             <div style={fieldStyle}>
@@ -621,6 +536,46 @@ export default function IAmMentor() {
 
                                     <button onClick={handleSaveConfig} disabled={saving} style={saveButtonStyle}>
                                         {saving ? 'Guardando...' : 'Guardar Configuración'}
+                                    </button>
+                                </div>
+                            </Card>
+                        </div>
+                    )}
+
+                    {activeTab === 'perfil' && (
+                        <div>
+                            <h2 style={sectionTitleStyle}>Perfil Público</h2>
+                            <p style={sectionSubtitleStyle}>Esta información aparece en tu perfil de mentor</p>
+
+                            <Card style={{ padding: 24, marginTop: 20 }}>
+                                <div style={formStyle}>
+                                    <div style={fieldStyle}>
+                                        <label style={labelStyle}>LinkedIn (opcional)</label>
+                                        <input
+                                            type="url"
+                                            placeholder="https://linkedin.com/in/tu-perfil"
+                                            value={perfilForm.linkedin}
+                                            onChange={(e) => setPerfilForm({ ...perfilForm, linkedin: e.target.value })}
+                                            style={inputStyle}
+                                        />
+                                    </div>
+
+                                    <div style={fieldStyle}>
+                                        <label style={labelStyle}>Biografía</label>
+                                        <textarea
+                                            placeholder="Contá un poco sobre vos, tu experiencia y por qué te gusta enseñar..."
+                                            value={perfilForm.bio}
+                                            onChange={(e) => setPerfilForm({ ...perfilForm, bio: e.target.value })}
+                                            rows={5}
+                                            style={{ ...inputStyle, resize: 'vertical' }}
+                                        />
+                                        <small style={{ fontSize: 13, color: '#6B7280' }}>
+                                            {perfilForm.bio.length}/500 caracteres
+                                        </small>
+                                    </div>
+
+                                    <button onClick={handleSavePerfil} disabled={saving} style={saveButtonStyle}>
+                                        {saving ? 'Guardando...' : 'Guardar Perfil'}
                                     </button>
                                 </div>
                             </Card>
@@ -746,12 +701,8 @@ export default function IAmMentor() {
                 </div>
             </div>
 
+            {/* Modal de bienvenida */}
             <MentorWelcomeModal open={showWelcome} onClose={handleCloseWelcome} />
-            <SuccessModal
-                open={successModal.open}
-                onClose={() => setSuccessModal({ open: false, message: '' })}
-                message={successModal.message}
-            />
         </div>
     );
 }
