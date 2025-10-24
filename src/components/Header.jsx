@@ -254,15 +254,16 @@ export default function Header() {
             signBorder: "#e5e7eb",
         }
         : {
-            headerBg: "#fff",
-            headerText: "#13346b",
-            border: "transparent",
-            pillBg: "#ffffff",
-            pillText: "#13346b",
-            pillBorder: "#13346b",
-            signBg: "#ffffff",
-            signText: "#13346b",
-            signBorder: "#13346b",
+            headerBg: "#f8fbff",           // ❄️ Azul hielo muy claro
+            headerText: "#0f172a",          // Texto oscuro
+            border: "#d4e4f7",              // Borde azul hielo
+            pillBg: "#ffffff",              // Pills blancos
+            pillText: "#13346b",            // Texto azul oscuro
+            pillBorder: "#13346b",          // Borde azul oscuro
+            signBg: "#ffffff",              // Botón blanco
+            signText: "#13346b",            // Texto azul oscuro
+            signBorder: "#13346b",          // Borde azul oscuro
+            boxShadow: "0 2px 12px rgba(19, 52, 107, 0.08)",  // Sombra azulada sutil
         };
 
     const pillReset = { all: "unset", display: "inline-block", cursor: "pointer" };
@@ -389,20 +390,37 @@ export default function Header() {
         return isValidUrl ? url : "";
     }
 
-    const iconButtonStyle = {
-        width: 40,
-        height: 40,
-        display: "grid",
-        placeItems: "center",
-        borderRadius: "50%",
-        background: "rgba(255,255,255,0.1)",
-        border: "1px solid rgba(255,255,255,0.2)",
-        color: TOKENS.headerText,
-        cursor: "pointer",
-        padding: 0,
-        outline: "none",
-        transition: "all 0.2s ease",
-    };
+    const iconButtonStyle = inHero
+        ? {
+            // EN HERO (azul oscuro)
+            width: 40,
+            height: 40,
+            display: "grid",
+            placeItems: "center",
+            borderRadius: "50%",
+            background: "rgba(255,255,255,0.1)",
+            border: "1px solid rgba(255,255,255,0.2)",
+            color: "#ffffff",
+            cursor: "pointer",
+            padding: 0,
+            outline: "none",
+            transition: "all 0.2s ease",
+        }
+        : {
+            // AL SCROLLEAR (hielo)
+            width: 40,
+            height: 40,
+            display: "grid",
+            placeItems: "center",
+            borderRadius: "50%",
+            background: "#ffffff",
+            border: "2px solid #13346b",
+            color: "#13346b",
+            cursor: "pointer",
+            padding: 0,
+            outline: "none",
+            transition: "all 0.2s ease",
+        };
 
     return (
         <>
@@ -451,6 +469,46 @@ export default function Header() {
                         >
                             KERANA
                         </button>
+
+                        {user && userProfile && (
+                            <button
+                                onClick={() => navigate("/credits")}
+                                style={{
+                                    display: "flex",
+                                    alignItems: "center",
+                                    gap: 8,
+                                    padding: "6px 14px",
+                                    borderRadius: 20,
+                                    background: inHero ? "rgba(255,255,255,0.15)" : "#ffffff",
+                                    border: inHero ? "1px solid rgba(255,255,255,0.25)" : "2px solid #13346b",
+                                    color: TOKENS.headerText,
+                                    fontWeight: 600,
+                                    fontSize: 14,
+                                    fontFamily: 'Inter, sans-serif',
+                                    cursor: "pointer",
+                                    transition: "all 0.2s ease",
+                                }}
+                                onMouseEnter={(e) => {
+                                    if (inHero) {
+                                        e.currentTarget.style.background = "rgba(255,255,255,0.25)";
+                                        e.currentTarget.style.borderColor = "rgba(255,255,255,0.4)";
+                                    } else {
+                                        e.currentTarget.style.background = "#f8fafc";
+                                        e.currentTarget.style.borderColor = "#2563eb";
+                                    }
+                                    e.currentTarget.style.transform = "scale(1.05)";
+                                }}
+                                onMouseLeave={(e) => {
+                                    e.currentTarget.style.background = inHero ? "rgba(255,255,255,0.15)" : "#ffffff";
+                                    e.currentTarget.style.borderColor = inHero ? "rgba(255,255,255,0.25)" : "#13346b";
+                                    e.currentTarget.style.transform = "scale(1)";
+                                }}
+                                aria-label="Ver mis créditos"
+                            >
+                                <span style={{ fontSize: 16 }}>💳</span>
+                                <span>{userProfile.creditos || 0}</span>
+                            </button>
+                        )}
                     </div>
 
                     <nav style={{
@@ -527,20 +585,25 @@ export default function Header() {
                                     aria-label="Favoritos"
                                     style={iconButtonStyle}
                                     onMouseEnter={(e) => {
-                                        e.currentTarget.style.background = "rgba(255,255,255,0.15)";
-                                        e.currentTarget.style.borderColor = "rgba(255,255,255,0.3)";
+                                        if (inHero) {
+                                            e.currentTarget.style.background = "rgba(255,255,255,0.15)";
+                                            e.currentTarget.style.borderColor = "rgba(255,255,255,0.3)";
+                                        } else {
+                                            e.currentTarget.style.background = "#f8fafc";
+                                            e.currentTarget.style.borderColor = "#2563eb";
+                                        }
                                         e.currentTarget.style.transform = "scale(1.05)";
                                     }}
                                     onMouseLeave={(e) => {
-                                        e.currentTarget.style.background = "rgba(255,255,255,0.1)";
-                                        e.currentTarget.style.borderColor = "rgba(255,255,255,0.2)";
+                                        e.currentTarget.style.background = iconButtonStyle.background;
+                                        e.currentTarget.style.borderColor = inHero ? "rgba(255,255,255,0.2)" : "#13346b";
                                         e.currentTarget.style.transform = "scale(1)";
                                     }}
                                 >
                                     <FontAwesomeIcon icon={faBookmark} style={{ fontSize: 16 }} />
                                 </button>
 
-                                <NotificationBadge />
+                                <NotificationBadge inHero={inHero} />
 
                                 <div style={{ position: "relative" }}>
                                     <button
@@ -552,12 +615,18 @@ export default function Header() {
                                             overflow: "hidden",
                                         }}
                                         onMouseEnter={(e) => {
+                                            if (inHero) {
+                                                e.currentTarget.style.borderColor = "rgba(255,255,255,0.4)";
+                                            } else {
+                                                e.currentTarget.style.borderColor = "#2563eb";
+                                                e.currentTarget.style.background = "#f8fafc";
+                                            }
                                             e.currentTarget.style.transform = "scale(1.05)";
-                                            e.currentTarget.style.borderColor = "rgba(255,255,255,0.4)";
                                         }}
                                         onMouseLeave={(e) => {
+                                            e.currentTarget.style.background = iconButtonStyle.background;
+                                            e.currentTarget.style.borderColor = inHero ? "rgba(255,255,255,0.2)" : "#13346b";
                                             e.currentTarget.style.transform = "scale(1)";
-                                            e.currentTarget.style.borderColor = "rgba(255,255,255,0.2)";
                                         }}
                                         aria-haspopup="menu"
                                         aria-expanded={avatarMenuOpen ? "true" : "false"}

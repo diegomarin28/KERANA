@@ -4,7 +4,7 @@ import { useNotificationsContext } from '../contexts/NotificationsContext';
 import { useTabBadge } from '../hooks/useTabBadge';
 import { useSeguidores } from '../hooks/useSeguidores';
 
-export default function NotificationBadge() {
+export default function NotificationBadge({ inHero = true }) {  // 👈 NUEVA PROP
     const [isOpen, setIsOpen] = useState(false);
     const [shouldAnimate, setShouldAnimate] = useState(false);
     const [showUnfollowConfirm, setShowUnfollowConfirm] = useState(null);
@@ -25,10 +25,8 @@ export default function NotificationBadge() {
 
     const { seguirUsuario, dejarDeSeguir } = useSeguidores();
 
-    // Tab badge para título del navegador
     useTabBadge(unreadCount);
 
-    // ✨ Animación cuando aumenta el contador
     useEffect(() => {
         if (unreadCount > prevUnreadCount.current && prevUnreadCount.current !== 0) {
             setShouldAnimate(true);
@@ -37,14 +35,12 @@ export default function NotificationBadge() {
         prevUnreadCount.current = unreadCount;
     }, [unreadCount]);
 
-    // Cerrar automáticamente si no hay notificaciones
     useEffect(() => {
         if (isOpen && notificaciones.length === 0) {
             setIsOpen(false);
         }
     }, [notificaciones.length, isOpen]);
 
-    //Auto-marcar como leídas después de 15s con modal abierto
     useEffect(() => {
         if (isOpen && unreadCount > 0) {
             autoMarkTimerRef.current = setTimeout(() => {
@@ -65,7 +61,6 @@ export default function NotificationBadge() {
         };
     }, [isOpen, unreadCount, marcarTodasLeidas]);
 
-    // Cerrar con ESC
     useEffect(() => {
         const handleEsc = (e) => {
             if (e.key === 'Escape') setIsOpen(false);
@@ -76,7 +71,6 @@ export default function NotificationBadge() {
         }
     }, [isOpen]);
 
-    // Cerrar al hacer click fuera
     useEffect(() => {
         const handleClickOutside = (e) => {
             if (dropdownRef.current && !dropdownRef.current.contains(e.target)) {
@@ -93,7 +87,7 @@ export default function NotificationBadge() {
         const states = {};
         notificaciones.forEach(notif => {
             if (notif.tipo === 'nuevo_seguidor' && notif.emisor_id) {
-                states[notif.emisor_id] = notif.ya_lo_sigo;
+                states[notif.emisor_id] = notif.ya_lo_sigo ?? false;
             }
         });
         setFollowingStates(states);
@@ -101,12 +95,9 @@ export default function NotificationBadge() {
 
     const handleFollowBack = async (e, notif) => {
         e.stopPropagation();
-
         if (!notif.emisor_id) return;
-
         const result = await seguirUsuario(notif.emisor_id);
         if (result.success) {
-            // ✅ Actualizar solo el estado local
             setFollowingStates(prev => ({
                 ...prev,
                 [notif.emisor_id]: true
@@ -116,10 +107,8 @@ export default function NotificationBadge() {
 
     const handleConfirmUnfollow = async () => {
         if (!showUnfollowConfirm) return;
-
         const result = await dejarDeSeguir(showUnfollowConfirm.emisor_id);
         if (result.success) {
-            // ✅ Actualizar solo el estado local
             setFollowingStates(prev => ({
                 ...prev,
                 [showUnfollowConfirm.emisor_id]: false
@@ -130,27 +119,20 @@ export default function NotificationBadge() {
 
     const handleNotificationClick = async (e, notif) => {
         e.stopPropagation();
-
-        // Marcar como leída
         if (!notif.leida) {
             await marcarComoLeida(notif.id);
+            return;
         }
-
-        // Si es "nuevo_seguidor", ir al perfil del emisor
-        if (notif.tipo === 'nuevo_seguidor' && notif.emisor?.username) {
+        if (notif.emisor?.username) {
             setIsOpen(false);
             navigate(`/user/${notif.emisor.username}`);
         }
     };
 
-
-
     const handleShowUnfollowModal = (e, notif) => {
         e.stopPropagation();
         setShowUnfollowConfirm(notif);
     };
-
-
 
     const handleCancelUnfollow = () => {
         setShowUnfollowConfirm(null);
@@ -177,6 +159,31 @@ export default function NotificationBadge() {
 
     const recentNotifications = notificaciones.slice(0, 5);
 
+    // 🎨 ESTILOS ADAPTATIVOS
+    const buttonStyle = inHero
+        ? {
+            // EN HERO (azul oscuro)
+            background: 'rgba(255,255,255,0.1)',
+            border: '1px solid rgba(255,255,255,0.2)',
+            color: '#ffffff',
+        }
+        : {
+            // AL SCROLLEAR (hielo)
+            background: '#ffffff',
+            border: '2px solid #13346b',
+            color: '#13346b',
+        };
+
+    const badgeStyle = inHero
+        ? {
+            // EN HERO
+            border: '2px solid #13346b',
+        }
+        : {
+            // AL SCROLLEAR
+            border: '2px solid #f0f7ff',
+        };
+
     return (
         <div ref={dropdownRef} style={{ position: 'relative' }}>
             {/* Botón Badge */}
@@ -188,19 +195,23 @@ export default function NotificationBadge() {
                     width: 40,
                     height: 40,
                     borderRadius: '50%',
-                    border: '1px solid rgba(255,255,255,0.2)',
-                    background: 'rgba(255,255,255,0.1)',
-                    color: '#ffffff',
+                    ...buttonStyle,
                     display: 'grid',
                     placeItems: 'center',
                     cursor: 'pointer',
                     transition: 'all 0.2s ease',
                 }}
                 onMouseEnter={(e) => {
-                    e.currentTarget.style.background = 'rgba(255,255,255,0.2)';
+                    if (inHero) {
+                        e.currentTarget.style.background = 'rgba(255,255,255,0.2)';
+                    } else {
+                        e.currentTarget.style.background = '#f8fafc';
+                        e.currentTarget.style.transform = 'scale(1.05)';
+                    }
                 }}
                 onMouseLeave={(e) => {
-                    e.currentTarget.style.background = 'rgba(255,255,255,0.1)';
+                    e.currentTarget.style.background = buttonStyle.background;
+                    e.currentTarget.style.transform = 'scale(1)';
                 }}
                 aria-label="Notificaciones"
             >
@@ -229,14 +240,14 @@ export default function NotificationBadge() {
                         fontWeight: 700,
                         display: 'grid',
                         placeItems: 'center',
-                        border: '2px solid #13346b',
+                        ...badgeStyle,
                     }}>
                         {unreadCount > 99 ? '99+' : unreadCount}
                     </span>
                 )}
             </button>
 
-            {/* Dropdown Modal */}
+            {/* Dropdown Modal - SIN CAMBIOS */}
             {isOpen && (
                 <div style={{
                     position: 'absolute',
@@ -385,7 +396,7 @@ export default function NotificationBadge() {
                                                 </div>
                                             )}
 
-                                            {/* Contenido: Mensaje + Tiempo */}
+                                            {/* Contenido */}
                                             <div style={{ flex: 1, minWidth: 0 }}>
                                                 <p style={{
                                                     margin: 0,
@@ -394,7 +405,27 @@ export default function NotificationBadge() {
                                                     lineHeight: 1.4,
                                                     fontWeight: notif.leida ? 400 : 600,
                                                 }}>
-                                                    <strong>{notif.emisor?.nombre || 'Alguien'}</strong> comenzó a seguirte.{' '}
+                                                    <strong>{notif.emisor?.nombre || 'Alguien'}</strong>{' '}
+                                                    {notif.tipo === 'nuevo_seguidor' && 'comenzó a seguirte'}
+                                                    {notif.tipo === 'nuevo_apunte_seguido' && (() => {
+                                                        const match = notif.mensaje.match(/subió "(.+)"/);
+                                                        const titulo = match ? match[1] : 'un apunte';
+                                                        return `subió "${titulo}"`;
+                                                    })()}
+                                                    {notif.tipo === 'compra_apunte' && (() => {
+                                                        const match = notif.mensaje.match(/compró "(.+)"/);
+                                                        const titulo = match ? match[1] : 'tu apunte';
+                                                        return `compró "${titulo}"`;
+                                                    })()}
+                                                    {notif.tipo === 'nueva_resena' && (() => {
+                                                        const match = notif.mensaje.match(/calificó "(.+)" con (\d+)/);
+                                                        if (match) {
+                                                            return `calificó "${match[1]}" con ${match[2]} ⭐`;
+                                                        }
+                                                        return 'dejó una reseña';
+                                                    })()}
+                                                    {!['nuevo_seguidor', 'nuevo_apunte_seguido', 'compra_apunte', 'nueva_resena'].includes(notif.tipo) && notif.mensaje}
+                                                    .{' '}
                                                     <span style={{
                                                         fontSize: 11,
                                                         color: '#94a3b8',
@@ -405,7 +436,7 @@ export default function NotificationBadge() {
                                                 </p>
                                             </div>
 
-                                            {/* Botón Seguir/Siguiendo - COLORES INSTAGRAM */}
+                                            {/* Botón Seguir/Siguiendo */}
                                             {isFollowerNotif && !isFollowing && (
                                                 <button
                                                     onClick={(e) => handleFollowBack(e, notif)}
@@ -430,12 +461,6 @@ export default function NotificationBadge() {
                                                         e.target.style.background = '#0095f6';
                                                         e.target.style.transform = 'scale(1)';
                                                     }}
-                                                    onMouseDown={(e) => {
-                                                        e.target.style.transform = 'scale(0.98)';
-                                                    }}
-                                                    onMouseUp={(e) => {
-                                                        e.target.style.transform = 'scale(1.02)';
-                                                    }}
                                                 >
                                                     Seguir
                                                 </button>
@@ -458,17 +483,9 @@ export default function NotificationBadge() {
                                                     }}
                                                     onMouseEnter={(e) => {
                                                         e.target.style.background = '#dbdbdb';
-                                                        e.target.style.transform = 'scale(1.02)';
                                                     }}
                                                     onMouseLeave={(e) => {
                                                         e.target.style.background = '#efefef';
-                                                        e.target.style.transform = 'scale(1)';
-                                                    }}
-                                                    onMouseDown={(e) => {
-                                                        e.target.style.transform = 'scale(0.98)';
-                                                    }}
-                                                    onMouseUp={(e) => {
-                                                        e.target.style.transform = 'scale(1.02)';
                                                     }}
                                                 >
                                                     Siguiendo
@@ -476,7 +493,7 @@ export default function NotificationBadge() {
                                             )}
                                         </div>
 
-                                        {/* Botón eliminar - centro vertical derecha */}
+                                        {/* Botón eliminar */}
                                         <button
                                             onClick={(e) => handleDelete(e, notif.id)}
                                             style={{
@@ -511,7 +528,7 @@ export default function NotificationBadge() {
                                             ×
                                         </button>
 
-                                        {/* Indicador no leída - AZUL INSTAGRAM */}
+                                        {/* Indicador no leída */}
                                         {!notif.leida && (
                                             <div style={{
                                                 position: 'absolute',
@@ -589,7 +606,7 @@ export default function NotificationBadge() {
                 </div>
             )}
 
-            {/* Modal de confirmación para dejar de seguir */}
+            {/* Modal de confirmación unfollow - SIN CAMBIOS */}
             {showUnfollowConfirm && (
                 <div
                     onClick={handleCancelUnfollow}
@@ -645,20 +662,10 @@ export default function NotificationBadge() {
                                     fontWeight: 600,
                                     fontSize: 14,
                                     cursor: 'pointer',
-                                    transition: 'all 0.15s cubic-bezier(0.4, 0, 0.2, 1)',
+                                    transition: 'all 0.15s',
                                 }}
-                                onMouseEnter={(e) => {
-                                    e.target.style.background = '#dbdbdb';
-                                }}
-                                onMouseLeave={(e) => {
-                                    e.target.style.background = '#efefef';
-                                }}
-                                onMouseDown={(e) => {
-                                    e.target.style.transform = 'scale(0.98)';
-                                }}
-                                onMouseUp={(e) => {
-                                    e.target.style.transform = 'scale(1)';
-                                }}
+                                onMouseEnter={(e) => e.target.style.background = '#dbdbdb'}
+                                onMouseLeave={(e) => e.target.style.background = '#efefef'}
                             >
                                 Cancelar
                             </button>
@@ -673,20 +680,10 @@ export default function NotificationBadge() {
                                     fontWeight: 600,
                                     fontSize: 14,
                                     cursor: 'pointer',
-                                    transition: 'all 0.15s cubic-bezier(0.4, 0, 0.2, 1)',
+                                    transition: 'all 0.15s',
                                 }}
-                                onMouseEnter={(e) => {
-                                    e.target.style.background = '#c92a37';
-                                }}
-                                onMouseLeave={(e) => {
-                                    e.target.style.background = '#ed4956';
-                                }}
-                                onMouseDown={(e) => {
-                                    e.target.style.transform = 'scale(0.98)';
-                                }}
-                                onMouseUp={(e) => {
-                                    e.target.style.transform = 'scale(1)';
-                                }}
+                                onMouseEnter={(e) => e.target.style.background = '#c92a37'}
+                                onMouseLeave={(e) => e.target.style.background = '#ed4956'}
                             >
                                 Dejar de seguir
                             </button>

@@ -32,33 +32,25 @@ export default function Notifications() {
         };
     }, [cargarNotificaciones, marcarVisita]);
 
-    // ✅ Verificar estado de seguimiento al cargar notificaciones
     useEffect(() => {
-        const checkFollowingStates = async () => {
-            const states = {};
-            const promises = notificaciones
-                .filter(notif => notif.emisor_id)
-                .map(async (notif) => {
-                    const result = await verificarSiSigue(notif.emisor_id);
-                    states[notif.emisor_id] = result.sigue;
-                });
-
-            await Promise.all(promises);
-            setFollowingStates(states);
-        };
-
-        if (notificaciones.length > 0) {
-            checkFollowingStates();
-        }
-    }, [notificaciones, verificarSiSigue]);
+        // Usar los estados ya cargados desde el contexto
+        const states = {};
+        notificaciones.forEach(notif => {
+            if (notif.emisor_id && notif.ya_lo_sigo !== undefined) {
+                states[notif.emisor_id] = notif.ya_lo_sigo;
+            }
+        });
+        setFollowingStates(states);
+    }, [notificaciones]);
 
     const handleNotificationClick = async (notif) => {
-        // Marcar como leída
+        // Si NO está leída: solo marcar como leída (primer click)
         if (!notif.leida) {
             await marcarComoLeida(notif.id);
+            return; // ← DETENER AQUÍ
         }
 
-        // Si tiene emisor, ir a su perfil
+        // Si YA está leída: ir al perfil (segundo click)
         if (notif.emisor?.username) {
             navigate(`/user/${notif.emisor.username}`);
         }
@@ -152,6 +144,23 @@ export default function Notifications() {
                                     onMouseLeave={(e) => e.target.style.background = '#fff'}
                                 >
                                     ✓ Marcar todas como leídas
+                                </button>
+                            )}
+                            {notificaciones.length > 0 && (
+                                <button
+                                    onClick={async () => {
+                                        if (confirm('¿Eliminar todas las notificaciones? Esta acción no se puede deshacer.')) {
+                                            // Eliminar todas en paralelo
+                                            await Promise.all(
+                                                notificaciones.map(notif => eliminarNotificacion(notif.id))
+                                            );
+                                        }
+                                    }}
+                                    style={{...actionButtonStyle, color: '#ef4444'}}
+                                    onMouseEnter={(e) => e.target.style.background = '#fef2f2'}
+                                    onMouseLeave={(e) => e.target.style.background = '#fff'}
+                                >
+                                    🗑️ Eliminar todas
                                 </button>
                             )}
                         </div>

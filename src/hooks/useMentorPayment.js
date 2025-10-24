@@ -22,39 +22,45 @@ export function useMentorPayment() {
             }
 
             // Obtener id_usuario
-            const { data: usuarioData } = await supabase
+            const { data: usuarioData, error: usuarioError } = await supabase
                 .from('usuario')
                 .select('id_usuario')
                 .eq('auth_id', user.id)
-                .single();
+                .maybeSingle();
 
-            if (!usuarioData) {
+            if (usuarioError || !usuarioData) {
+                console.error('Error obteniendo usuario:', usuarioError);
                 setLoading(false);
                 return;
             }
 
             // Obtener mentor
-            const { data: mentorData } = await supabase
+            const { data: mentorData, error: mentorError } = await supabase
                 .from('mentor')
                 .select('id_mentor, puede_recibir_clases')
                 .eq('id_usuario', usuarioData.id_usuario)
-                .single();
+                .maybeSingle();
 
-            if (!mentorData) {
+            if (mentorError || !mentorData) {
+                console.error('Error obteniendo mentor:', mentorError);
                 setLoading(false);
                 return;
             }
 
-            // Obtener datos de pago
-            const { data: pagoData, error } = await supabase
+            // Obtener datos de pago - usar maybeSingle() en lugar de single()
+            const { data: pagoData, error: pagoError } = await supabase
                 .from('mentor_pago')
                 .select('*')
                 .eq('id_mentor', mentorData.id_mentor)
-                .single();
+                .maybeSingle();
+
+            if (pagoError) {
+                console.error('Error obteniendo datos de pago:', pagoError);
+            }
 
             if (pagoData) {
                 setPaymentData(pagoData);
-                setHasPaymentConfigured(pagoData.configurado);
+                setHasPaymentConfigured(pagoData.configurado || false);
             } else {
                 setPaymentData(null);
                 setHasPaymentConfigured(false);
@@ -75,29 +81,37 @@ export function useMentorPayment() {
             if (!user) return { success: false, error: 'No autenticado' };
 
             // Obtener id_usuario
-            const { data: usuarioData } = await supabase
+            const { data: usuarioData, error: usuarioError } = await supabase
                 .from('usuario')
                 .select('id_usuario')
                 .eq('auth_id', user.id)
-                .single();
+                .maybeSingle();
 
-            if (!usuarioData) return { success: false, error: 'Usuario no encontrado' };
+            if (usuarioError || !usuarioData) {
+                return { success: false, error: 'Usuario no encontrado' };
+            }
 
             // Obtener mentor
-            const { data: mentorData } = await supabase
+            const { data: mentorData, error: mentorError } = await supabase
                 .from('mentor')
                 .select('id_mentor')
                 .eq('id_usuario', usuarioData.id_usuario)
-                .single();
+                .maybeSingle();
 
-            if (!mentorData) return { success: false, error: 'No eres mentor' };
+            if (mentorError || !mentorData) {
+                return { success: false, error: 'No eres mentor' };
+            }
 
-            // Verificar si ya existe registro
-            const { data: existingPayment } = await supabase
+            // Verificar si ya existe registro - usar maybeSingle()
+            const { data: existingPayment, error: checkError } = await supabase
                 .from('mentor_pago')
                 .select('id')
                 .eq('id_mentor', mentorData.id_mentor)
-                .single();
+                .maybeSingle();
+
+            if (checkError) {
+                console.error('Error verificando pago existente:', checkError);
+            }
 
             let result;
             if (existingPayment) {
@@ -124,10 +138,14 @@ export function useMentorPayment() {
             if (result.error) throw result.error;
 
             // Actualizar mentor.puede_recibir_clases
-            await supabase
+            const { error: updateMentorError } = await supabase
                 .from('mentor')
                 .update({ puede_recibir_clases: true })
                 .eq('id_mentor', mentorData.id_mentor);
+
+            if (updateMentorError) {
+                console.error('Error actualizando mentor:', updateMentorError);
+            }
 
             // Recargar datos
             await fetchPaymentData();
