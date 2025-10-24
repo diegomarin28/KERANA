@@ -66,7 +66,10 @@ export default function IAmMentor() {
 
             const { data: mentorDataResult, error: mentorError } = await mentorAPI.getMyMentorStatus();
 
+            console.log('🔍 DEBUG - Mentor Data:', mentorDataResult);
+
             if (mentorError || !mentorDataResult) {
+                console.log('❌ No hay mentor data o error:', mentorError);
                 setMentorships([]);
                 setLoading(false);
                 return;
@@ -108,11 +111,14 @@ export default function IAmMentor() {
             const { data, error: fetchError } = await supabase
                 .from('mentor_materia')
                 .select(`
-                    id,
-                    id_materia,
-                    materia(id_materia, nombre_materia, semestre)
-                `)
+                id,
+                id_materia,
+                materia(id_materia, nombre_materia, semestre)
+            `)
                 .eq('id_mentor', mentorDataResult.id_mentor);
+
+            console.log('🔍 DEBUG - Materias Query Result:', { data, error: fetchError });
+            console.log('🔍 DEBUG - ID Mentor usado:', mentorDataResult.id_mentor);
 
             if (fetchError) throw fetchError;
             setMentorships(data || []);
