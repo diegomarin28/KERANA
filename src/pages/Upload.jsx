@@ -519,7 +519,9 @@ export default function Upload() {
                 <div style={{ width: 260 }}>
                     <Card style={{
                         padding: 20, background: '#f0f9ff',
-                        border: '1px solid #bfdbfe', position: 'sticky', top: 20
+                        border: '1px solid #bfdbfe',
+                        position: 'sticky',
+                        top: 80
                     }}>
                         <h3 style={{ margin: '0 0 12px', color: '#1e40af', fontSize: 16 }}>💡 Consejos</h3>
                         <ul style={{ margin: 0, paddingLeft: 20, color: '#1e3a8a', fontSize: 13, lineHeight: 1.6 }}>
