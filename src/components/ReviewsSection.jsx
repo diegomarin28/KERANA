@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '../supabase';
-import { ratingsAPI } from '../api/Database';
+import { ratingsAPI } from '../api/database';
 import StarDisplay from './StarDisplay';
 
 // Tags disponibles (mismo array que en AuthModal)
