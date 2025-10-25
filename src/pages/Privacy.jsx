@@ -1,5 +1,5 @@
 // src/pages/Privacy.jsx
-import { Card } from '../components/ui/Card';
+import { Card } from '../components/UI/Card';
 
 export default function Privacy() {
     return (

@@ -1,5 +1,5 @@
 import { useNavigate } from "react-router-dom";
-import { Card } from "../components/ui/Card";
+import { Card } from "../components/UI/Card";
 import PDFThumbnail from "../components/PDFThumbnail";
 
 export default function ApunteCard({ note, currentUserId }) {

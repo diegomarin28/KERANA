@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '../../supabase';
-import { Card } from '../../components/ui/Card';
-import { Button } from '../../components/ui/Button';
+import { Card } from '../../components/UI/Card';
+import { Button } from '../../components/UI/Button';
 
 export default function MyStudents() {
     const [activeTab, setActiveTab] = useState('alumnos'); // alumnos, recursos

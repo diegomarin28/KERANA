@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { supabase } from "../supabase";
-import { Button } from "../components/ui/Button";
-import { Card } from "../components/ui/Card";
+import { Button } from "../components/UI/Button";
+import { Card } from "../components/UI/Card";
 import ApunteCard from "../components/ApunteCard";
 
 export default function MyPapers() {

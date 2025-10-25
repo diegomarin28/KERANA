@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '../supabase';
-import { Card } from '../components/ui/Card';
+import { Card } from '../components/UI/Card';
 import { FollowersList } from '../components/FollowersList';
 
 export default function FollowersPage() {

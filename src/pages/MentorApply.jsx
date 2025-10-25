@@ -1,8 +1,8 @@
     import { useState, useEffect, useRef } from 'react';
     import { useNavigate } from 'react-router-dom';
     import { supabase } from '../supabase';
-    import { Card } from '../components/ui/Card';
-    import { Button } from '../components/ui/Button';
+    import { Card } from '../components/UI/Card';
+    import { Button } from '../components/UI/Button';
     import emailjs from '@emailjs/browser';
 
 
