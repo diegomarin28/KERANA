@@ -59,7 +59,8 @@ export const useMentorStatus = (autoCheck = true) => {
                             id_materia,
                             materia (
                                 id_materia,
-                                nombre_materia
+                                nombre_materia,
+                                semestre
                             )
                         `)
                         .eq('id_mentor', mentor.id_mentor)
