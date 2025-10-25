@@ -1,6 +1,7 @@
 // src/api/Database.js
 import { supabase } from '../supabase'
 import emailjs from '@emailjs/browser';
+import { validarComentario } from '../utils/wordFilter';
 
 
 // ==========================================
@@ -110,23 +111,57 @@ async function searchProfessors(term) {
     if (!q) return { data: [], error: null };
 
     try {
-        // 1. Buscar profesores (con la función vieja que solo devuelve id y nombre)
-        const { data: profesores, error } = await supabase
+        // 1. Buscar profesores por NOMBRE
+        const { data: profesoresPorNombre, error: errorNombre } = await supabase
             .rpc('buscar_profesores_sin_tildes', { termino: q });
 
-        if (error) {
-            console.error('Error buscando profesores:', error);
-            return { data: [], error };
+        if (errorNombre) {
+            console.error('Error buscando profesores por nombre:', errorNombre);
         }
 
-        if (!profesores || profesores.length === 0) {
+        // 2. Buscar profesores por MATERIA
+        const { data: profesoresPorMateria, error: errorMateria } = await supabase
+            .rpc('buscar_profesores_por_materia', { termino: q });
+
+        if (errorMateria) {
+            console.error('Error buscando profesores por materia:', errorMateria);
+        }
+
+        // 3. Combinar resultados (evitar duplicados)
+        const profesoresMap = new Map();
+
+        // Agregar profesores encontrados por nombre
+        (profesoresPorNombre || []).forEach(prof => {
+            if (!profesoresMap.has(prof.id_profesor)) {
+                profesoresMap.set(prof.id_profesor, {
+                    id_profesor: prof.id_profesor,
+                    profesor_nombre: prof.profesor_nombre,
+                    materias: []
+                });
+            }
+        });
+
+        // Agregar profesores encontrados por materia
+        (profesoresPorMateria || []).forEach(prof => {
+            if (!profesoresMap.has(prof.id_profesor)) {
+                profesoresMap.set(prof.id_profesor, {
+                    id_profesor: prof.id_profesor,
+                    profesor_nombre: prof.profesor_nombre,
+                    materias: []
+                });
+            }
+            // Agregar la materia a la lista
+            if (prof.nombre_materia) {
+                profesoresMap.get(prof.id_profesor).materias.push(prof.nombre_materia);
+            }
+        });
+
+        if (profesoresMap.size === 0) {
             return { data: [], error: null };
         }
 
-        // 2. Obtener los IDs de los profesores encontrados
-        const profesorIds = profesores.map(p => p.id_profesor);
-
-        // 3. Obtener los ratings de todos esos profesores en una sola query
+        // 4. Obtener ratings de todos los profesores
+        const profesorIds = Array.from(profesoresMap.keys());
         const { data: ratings, error: ratingsError } = await supabase
             .from('rating')
             .select('ref_id, estrellas')
@@ -137,9 +172,8 @@ async function searchProfessors(term) {
             console.error('Error obteniendo ratings:', ratingsError);
         }
 
-        // 4. Calcular el promedio de cada profesor
+        // 5. Calcular promedio de ratings
         const ratingsMap = {};
-
         if (ratings && ratings.length > 0) {
             ratings.forEach(rating => {
                 if (!ratingsMap[rating.ref_id]) {
@@ -150,8 +184,8 @@ async function searchProfessors(term) {
             });
         }
 
-        // 5. Transformar los resultados con el rating calculado
-        const transformed = profesores.map(prof => {
+        // 6. Transformar resultados finales
+        const transformed = Array.from(profesoresMap.values()).map(prof => {
             const ratingData = ratingsMap[prof.id_profesor];
             const avgRating = ratingData
                 ? Number((ratingData.sum / ratingData.count).toFixed(1))
@@ -161,7 +195,7 @@ async function searchProfessors(term) {
                 id: prof.id_profesor,
                 id_profesor: prof.id_profesor,
                 profesor_nombre: prof.profesor_nombre,
-                materia_nombre: '',
+                materia_nombre: prof.materias.join(', ') || '',
                 rating_promedio: avgRating,
                 estrellas: avgRating
             };
@@ -207,23 +241,34 @@ async function searchNotes(term) {
     if (!q) return { data: [], error: null };
 
     try {
-        // 1️⃣ Primero buscamos solo los IDs
-        const { data: apuntes, error } = await supabase
+        // 1️⃣ Buscar apuntes por TÍTULO
+        const { data: apuntesPorTitulo, error: errorTitulo } = await supabase
             .rpc('buscar_apuntes_sin_tildes', { termino: q });
 
-        if (error) {
-            console.error('Error buscando apuntes:', error);
-            return { data: [], error };
+        if (errorTitulo) {
+            console.error('Error buscando apuntes por título:', errorTitulo);
         }
 
-        if (!apuntes || apuntes.length === 0) {
+        // 2️⃣ Buscar apuntes por NOMBRE DE MATERIA
+        const { data: apuntesPorMateria, error: errorMateria } = await supabase
+            .rpc('buscar_apuntes_por_materia', { termino: q });
+
+        if (errorMateria) {
+            console.error('Error buscando apuntes por materia:', errorMateria);
+        }
+
+        // 3️⃣ Combinar IDs únicos
+        const idsSet = new Set();
+        (apuntesPorTitulo || []).forEach(a => idsSet.add(a.id_apunte));
+        (apuntesPorMateria || []).forEach(a => idsSet.add(a.id_apunte));
+
+        if (idsSet.size === 0) {
             return { data: [], error: null };
         }
 
-        // 2️⃣ Obtenemos los IDs encontrados
-        const ids = apuntes.map(a => a.id_apunte);
+        const ids = Array.from(idsSet);
 
-        // 3️⃣ Traemos toda la info de esos apuntes (con thumbnail_path)
+        // 4️⃣ Traer toda la info de esos apuntes
         const { data: apuntesCompletos, error: errorCompleto } = await supabase
             .from('apunte')
             .select(`
@@ -245,7 +290,7 @@ async function searchNotes(term) {
             return { data: [], error: errorCompleto };
         }
 
-        // 3.5️⃣ Contar likes por apunte
+        // 5️⃣ Contar likes por apunte
         const apunteIds = apuntesCompletos.map(a => a.id_apunte);
         const { data: likesData, error: likesError } = await supabase
             .from('likes')
@@ -257,13 +302,13 @@ async function searchNotes(term) {
             console.error('Error cargando likes:', likesError);
         }
 
-        // Crear un mapa de conteo de likes
+        // Crear mapa de conteo de likes
         const likesCountMap = {};
         likesData?.forEach(like => {
             likesCountMap[like.id_apunte] = (likesCountMap[like.id_apunte] || 0) + 1;
         });
 
-        // 4️⃣ Obtener nombres de usuarios separadamente
+        // 6️⃣ Obtener nombres de usuarios
         const userIds = [...new Set(apuntesCompletos.map(a => a.id_usuario))];
         const { data: usuarios } = await supabase
             .from('usuario')
@@ -272,7 +317,7 @@ async function searchNotes(term) {
 
         const userMap = new Map(usuarios?.map(u => [u.id_usuario, u.nombre]) || []);
 
-        // 5️⃣ Transformar
+        // 7️⃣ Transformar con signed URLs
         const transformed = [];
         for (const a of (apuntesCompletos || [])) {
             let signedUrl = null;
@@ -310,7 +355,6 @@ async function searchNotes(term) {
         return { data: [], error };
     }
 }
-
 
 async function searchUsers(term) {
     const q = (term || "").trim();
@@ -378,18 +422,69 @@ async function searchMentors(term) {
     const q = (term || "").trim();
     if (!q) return { data: [], error: null };
 
+
     try {
         const { data: miIdData } = await supabase.rpc('obtener_usuario_actual_id');
         const miId = miIdData || null;
 
-        const { data, error } = await supabase
+        // 1. Buscar mentores por NOMBRE
+        const { data: mentoresPorNombre, error: errorNombre } = await supabase
             .rpc('buscar_mentores_sin_tildes', { termino: q });
 
-        if (error) return { data, error };
 
-        // Obtener los id_usuario de cada mentor
-        const mentorIds = (data || []).map(m => m.id_mentor);
+        if (errorNombre) {
+            console.error('Error buscando mentores por nombre:', errorNombre);
+        }
 
+        // 2. Buscar mentores por MATERIA
+        const { data: mentoresPorMateria, error: errorMateria } = await supabase
+            .rpc('buscar_mentores_por_materia', { termino: q });
+
+        if (errorMateria) {
+            console.error('Error buscando mentores por materia:', errorMateria);
+        }
+
+        // 3. Combinar resultados (evitar duplicados)
+        const mentoresMap = new Map();
+
+        // Agregar mentores encontrados por nombre
+        (mentoresPorNombre || []).forEach(mentor => {
+            if (!mentoresMap.has(mentor.id_mentor)) {
+                mentoresMap.set(mentor.id_mentor, {
+                    id_mentor: mentor.id_mentor,
+                    nombre: mentor.nombre,
+                    username: mentor.username,
+                    foto: mentor.foto,
+                    estrellas_mentor: mentor.estrellas_mentor,
+                    materias: []
+                });
+            }
+        });
+
+        // Agregar mentores encontrados por materia
+        (mentoresPorMateria || []).forEach(mentor => {
+            if (!mentoresMap.has(mentor.id_mentor)) {
+                mentoresMap.set(mentor.id_mentor, {
+                    id_mentor: mentor.id_mentor,
+                    nombre: mentor.nombre,
+                    username: mentor.username,
+                    foto: mentor.foto,
+                    estrellas_mentor: mentor.estrellas_mentor,
+                    materias: []
+                });
+            }
+            // Agregar la materia a la lista
+            if (mentor.nombre_materia) {
+                mentoresMap.get(mentor.id_mentor).materias.push(mentor.nombre_materia);
+            }
+        });
+
+        if (mentoresMap.size === 0) {
+            return { data: [], error: null };
+        }
+
+        // 4. Obtener id_usuario de cada mentor y filtrar seguimientos
+        const mentorIds = Array.from(mentoresMap.keys());
         const { data: mentorUsers } = await supabase
             .from('mentor')
             .select('id_mentor, id_usuario')
@@ -397,7 +492,7 @@ async function searchMentors(term) {
 
         const userMap = new Map(mentorUsers?.map(m => [m.id_mentor, m.id_usuario]) || []);
 
-        // ✨ NUEVO: Obtener quiénes estoy siguiendo
+        // 5. Obtener quiénes estoy siguiendo
         let siguiendoSet = new Set();
         if (miId && mentorUsers && mentorUsers.length > 0) {
             const userIds = mentorUsers.map(m => m.id_usuario);
@@ -411,7 +506,8 @@ async function searchMentors(term) {
             siguiendoSet = new Set(seguimientos?.map(s => s.seguido_id) || []);
         }
 
-        const transformed = (data || []).map(m => {
+// 6. Transformar resultados finales
+        const transformed = Array.from(mentoresMap.values()).map(m => {
             const userId = userMap.get(m.id_mentor) || null;
             return {
                 id: m.id_mentor,
@@ -427,6 +523,7 @@ async function searchMentors(term) {
                 siguiendo: userId ? siguiendoSet.has(userId) : false
             };
         });
+
 
         return { data: transformed, error: null };
 
@@ -864,6 +961,9 @@ export const notificationsAPI = {
 // ==========================================
 // ⭐ RATINGS (MODIFICADO PARA SOPORTAR PROFESOR/MENTOR/MATERIA)
 // ==========================================
+
+
+
 export const ratingsAPI = {
     async createRating(tipo, refId, estrellas, comentario, extra = {}) {
         const {data: authData, error: authErr} = await supabase.auth.getUser();
@@ -880,6 +980,13 @@ export const ratingsAPI = {
 
         if (usuarioError || !usuarioData) {
             return {data: null, error: {message: "Usuario no encontrado en la base de datos."}};
+        }
+
+        // ✅ VALIDAR PALABRAS PROHIBIDAS
+        const validacion = validarComentario(comentario);
+        if (!validacion.valido) {
+            console.warn('⚠️ Comentario bloqueado por contenido inapropiado');
+            return {data: null, error: {message: validacion.error}};
         }
 
         const refIdAsInt = parseInt(refId, 10);
