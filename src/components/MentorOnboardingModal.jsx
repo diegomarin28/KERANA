@@ -130,11 +130,11 @@ export function MentorOnboardingModal({ open, onComplete }) {
                                 <ul style={listStyle}>
                                     <li><strong>Cancelación del estudiante:</strong>
                                         <ul style={{ marginTop: 8 }}>
-                                            <li>✅ Más de 12 horas antes: Reembolso completo</li>
+                                            <li>✅ Más de 12 horas antes: Reembolso completo al usuario</li>
                                             <li>⚠️ Menos de 12 horas: Se te acredita 25% aunque no des la clase</li>
                                         </ul>
                                     </li>
-                                    <li><strong>Cancelación tuya:</strong>
+                                    <li><strong>Cancelación del mentor:</strong>
                                         <ul style={{ marginTop: 8 }}>
                                             <li>✅ Más de 36 horas antes: Sin penalización</li>
                                             <li>❌ Menos de 36 horas: Recibes 1 strike</li>

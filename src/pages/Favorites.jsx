@@ -1,10 +1,12 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { Card } from '../components/ui/Card';
-import { Button } from '../components/ui/Button';
+import { Card } from '../components/UI/Card';
+import { Button } from '../components/UI/Button';
 import { supabase } from '../supabase';
 import { getOrCreateUserProfile } from '../api/userService';
 import ApunteCard from '../components/ApunteCard';
+import { MentorCard } from '../components/MentorCard';
+
 
 export default function Favorites() {
     const [items, setItems] = useState([]);
@@ -132,34 +134,71 @@ export default function Favorites() {
             const uid = auth?.user?.id; // uuid requerido por RLS
             let mentorItems = [];
             if (uid) {
-                const { data: mentorsFav } = await supabase
-                    .from('usuario_fav_mentores')
-                    .select('id, id_mentor')
-                    .eq('usuario_id', uid);
+                // Obtener el id_usuario del usuario actual
+                const { data: usuarioData } = await supabase
+                    .from('usuario')
+                    .select('id_usuario')
+                    .eq('auth_id', uid)
+                    .single();
 
-                if (mentorsFav?.length) {
-                    const mIds = mentorsFav.map(r => r.id_mentor);
-                    const { data: mentors } = await supabase
-                        .from('mentor')
-                        .select('id_mentor, estrellas_mentor, contacto, descripcion')
-                        .in('id_mentor', mIds);
+                if (!usuarioData) {
+                    console.warn('No se encontró usuario');
+                } else {
+                    const {data: mentorsFav, error: mentorsFavError} = await supabase
+                        .from('mentor_fav')
+                        .select('id_usuario, id_mentor')
+                        .eq('id_usuario', usuarioData.id_usuario);
 
-                    mentorItems = mentorsFav
-                        .map(r => {
-                            const m = (mentors || []).find(x => x.id_mentor === r.id_mentor);
-                            return m ? {
-                                favId: r.id,
-                                id: m.id_mentor,
-                                type: 'mentor',
-                                title: m.descripcion || 'Mentor',
-                                subtitle: String(m.contacto || '').trim() || 'Contacto',
-                                details: 'Mentoría personalizada',
-                                price: 0,
-                                rating: m.estrellas_mentor || '0',
-                                link: `/mentores/${m.id_mentor}`
-                            } : null;
-                        })
-                        .filter(Boolean);
+                    if (mentorsFavError) {
+                        console.error('Error cargando mentores favoritos:', mentorsFavError);
+                    }
+                    if (mentorsFav?.length) {
+                        const mIds = mentorsFav.map(r => r.id_mentor);
+                        const {data: mentors} = await supabase
+                            .from('mentor')
+                            .select('id_mentor, id_usuario, estrellas_mentor, contacto, descripcion')
+                            .in('id_mentor', mIds);
+
+                        // Obtener datos del usuario (nombre, username) para cada mentor
+                        const userIds = (mentors || []).map(m => m.id_usuario).filter(Boolean);
+                        let mentorUserData = {};
+                        if (userIds.length > 0) {
+                            const {data: userData} = await supabase
+                                .from('usuario')
+                                .select('id_usuario, nombre, username')
+                                .in('id_usuario', userIds);
+
+                            mentorUserData = (userData || []).reduce((acc, u) => {
+                                acc[u.id_usuario] = u;
+                                return acc;
+                            }, {});
+                        }
+
+                        mentorItems = mentorsFav
+                            .map(r => {
+                                const m = (mentors || []).find(x => x.id_mentor === r.id_mentor);
+                                if (!m) return null;
+
+                                const userData = mentorUserData[m.id_usuario] || {};
+
+                                return {
+                                    favId: `${r.id_usuario}-${r.id_mentor}`,
+                                    type: 'mentor',
+                                    mentor: {
+                                        id_mentor: m.id_mentor,
+                                        id_usuario: m.id_usuario,
+                                        mentor_nombre: userData.nombre || 'Mentor',
+                                        username: userData.username || '',
+                                        estrellas_mentor: m.estrellas_mentor || 0,
+                                        descripcion: m.descripcion || '',
+                                        foto: userData.foto || null,
+                                        materias: [], // se cargan después en MentorCard
+                                    }
+                                };
+
+                            })
+                            .filter(Boolean);
+                    }
                 }
             }
             allFavorites = [...allFavorites, ...mentorItems];
@@ -187,8 +226,13 @@ export default function Favorites() {
                 const { error } = await supabase.from(tableName).delete().match(field);
                 if (error) throw error;
             } else if (type === 'mentor') {
-                tableName = 'usuario_fav_mentores';
-                const { error } = await supabase.from(tableName).delete().eq('id', favId);
+                // favId es `${id_usuario}-${id_mentor}`
+                const [u, m] = String(favId).split('-').map(x => Number(x));
+                tableName = 'mentor_fav';
+                const { error } = await supabase
+                    .from(tableName)
+                    .delete()
+                    .match({ id_usuario: u, id_mentor: m });
                 if (error) throw error;
             } else {
                 // otro tipo → usuario_fav (estructura actual apunta a usuario)
@@ -333,16 +377,25 @@ export default function Favorites() {
                                 key={`${item.type}-${item.favId}`}
                                 note={item.note}
                             />
+                        ) : item.type === 'mentor' ? (
+                                <div
+                                    key={`${item.type}-${item.favId}`}
+                                    style={{ gridColumn: 'span 2' }}
+                                >
+                                    <MentorCard
+                                        key={`${item.type}-${item.favId}`}
+                                        mentor={item.mentor}
+                                    />
+                                </div>
                         ) : (
                             <Card
                                 key={`${item.type}-${item.favId}`}
                                 style={{
                                     padding: 20,
-                                    transition: 'transform 0.2s ease, box-shadow 0.2s ease',
                                     border: '1px solid #e5e7eb'
                                 }}
                             >
-                                {/* contenido del card de curso o mentor */}
+                                {/* otros tipos, si los hubiera */}
                             </Card>
                         )
                     ))}

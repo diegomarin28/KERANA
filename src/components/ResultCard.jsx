@@ -1,6 +1,6 @@
 import { Link } from "react-router-dom"
-import { Card } from "../components/ui/Card"
-import { Chip } from "../components/ui/Chip"
+import { Card } from "../components/UI/Card"
+import { Chip } from "../components/UI/Chip"
 
 export default function ResultCard({ title, subtitle, description, link, pill, rating }) {
     return (

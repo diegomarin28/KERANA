@@ -2,9 +2,9 @@ import { useEffect, useState } from "react"
 import { supabase } from "../supabase"
 import { userAPI } from "../api/database"
 import { Link } from "react-router-dom"
-import { Button } from "../components/ui/Button"
-import { Card } from "../components/ui/Card"
-import { Chip } from "../components/ui/Chip"
+import { Button } from "../components/UI/Button"
+import { Card } from "../components/UI/Card"
+import { Chip } from "../components/UI/Chip"
 
 function TabButton({ active, onClick, children }) {
     return (

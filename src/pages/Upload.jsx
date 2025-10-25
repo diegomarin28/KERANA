@@ -1,8 +1,8 @@
 import { useState, useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { supabase } from '../supabase';
-import { Card } from '../components/ui/Card';
-import { Button } from '../components/ui/Button';
+import { Card } from '../components/UI/Card';
+import { Button } from '../components/UI/Button';
 import FileDrop from "../components/FileDrop";
 import { useNotificationSound } from '../hooks/useNotificationSound';
 import * as pdfjsLib from "pdfjs-dist";
@@ -227,7 +227,7 @@ export default function Upload() {
             if (thumbnailBlob) {
                 setUploadProgress('Subiendo vista previa...');
                 const { error: thumbError } = await supabase.storage
-                    .from('thumbnail')
+                    .from('thumbnails')
                     .upload(thumbnailFileName, thumbnailBlob, {
                         cacheControl: '31536000',
                         contentType: 'image/jpeg',
@@ -263,7 +263,7 @@ export default function Upload() {
                 // cleanup
                 await supabase.storage.from('apuntes').remove([fileName]).catch(() => {});
                 if (thumbnailPath) {
-                    await supabase.storage.from('thumbnail').remove([thumbnailFileName]).catch(() => {});
+                    await supabase.storage.from('thumbnails').remove([thumbnailFileName]).catch(() => {});
                 }
                 throw new Error('Error al guardar en base de datos: ' + insertError.message);
             }
@@ -519,7 +519,9 @@ export default function Upload() {
                 <div style={{ width: 260 }}>
                     <Card style={{
                         padding: 20, background: '#f0f9ff',
-                        border: '1px solid #bfdbfe', position: 'sticky', top: 20
+                        border: '1px solid #bfdbfe',
+                        position: 'sticky',
+                        top: 80
                     }}>
                         <h3 style={{ margin: '0 0 12px', color: '#1e40af', fontSize: 16 }}>💡 Consejos</h3>
                         <ul style={{ margin: 0, paddingLeft: 20, color: '#1e3a8a', fontSize: 13, lineHeight: 1.6 }}>

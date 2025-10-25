@@ -1,6 +1,6 @@
 // src/pages/Subjects.jsx
 import { useEffect, useState, useMemo } from "react";
-import { subjectsAPI } from "../api/Database";
+import { subjectsAPI } from "../api/database";
 
 export default function Subjects() {
     const [subjects, setSubjects] = useState([]);

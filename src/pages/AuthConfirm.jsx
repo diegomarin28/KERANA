@@ -2,8 +2,8 @@
 import { useEffect, useState, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '../supabase';
-import { Card } from '../components/ui/Card';
-import { Button } from '../components/ui/Button';
+import { Card } from '../components/UI/Card';
+import { Button } from '../components/UI/Button';
 import { createOrUpdateUserProfile } from '../utils/authHelpers';
 
 export default function AuthConfirm() {

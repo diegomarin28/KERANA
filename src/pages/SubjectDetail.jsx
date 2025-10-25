@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { supabase } from '../supabase';
-import { ratingsAPI } from '../api/Database';
+import { ratingsAPI } from '../api/database';
 import ProfessorCarousel from '../components/ProfessorCarousel';
 import MentorCarousel from '../components/MentorCarousel';
 import NotesModal from '../components/NotesModal';
@@ -104,12 +104,15 @@ export default function SubjectDetail() {
                 .from('apunte')
                 .select(`
                     id_apunte,
+                    id_usuario,
                     titulo,
                     descripcion,
                     creditos,
+                    estrellas,
                     file_path,
+                    thumbnail_path,
                     created_at,
-                    id_usuario,
+                    id_materia,
                     usuario:id_usuario(nombre),
                     materia:id_materia(nombre_materia)
                 `)
@@ -118,30 +121,32 @@ export default function SubjectDetail() {
                 .limit(12);
 
             if (!apuntesError && apuntesData) {
-                const apuntesConData = await Promise.all(
-                    apuntesData.map(async (apunte) => {
-                        let signedUrl = null;
-                        if (apunte.file_path) {
-                            const { data: signedData, error: signedError } = await supabase.storage
-                                .from('apuntes')
-                                .createSignedUrl(apunte.file_path, 3600);
-                            if (!signedError && signedData) {
-                                signedUrl = signedData.signedUrl;
-                            }
-                        }
+                // Obtener IDs de todos los apuntes para contar likes
+                const apIds = apuntesData.map(a => a.id_apunte);
+                let likesCountMap = {};
 
-                        // Contar likes y dislikes
-                        const { data: likesData } = await supabase
-                            .from('likes')
-                            .select('tipo')
-                            .eq('id_apunte', apunte.id_apunte);
+                if (apIds.length > 0) {
+                    const { data: likesData, error: likesError } = await supabase
+                        .from('likes')
+                        .select('id_apunte')
+                        .eq('tipo', 'like')
+                        .in('id_apunte', apIds);
 
-                        const likes = likesData?.filter(l => l.tipo === 'like').length || 0;
-                        const dislikes = likesData?.filter(l => l.tipo === 'dislike').length || 0;
+                    if (likesError) {
+                        console.error('Error cargando likes:', likesError);
+                    }
 
-                        return { ...apunte, signedUrl, likes, dislikes };
-                    })
-                );
+                    likesData?.forEach(like => {
+                        likesCountMap[like.id_apunte] = (likesCountMap[like.id_apunte] || 0) + 1;
+                    });
+                }
+
+                // Agregar likes_count a cada apunte
+                const apuntesConData = apuntesData.map(apunte => ({
+                    ...apunte,
+                    likes_count: likesCountMap[apunte.id_apunte] || 0
+                }));
+
                 setApuntes(apuntesConData);
             }
 

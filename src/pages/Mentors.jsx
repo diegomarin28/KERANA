@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '../supabase';
-import { Card } from '../components/ui/Card';
+import { Card } from '../components/UI/Card';
 import { MentorCard } from '../components/MentorCard';
 
 export default function Mentors() {

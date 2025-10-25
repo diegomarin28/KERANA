@@ -1,6 +1,6 @@
 // src/pages/SearchCourses.jsx
 import { useEffect, useState } from 'react'
-import { subjectsAPI, searchAPI, favoritesAPI } from '../api/Database'
+import { subjectsAPI, searchAPI, favoritesAPI } from '../api/database'
 import CourseCard from '../components/CourseCard'
 
 export default function SearchCourses() {

@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { supabase } from '../supabase';
 import { useSeguidores } from '../hooks/useSeguidores';
 
+
 export function MentorCard({ mentor }) {
     // ✅ Inicializar con el estado que viene de la búsqueda
     const [siguiendo, setSiguiendo] = useState(mentor.siguiendo || false);

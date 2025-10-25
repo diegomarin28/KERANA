@@ -1,7 +1,7 @@
 import { useRef, useState, useEffect } from "react";
 import emailjs from "@emailjs/browser";
-import { Button } from "../components/ui/Button";
-import { Card } from "../components/ui/Card";
+import { Button } from "../components/UI/Button";
+import { Card } from "../components/UI/Card";
 import { supabase } from "../supabase";
 
 export default function Contact() {
@@ -18,7 +18,6 @@ export default function Contact() {
             if (user?.email) {
                 setEmail(user.email);
 
-                // Obtener nombre del usuario desde la tabla usuario
                 const { data: profile } = await supabase
                     .from('usuario')
                     .select('nombre, username')
@@ -39,7 +38,6 @@ export default function Contact() {
         setStatus(null);
 
         try {
-            // Agregar datos del usuario al formulario
             const formData = new FormData(form.current);
             const templateParams = {
                 name: formData.get('name'),
@@ -65,241 +63,258 @@ export default function Contact() {
         }
     };
 
-    const wrap = (children) => (
+    return (
         <div
             style={{
                 minHeight: "100dvh",
                 display: "grid",
                 placeItems: "center",
-                padding: "32px",
-                background:
-                    "radial-gradient(1200px 800px at 10% -10%, #e8f1ff 0%, transparent 60%)," +
-                    "radial-gradient(1000px 700px at 110% 10%, #e3f0ff 0%, transparent 55%)," +
-                    "linear-gradient(180deg, #f7fbff 0%, #f9fbff 30%, #f6faff 60%, #f7fbff 100%)",
+                padding: "0px 20px 0px",
+                background: "#fafafa",
+                fontFamily: "-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif",
             }}
         >
-            {children}
-        </div>
-    );
+            <div style={{ width: "100%", maxWidth: 960 }}>
+                {/* Header */}
+                <div style={{ textAlign: "center", marginBottom: 28 }}>
+                    {/* Emoji arriba */}
+                    <div style={{
+                        fontSize: 36,
+                        marginBottom: 16,
+                        lineHeight: 1,
+                    }}>
+                        ✉️
+                    </div>
 
-    return wrap(
-        <div style={{ width: "100%", maxWidth: 960 }}>
-            <div style={{ textAlign: "center", marginBottom: 24 }}>
-                <div
-                    style={{
-                        display: "inline-flex",
-                        alignItems: "center",
-                        gap: 10,
-                        padding: "8px 14px",
-                        borderRadius: 999,
-                        background: "linear-gradient(90deg, rgba(37,99,235,.08), rgba(59,130,246,.08))",
-                        color: "#1e40af",
-                        fontWeight: 600,
-                        fontSize: 12,
-                        letterSpacing: 0.4,
-                        textTransform: "uppercase",
-                    }}
-                >
-                    ✉️ Contacto
-                </div>
-
-                <h1
-                    style={{
-                        margin: "14px 0 8px",
-                        fontSize: 34,
-                        lineHeight: 1.15,
-                        letterSpacing: -0.4,
-                        color: "#0f172a",
-                    }}
-                >
-                    Hablemos de tu proyecto académico
-                </h1>
-
-                <p style={{ margin: 0, color: "#475569" }}>
-                    Escribinos y te respondemos a la brevedad. Cualquier consulta o sugerencia es bienvenida.
-                </p>
-            </div>
-
-            <div
-                style={{
-                    display: "grid",
-                    gridTemplateColumns: "1.2fr 0.8fr",
-                    gap: 24,
-                }}
-            >
-                <Card
-                    style={{
-                        border: "1px solid #e6eefc",
-                        boxShadow: "0 8px 30px -12px rgba(30, 64, 175, .18), 0 1px 0 rgba(15, 23, 42, .02)",
-                        backdropFilter: "saturate(140%) blur(4px)",
-                    }}
-                >
-                    <form
-                        ref={form}
-                        onSubmit={sendEmail}
+                    <div
                         style={{
-                            display: "grid",
-                            gap: 16,
-                            padding: 22,
+                            display: "inline-flex",
+                            alignItems: "center",
+                            gap: 8,
+                            padding: "6px 14px",
+                            borderRadius: 999,
+                            background: "#f5f5f5",
+                            color: "#8e8e8e",
+                            fontWeight: 600,
+                            fontSize: 12,
+                            letterSpacing: 0.5,
+                            textTransform: "uppercase",
+                            marginBottom: 12,
                         }}
                     >
-                        <div style={{ display: "grid", gap: 6 }}>
-                            <label
-                                htmlFor="name"
-                                style={{ fontSize: 13, color: "#0f172a", fontWeight: 600 }}
-                            >
-                                Nombre
-                            </label>
-                            <input
-                                id="name"
-                                name="name"
-                                type="text"
-                                required
-                                defaultValue={userName}
-                                placeholder="Tu nombre completo"
-                                style={inputStyle}
-                            />
-                        </div>
+                        Contacto
+                    </div>
 
-                        <div style={{ display: "grid", gap: 6 }}>
-                            <label
-                                htmlFor="email"
-                                style={{ fontSize: 13, color: "#0f172a", fontWeight: 600 }}
-                            >
-                                Email (opcional)
-                            </label>
-                            <input
-                                id="email"
-                                name="email"
-                                type="email"
-                                defaultValue={email}
-                                placeholder="tu@email.com"
-                                style={inputStyle}
-                            />
-                            <small style={{ fontSize: 12, color: "#64748b" }}>
-                                Solo si querés que te contactemos sobre tu mensaje
-                            </small>
-                        </div>
+                    <h1
+                        style={{
+                            margin: "0 0 8px 0",
+                            fontSize: 32,
+                            lineHeight: 1.2,
+                            letterSpacing: "-0.5px",
+                            color: "#262626",
+                            fontWeight: 700,
+                        }}
+                    >
+                        ¿Tenés alguna consulta?
+                    </h1>
 
-                        <div style={{ display: "grid", gap: 6 }}>
-                            <div
-                                style={{
-                                    display: "flex",
-                                    alignItems: "center",
-                                    gap: 8,
-                                    justifyContent: "space-between",
-                                }}
-                            >
+                    <p style={{ margin: 0, color: "#8e8e8e", fontSize: 15 }}>
+                        Escribinos y te respondemos a la brevedad
+                    </p>
+                </div>
+
+                <div
+                    style={{
+                        display: "grid",
+                        gridTemplateColumns: "1.2fr 0.8fr",
+                        gap: 20,
+                    }}
+                >
+                    {/* Formulario */}
+                    <Card
+                        style={{
+                            border: "1px solid #dbdbdb",
+                            background: "white",
+                            boxShadow: "0 2px 12px rgba(0,0,0,0.04)",
+                        }}
+                    >
+                        <form
+                            ref={form}
+                            onSubmit={sendEmail}
+                            style={{
+                                display: "grid",
+                                gap: 16,
+                                padding: 20,
+                            }}
+                        >
+                            <div style={{ display: "grid", gap: 8 }}>
+                                <label
+                                    htmlFor="name"
+                                    style={{ fontSize: 14, color: "#262626", fontWeight: 600 }}
+                                >
+                                    Nombre
+                                </label>
+                                <input
+                                    id="name"
+                                    name="name"
+                                    type="text"
+                                    required
+                                    defaultValue={userName}
+                                    placeholder="Tu nombre completo"
+                                    style={inputStyle}
+                                />
+                            </div>
+
+                            <div style={{ display: "grid", gap: 8 }}>
+                                <label
+                                    htmlFor="email"
+                                    style={{ fontSize: 14, color: "#262626", fontWeight: 600 }}
+                                >
+                                    Email <span style={{ color: "#8e8e8e", fontWeight: 400 }}>(opcional)</span>
+                                </label>
+                                <input
+                                    id="email"
+                                    name="email"
+                                    type="email"
+                                    defaultValue={email}
+                                    placeholder="tu@email.com"
+                                    style={inputStyle}
+                                />
+                                <small style={{ fontSize: 12, color: "#8e8e8e" }}>
+                                    Solo si querés que te contactemos sobre tu mensaje
+                                </small>
+                            </div>
+
+                            <div style={{ display: "grid", gap: 8 }}>
                                 <label
                                     htmlFor="message"
-                                    style={{ fontSize: 13, color: "#0f172a", fontWeight: 600 }}
+                                    style={{ fontSize: 14, color: "#262626", fontWeight: 600 }}
                                 >
                                     Mensaje
                                 </label>
-                                <span style={{ fontSize: 12, color: "#5b6b8a" }}>
-                                    Contanos qué necesitás
-                                </span>
+                                <textarea
+                                    id="message"
+                                    name="message"
+                                    rows={5}
+                                    required
+                                    placeholder="Ej: Falta el profesor John Doe en la materia..."
+                                    style={{ ...inputStyle, resize: "vertical", lineHeight: 1.5, fontFamily: 'inherit' }}
+                                />
                             </div>
 
-                            <textarea
-                                id="message"
-                                name="message"
-                                rows={6}
-                                required
-                                placeholder="Ej: Falta el profesor John Doe en la materia ...."
-                                style={{ ...inputStyle, resize: "vertical", lineHeight: 1.45 }}
-                            />
-                        </div>
-
-                        <div
-                            style={{
-                                display: "flex",
-                                gap: 12,
-                                alignItems: "center",
-                                justifyContent: "space-between",
-                                marginTop: 4,
-                            }}
-                        >
-                            <Button
-                                type="submit"
-                                disabled={sending}
-                                variant="primary"
+                            <div
+                                style={{
+                                    display: "flex",
+                                    gap: 12,
+                                    alignItems: "center",
+                                    justifyContent: "space-between",
+                                    marginTop: 4,
+                                }}
                             >
-                                {sending ? "Enviando..." : "Enviar mensaje"}
-                            </Button>
-
-                            {status === "ok" && (
-                                <span
+                                <button
+                                    type="submit"
+                                    disabled={sending}
                                     style={{
-                                        fontSize: 13,
-                                        color: "#065f46",
-                                        background: "#ecfdf5",
-                                        border: "1px solid #a7f3d0",
-                                        padding: "6px 10px",
+                                        padding: "10px 24px",
                                         borderRadius: 8,
+                                        border: "none",
+                                        background: sending ? "#b3b3b3" : "#0095f6",
+                                        color: "white",
+                                        fontWeight: 600,
+                                        fontSize: 14,
+                                        cursor: sending ? "not-allowed" : "pointer",
+                                        transition: "all 0.2s ease",
+                                        fontFamily: 'inherit',
+                                    }}
+                                    onMouseEnter={(e) => {
+                                        if (!sending) e.target.style.background = "#1877f2";
+                                    }}
+                                    onMouseLeave={(e) => {
+                                        if (!sending) e.target.style.background = "#0095f6";
                                     }}
                                 >
-                                    Mensaje enviado
-                                </span>
-                            )}
-                            {status === "err" && (
-                                <span
-                                    style={{
-                                        fontSize: 13,
-                                        color: "#7f1d1d",
-                                        background: "#fef2f2",
-                                        border: "1px solid #fecaca",
-                                        padding: "6px 10px",
-                                        borderRadius: 8,
-                                    }}
-                                >
-                                    Ocurrió un error
-                                </span>
-                            )}
-                        </div>
-                    </form>
-                </Card>
+                                    {sending ? "Enviando..." : "Enviar mensaje"}
+                                </button>
 
-                <Card
-                    style={{
-                        border: "1px solid #e6eefc",
-                        padding: 22,
-                        background: "linear-gradient(180deg, rgba(59,130,246,.06), rgba(59,130,246,.03))",
-                    }}
-                >
-                    <div style={{ display: "grid", gap: 14 }}>
-                        <h3 style={{ margin: 0, fontSize: 18, color: "#0f172a", letterSpacing: -0.2 }}>
-                            ¿Por qué contactarnos?
-                        </h3>
-                        <Feature
-                            title="Soporte académico"
-                            desc="Integraciones de IA para corrección de apuntes, rúbricas y créditos."
-                        />
-                        <Feature
-                            title="No está tu profesor"
-                            desc="Lo ingresamos de inmediato así podes realizar tu reseña."
-                        />
-                        <Feature
-                            title="No tenemos una materia que cursas"
-                            desc="Contactate y lo cambiamos a la brevedad."
-                        />
+                                {status === "ok" && (
+                                    <span
+                                        style={{
+                                            fontSize: 13,
+                                            color: "#00a400",
+                                            background: "#d4edda",
+                                            border: "1px solid #c3e6cb",
+                                            padding: "6px 12px",
+                                            borderRadius: 6,
+                                            fontWeight: 500,
+                                        }}
+                                    >
+                                        ✓ Mensaje enviado
+                                    </span>
+                                )}
+                                {status === "err" && (
+                                    <span
+                                        style={{
+                                            fontSize: 13,
+                                            color: "#ed4956",
+                                            background: "#ffe0e3",
+                                            border: "1px solid #ffccd5",
+                                            padding: "6px 12px",
+                                            borderRadius: 6,
+                                            fontWeight: 500,
+                                        }}
+                                    >
+                                        ✗ Ocurrió un error
+                                    </span>
+                                )}
+                            </div>
+                        </form>
+                    </Card>
 
-                        <div
-                            style={{
-                                marginTop: 8,
-                                padding: 14,
-                                borderRadius: 12,
-                                border: "1px dashed rgba(37,99,235,.35)",
-                                background: "linear-gradient(180deg, rgba(219,234,254,.45), rgba(219,234,254,.18))",
-                            }}
-                        >
-                            <p style={{ margin: 0, fontSize: 13, color: "#1e3a8a" }}>
-                                También podés escribirnos luego a{" "}
-                                <strong>kerana.soporte@gmail.com</strong>. Te respondemos en 24-48 hs.
-                            </p>
+                    {/* Sidebar */}
+                    <Card
+                        style={{
+                            border: "1px solid #dbdbdb",
+                            padding: 20,
+                            background: "white",
+                        }}
+                    >
+                        <div style={{ display: "grid", gap: 20 }}>
+                            <h3 style={{ margin: 0, fontSize: 18, color: "#262626", fontWeight: 600, letterSpacing: "-0.3px" }}>
+                                ¿Por qué contactarnos?
+                            </h3>
+
+                            <Feature
+                                title="Soporte académico"
+                                desc="Integraciones de IA para corrección de apuntes, rúbricas y créditos."
+                            />
+                            <Feature
+                                title="No está tu profesor"
+                                desc="Lo ingresamos de inmediato así podés realizar tu reseña."
+                            />
+                            <Feature
+                                title="Falta una materia"
+                                desc="Contactate y lo agregamos a la brevedad."
+                            />
+
+                            <div
+                                style={{
+                                    marginTop: 8,
+                                    padding: 16,
+                                    borderRadius: 8,
+                                    background: "#f5f5f5",
+                                    border: "1px solid #efefef",
+                                }}
+                            >
+                                <p style={{ margin: 0, fontSize: 13, color: "#262626", lineHeight: 1.5 }}>
+                                    También podés escribirnos a{" "}
+                                    <strong style={{ color: "#0095f6" }}>kerana.soporte@gmail.com</strong>
+                                    <br />
+                                    <span style={{ color: "#8e8e8e", fontSize: 12 }}>Respondemos en 24-48 hs</span>
+                                </p>
+                            </div>
                         </div>
-                    </div>
-                </Card>
+                    </Card>
+                </div>
             </div>
         </div>
     );
@@ -307,30 +322,37 @@ export default function Contact() {
 
 function Feature({ title, desc }) {
     return (
-        <div style={{ display: "grid", gap: 4 }}>
+        <div style={{ display: "flex", gap: 12, alignItems: "flex-start" }}>
             <div
                 style={{
-                    fontWeight: 700,
-                    fontSize: 14,
-                    color: "#1d4ed8",
+                    width: 28,
+                    height: 28,
+                    borderRadius: "50%",
+                    background: "#f5f5f5",
                     display: "flex",
                     alignItems: "center",
-                    gap: 8,
+                    justifyContent: "center",
+                    flexShrink: 0,
+                    marginTop: 2,
                 }}
             >
-                <span
-                    aria-hidden
-                    style={{
-                        width: 8,
-                        height: 8,
-                        borderRadius: 999,
-                        background: "radial-gradient(circle at 30% 30%, #93c5fd 0 45%, #2563eb 55% 100%)",
-                        boxShadow: "0 0 0 4px rgba(59,130,246,.15)",
-                    }}
-                />
-                {title}
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#0095f6" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
+                    <polyline points="20 6 9 17 4 12" />
+                </svg>
             </div>
-            <p style={{ margin: 0, fontSize: 13, color: "#475569" }}>{desc}</p>
+            <div style={{ flex: 1 }}>
+                <div
+                    style={{
+                        fontWeight: 600,
+                        fontSize: 14,
+                        color: "#262626",
+                        marginBottom: 4,
+                    }}
+                >
+                    {title}
+                </div>
+                <p style={{ margin: 0, fontSize: 13, color: "#8e8e8e", lineHeight: 1.5 }}>{desc}</p>
+            </div>
         </div>
     );
 }
@@ -338,11 +360,14 @@ function Feature({ title, desc }) {
 const inputStyle = {
     appearance: "none",
     outline: "none",
-    border: "1px solid #cfe0ff",
-    background: "linear-gradient(180deg, #ffffff, rgba(248, 250, 255, .7))",
-    padding: "12px 14px",
-    borderRadius: 10,
+    border: "1px solid #dbdbdb",
+    background: "white",
+    padding: "10px 12px",
+    borderRadius: 6,
     fontSize: 14,
-    color: "#0f172a",
-    boxShadow: "inset 0 1px 0 rgba(255,255,255,.8), 0 1px 0 rgba(15,23,42,.03)",
+    color: "#262626",
+    transition: "border-color 0.2s ease",
+    fontFamily: "inherit",
+    width: "100%",
+    boxSizing: "border-box",
 };

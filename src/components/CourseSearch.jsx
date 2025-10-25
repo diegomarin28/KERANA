@@ -1,9 +1,9 @@
 import { useEffect, useState } from "react";
 import { favoritesAPI, subjectsAPI } from "../api/database";
 import CourseCard from "../components/CourseCard";
-import { Card } from "../components/ui/Card";
-import { Button } from "../components/ui/Button";
-import { Chip } from "../components/ui/Chip";
+import { Card } from '../components/UI/Card';
+import { Button } from "../components/UI/Button";
+import { Chip } from "../components/UI/Chip";
 
 export default function CourseSearch() {
     const [subjects, setSubjects] = useState([]);

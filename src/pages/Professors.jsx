@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '../supabase';
-import { Card } from '../components/ui/Card';
+import { Card } from '../components/UI/Card';
 
 export default function Professors() {
     const [professors, setProfessors] = useState([]);

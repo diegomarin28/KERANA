@@ -55,32 +55,6 @@ export const followersAPI = {
                 return { success: false, error: error.message };
             }
 
-            // ✅ CREAR NOTIFICACIÓN
-            try {
-                // Obtener mi nombre y username
-                const { data: miUsuario } = await supabase
-                    .from('usuario')
-                    .select('nombre, username')
-                    .eq('id_usuario', miId)
-                    .single();
-
-                const miNombre = miUsuario?.nombre || miUsuario?.username || 'Alguien';
-                const miUsername = miUsuario?.username || null;
-
-                // Crear notificación para el usuario seguido
-                await notificationTypes.nuevoSeguidor(
-                    miId,           // ID de quien sigue
-                    usuarioId,      // ID de quien recibe la notificación
-                    miNombre,       // Nombre de quien sigue
-                    miUsername      // Username de quien sigue
-                );
-
-                console.log('✅ Notificación de seguidor creada');
-            } catch (notifError) {
-                console.error('⚠️ Error creando notificación (no crítico):', notifError);
-                // No fallar toda la operación si falla la notificación
-            }
-
             return { success: true };
         } catch (e) {
             console.error('[followersAPI] Exception en seguirUsuario:', e);

@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { supabase } from '../supabase'
 import { userAPI } from '../api/database'
-import { Button } from '../components/ui/Button'
+import { Button } from '../components/UI/Button'
 
 export default function SignIn() {
     const [mode, setMode] = useState('signin')

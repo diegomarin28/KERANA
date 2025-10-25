@@ -1,6 +1,6 @@
-import { Card } from "../components/ui/Card";
-import { Chip } from "../components/ui/Chip";
-import { Button } from "../components/ui/Button";
+import { Card } from "../components/UI/Card";
+import { Chip } from "../components/UI/Chip";
+import { Button } from "../components/UI/Button";
 
 export default function CourseCard({ course, onFav }) {
     const getTipoIcon = (tipo) => {

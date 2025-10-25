@@ -15,7 +15,27 @@ export const notificationsAPI = {
                 return { data: [], error: error.message };
             }
 
-            return { data: data || [], error: null };
+            const transformed = (data || []).map(notif => ({
+                id: notif.id,
+                usuario_id: notif.usuario_id,
+                tipo: notif.tipo,
+                titulo: notif.titulo,
+                mensaje: notif.mensaje,
+                url: notif.url,
+                leida: notif.leida,
+                emisor_id: notif.emisor_id,
+                relacion_id: notif.relacion_id,
+                creado_en: notif.creado_en,
+                ya_lo_sigo: notif.ya_lo_sigo, // ✅ Incluir estado de seguimiento
+                emisor: notif.emisor_id ? {
+                    nombre: notif.emisor_nombre,
+                    username: notif.emisor_username,
+                    foto: notif.emisor_foto
+                } : null
+            }));
+
+            // 🔥 FIX: Retornar transformed en vez de data
+            return { data: transformed, error: null };
         } catch (e) {
             console.error('[notificationsAPI] Exception en obtenerMisNotificaciones:', e);
             return { data: [], error: e.message };

@@ -1,22 +1,13 @@
 import SearchBar from "../components/SearchBar";
 import { useEffect, useState } from "react";
-import { Card } from "../components/ui/Card";
 import ScrollDownHint from "../components/ScrollDownHint.jsx";
 import { Link } from "react-router-dom";
 import { supabase } from "../supabase";
 import ApunteCard from "../components/ApunteCard.jsx";
-
-
-const HERO_BG = "gradient"; // podés cambiar: "solid" | "gradient" | "radial"
-
-const heroBackground = {
-    solid: "#0b5ed7", // #0097b2 turquesa , #386641 verde
-    gradient: "linear-gradient(135deg, #0ea5a3 0%, #2563eb 40%, #f59e0b 100%)",
-    radial: "radial-gradient(1200px 600px at 20% 20%, #2563eb 0%, #0ea5a3 45%, #f59e0b 80%)",
-}[HERO_BG];
+import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
+import { faLeaf, faTint, faCloud, faArrowRight } from '@fortawesome/free-solid-svg-icons';
 
 export default function Home() {
-    const [currentUserId, setCurrentUserId] = useState(null);
     const [reveal, setReveal] = useState(false);
     const [scrollProg, setScrollProg] = useState(0);
 
@@ -33,64 +24,30 @@ export default function Home() {
         (async () => {
             try {
                 setLoadingTop(true);
-
-                // 1. Cargar usuario actual
-                const { data: { user } } = await supabase.auth.getUser();
-                if (user && mounted) {
-                    const { data: usuarioData } = await supabase
-                        .from("usuario")
-                        .select("id_usuario")
-                        .eq("auth_id", user.id)
-                        .maybeSingle();
-
-                    if (usuarioData && mounted) {
-                        setCurrentUserId(usuarioData.id_usuario);
-                    }
-                }
-
-                // 2. Cargar top apuntes
                 const { data, error } = await supabase.rpc("top_apuntes_best", { limit_count: 8 });
                 if (error) throw error;
 
-                // Obtener metadatos de cada apunte (incluye thumbnail_path y materia)
                 const apIds = data.map(d => d.apunte_id);
                 const { data: apuntes, error: apError } = await supabase
-                    .from("apunte")
+                    .from('apunte')
                     .select(`
-            id_apunte,
-            file_path,
-            usuario:id_usuario(nombre),
-            materia(nombre_materia),
-            thumbnail_path
-          `)
-                    .in("id_apunte", apIds);
+                        id_apunte, 
+                        file_path,
+                        usuario:id_usuario(nombre),
+                        thumbnail_path
+                    `)
+                    .in('id_apunte', apIds);
 
                 if (apError) throw apError;
 
-                // Contar likes por apunte
-                const { data: likesData, error: likesError } = await supabase
-                    .from("likes")
-                    .select("id_apunte")
-                    .eq("tipo", "like")
-                    .in("id_apunte", apIds);
-
-                if (likesError) throw likesError;
-
-                // Crear un mapa de conteo de likes
-                const likesCountMap = {};
-                likesData?.forEach(like => {
-                    likesCountMap[like.id_apunte] = (likesCountMap[like.id_apunte] || 0) + 1;
-                });
-
                 const filePathMap = new Map(apuntes.map(a => [a.id_apunte, a.file_path]));
 
-                // Generar signed URLs (apuntes)
                 const urls = {};
                 for (const note of data) {
                     const filePath = filePathMap.get(note.apunte_id);
                     if (filePath) {
                         const { data: signedData, error: signedError } = await supabase.storage
-                            .from("apuntes")
+                            .from('apuntes')
                             .createSignedUrl(filePath, 3600);
 
                         if (!signedError && signedData) {
@@ -99,16 +56,13 @@ export default function Home() {
                     }
                 }
 
-                // Merge: mantenemos likes_count + thumbnail_path + usuario/materia desde la tabla apunte
                 const notesWithUrls = data.map(note => {
                     const apunte = apuntes.find(a => a.id_apunte === note.apunte_id);
                     return {
                         ...note,
-                        usuario: apunte?.usuario || { nombre: "Anónimo" },
-                        materia: apunte?.materia || null,
+                        usuario: apunte?.usuario || { nombre: 'Anónimo' },
                         signedUrl: urls[note.apunte_id] || null,
-                        likes_count: likesCountMap[note.apunte_id] || 0,
-                        thumbnail_path: apunte?.thumbnail_path || null,
+                        thumbnail_path: apunte?.thumbnail_path || null
                     };
                 });
 
@@ -141,100 +95,195 @@ export default function Home() {
 
     return (
         <div>
-            {/* HERO */}
+            {/* HERO - Gradiente Kerana azules */}
             <section
                 id="hero"
                 style={{
-                    position: "relative", minHeight: "72vh", display: "grid", placeItems: "center",
-                    padding: "64px 16px 0", background: heroBackground, color: "#fff"
+                    position: "relative",
+                    minHeight: "65vh",
+                    display: "grid",
+                    placeItems: "center",
+                    padding: "80px 20px 40px",
+                    background: "linear-gradient(135deg, #13346b 0%, #2563eb 60%, #0ea5a3 100%)",
+                    color: "#fff",
+                    // overflow: "hidden" ← REMOVIDO: causaba que el dropdown se corte
                 }}
             >
-                <div style={{ width: "min(1080px, 92vw)", textAlign: "center" }}>
+                {/* Decoración de fondo sutil */}
+                <div style={{
+                    position: "absolute",
+                    inset: 0,
+                    opacity: 0.1,
+                    background: "radial-gradient(circle at 30% 40%, rgba(255,255,255,0.3) 0%, transparent 50%)",
+                }} />
+
+                <div style={{
+                    width: "min(1080px, 92vw)",
+                    textAlign: "center",
+                    position: "relative",
+                    zIndex: 1,
+                }}>
                     <h1
                         style={{
-                            fontSize: "clamp(28px, 5vw, 56px)",
+                            fontSize: "clamp(32px, 6vw, 64px)",
                             fontWeight: 800,
-                            margin: "0 0 14px",
-                            lineHeight: 1.15,
+                            margin: "0 0 20px",
+                            lineHeight: 1.1,
                             opacity: reveal ? 1 : 0,
-                            transform: `translateY(${(reveal ? 0 : 10) - scrollProg * 20}px)`,
-                            transition: "opacity 600ms ease, transform 600ms ease",
+                            transform: `translateY(${(reveal ? 0 : 20) - scrollProg * 30}px)`,
+                            transition: "opacity 700ms ease, transform 700ms ease",
+                            letterSpacing: "-0.02em",
                         }}
                     >
                         Conectando tu futuro con su experiencia
                     </h1>
                     <p
                         style={{
-                            color: "rgba(255,255,255,.9)",
-                            margin: "0 0 24px",
-                            fontSize: "clamp(14px, 2.2vw, 18px)",
+                            color: "rgba(255,255,255,0.95)",
+                            fontSize: "clamp(16px, 2.5vw, 20px)",
                             opacity: reveal ? 1 : 0,
-                            transform: `translateY(${(reveal ? 0 : 8) - scrollProg * 14}px)`,
-                            transition: "opacity 700ms ease 80ms, transform 700ms ease 80ms",
+                            transform: `translateY(${(reveal ? 0 : 15) - scrollProg * 20}px)`,
+                            transition: "opacity 800ms ease 100ms, transform 800ms ease 100ms",
+                            lineHeight: 1.6,
+                            maxWidth: "680px",
+                            margin: "0 auto 32px",
                         }}
                     >
-                        Buscá profesores, cursos, mentores y apuntes en un solo lugar.
+                        Buscá profesores, cursos, mentores y apuntes en un solo lugar
                     </p>
-                    <SearchBar />
+                    <div style={{
+                        opacity: reveal ? 1 : 0,
+                        transform: `translateY(${(reveal ? 0 : 10) - scrollProg * 15}px)`,
+                        transition: "opacity 900ms ease 200ms, transform 900ms ease 200ms",
+                    }}>
+                        <SearchBar />
+                    </div>
                 </div>
 
-                {/* Flecha / scroll cue */}
-                <ScrollDownHint targetId="after-hero" offset={64} label="Ver más" />
+                <ScrollDownHint targetId="after-hero" offset={64} label="Explorar" />
             </section>
 
-            <main style={{ background: "#fff", color: "#111827" }}>
-                {/* Siguiente sección (destino del scroll) */}
+            <main style={{
+                background: "#fff",
+                color: "#111827",
+            }}>
+                {/* Sección de impacto ambiental */}
                 <section
                     id="after-hero"
                     style={{
                         scrollMarginTop: "72px",
-                        padding: "64px 16px",
-                        borderBottom: "1px solid #e5e7eb",
-                        background: "#f8fafc"
+                        padding: "80px 20px",
+                        background: "linear-gradient(180deg, #f8fafc 0%, #ffffff 100%)",
+                        position: "relative"
                     }}
                 >
                     <div style={{ width: "min(1080px, 92vw)", margin: "0 auto" }}>
-                        <h2 style={{ margin: 0 }}>¿Por qué apuntes digitales?</h2>
-                        <p style={{ color: "#6b7280", marginTop: 6 }}>
-                            Ahorro ambiental por cada apunte compartido en PDF.
+                        {/* Header con badge */}
+                        <div style={{
+                            display: "flex",
+                            alignItems: "center",
+                            justifyContent: "center",
+                            gap: 12,
+                            marginBottom: 12,
+                        }}>
+                            <span style={{
+                                display: "inline-block",
+                                padding: "6px 14px",
+                                background: "linear-gradient(135deg, #10b981 0%, #059669 100%)",
+                                color: "#fff",
+                                borderRadius: 20,
+                                fontSize: 13,
+                                fontWeight: 700,
+                                letterSpacing: "0.5px",
+                                textTransform: "uppercase",
+                            }}>
+                                Impacto Positivo
+                            </span>
+                        </div>
+
+                        <h2 style={{
+                            margin: "0 0 12px",
+                            fontSize: "clamp(28px, 4vw, 42px)",
+                            fontWeight: 800,
+                            textAlign: "center",
+                            color: "#0f172a",
+                            letterSpacing: "-0.02em",
+                        }}>
+                            ¿Por qué apuntes digitales?
+                        </h2>
+                        <p style={{
+                            color: "#64748b",
+                            textAlign: "center",
+                            fontSize: "clamp(14px, 2vw, 17px)",
+                            maxWidth: "600px",
+                            margin: "0 auto 40px",
+                            lineHeight: 1.6,
+                        }}>
+                            Cada apunte compartido en PDF genera un impacto ambiental positivo
                         </p>
 
-                        {/*
-              Parámetros conservadores:
-              - Páginas típicas por apunte: 20
-              - Agua por hoja: 0.15 L/hoja (fabricación y procesado)
-              - CO2 por hoja: 1.2 g/hoja (impresión hogareña + transporte mínimo)
-            */}
                         <EcoStats
                             pagesPerNote={20}
                             waterPerSheetL={0.15}
                             co2PerSheetG={1.2}
                         />
 
-                        <p style={{ color: "#94a3b8", fontSize: 12, marginTop: 12 }}>
+                        <p style={{
+                            color: "#94a3b8",
+                            fontSize: 13,
+                            marginTop: 24,
+                            textAlign: "center",
+                            lineHeight: 1.6,
+                        }}>
                             Estimaciones conservadoras basadas en literatura general. Los valores reales varían según tipo de papel, tinta y logística.
-                            <Link to="/impacto-ambiental" style={{ color: "#2563eb", marginLeft: 8 }}>
-                                Ver metodología
+                            <Link
+                                to="/impacto-ambiental"
+                                style={{
+                                    color: "#2563eb",
+                                    marginLeft: 8,
+                                    fontWeight: 600,
+                                    textDecoration: "none",
+                                }}
+                            >
+                                Ver metodología <FontAwesomeIcon icon={faArrowRight} style={{ fontSize: 11 }} />
                             </Link>
                         </p>
                     </div>
                 </section>
 
-                {/* Mejores apuntes (últimas 24h → 7d → rating) */}
-                <section style={{ padding: "56px 16px", background: "#fff" }}>
+                {/* Mejores apuntes */}
+                <section style={{
+                    padding: "80px 20px",
+                    background: "#fff",
+                    borderTop: "1px solid #f1f5f9",
+                }}>
                     <div style={{ width: "min(1080px, 92vw)", margin: "0 auto" }}>
-                        <h2>Mejores apuntes</h2>
-                        <p style={{ color: "#6b7280" }}>
-                            Top del momento (compras recientes y calificación).
-                        </p>
+                        <div style={{ textAlign: "center", marginBottom: 48 }}>
+                            <h2 style={{
+                                fontSize: "clamp(28px, 4vw, 42px)",
+                                fontWeight: 800,
+                                color: "#0f172a",
+                                margin: "0 0 12px",
+                                letterSpacing: "-0.02em",
+                            }}>
+                                Mejores apuntes
+                            </h2>
+                            <p style={{
+                                color: "#64748b",
+                                margin: 0,
+                                fontSize: "clamp(14px, 2vw, 17px)",
+                                lineHeight: 1.6,
+                            }}>
+                                Top del momento según compras recientes y calificación
+                            </p>
+                        </div>
 
                         {loadingTop ? (
                             <div
                                 style={{
-                                    marginTop: 20,
                                     display: "grid",
-                                    gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))",
-                                    gap: 20,
+                                    gridTemplateColumns: "repeat(auto-fill, minmax(220px, 1fr))",
+                                    gap: 24,
                                     justifyItems: "center",
                                 }}
                             >
@@ -243,52 +292,61 @@ export default function Home() {
                                 ))}
                             </div>
                         ) : topNotes.length === 0 ? (
-                            <div style={{ marginTop: 16, color: "#6b7280" }}>
-                                No hay compras recientes todavía. ¡Sé el primero en descubrir nuevos apuntes!
+                            <div style={{
+                                textAlign: "center",
+                                padding: "60px 20px",
+                                background: "#f8fafc",
+                                borderRadius: 16,
+                                border: "2px dashed #e2e8f0",
+                            }}>
+                                <div style={{
+                                    fontSize: 48,
+                                    marginBottom: 16,
+                                    opacity: 0.5,
+                                }}>
+                                    📚
+                                </div>
+                                <p style={{
+                                    color: "#64748b",
+                                    margin: 0,
+                                    fontSize: 16,
+                                }}>
+                                    No hay compras recientes todavía. ¡Sé el primero en descubrir nuevos apuntes!
+                                </p>
                             </div>
                         ) : (
                             <div
                                 style={{
-                                    marginTop: 20,
                                     display: "grid",
-                                    gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", // tres columnas
-                                    gap: 20,
+                                    gridTemplateColumns: "repeat(auto-fill, minmax(220px, 1fr))",
+                                    gap: 24,
                                     justifyItems: "center",
                                 }}
                             >
-                                {topNotes.slice(0, 8).map((n) => {
-                                    // buscamos el apunte enriquecido correspondiente (ya vienen mergeados en n)
-                                    const usuario = n.usuario || { nombre: "Anónimo" };
-                                    const materia = n.materia || null;
-
-                                    return (
-                                        <div
-                                            key={n.apunte_id}
-                                            style={{
-                                                width: "100%",
-                                                maxWidth: 230,
-                                                aspectRatio: "4 / 5",
+                                {topNotes.slice(0, 8).map((n) => (
+                                    <div
+                                        key={n.apunte_id}
+                                        style={{
+                                            width: "100%",
+                                            maxWidth: 240,
+                                            aspectRatio: "4 / 5",
+                                        }}
+                                    >
+                                        <ApunteCard
+                                            note={{
+                                                id_apunte: n.apunte_id,
+                                                titulo: n.titulo,
+                                                descripcion: n.descripcion || '',
+                                                creditos: n.creditos,
+                                                estrellas: n.rating_promedio || 0,
+                                                usuario: { nombre: n.usuario_nombre },
+                                                materia: { nombre_materia: n.nombre_materia },
+                                                signedUrl: n.signedUrl,
+                                                thumbnail_path: n.thumbnail_path
                                             }}
-                                        >
-                                            <ApunteCard
-                                                note={{
-                                                    id_apunte: n.apunte_id,
-                                                    id_usuario: n.id_usuario,
-                                                    titulo: n.titulo,
-                                                    descripcion: n.descripcion || "",
-                                                    creditos: n.creditos,
-                                                    // estrellas: n.rating_promedio || 0, // si tu card lo usa, reactivá
-                                                    usuario,                         // ← del join a usuario
-                                                    materia,                         // ← del join a materia
-                                                    signedUrl: n.signedUrl,
-                                                    likes_count: n.likes_count,      // ← mantenido
-                                                    thumbnail_path: n.thumbnail_path // ← mantenido
-                                                }}
-                                                currentUserId={currentUserId}
-                                            />
-                                        </div>
-                                    );
-                                })}
+                                        />
+                                    </div>
+                                ))}
                             </div>
                         )}
                     </div>
@@ -296,22 +354,25 @@ export default function Home() {
 
                 {/* Footer */}
                 <section
-                    style={{ borderTop: "1px solid #e5e7eb", background: "#0b1e3a", color: "#fff" }}
+                    style={{
+                        background: "linear-gradient(135deg, #0f172a 0%, #1e293b 100%)",
+                        color: "#fff",
+                    }}
                 >
                     <div
                         style={{
                             width: "min(1080px, 92vw)",
                             margin: "0 auto",
-                            padding: "56px 16px",
+                            padding: "48px 20px",
                             display: "grid",
-                            gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))",
-                            gap: 20,
+                            gridTemplateColumns: "repeat(auto-fit, minmax(240px, 1fr))",
+                            gap: 32,
                         }}
                     >
                         <FooterCol
                             title="Sobre nosotros"
                             items={[
-                                { label: "Misión Visión", to: "/mision-vision" },
+                                { label: "Misión y Visión", to: "/mision-vision" },
                                 { label: "Equipo", to: "/equipo" },
                                 { label: "Cómo funciona Kerana", to: "/how-it-works" }
                             ]}
@@ -331,14 +392,41 @@ export default function Home() {
                             ]}
                         />
                     </div>
+
+                    {/* Copyright */}
+                    <div style={{
+                        borderTop: "1px solid rgba(255,255,255,0.1)",
+                        padding: "24px 20px",
+                        textAlign: "center",
+                        color: "rgba(255,255,255,0.6)",
+                        fontSize: 13,
+                    }}>
+                        © {new Date().getFullYear()} Kerana. Todos los derechos reservados.
+                    </div>
                 </section>
-                <style>{`
-          @keyframes shimmer {
-            0% { background-position: -200% 0; }
-            100% { background-position: 200% 0; }
-          }
-        `}</style>
             </main>
+
+            <style>{`
+                @keyframes shimmer {
+                    0% {
+                        background-position: -200% 0;
+                    }
+                    100% {
+                        background-position: 200% 0;
+                    }
+                }
+                
+                @keyframes fadeInUp {
+                    from {
+                        opacity: 0;
+                        transform: translateY(20px);
+                    }
+                    to {
+                        opacity: 1;
+                        transform: translateY(0);
+                    }
+                }
+            `}</style>
         </div>
     );
 }
@@ -348,127 +436,160 @@ export default function Home() {
 /* ======================= */
 
 function EcoStats({ pagesPerNote, waterPerSheetL, co2PerSheetG }) {
-    const paperSaved = `${pagesPerNote} hojas por apunte`;
-    const waterSaved = `~${(pagesPerNote * waterPerSheetL).toFixed(1)} L por apunte`;
-    const co2Saved = `~${Math.round(pagesPerNote * co2PerSheetG)} g por apunte`;
+    const paperSaved = `${pagesPerNote} hojas`;
+    const waterSaved = `~${(pagesPerNote * waterPerSheetL).toFixed(1)} L`;
+    const co2Saved = `~${Math.round(pagesPerNote * co2PerSheetG)} g`;
 
     return (
         <div
             style={{
                 display: "grid",
-                gridTemplateColumns: "repeat(auto-fit, minmax(260px, 1fr))",
-                gap: 16,
-                marginTop: 20,
+                gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))",
+                gap: 24,
             }}
         >
-            <Card style={{ padding: 16 }}>
-                <StatCard
-                    title="Papel ahorrado"
-                    value={paperSaved}
-                    subtitle="Estimado para un apunte de 20 páginas."
-                >
-                    <LeafIcon />
-                </StatCard>
-            </Card>
-            <Card style={{ padding: 16 }}>
-                <StatCard
-                    title="Agua evitada"
-                    value={waterSaved}
-                    subtitle="Consumo de fabricación por hoja."
-                >
-                    <DropIcon />
-                </StatCard>
-            </Card>
-            <Card style={{ padding: 16 }}>
-                <StatCard
-                    title="CO₂ evitado"
-                    value={co2Saved}
-                    subtitle="Impresión doméstica y traslado mínimo."
-                >
-                    <CloudIcon />
-                </StatCard>
-            </Card>
+            <EcoCard
+                icon={<FontAwesomeIcon icon={faLeaf} />}
+                color="#10b981"
+                title="Papel ahorrado"
+                value={paperSaved}
+                subtitle="Por cada apunte compartido"
+            />
+            <EcoCard
+                icon={<FontAwesomeIcon icon={faTint} />}
+                color="#0ea5e9"
+                title="Agua evitada"
+                value={waterSaved}
+                subtitle="Fabricación de papel"
+            />
+            <EcoCard
+                icon={<FontAwesomeIcon icon={faCloud} />}
+                color="#8b5cf6"
+                title="CO₂ evitado"
+                value={co2Saved}
+                subtitle="Impresión y transporte"
+            />
         </div>
     );
 }
 
-function StatCard({ title, value, subtitle, children }) {
+function EcoCard({ icon, color, title, value, subtitle }) {
     return (
-        <div style={{ display: "grid", gridTemplateColumns: "48px 1fr", gap: 12, alignItems: "center" }}>
-            <div
-                style={{
-                    width: 48,
-                    height: 48,
-                    borderRadius: 12,
-                    background: "#e2e8f0",
-                    display: "grid",
-                    placeItems: "center"
-                }}
-            >
-                {children}
+        <div
+            style={{
+                background: "#fff",
+                borderRadius: 16,
+                padding: 28,
+                border: "2px solid #f1f5f9",
+                transition: "all 0.3s cubic-bezier(0.4, 0, 0.2, 1)",
+                cursor: "default",
+            }}
+            onMouseEnter={(e) => {
+                e.currentTarget.style.transform = "translateY(-4px)";
+                e.currentTarget.style.boxShadow = "0 12px 32px rgba(0,0,0,0.1)";
+                e.currentTarget.style.borderColor = color;
+            }}
+            onMouseLeave={(e) => {
+                e.currentTarget.style.transform = "translateY(0)";
+                e.currentTarget.style.boxShadow = "none";
+                e.currentTarget.style.borderColor = "#f1f5f9";
+            }}
+        >
+            <div style={{
+                display: "flex",
+                alignItems: "center",
+                gap: 16,
+                marginBottom: 16,
+            }}>
+                <div
+                    style={{
+                        width: 56,
+                        height: 56,
+                        borderRadius: 14,
+                        background: `${color}15`,
+                        color: color,
+                        display: "grid",
+                        placeItems: "center",
+                        fontSize: 24,
+                        flexShrink: 0,
+                    }}
+                >
+                    {icon}
+                </div>
+                <div style={{ flex: 1 }}>
+                    <div style={{
+                        fontSize: 13,
+                        color: "#64748b",
+                        fontWeight: 600,
+                        textTransform: "uppercase",
+                        letterSpacing: "0.5px",
+                        marginBottom: 4,
+                    }}>
+                        {title}
+                    </div>
+                    <div style={{
+                        fontSize: 28,
+                        fontWeight: 800,
+                        color: "#0f172a",
+                        letterSpacing: "-0.02em",
+                    }}>
+                        {value}
+                    </div>
+                </div>
             </div>
-            <div>
-                <div style={{ fontSize: 13, color: "#6b7280" }}>{title}</div>
-                <div style={{ fontSize: 22, fontWeight: 800, marginTop: 2 }}>{value}</div>
-                {subtitle ? (
-                    <div style={{ fontSize: 12, color: "#94a3b8", marginTop: 2 }}>{subtitle}</div>
-                ) : null}
+            <div style={{
+                fontSize: 13,
+                color: "#94a3b8",
+                lineHeight: 1.5,
+            }}>
+                {subtitle}
             </div>
         </div>
-    );
-}
-
-/* Iconos simples en SVG para evitar dependencias */
-function LeafIcon() {
-    return (
-        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#0f172a" strokeWidth="1.8">
-            <path d="M5 21c8 0 14-6 14-14 0-1-.1-2-.3-3C17 5 13 6 9 6 6 6 4 5.5 3 5c0 8 6 14 14 14" />
-            <path d="M9 6c0 6 3 9 9 9" />
-        </svg>
-    );
-}
-
-function DropIcon() {
-    return (
-        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#0f172a" strokeWidth="1.8">
-            <path d="M12 2s6 6 6 10a6 6 0 0 1-12 0C6 8 12 2 12 2z" />
-        </svg>
-    );
-}
-
-function CloudIcon() {
-    return (
-        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#0f172a" strokeWidth="1.8">
-            <path d="M20 17.5a4.5 4.5 0 0 0-2-8.5 6 6 0 0 0-11 2" />
-            <path d="M6 17h11a3 3 0 0 0 3-3" />
-        </svg>
     );
 }
 
 /* ======================= */
-/*  FOOTER (igual)         */
+/*  FOOTER */
 /* ======================= */
 
 function FooterCol({ title, items }) {
     return (
         <div>
-            <h3 style={{ margin: "0 0 12px", fontSize: 16 }}>{title}</h3>
+            <h3 style={{
+                margin: "0 0 20px",
+                fontSize: 16,
+                fontWeight: 700,
+                color: "#fff",
+            }}>
+                {title}
+            </h3>
             <ul
                 style={{
                     listStyle: "none",
                     padding: 0,
                     margin: 0,
                     display: "grid",
-                    gap: 8,
+                    gap: 12,
                 }}
             >
                 {items.map((item) => (
                     <li key={item.label}>
                         <Link
                             to={item.to}
-                            style={{ color: "rgba(255,255,255,.9)", textDecoration: "none" }}
-                            onMouseEnter={(e) => (e.currentTarget.style.textDecoration = "underline")}
-                            onMouseLeave={(e) => (e.currentTarget.style.textDecoration = "none")}
+                            style={{
+                                color: "rgba(255,255,255,0.7)",
+                                textDecoration: "none",
+                                fontSize: 14,
+                                transition: "color 0.2s ease",
+                            }}
+                            onMouseEnter={(e) => {
+                                e.currentTarget.style.color = "#fff";
+                                e.currentTarget.style.textDecoration = "underline";
+                            }}
+                            onMouseLeave={(e) => {
+                                e.currentTarget.style.color = "rgba(255,255,255,0.7)";
+                                e.currentTarget.style.textDecoration = "none";
+                            }}
                         >
                             {item.label}
                         </Link>
@@ -484,12 +605,13 @@ function SkeletonCard() {
         <div
             style={{
                 width: "100%",
-                maxWidth: 230,
+                maxWidth: 240,
                 aspectRatio: "4 / 5",
-                borderRadius: 12,
+                borderRadius: 16,
                 background: "linear-gradient(90deg, #f3f4f6 0%, #e5e7eb 50%, #f3f4f6 100%)",
                 backgroundSize: "200% 100%",
                 animation: "shimmer 1.5s infinite",
+                border: "2px solid #f1f5f9",
             }}
         />
     );

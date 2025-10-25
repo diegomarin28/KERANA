@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { supabase } from '../supabase';
-import { ratingsAPI } from '../api/Database';
+import { ratingsAPI } from '../api/database';
 import AuthModal_HacerResenia from '../components/AuthModal_HacerResenia';
 import SubjectCarousel from '../components/SubjectCarousel';
 import ReviewsSection from '../components/ReviewsSection';

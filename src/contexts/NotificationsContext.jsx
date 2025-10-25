@@ -1,6 +1,6 @@
 import { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import { notificationsAPI } from '../api/notifications';
-import { notificationStorage } from '../utils/notificationStorage';
+import { notificationStorage } from '../utils/NotificationStorage';
 import { fetchUserProfile } from '../utils/authHelpers';
 
 const NotificationsContext = createContext();

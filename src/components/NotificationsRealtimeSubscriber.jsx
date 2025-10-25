@@ -7,12 +7,11 @@ import { useNotificationSettings } from '../hooks/useNotificationSettings';
 
 const POLLING_INTERVAL = 10000; // 10 segundos
 
-// 🔊 Audio context global para evitar el autoplay policy
 let audioContext = null;
 let audioUnlocked = false;
 
 export default function NotificationsRealtimeSubscriber() {
-    const { cargarNotificaciones, contarNoLeidas, notificaciones } = useNotificationsContext();
+    const { cargarNotificaciones, contarNoLeidas } = useNotificationsContext();
     const { addNotification } = useNotifications();
     const { shouldPlaySound, shouldShowToast, isTypeEnabled } = useNotificationSettings();
     const intervalRef = useRef(null);
@@ -25,8 +24,7 @@ export default function NotificationsRealtimeSubscriber() {
         const handleOnline = () => {
             console.log('🌐 Conexión restaurada');
             isOnlineRef.current = true;
-            // Hacer un check inmediato al volver online
-            lastCheckRef.current = new Date(Date.now() - 30000); // Buscar últimos 30s
+            lastCheckRef.current = new Date(Date.now() - 30000);
         };
 
         const handleOffline = () => {
@@ -43,18 +41,16 @@ export default function NotificationsRealtimeSubscriber() {
         };
     }, []);
 
-    // 🔓 Desbloquear audio con la primera interacción del usuario
+    // 🔓 Desbloquear audio
     useEffect(() => {
         const unlockAudio = async () => {
             if (audioUnlocked) return;
 
             try {
-                // Crear el audio context
                 if (!audioContext) {
                     audioContext = new (window.AudioContext || window.webkitAudioContext)();
                 }
 
-                // Intentar reproducir un sonido silencioso
                 const buffer = audioContext.createBuffer(1, 1, 22050);
                 const source = audioContext.createBufferSource();
                 source.buffer = buffer;
@@ -64,7 +60,6 @@ export default function NotificationsRealtimeSubscriber() {
                 audioUnlocked = true;
                 console.log('🔓 Audio desbloqueado');
 
-                // Remover listeners después de desbloquear
                 document.removeEventListener('click', unlockAudio);
                 document.removeEventListener('touchstart', unlockAudio);
                 document.removeEventListener('keydown', unlockAudio);
@@ -73,7 +68,6 @@ export default function NotificationsRealtimeSubscriber() {
             }
         };
 
-        // Escuchar cualquier interacción del usuario
         document.addEventListener('click', unlockAudio);
         document.addEventListener('touchstart', unlockAudio);
         document.addEventListener('keydown', unlockAudio);
@@ -90,7 +84,6 @@ export default function NotificationsRealtimeSubscriber() {
 
         const setupPolling = async () => {
             try {
-                // Obtener mi usuario ID
                 const { data: { user } } = await supabase.auth.getUser();
                 if (!user || cancelled) return;
 
@@ -104,13 +97,15 @@ export default function NotificationsRealtimeSubscriber() {
 
                 miUsuarioIdRef.current = usuarioData.id_usuario;
 
-
-                // Función de polling
                 const checkForNewNotifications = async () => {
                     if (cancelled) return;
 
+                    if (!isOnlineRef.current) {
+                        console.log('⏸️ Polling pausado (sin conexión)');
+                        return;
+                    }
+
                     try {
-                        // Buscar notificaciones nuevas desde el último check
                         const { data: nuevasNotifs, error } = await supabase
                             .from('notificaciones')
                             .select(`
@@ -118,6 +113,7 @@ export default function NotificationsRealtimeSubscriber() {
                                 emisor:usuario!notificaciones_emisor_id_fkey(
                                     id_usuario,
                                     nombre,
+                                    username,
                                     foto
                                 )
                             `)
@@ -130,37 +126,58 @@ export default function NotificationsRealtimeSubscriber() {
                             return;
                         }
 
-                        // Si hay notificaciones nuevas
                         if (nuevasNotifs && nuevasNotifs.length > 0) {
-
-                            // Actualizar última verificación
                             lastCheckRef.current = new Date();
 
-                            // Recargar lista completa
                             await cargarNotificaciones();
                             await contarNoLeidas();
 
-                            // Mostrar cada notificación nueva
                             for (const notif of nuevasNotifs) {
-                                // Verificar si el tipo está habilitado
                                 if (!isTypeEnabled(notif.tipo)) {
                                     continue;
                                 }
 
-                                // Sonido
                                 if (shouldPlaySound) {
                                     playSound(notif.tipo);
                                 }
 
-                                // Toast
                                 if (shouldShowToast) {
+                                    // 🎨 FORMATO MEJORADO - OPCIÓN 1
+                                    const emisorNombre = notif.emisor?.nombre || 'Alguien';
+                                    const emisorUsername = notif.emisor?.username;
+
+                                    let mensajeFormateado = notif.mensaje;
+                                    let urlDestino = notif.url || (emisorUsername ? `/user/${emisorUsername}` : null);
+
+                                    // Extraer acción del mensaje según tipo
+                                    if (notif.tipo === 'nuevo_seguidor') {
+                                        mensajeFormateado = 'empezó a seguirte';
+                                    } else if (notif.tipo === 'nuevo_apunte_seguido') {
+                                        const match = notif.mensaje.match(/subió "(.+)"/);
+                                        if (match) {
+                                            mensajeFormateado = `subió "${match[1]}"`;
+                                        }
+                                    } else if (notif.tipo === 'compra_apunte') {
+                                        const match = notif.mensaje.match(/compró "(.+)"/);
+                                        if (match) {
+                                            mensajeFormateado = `compró "${match[1]}"`;
+                                        }
+                                    } else if (notif.tipo === 'nueva_resena') {
+                                        const match = notif.mensaje.match(/calificó "(.+)" con (\d+)/);
+                                        if (match) {
+                                            mensajeFormateado = `calificó "${match[1]}" con ${match[2]} ⭐`;
+                                        }
+                                    }
+
                                     addNotification({
                                         id: notif.id,
-                                        title: notif.emisor?.nombre || 'Nueva notificación',
-                                        message: notif.mensaje,
+                                        title: emisorNombre,
+                                        username: emisorUsername,
+                                        message: mensajeFormateado,
                                         type: 'info',
                                         duration: 5000,
                                         avatar: notif.emisor?.foto,
+                                        url: urlDestino, // ✅ URL para navegación
                                     });
                                 }
                             }
@@ -170,10 +187,7 @@ export default function NotificationsRealtimeSubscriber() {
                     }
                 };
 
-                // Ejecutar inmediatamente
                 checkForNewNotifications();
-
-                // Configurar intervalo
                 intervalRef.current = setInterval(checkForNewNotifications, POLLING_INTERVAL);
 
             } catch (error) {
@@ -183,7 +197,6 @@ export default function NotificationsRealtimeSubscriber() {
 
         setupPolling();
 
-        // Cleanup
         return () => {
             cancelled = true;
             if (intervalRef.current) {
@@ -196,7 +209,7 @@ export default function NotificationsRealtimeSubscriber() {
     return null;
 }
 
-// 🔊 Función mejorada para reproducir sonido según tipo
+// 🔊 Función para reproducir sonido según tipo
 function playSound(tipo = 'default') {
     if (!audioUnlocked) {
         console.log('⚠️ Audio aún no desbloqueado. Esperando interacción del usuario...');
@@ -210,39 +223,33 @@ function playSound(tipo = 'default') {
 
         switch (tipo) {
             case 'nuevo_seguidor':
-                // 🎵 Sonido ascendente alegre (Do-Mi-Sol)
-                playNote(523, now, 0.15, 0.2);      // Do
-                playNote(659, now + 0.1, 0.15, 0.2); // Mi
-                playNote(784, now + 0.2, 0.2, 0.3);  // Sol
+                playNote(523, now, 0.15, 0.2);
+                playNote(659, now + 0.1, 0.15, 0.2);
+                playNote(784, now + 0.2, 0.2, 0.3);
                 break;
 
             case 'solicitud_aceptada':
-                // 🎵 Sonido de éxito (ding brillante)
-                playNote(880, now, 0.25, 0.15);      // La alto
-                playNote(1047, now + 0.1, 0.3, 0.25); // Do alto
+                playNote(880, now, 0.25, 0.15);
+                playNote(1047, now + 0.1, 0.3, 0.25);
                 break;
 
             case 'nuevo_comentario':
-                // 🎵 Pop suave
                 playNote(700, now, 0.2, 0.1);
                 playNote(900, now + 0.05, 0.15, 0.1);
                 break;
 
             case 'nuevo_like':
-                // 💖 Sonido corto y brillante
                 playNote(1200, now, 0.25, 0.08);
                 playNote(1400, now + 0.06, 0.2, 0.08);
                 break;
 
-            case 'nueva_resenia':
-                // 📝 Sonido de notificación estándar
+            case 'nueva_resena':
                 playNote(800, now, 0.2, 0.15);
                 playNote(1000, now + 0.1, 0.2, 0.15);
                 break;
 
             case 'mentor_acepto':
             case 'mentor_aprobado':
-                // 🎓 Fanfarria de éxito (Do-Mi-Sol-Do)
                 playNote(523, now, 0.15, 0.12);
                 playNote(659, now + 0.1, 0.15, 0.12);
                 playNote(784, now + 0.2, 0.15, 0.12);
@@ -250,14 +257,12 @@ function playSound(tipo = 'default') {
                 break;
 
             case 'nuevo_apunte':
-                // 📚 Sonido de nuevo contenido
                 playNote(600, now, 0.2, 0.12);
                 playNote(800, now + 0.08, 0.2, 0.12);
                 playNote(900, now + 0.16, 0.25, 0.15);
                 break;
 
             case 'apunte_aprobado':
-                // ✅ Sonido de aprobación
                 playNote(700, now, 0.2, 0.1);
                 playNote(900, now + 0.08, 0.2, 0.1);
                 playNote(1100, now + 0.16, 0.3, 0.2);
@@ -265,12 +270,10 @@ function playSound(tipo = 'default') {
 
             case 'system':
             case 'update':
-                // 🔔 Campana simple del sistema
                 playNote(900, now, 0.25, 0.2);
                 break;
 
             default:
-                // 🔔 Sonido por defecto
                 playNote(800, now, 0.2, 0.15);
                 playNote(1000, now + 0.1, 0.2, 0.15);
         }
@@ -281,7 +284,6 @@ function playSound(tipo = 'default') {
     }
 }
 
-// Helper para tocar una nota individual
 function playNote(frequency, startTime, volume = 0.2, duration = 0.15) {
     if (!audioContext) return;
 
@@ -294,7 +296,6 @@ function playNote(frequency, startTime, volume = 0.2, duration = 0.15) {
     oscillator.frequency.value = frequency;
     oscillator.type = 'sine';
 
-    // Envelope (fade in/out)
     gainNode.gain.setValueAtTime(0, startTime);
     gainNode.gain.linearRampToValueAtTime(volume, startTime + 0.01);
     gainNode.gain.exponentialRampToValueAtTime(0.01, startTime + duration);

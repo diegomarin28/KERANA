@@ -1,8 +1,8 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '../supabase';
 import { mentorAPI } from '../api/database';
-import { Card } from '../components/ui/Card';
-import { Button } from '../components/ui/Button';
+import { Card } from '../components/UI/Card';
+import { Button } from '../components/UI/Button';
 import { useMentorPayment } from '../hooks/useMentorPayment';
 import { MentorWelcomeModal } from '../components/MentorWelcomeModal';
 

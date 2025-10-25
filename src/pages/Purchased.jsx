@@ -2,8 +2,8 @@ import { useEffect, useState, useRef } from "react";
 import { supabase } from "../supabase";
 import { getOrCreateUserProfile } from "../api/userService";
 import { foldersAPI } from "../api/database";
-import { Button } from "../components/ui/Button";
-import { Card } from "../components/ui/Card";
+import { Button } from "../components/UI/Button";
+import { Card } from "../components/UI/Card";
 import { useNavigate, useLocation } from "react-router-dom";
 import ApunteCard from "../components/ApunteCard";
 import { FolderCard } from "../components/FolderCard";
@@ -251,12 +251,29 @@ export default function Purchased() {
             });
 
             // Calcular semestres por carpeta
+            // ✅ Función recursiva para obtener todos los apuntes (incluyendo subcarpetas)
+            const getAllNotesRecursive = (folderId) => {
+                const directNotes = notesPerFolder[folderId] || [];
+                const childFolders = allFolders.filter(f => f.parent_id === folderId);
+
+                let allNotes = [...directNotes];
+                childFolders.forEach(child => {
+                    allNotes = [...allNotes, ...getAllNotesRecursive(child.id_carpeta)];
+                });
+
+                return allNotes;
+            };
+
+// Calcular semestres por carpeta (incluyendo subcarpetas)
             const foldersWithData = allFolders.map((folder) => {
                 const notesInFolder = notesPerFolder[folder.id_carpeta] || [];
                 const childFolders = allFolders.filter((f) => f.parent_id === folder.id_carpeta);
 
+                // ✅ NUEVO: Obtener TODOS los apuntes (incluyendo los de subcarpetas)
+                const allNotesInTree = getAllNotesRecursive(folder.id_carpeta);
+
                 const semestres = new Set();
-                notesInFolder.forEach((compraId) => {
+                allNotesInTree.forEach((compraId) => {
                     const compra = comprasWithMaterias.find((c) => c.id === compraId);
                     const sem = compra?.apunte?.materia?.semestre;
                     if (sem) semestres.add(sem);
@@ -297,10 +314,22 @@ export default function Purchased() {
             setOrganizing(true);
             setErrorMsg("");
 
+            // ✅ NUEVO: Primero limpiar todas las relaciones apunte-carpeta
+            const { error: deleteRelError } = await supabase
+                .from('apunte_en_carpeta')
+                .delete()
+                .neq('id', 0); // Esto borra todo (workaround porque no hay .deleteAll())
+
+            if (deleteRelError) {
+                console.error('Error limpiando relaciones:', deleteRelError);
+            }
+
+            // Ahora eliminar todas las carpetas
             const { data: allFolders } = await foldersAPI.getMyFolders();
             for (const folder of allFolders || []) {
                 await foldersAPI.deleteFolder(folder.id_carpeta);
             }
+
             await loadFolders();
         } catch (err) {
             console.error("Error eliminando carpetas:", err);
@@ -516,28 +545,36 @@ export default function Purchased() {
                 )
             ) : (
                 <div>
-                    <div style={{ display: "flex", gap: 12, marginBottom: 24, flexWrap: "wrap" }}>
+                    <div style={{ display: 'flex', gap: 12, marginBottom: 24, flexWrap: 'wrap' }}>
                         <button
                             onClick={() => setShowCreateFolderModal(true)}
                             style={{
-                                display: "flex",
-                                alignItems: "center",
+                                display: 'flex',
+                                alignItems: 'center',
                                 gap: 8,
-                                padding: "10px 18px",
+                                padding: '10px 18px',
                                 borderRadius: 8,
-                                fontWeight: 500,
+                                fontWeight: 600,
                                 fontSize: 14,
-                                background: "white",
-                                border: "2px solid #e5e7eb",
-                                color: "#374151",
-                                cursor: "pointer",
-                                transition: "all 0.2s"
+                                background: 'white',
+                                border: '1px solid #dbdbdb',
+                                color: '#262626',
+                                cursor: 'pointer',
+                                transition: 'all 0.2s'
                             }}
-                            onMouseEnter={(e) => (e.target.style.background = "#f9fafb")}
-                            onMouseLeave={(e) => (e.target.style.background = "white")}
+                            onMouseEnter={(e) => {
+                                e.currentTarget.style.background = '#fafafa';
+                                e.currentTarget.style.borderColor = '#b3b3b3';
+                            }}
+                            onMouseLeave={(e) => {
+                                e.currentTarget.style.background = 'white';
+                                e.currentTarget.style.borderColor = '#dbdbdb';
+                            }}
                         >
                             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
-                                <path d="M12 5v14M5 12h14" />
+                                <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/>
+                                <line x1="12" y1="11" x2="12" y2="17"/>
+                                <line x1="9" y1="14" x2="15" y2="14"/>
                             </svg>
                             Crear carpeta
                         </button>
@@ -547,24 +584,24 @@ export default function Purchased() {
                                 onClick={() => setShowOrgModal(true)}
                                 disabled={organizing}
                                 style={{
-                                    display: "flex",
-                                    alignItems: "center",
+                                    display: 'flex',
+                                    alignItems: 'center',
                                     gap: 8,
-                                    background: organizing ? "#9ca3af" : "#2563eb",
-                                    color: "white",
-                                    border: "none",
-                                    padding: "10px 18px",
+                                    background: organizing ? '#b3b3b3' : '#0095f6',
+                                    color: 'white',
+                                    border: 'none',
+                                    padding: '10px 18px',
                                     borderRadius: 8,
-                                    fontWeight: 500,
+                                    fontWeight: 600,
                                     fontSize: 14,
-                                    cursor: organizing ? "not-allowed" : "pointer",
-                                    transition: "all 0.2s"
+                                    cursor: organizing ? 'not-allowed' : 'pointer',
+                                    transition: 'all 0.2s'
                                 }}
                                 onMouseEnter={(e) => {
-                                    if (!organizing) e.target.style.background = "#1d4ed8";
+                                    if (!organizing) e.target.style.background = '#1877f2';
                                 }}
                                 onMouseLeave={(e) => {
-                                    if (!organizing) e.target.style.background = "#2563eb";
+                                    if (!organizing) e.target.style.background = '#0095f6';
                                 }}
                             >
                                 {organizing ? (
@@ -573,10 +610,10 @@ export default function Purchased() {
                                             style={{
                                                 width: 14,
                                                 height: 14,
-                                                border: "2px solid white",
-                                                borderTop: "2px solid transparent",
-                                                borderRadius: "50%",
-                                                animation: "spin 1s linear infinite"
+                                                border: '2px solid white',
+                                                borderTop: '2px solid transparent',
+                                                borderRadius: '50%',
+                                                animation: 'spin 1s linear infinite'
                                             }}
                                         />
                                         Organizando...
@@ -584,9 +621,9 @@ export default function Purchased() {
                                 ) : (
                                     <>
                                         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                                            <circle cx="12" cy="12" r="10" />
-                                            <circle cx="12" cy="12" r="3" />
-                                            <path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83" />
+                                            <circle cx="12" cy="12" r="10"/>
+                                            <circle cx="12" cy="12" r="3"/>
+                                            <path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83"/>
                                         </svg>
                                         Organizar automáticamente
                                     </>
@@ -599,30 +636,28 @@ export default function Purchased() {
                                 onClick={handleDeleteAllFolders}
                                 disabled={organizing}
                                 style={{
-                                    display: "flex",
-                                    alignItems: "center",
+                                    display: 'flex',
+                                    alignItems: 'center',
                                     gap: 8,
-                                    padding: "10px 18px",
+                                    padding: '10px 18px',
                                     borderRadius: 8,
-                                    fontWeight: 500,
+                                    fontWeight: 600,
                                     fontSize: 14,
-                                    background: "white",
-                                    border: "2px solid #fecaca",
-                                    color: "#dc2626",
-                                    cursor: organizing ? "not-allowed" : "pointer",
+                                    background: 'white',
+                                    border: '1px solid #ed4956',
+                                    color: '#ed4956',
+                                    cursor: organizing ? 'not-allowed' : 'pointer',
                                     opacity: organizing ? 0.6 : 1,
-                                    transition: "all 0.2s"
+                                    transition: 'all 0.2s'
                                 }}
                                 onMouseEnter={(e) => {
                                     if (!organizing) {
-                                        e.target.style.background = "#fef2f2";
-                                        e.target.style.borderColor = "#fca5a5";
+                                        e.target.style.background = '#fef2f2';
                                     }
                                 }}
                                 onMouseLeave={(e) => {
                                     if (!organizing) {
-                                        e.target.style.background = "white";
-                                        e.target.style.borderColor = "#fecaca";
+                                        e.target.style.background = 'white';
                                     }
                                 }}
                             >
@@ -632,10 +667,10 @@ export default function Purchased() {
                                             style={{
                                                 width: 14,
                                                 height: 14,
-                                                border: "2px solid #dc2626",
-                                                borderTop: "2px solid transparent",
-                                                borderRadius: "50%",
-                                                animation: "spin 1s linear infinite"
+                                                border: '2px solid #ed4956',
+                                                borderTop: '2px solid transparent',
+                                                borderRadius: '50%',
+                                                animation: 'spin 1s linear infinite'
                                             }}
                                         />
                                         Borrando...
@@ -643,7 +678,7 @@ export default function Purchased() {
                                 ) : (
                                     <>
                                         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                                            <path d="M3 6h18M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2" />
+                                            <path d="M3 6h18M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2"/>
                                         </svg>
                                         Borrar todas las carpetas
                                     </>

@@ -1,4 +1,6 @@
 
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
+
 /* ===== Paleta y base ===== */
 :root{
     --bg: #2563eb;
@@ -7,6 +9,10 @@
     --accent-2: #1d4ed8; /* azul más oscuro */
     --muted: #64748b;
     --border: #e5e7eb;
+}
+
+* {
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
 }
 
 html, body, #root { height: 100%; margin: 0; }
