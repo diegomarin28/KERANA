@@ -66,6 +66,7 @@ export default function SearchResults() {
             setProfessors(data?.profesores ?? []);
             setMentors(data?.mentores ?? []);
             setUsers(data?.usuarios ?? []);
+
         } catch (e) {
             console.error("❌ Error en fetchAll:", e);
             setSubjects([]);
@@ -85,7 +86,6 @@ export default function SearchResults() {
             try {
                 const { data: { user } } = await supabase.auth.getUser();
                 if (!user) {
-                    console.log('No hay usuario autenticado');
                     return;
                 }
 
@@ -118,6 +118,8 @@ export default function SearchResults() {
                 return true;
             });
         };
+
+
 
         return {
             subjects: removeDuplicates(subjects, (s) => s.id_materia ?? s.id),

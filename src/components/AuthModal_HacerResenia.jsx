@@ -1,145 +1,96 @@
 import { useState, useEffect } from "react";
 import { ratingsAPI } from "../api/Database";
 import { supabase } from "../supabase";
+import { validarComentario } from "../utils/wordFilter";
+import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
+import {
+    faStar,
+    faStarHalfAlt,
+    faCheck,
+    faTimes,
+    faChalkboardTeacher,
+    faGraduationCap,
+    faSearch,
+    faLightbulb,
+    faExclamationTriangle,
+    faSpinner,
+    faLock
+} from '@fortawesome/free-solid-svg-icons';
 
-// Tags disponibles (13)
+// Tags disponibles con iconos Font Awesome
 const AVAILABLE_TAGS = [
     // Positivos
-    { id: 'muy-claro', label: '✨ Muy claro', type: 'positive' },
-    { id: 'querido', label: '🎓 Querido por los estudiantes', type: 'positive' },
-    { id: 'apasionado', label: '🔥 Apasionado', type: 'positive' },
-    { id: 'disponible', label: '💬 Siempre disponible', type: 'positive' },
-    { id: 'ordenado', label: '📋 Muy ordenado', type: 'positive' },
-    { id: 'dinamico', label: '⚡ Clases dinámicas', type: 'positive' },
-    { id: 'cercano', label: '🤝 Cercano a los alumnos', type: 'positive' },
+    { id: 'muy-claro', label: 'Muy claro', type: 'positive', icon: 'sparkles' },
+    { id: 'querido', label: 'Querido', type: 'positive', icon: 'heart' },
+    { id: 'apasionado', label: 'Apasionado', type: 'positive', icon: 'fire' },
+    { id: 'disponible', label: 'Disponible', type: 'positive', icon: 'comments' },
+    { id: 'ordenado', label: 'Ordenado', type: 'positive', icon: 'list' },
+    { id: 'dinamico', label: 'Dinámico', type: 'positive', icon: 'bolt' },
+    { id: 'cercano', label: 'Cercano', type: 'positive', icon: 'handshake' },
     // Negativos/Desafiantes
-    { id: 'califica-duro', label: '📊 Califica duro', type: 'negative' },
-    { id: 'mucha-tarea', label: '📖 Mucha tarea', type: 'negative' },
-    { id: 'participacion', label: '🎤 La participación importa', type: 'negative' },
-    { id: 'confuso', label: '🤔 Confuso', type: 'negative' },
-    { id: 'lejano', label: '🚪 Lejano a los alumnos', type: 'negative' },
-    { id: 'examenes-dificiles', label: '📝 Exámenes difíciles', type: 'negative' }
+    { id: 'califica-duro', label: 'Califica duro', type: 'negative', icon: 'chart-line' },
+    { id: 'mucha-tarea', label: 'Mucha tarea', type: 'negative', icon: 'book' },
+    { id: 'participacion', label: 'Participación', type: 'negative', icon: 'microphone' },
+    { id: 'confuso', label: 'Confuso', type: 'negative', icon: 'question' },
+    { id: 'lejano', label: 'Lejano', type: 'negative', icon: 'door-open' },
+    { id: 'examenes-dificiles', label: 'Exámenes difíciles', type: 'negative', icon: 'clipboard' }
 ];
 
-// Componente de estrellas interactivo
+// Componente de estrellas interactivo con Font Awesome
 const StarRating = ({ rating, onRatingChange }) => {
     const [hoverRating, setHoverRating] = useState(0);
-
-    const handleStarClick = (starValue) => {
-        onRatingChange(starValue);
-    };
-
-    const handleStarHover = (starValue) => {
-        setHoverRating(starValue);
-    };
-
-    const handleMouseLeave = () => {
-        setHoverRating(0);
-    };
-
     const displayRating = hoverRating || rating;
 
     return (
         <div style={{
             display: "flex",
             alignItems: "center",
-            gap: 12,
-            cursor: "pointer"
+            gap: 16,
+            fontFamily: "'Inter', sans-serif"
         }}>
             <div
                 style={{ display: "flex", gap: 4 }}
-                onMouseLeave={handleMouseLeave}
+                onMouseLeave={() => setHoverRating(0)}
             >
                 {[1, 2, 3, 4, 5].map((starIndex) => {
+                    const isHalf = displayRating >= starIndex - 0.5 && displayRating < starIndex;
+                    const isFull = displayRating >= starIndex;
+
                     return (
                         <div
                             key={starIndex}
                             style={{
                                 position: "relative",
-                                fontSize: 28,
-                                lineHeight: 1,
-                                color: "#e5e7eb",
-                                transition: "color 0.15s ease"
+                                fontSize: 32,
+                                cursor: "pointer",
+                                color: isFull || isHalf ? "#f59e0b" : "#e5e7eb",
+                                transition: "all 0.15s ease"
                             }}
                         >
-                            <span>★</span>
-
-                            <div
-                                style={{
-                                    position: "absolute",
-                                    top: 0,
-                                    left: 0,
-                                    width: "50%",
-                                    height: "100%",
-                                    zIndex: 2
-                                }}
-                                onMouseEnter={() => handleStarHover(starIndex - 0.5)}
-                                onClick={() => handleStarClick(starIndex - 0.5)}
+                            <FontAwesomeIcon
+                                icon={isHalf ? faStarHalfAlt : faStar}
+                                onMouseEnter={() => setHoverRating(starIndex)}
+                                onClick={() => onRatingChange(starIndex)}
                             />
-
-                            <div
-                                style={{
-                                    position: "absolute",
-                                    top: 0,
-                                    right: 0,
-                                    width: "50%",
-                                    height: "100%",
-                                    zIndex: 2
-                                }}
-                                onMouseEnter={() => handleStarHover(starIndex)}
-                                onClick={() => handleStarClick(starIndex)}
-                            />
-
-                            {displayRating >= starIndex - 0.5 && displayRating < starIndex && (
-                                <div
-                                    style={{
-                                        position: "absolute",
-                                        top: 0,
-                                        left: 0,
-                                        overflow: "hidden",
-                                        width: "50%",
-                                        color: "#f59e0b",
-                                        transition: "color 0.15s ease",
-                                        pointerEvents: "none"
-                                    }}
-                                >
-                                    ★
-                                </div>
-                            )}
-
-                            {displayRating >= starIndex && (
-                                <div
-                                    style={{
-                                        position: "absolute",
-                                        top: 0,
-                                        left: 0,
-                                        color: "#f59e0b",
-                                        transition: "color 0.15s ease",
-                                        pointerEvents: "none"
-                                    }}
-                                >
-                                    ★
-                                </div>
-                            )}
                         </div>
                     );
                 })}
             </div>
 
             <div style={{
-                padding: "8px 12px",
+                padding: "10px 16px",
                 background: "#f8fafc",
-                borderRadius: 8,
-                border: "1px solid #e2e8f0",
-                minWidth: 80,
-                textAlign: "center"
+                borderRadius: 10,
+                border: "2px solid #e2e8f0",
+                minWidth: 90
             }}>
                 <span style={{
-                    fontWeight: 600,
-                    color: "#374151",
-                    fontSize: 14
+                    fontWeight: 700,
+                    color: "#0f172a",
+                    fontSize: 15,
+                    fontFamily: "'Inter', sans-serif"
                 }}>
-                    {displayRating} de 5
+                    {displayRating.toFixed(1)} / 5
                 </span>
             </div>
         </div>
@@ -152,16 +103,16 @@ const WorkloadSlider = ({ value, onChange }) => {
     const index = options.indexOf(value);
 
     return (
-        <div style={{ display: "grid", gap: 8 }}>
+        <div style={{ display: "grid", gap: 12, fontFamily: "'Inter', sans-serif" }}>
             <div style={{ position: "relative", padding: "20px 0" }}>
                 <div style={{
                     position: "absolute",
                     top: "50%",
                     left: 0,
                     right: 0,
-                    height: 4,
-                    background: "#e5e7eb",
-                    borderRadius: 4,
+                    height: 6,
+                    background: "#e2e8f0",
+                    borderRadius: 6,
                     transform: "translateY(-50%)"
                 }} />
 
@@ -170,11 +121,11 @@ const WorkloadSlider = ({ value, onChange }) => {
                     top: "50%",
                     left: 0,
                     width: `${(index / 2) * 100}%`,
-                    height: 4,
-                    background: "linear-gradient(90deg, #3b82f6 0%, #1d4ed8 100%)",
-                    borderRadius: 4,
+                    height: 6,
+                    background: "linear-gradient(90deg, #2563eb 0%, #1e40af 100%)",
+                    borderRadius: 6,
                     transform: "translateY(-50%)",
-                    transition: "width 0.3s ease"
+                    transition: "width 0.3s cubic-bezier(0.4, 0, 0.2, 1)"
                 }} />
 
                 <div style={{
@@ -188,14 +139,14 @@ const WorkloadSlider = ({ value, onChange }) => {
                             type="button"
                             onClick={() => onChange(opt)}
                             style={{
-                                width: 20,
-                                height: 20,
+                                width: 24,
+                                height: 24,
                                 borderRadius: "50%",
-                                border: index >= idx ? "3px solid #2563eb" : "3px solid #d1d5db",
-                                background: index >= idx ? "#fff" : "#f3f4f6",
+                                border: index >= idx ? "3px solid #2563eb" : "3px solid #cbd5e1",
+                                background: index >= idx ? "#fff" : "#f1f5f9",
                                 cursor: "pointer",
-                                transition: "all 0.3s ease",
-                                boxShadow: index === idx ? "0 0 0 4px rgba(37, 99, 235, 0.2)" : "none",
+                                transition: "all 0.2s ease",
+                                boxShadow: index === idx ? "0 0 0 6px rgba(37, 99, 235, 0.15)" : "none",
                                 zIndex: index === idx ? 2 : 1
                             }}
                         />
@@ -206,15 +157,14 @@ const WorkloadSlider = ({ value, onChange }) => {
             <div style={{
                 display: "flex",
                 justifyContent: "space-between",
-                fontSize: 13,
-                color: "#6b7280",
+                fontSize: 14,
                 fontWeight: 500
             }}>
                 {options.map((opt, idx) => (
                     <span
                         key={opt}
                         style={{
-                            color: index === idx ? "#2563eb" : "#6b7280",
+                            color: index === idx ? "#2563eb" : "#64748b",
                             fontWeight: index === idx ? 700 : 500,
                             transition: "all 0.2s ease"
                         }}
@@ -248,6 +198,7 @@ export default function AuthModal_HacerResenia({
     const [errors, setErrors] = useState({});
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [toast, setToast] = useState(null);
+    const [wordFilterError, setWordFilterError] = useState(null);
 
     const [searchTerm, setSearchTerm] = useState("");
     const [searchResults, setSearchResults] = useState([]);
@@ -280,40 +231,34 @@ export default function AuthModal_HacerResenia({
                         })));
                     }
                 } else {
-                    // Para mentores: obtener primero los mentores, luego los usuarios
                     const { data: mentorData, error: mentorError } = await supabase
                         .from('mentor')
                         .select('id_mentor, id_usuario');
 
                     if (mentorError) {
-                        console.error('❌ Error cargando mentores:', mentorError);
+                        console.error('Error cargando mentores:', mentorError);
                         setSearchResults([]);
                         return;
                     }
 
                     if (mentorData && mentorData.length > 0) {
-                        // Obtener los ids de usuario únicos
                         const userIds = [...new Set(mentorData.map(m => m.id_usuario))];
 
-                        // Obtener los datos de usuarios
                         const { data: usuariosData, error: usuariosError } = await supabase
                             .from('usuario')
                             .select('id_usuario, nombre')
                             .in('id_usuario', userIds);
 
                         if (usuariosError) {
-                            console.error('❌ Error cargando usuarios:', usuariosError);
+                            console.error('Error cargando usuarios:', usuariosError);
                             setSearchResults([]);
                             return;
                         }
 
-                        // Combinar datos
                         const normalizeText = (text) =>
                             text.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
 
                         const termNormalized = normalizeText(term);
-
-                        // Crear un Map para eliminar duplicados por id_usuario
                         const mentoresMap = new Map();
 
                         mentorData.forEach(m => {
@@ -323,11 +268,8 @@ export default function AuthModal_HacerResenia({
                                 const nombreCompleto = usuario.nombre;
                                 const nombreNormalized = normalizeText(nombreCompleto);
 
-                                // Si coincide con la búsqueda
                                 if (nombreNormalized.includes(termNormalized)) {
                                     const usuarioKey = `${m.id_usuario}`;
-
-                                    // Solo agregar si no existe o reemplazar con id_mentor más alto
                                     const existing = mentoresMap.get(usuarioKey);
                                     if (!existing || m.id_mentor > existing.id) {
                                         mentoresMap.set(usuarioKey, {
@@ -339,7 +281,6 @@ export default function AuthModal_HacerResenia({
                             }
                         });
 
-                        console.log('✅ Mentores filtrados:', Array.from(mentoresMap.values()));
                         setSearchResults(Array.from(mentoresMap.values()));
                     } else {
                         setSearchResults([]);
@@ -360,7 +301,6 @@ export default function AuthModal_HacerResenia({
         return () => clearTimeout(debounce);
     }, [searchTerm, form.tipo, isPreSelected]);
 
-    // Cargar materias cuando se selecciona una entidad
     useEffect(() => {
         if (!form.selectedEntity) {
             setMaterias([]);
@@ -383,10 +323,6 @@ export default function AuthModal_HacerResenia({
                         })));
                     }
                 } else {
-                    // Para mentores: obtener TODAS las materias de TODOS los id_mentor del usuario
-                    console.log('🔍 Buscando materias para id_mentor:', form.selectedEntity.id);
-
-                    // Primero obtener el id_usuario del mentor seleccionado
                     const { data: mentorData, error: mentorError } = await supabase
                         .from('mentor')
                         .select('id_usuario')
@@ -394,41 +330,32 @@ export default function AuthModal_HacerResenia({
                         .single();
 
                     if (mentorError || !mentorData) {
-                        console.error('❌ Error obteniendo mentor:', mentorError);
+                        console.error('Error obteniendo mentor:', mentorError);
                         setMaterias([]);
                         setLoadingMaterias(false);
                         return;
                     }
 
-                    console.log('👤 ID Usuario del mentor:', mentorData.id_usuario);
-
-                    // Obtener TODOS los id_mentor de ese usuario
                     const { data: todosMentores, error: todosMentoresError } = await supabase
                         .from('mentor')
                         .select('id_mentor')
                         .eq('id_usuario', mentorData.id_usuario);
 
                     if (todosMentoresError || !todosMentores) {
-                        console.error('❌ Error obteniendo todos los mentores:', todosMentoresError);
+                        console.error('Error obteniendo todos los mentores:', todosMentoresError);
                         setMaterias([]);
                         setLoadingMaterias(false);
                         return;
                     }
 
                     const mentorIds = todosMentores.map(m => m.id_mentor);
-                    console.log('🎓 Todos los id_mentor del usuario:', mentorIds);
 
-                    // Obtener materias de TODOS los id_mentor
                     const { data, error } = await supabase
                         .from('mentor_materia')
                         .select('materia(id_materia, nombre_materia)')
                         .in('id_mentor', mentorIds);
 
-                    console.log('📚 Materias encontradas:', data);
-                    console.log('📚 Cantidad:', data?.length);
-
                     if (!error && data) {
-                        // Eliminar materias duplicadas
                         const materiasUnicas = data.reduce((acc, m) => {
                             if (!acc.find(mat => mat.id === m.materia.id_materia)) {
                                 acc.push({
@@ -439,7 +366,6 @@ export default function AuthModal_HacerResenia({
                             return acc;
                         }, []);
 
-                        console.log('✅ Materias únicas:', materiasUnicas);
                         setMaterias(materiasUnicas);
                     }
                 }
@@ -456,32 +382,15 @@ export default function AuthModal_HacerResenia({
 
     if (!open) return null;
 
-    // Componente de Notificación Toast
     const Toast = ({ message, type, onClose }) => {
         useEffect(() => {
             const timer = setTimeout(() => {
                 onClose();
             }, 4000);
-
             return () => clearTimeout(timer);
         }, [onClose]);
 
-        const colors = {
-            success: {
-                bg: "linear-gradient(135deg, #dcfce7 0%, #bbf7d0 100%)",
-                border: "#86efac",
-                text: "#166534",
-                icon: "✓"
-            },
-            error: {
-                bg: "linear-gradient(135deg, #fee2e2 0%, #fecaca 100%)",
-                border: "#fca5a5",
-                text: "#991b1b",
-                icon: "✕"
-            }
-        };
-
-        const style = colors[type] || colors.success;
+        const isSuccess = type === 'success';
 
         return (
             <div style={{
@@ -489,36 +398,29 @@ export default function AuthModal_HacerResenia({
                 top: 24,
                 right: 24,
                 zIndex: 9999,
-                background: style.bg,
-                border: `2px solid ${style.border}`,
+                background: isSuccess
+                    ? "linear-gradient(135deg, #d1fae5 0%, #a7f3d0 100%)"
+                    : "linear-gradient(135deg, #fee2e2 0%, #fecaca 100%)",
+                border: `2px solid ${isSuccess ? '#10b981' : '#ef4444'}`,
                 borderRadius: 12,
                 padding: "16px 20px",
                 minWidth: 320,
                 maxWidth: 480,
-                boxShadow: "0 10px 40px rgba(0,0,0,0.15)",
+                boxShadow: "0 12px 32px rgba(0,0,0,0.12)",
                 display: "flex",
                 alignItems: "center",
                 gap: 12,
-                animation: "slideIn 0.3s ease-out"
+                animation: "slideInRight 0.3s cubic-bezier(0.16, 1, 0.3, 1)",
+                fontFamily: "'Inter', sans-serif"
             }}>
                 <div style={{
-                    width: 32,
-                    height: 32,
-                    borderRadius: "50%",
-                    background: "#fff",
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "center",
-                    fontSize: 18,
-                    fontWeight: 700,
-                    color: style.text,
-                    flexShrink: 0
+                    fontSize: 22
                 }}>
-                    {style.icon}
+                    {isSuccess ? '✅' : '❌'}
                 </div>
                 <p style={{
                     margin: 0,
-                    color: style.text,
+                    color: isSuccess ? '#065f46' : '#991b1b',
                     fontSize: 14,
                     fontWeight: 600,
                     flex: 1,
@@ -531,9 +433,9 @@ export default function AuthModal_HacerResenia({
                     style={{
                         border: "none",
                         background: "transparent",
-                        color: style.text,
+                        color: isSuccess ? '#065f46' : '#991b1b',
                         cursor: "pointer",
-                        fontSize: 18,
+                        fontSize: 16,
                         padding: 4,
                         display: "flex",
                         alignItems: "center",
@@ -544,12 +446,12 @@ export default function AuthModal_HacerResenia({
                     onMouseEnter={(e) => e.currentTarget.style.opacity = 1}
                     onMouseLeave={(e) => e.currentTarget.style.opacity = 0.7}
                 >
-                    ✕
+                    <FontAwesomeIcon icon={faTimes} />
                 </button>
 
                 <style>
                     {`
-                    @keyframes slideIn {
+                    @keyframes slideInRight {
                         from {
                             transform: translateX(400px);
                             opacity: 0;
@@ -563,10 +465,6 @@ export default function AuthModal_HacerResenia({
                 </style>
             </div>
         );
-    };
-
-    const showToast = (message, type) => {
-        setToast({ message, type });
     };
 
     const toggleTag = (tagId) => {
@@ -623,9 +521,9 @@ export default function AuthModal_HacerResenia({
             );
 
             if (error) {
-                alert('Error al enviar reseña: ' + error.message);
+                setToast({ message: 'Error al enviar reseña: ' + error.message, type: 'error' });
             } else {
-                alert('¡Reseña enviada correctamente!');
+                setToast({ message: '¡Reseña enviada correctamente!', type: 'success' });
 
                 if (onSave) {
                     onSave({
@@ -635,39 +533,26 @@ export default function AuthModal_HacerResenia({
                     });
                 }
 
-                setForm({
-                    tipo: isPreSelected ? preSelectedEntity.tipo : "profesor",
-                    selectedEntity: isPreSelected ? preSelectedEntity : null,
-                    selectedMateria: null,
-                    rating: 5,
-                    selectedTags: [],
-                    texto: "",
-                    workload: "Medio"
-                });
-                setSearchTerm("");
-                setErrors({});
-                onClose();
-                // Limpiar formulario después de 1 segundo
                 setTimeout(() => {
                     setForm({
                         tipo: isPreSelected ? preSelectedEntity.tipo : "profesor",
                         selectedEntity: isPreSelected ? preSelectedEntity : null,
                         selectedMateria: null,
                         rating: 5,
-                        titulo: "",
+                        selectedTags: [],
                         texto: "",
-                        workload: "Medio",
-                        metodologia: "Clases prácticas"
+                        workload: "Medio"
                     });
                     setSearchTerm("");
                     setErrors({});
+                    setWordFilterError(null);
                     onClose();
-                }, 1000);
+                }, 1500);
             }
 
         } catch (error) {
             console.error("Error al enviar reseña:", error);
-            showToast('Error inesperado al enviar la reseña', 'error');
+            setToast({ message: 'Error inesperado al enviar la reseña', type: 'error' });
         } finally {
             setIsSubmitting(false);
         }
@@ -675,7 +560,6 @@ export default function AuthModal_HacerResenia({
 
     return (
         <>
-            {/* Toast Notification */}
             {toast && (
                 <Toast
                     message={toast.message}
@@ -684,20 +568,18 @@ export default function AuthModal_HacerResenia({
                 />
             )}
 
-            {/* Backdrop */}
-            {/* Backdrop - Click para cerrar */}
             <div
                 onClick={onClose}
                 style={{
                     position: "fixed",
                     inset: 0,
-                    background: "rgba(0,0,0,.35)",
+                    background: "rgba(0,0,0,0.5)",
+                    backdropFilter: "blur(4px)",
                     zIndex: 3000,
                     cursor: "pointer"
                 }}
             />
 
-            {/* Modal */}
             <div
                 role="dialog"
                 aria-modal="true"
@@ -708,7 +590,8 @@ export default function AuthModal_HacerResenia({
                     placeItems: "center",
                     zIndex: 3010,
                     padding: "20px",
-                    pointerEvents: "none"
+                    pointerEvents: "none",
+                    fontFamily: "'Inter', sans-serif"
                 }}
             >
                 <div
@@ -716,28 +599,34 @@ export default function AuthModal_HacerResenia({
                     style={{
                         width: "min(720px, 92vw)",
                         background: "#fff",
-                        borderRadius: 14,
-                        border: "1px solid var(--border)",
-                        boxShadow: "0 24px 60px rgba(0,0,0,.25)",
-                        padding: 18,
+                        borderRadius: 16,
+                        border: "2px solid #e2e8f0",
+                        boxShadow: "0 24px 60px rgba(0,0,0,0.2)",
+                        padding: 24,
                         display: "grid",
-                        gap: 12,
+                        gap: 20,
                         maxHeight: "90vh",
                         overflowY: "auto",
                         pointerEvents: "auto"
                     }}>
+
                     {/* Header */}
                     <div style={{
                         display: "flex",
                         justifyContent: "space-between",
                         alignItems: "center",
-                        paddingBottom: 12,
-                        borderBottom: "1px solid #e5e7eb"
+                        paddingBottom: 16,
+                        borderBottom: "2px solid #f1f5f9"
                     }}>
-                        <h3 style={{ margin: 0 }}>
+                        <h3 style={{
+                            margin: 0,
+                            fontSize: 20,
+                            fontWeight: 700,
+                            color: "#0f172a"
+                        }}>
                             {isPreSelected
-                                ? `Hacer reseña a ${form.selectedEntity.nombre}`
-                                : "Hacer reseña"
+                                ? `Reseñar a ${form.selectedEntity.nombre}`
+                                : "Crear reseña"
                             }
                         </h3>
                         <button
@@ -747,36 +636,57 @@ export default function AuthModal_HacerResenia({
                                 background: "transparent",
                                 fontSize: 20,
                                 cursor: "pointer",
-                                color: "#6b7280",
-                                transition: "color 0.2s ease"
+                                color: "#64748b",
+                                transition: "color 0.2s ease",
+                                padding: 8,
+                                borderRadius: 8
                             }}
-                            onMouseEnter={(e) => e.target.style.color = "#ef4444"}
-                            onMouseLeave={(e) => e.target.style.color = "#6b7280"}
+                            onMouseEnter={(e) => {
+                                e.target.style.color = "#ef4444";
+                                e.target.style.background = "#fee2e2";
+                            }}
+                            onMouseLeave={(e) => {
+                                e.target.style.color = "#64748b";
+                                e.target.style.background = "transparent";
+                            }}
                         >
-                            ✖
+                            <FontAwesomeIcon icon={faTimes} />
                         </button>
                     </div>
 
-                    {/* Recordatorio de anonimato */}
+                    {/* Banner de anonimato */}
                     <div style={{
                         background: "linear-gradient(135deg, #fef3c7 0%, #fde68a 100%)",
-                        padding: 12,
-                        borderRadius: 10,
-                        border: "1px solid #fcd34d",
+                        padding: 14,
+                        borderRadius: 12,
+                        border: "2px solid #fcd34d",
                         display: "flex",
                         alignItems: "center",
-                        gap: 10
+                        gap: 12
                     }}>
-                        <span style={{ fontSize: 20 }}>🔒</span>
-                        <p style={{ margin: 0, fontSize: 13, color: "#78350f", fontWeight: 500 }}>
-                            <strong>Tu reseña es completamente anónima.</strong> Nadie sabrá quién la escribió.
+                        <FontAwesomeIcon
+                            icon={faLock}
+                            style={{
+                                fontSize: 20,
+                                color: "#d97706",
+                                flexShrink: 0
+                            }}
+                        />
+                        <p style={{
+                            margin: 0,
+                            fontSize: 14,
+                            color: "#78350f",
+                            fontWeight: 600,
+                            lineHeight: 1.5
+                        }}>
+                            Tu reseña es completamente anónima. Nadie sabrá quién la escribió.
                         </p>
                     </div>
 
-                    {/* Selector de tipo (solo si NO está preseleccionado) */}
+                    {/* Selector de tipo */}
                     {!isPreSelected && (
-                        <label style={{ display: "grid", gap: 8 }}>
-                            <span style={{ fontWeight: 600 }}>
+                        <label style={{ display: "grid", gap: 10 }}>
+                            <span style={{ fontWeight: 600, fontSize: 14, color: "#0f172a" }}>
                                 Tipo de reseña <span style={{color: "#ef4444"}}>*</span>
                             </span>
                             <div style={{ display: "flex", gap: 12 }}>
@@ -794,21 +704,22 @@ export default function AuthModal_HacerResenia({
                                     }}
                                     style={{
                                         flex: 1,
-                                        height: 48,
+                                        height: 52,
                                         borderRadius: 10,
-                                        border: form.tipo === "profesor" ? "2px solid #2563eb" : "1px solid #d1d5db",
+                                        border: form.tipo === "profesor" ? "2px solid #2563eb" : "2px solid #e2e8f0",
                                         background: form.tipo === "profesor" ? "#eff6ff" : "#fff",
-                                        color: form.tipo === "profesor" ? "#2563eb" : "#6b7280",
+                                        color: form.tipo === "profesor" ? "#2563eb" : "#64748b",
                                         cursor: "pointer",
                                         fontWeight: 600,
+                                        fontSize: 14,
                                         display: "flex",
                                         alignItems: "center",
                                         justifyContent: "center",
-                                        gap: 8,
+                                        gap: 10,
                                         transition: "all 0.2s ease"
                                     }}
                                 >
-                                    <span style={{ fontSize: 20 }}>👨‍🏫</span>
+                                    <FontAwesomeIcon icon={faChalkboardTeacher} style={{ fontSize: 18 }} />
                                     Profesor
                                 </button>
                                 <button
@@ -825,74 +736,93 @@ export default function AuthModal_HacerResenia({
                                     }}
                                     style={{
                                         flex: 1,
-                                        height: 48,
+                                        height: 52,
                                         borderRadius: 10,
-                                        border: form.tipo === "mentor" ? "2px solid #2563eb" : "1px solid #d1d5db",
+                                        border: form.tipo === "mentor" ? "2px solid #2563eb" : "2px solid #e2e8f0",
                                         background: form.tipo === "mentor" ? "#eff6ff" : "#fff",
-                                        color: form.tipo === "mentor" ? "#2563eb" : "#6b7280",
+                                        color: form.tipo === "mentor" ? "#2563eb" : "#64748b",
                                         cursor: "pointer",
                                         fontWeight: 600,
+                                        fontSize: 14,
                                         display: "flex",
                                         alignItems: "center",
                                         justifyContent: "center",
-                                        gap: 8,
+                                        gap: 10,
                                         transition: "all 0.2s ease"
                                     }}
                                 >
-                                    <span style={{ fontSize: 20 }}>🎓</span>
+                                    <FontAwesomeIcon icon={faGraduationCap} style={{ fontSize: 18 }} />
                                     Mentor
                                 </button>
                             </div>
                         </label>
                     )}
 
-                    {/* Buscador de profesor/mentor - Solo si NO está preseleccionado */}
+                    {/* Buscador */}
                     {!isPreSelected && (
-                        <label style={{ display: "grid", gap: 8, position: "relative" }}>
-                            <span style={{ fontWeight: 600 }}>
+                        <label style={{ display: "grid", gap: 10, position: "relative" }}>
+                            <span style={{ fontWeight: 600, fontSize: 14, color: "#0f172a" }}>
                                 Buscar {form.tipo} <span style={{color: "#ef4444"}}>*</span>
                             </span>
 
                             {!form.selectedEntity ? (
                                 <>
-                                    <input
-                                        type="text"
-                                        value={searchTerm}
-                                        onChange={(e) => {
-                                            setSearchTerm(e.target.value);
-                                            setShowSuggestions(true);
-                                            if (errors.selectedEntity) setErrors({...errors, selectedEntity: ""});
-                                        }}
-                                        onFocus={() => setShowSuggestions(true)}
-                                        placeholder={`Escribí el nombre del ${form.tipo}...`}
-                                        style={{
-                                            height: 44,
-                                            border: errors.selectedEntity ? "2px solid #ef4444" : "1px solid #d1d5db",
-                                            borderRadius: 10,
-                                            padding: "0 12px",
-                                            outline: "none",
-                                            transition: "border-color 0.2s ease"
-                                        }}
-                                    />
+                                    <div style={{ position: "relative" }}>
+                                        <FontAwesomeIcon
+                                            icon={faSearch}
+                                            style={{
+                                                position: "absolute",
+                                                left: 14,
+                                                top: "50%",
+                                                transform: "translateY(-50%)",
+                                                color: "#94a3b8",
+                                                fontSize: 16
+                                            }}
+                                        />
+                                        <input
+                                            type="text"
+                                            value={searchTerm}
+                                            onChange={(e) => {
+                                                setSearchTerm(e.target.value);
+                                                setShowSuggestions(true);
+                                                if (errors.selectedEntity) setErrors({...errors, selectedEntity: ""});
+                                            }}
+                                            onFocus={() => setShowSuggestions(true)}
+                                            placeholder={`Escribí el nombre del ${form.tipo}...`}
+                                            style={{
+                                                width: "100%",
+                                                height: 48,
+                                                border: errors.selectedEntity ? "2px solid #ef4444" : "2px solid #e2e8f0",
+                                                borderRadius: 10,
+                                                padding: "0 14px 0 44px",
+                                                outline: "none",
+                                                transition: "border-color 0.2s ease",
+                                                fontSize: 14,
+                                                fontWeight: 500,
+                                                fontFamily: "'Inter', sans-serif",
+                                                color: "#0f172a"
+                                            }}
+                                        />
+                                    </div>
 
                                     {/* Sugerencias */}
                                     {showSuggestions && searchTerm.trim() && (
                                         <div style={{
                                             position: "absolute",
-                                            top: "100%",
+                                            top: "calc(100% + 4px)",
                                             left: 0,
                                             right: 0,
-                                            marginTop: 4,
                                             background: "#fff",
-                                            border: "1px solid #d1d5db",
+                                            border: "2px solid #e2e8f0",
                                             borderRadius: 10,
-                                            boxShadow: "0 8px 16px rgba(0,0,0,0.1)",
-                                            maxHeight: 200,
+                                            boxShadow: "0 12px 24px rgba(0,0,0,0.1)",
+                                            maxHeight: 240,
                                             overflowY: "auto",
                                             zIndex: 10
                                         }}>
                                             {searchLoading ? (
-                                                <div style={{ padding: 16, textAlign: "center", color: "#6b7280" }}>
+                                                <div style={{ padding: 20, textAlign: "center", color: "#64748b" }}>
+                                                    <FontAwesomeIcon icon={faSpinner} spin style={{ marginRight: 8 }} />
                                                     Buscando...
                                                 </div>
                                             ) : searchResults.length > 0 ? (
@@ -909,20 +839,23 @@ export default function AuthModal_HacerResenia({
                                                         }}
                                                         style={{
                                                             width: "100%",
-                                                            padding: "12px 16px",
+                                                            padding: "14px 16px",
                                                             textAlign: "left",
                                                             cursor: "pointer",
                                                             transition: "background 0.2s ease",
-                                                            borderBottom: "1px solid #f3f4f6"
+                                                            borderBottom: "1px solid #f1f5f9",
+                                                            fontSize: 14,
+                                                            fontWeight: 500,
+                                                            color: "#0f172a"
                                                         }}
-                                                        onMouseEnter={(e) => e.currentTarget.style.background = "#f9fafb"}
+                                                        onMouseEnter={(e) => e.currentTarget.style.background = "#f8fafc"}
                                                         onMouseLeave={(e) => e.currentTarget.style.background = "transparent"}
                                                     >
                                                         {result.nombre}
                                                     </div>
                                                 ))
                                             ) : (
-                                                <div style={{ padding: 16, textAlign: "center", color: "#6b7280" }}>
+                                                <div style={{ padding: 20, textAlign: "center", color: "#64748b", fontSize: 14 }}>
                                                     No se encontraron resultados
                                                 </div>
                                             )}
@@ -934,12 +867,12 @@ export default function AuthModal_HacerResenia({
                                     display: "flex",
                                     alignItems: "center",
                                     justifyContent: "space-between",
-                                    padding: "12px 16px",
-                                    background: "#f0f9ff",
-                                    border: "2px solid #3b82f6",
+                                    padding: "14px 16px",
+                                    background: "#eff6ff",
+                                    border: "2px solid #2563eb",
                                     borderRadius: 10
                                 }}>
-                                    <span style={{ fontWeight: 600, color: "#1e40af" }}>
+                                    <span style={{ fontWeight: 600, color: "#1e40af", fontSize: 14 }}>
                                         {form.selectedEntity.nombre}
                                     </span>
                                     <button
@@ -950,14 +883,17 @@ export default function AuthModal_HacerResenia({
                                         }}
                                         style={{
                                             border: "none",
-                                            background: "#3b82f6",
+                                            background: "#2563eb",
                                             color: "#fff",
-                                            borderRadius: 6,
-                                            padding: "4px 12px",
+                                            borderRadius: 8,
+                                            padding: "6px 14px",
                                             cursor: "pointer",
-                                            fontSize: 12,
-                                            fontWeight: 600
+                                            fontSize: 13,
+                                            fontWeight: 600,
+                                            transition: "all 0.2s ease"
                                         }}
+                                        onMouseEnter={(e) => e.currentTarget.style.background = "#1e40af"}
+                                        onMouseLeave={(e) => e.currentTarget.style.background = "#2563eb"}
                                     >
                                         Cambiar
                                     </button>
@@ -965,7 +901,7 @@ export default function AuthModal_HacerResenia({
                             )}
 
                             {errors.selectedEntity && (
-                                <span style={{ color: "#ef4444", fontSize: 12 }}>
+                                <span style={{ color: "#ef4444", fontSize: 13, fontWeight: 500 }}>
                                     {errors.selectedEntity}
                                 </span>
                             )}
@@ -974,8 +910,8 @@ export default function AuthModal_HacerResenia({
 
                     {/* Selector de materia */}
                     {form.selectedEntity && (
-                        <label style={{ display: "grid", gap: 8 }}>
-                            <span style={{ fontWeight: 600 }}>
+                        <label style={{ display: "grid", gap: 10 }}>
+                            <span style={{ fontWeight: 600, fontSize: 14, color: "#0f172a" }}>
                                 Materia <span style={{color: "#ef4444"}}>*</span>
                             </span>
                             <select
@@ -987,12 +923,17 @@ export default function AuthModal_HacerResenia({
                                 }}
                                 disabled={loadingMaterias}
                                 style={{
-                                    height: 44,
-                                    border: errors.selectedMateria ? "2px solid #ef4444" : "1px solid #d1d5db",
+                                    height: 48,
+                                    border: errors.selectedMateria ? "2px solid #ef4444" : "2px solid #e2e8f0",
                                     borderRadius: 10,
-                                    padding: "0 12px",
+                                    padding: "0 14px",
                                     outline: "none",
-                                    cursor: loadingMaterias ? "not-allowed" : "pointer"
+                                    cursor: loadingMaterias ? "not-allowed" : "pointer",
+                                    fontSize: 14,
+                                    fontWeight: 500,
+                                    fontFamily: "'Inter', sans-serif",
+                                    color: "#0f172a",
+                                    background: "#fff"
                                 }}
                             >
                                 <option value="">
@@ -1005,7 +946,7 @@ export default function AuthModal_HacerResenia({
                                 ))}
                             </select>
                             {errors.selectedMateria && (
-                                <span style={{ color: "#ef4444", fontSize: 12 }}>
+                                <span style={{ color: "#ef4444", fontSize: 13, fontWeight: 500 }}>
                                     {errors.selectedMateria}
                                 </span>
                             )}
@@ -1015,8 +956,8 @@ export default function AuthModal_HacerResenia({
                     {/* Calificación y Tags */}
                     {form.selectedEntity && form.selectedMateria && (
                         <>
-                            <label style={{ display: "grid", gap: 8, marginTop: 8 }}>
-                                <span style={{ fontWeight: 600 }}>
+                            <label style={{ display: "grid", gap: 10 }}>
+                                <span style={{ fontWeight: 600, fontSize: 14, color: "#0f172a" }}>
                                     Calificación <span style={{color: "#ef4444"}}>*</span>
                                 </span>
                                 <StarRating
@@ -1026,28 +967,36 @@ export default function AuthModal_HacerResenia({
                             </label>
 
                             {/* Selector de Tags */}
-                            <label style={{ display: "grid", gap: 8 }}>
-                                <span style={{ fontWeight: 600 }}>
+                            <label style={{ display: "grid", gap: 10 }}>
+                                <span style={{ fontWeight: 600, fontSize: 14, color: "#0f172a" }}>
                                     Características (elegí entre 1 y 3) <span style={{color: "#ef4444"}}>*</span>
                                 </span>
                                 <div style={{
                                     display: "flex",
                                     flexWrap: "wrap",
-                                    gap: 8
+                                    gap: 10
                                 }}>
                                     {AVAILABLE_TAGS.map(tag => {
                                         const isSelected = form.selectedTags.includes(tag.id);
+                                        const isPositive = tag.type === 'positive';
+
                                         return (
                                             <button
                                                 key={tag.id}
                                                 type="button"
                                                 onClick={() => toggleTag(tag.id)}
                                                 style={{
-                                                    padding: "8px 14px",
-                                                    borderRadius: 20,
-                                                    border: isSelected ? "2px solid #2563eb" : "1px solid #d1d5db",
-                                                    background: isSelected ? "#eff6ff" : "#fff",
-                                                    color: isSelected ? "#2563eb" : "#374151",
+                                                    padding: "10px 16px",
+                                                    borderRadius: 10,
+                                                    border: isSelected
+                                                        ? `2px solid ${isPositive ? '#10b981' : '#f59e0b'}`
+                                                        : "2px solid #e2e8f0",
+                                                    background: isSelected
+                                                        ? isPositive ? '#d1fae5' : '#fef3c7'
+                                                        : "#fff",
+                                                    color: isSelected
+                                                        ? isPositive ? '#065f46' : '#78350f'
+                                                        : "#64748b",
                                                     cursor: "pointer",
                                                     fontWeight: isSelected ? 600 : 500,
                                                     fontSize: 13,
@@ -1062,14 +1011,15 @@ export default function AuthModal_HacerResenia({
                                     })}
                                 </div>
                                 <div style={{
-                                    fontSize: 12,
-                                    color: "#6b7280",
+                                    fontSize: 13,
+                                    color: "#64748b",
                                     display: "flex",
                                     justifyContent: "space-between",
-                                    alignItems: "center"
+                                    alignItems: "center",
+                                    fontWeight: 500
                                 }}>
                                     {errors.selectedTags && (
-                                        <span style={{ color: "#ef4444" }}>
+                                        <span style={{ color: "#ef4444", fontWeight: 600 }}>
                                             {errors.selectedTags}
                                         </span>
                                     )}
@@ -1080,43 +1030,91 @@ export default function AuthModal_HacerResenia({
                             </label>
 
                             {/* Comentario */}
-                            <label style={{ display: "grid", gap: 6 }}>
-                                <span style={{ fontWeight: 600 }}>
+                            <label style={{ display: "grid", gap: 10 }}>
+                                <span style={{ fontWeight: 600, fontSize: 14, color: "#0f172a" }}>
                                     Comentario <span style={{color: "#ef4444"}}>*</span>
                                 </span>
                                 <textarea
                                     value={form.texto}
                                     onChange={(e) => {
-                                        setForm({...form, texto: e.target.value});
+                                        const nuevoTexto = e.target.value;
+                                        setForm({...form, texto: nuevoTexto});
+
+                                        const validacion = validarComentario(nuevoTexto);
+                                        if (!validacion.valido) {
+                                            setWordFilterError(validacion.error);
+                                        } else {
+                                            setWordFilterError(null);
+                                        }
+
                                         if (errors.texto) setErrors({...errors, texto: ""});
                                     }}
-                                    placeholder="Contanos sobre la metodología, claridad, dificultad, si lo recomendas..."
+                                    placeholder="Contanos sobre la metodología, claridad, dificultad, si lo recomendás..."
                                     rows={5}
                                     maxLength={500}
                                     style={{
-                                        border: errors.texto ? "2px solid #ef4444" : "1px solid #d1d5db",
+                                        border: (errors.texto || wordFilterError) ? "2px solid #ef4444" : "2px solid #e2e8f0",
                                         borderRadius: 10,
-                                        padding: "12px",
+                                        padding: "14px",
                                         resize: "vertical",
-                                        minHeight: "100px",
+                                        minHeight: "120px",
                                         outline: "none",
                                         transition: "border-color 0.2s ease",
-                                        fontFamily: "inherit"
+                                        fontFamily: "'Inter', sans-serif",
+                                        fontSize: 14,
+                                        fontWeight: 500,
+                                        color: "#0f172a",
+                                        lineHeight: 1.6
                                     }}
                                 />
+
+                                {/* Error de palabras prohibidas */}
+                                {wordFilterError && (
+                                    <div style={{
+                                        background: 'linear-gradient(135deg, #fee2e2 0%, #fecaca 100%)',
+                                        border: '2px solid #ef4444',
+                                        borderRadius: 10,
+                                        padding: '14px 16px',
+                                        display: 'flex',
+                                        alignItems: 'flex-start',
+                                        gap: 12,
+                                        animation: 'shake 0.4s ease'
+                                    }}>
+                                        <FontAwesomeIcon
+                                            icon={faExclamationTriangle}
+                                            style={{
+                                                fontSize: 18,
+                                                color: '#dc2626',
+                                                flexShrink: 0,
+                                                marginTop: 2
+                                            }}
+                                        />
+                                        <p style={{
+                                            margin: 0,
+                                            color: '#991b1b',
+                                            fontSize: 13,
+                                            fontWeight: 600,
+                                            lineHeight: 1.5
+                                        }}>
+                                            {wordFilterError}
+                                        </p>
+                                    </div>
+                                )}
+
                                 <div style={{
                                     display: "flex",
                                     justifyContent: "space-between",
                                     alignItems: "center"
                                 }}>
-                                    {errors.texto && (
-                                        <span style={{ color: "#ef4444", fontSize: 12 }}>
+                                    {errors.texto && !wordFilterError && (
+                                        <span style={{ color: "#ef4444", fontSize: 13, fontWeight: 500 }}>
                                             {errors.texto}
                                         </span>
                                     )}
                                     <span style={{
-                                        color: form.texto.length >= 500 ? "#ef4444" : "#6b7280",
-                                        fontSize: 12,
+                                        color: form.texto.length >= 500 ? "#ef4444" : "#64748b",
+                                        fontSize: 13,
+                                        fontWeight: 500,
                                         marginLeft: "auto"
                                     }}>
                                         {form.texto.length}/500
@@ -1125,49 +1123,58 @@ export default function AuthModal_HacerResenia({
                             </label>
 
                             {/* Carga de trabajo */}
-                            <label style={{ display: "grid", gap: 6 }}>
-                                <span style={{ fontWeight: 600 }}>Carga de trabajo</span>
+                            <label style={{ display: "grid", gap: 10 }}>
+                                <span style={{ fontWeight: 600, fontSize: 14, color: "#0f172a" }}>
+                                    Carga de trabajo
+                                </span>
                                 <WorkloadSlider
                                     value={form.workload}
                                     onChange={(value) => setForm({...form, workload: value})}
                                 />
                             </label>
 
-                            {/* Información adicional */}
+                            {/* Tips */}
                             <div style={{
                                 background: "linear-gradient(135deg, #f0f9ff 0%, #e0f2fe 100%)",
                                 padding: 16,
                                 borderRadius: 12,
-                                border: "1px solid #bae6fd",
-                                position: "relative",
-                                overflow: "hidden"
+                                border: "2px solid #bae6fd"
                             }}>
                                 <div style={{
                                     display: "flex",
                                     alignItems: "flex-start",
-                                    gap: 12,
-                                    position: "relative",
-                                    zIndex: 1
+                                    gap: 12
                                 }}>
-                                    <div style={{ fontSize: 20 }}>💡</div>
+                                    <FontAwesomeIcon
+                                        icon={faLightbulb}
+                                        style={{
+                                            fontSize: 20,
+                                            color: "#0284c7",
+                                            flexShrink: 0,
+                                            marginTop: 2
+                                        }}
+                                    />
                                     <div>
                                         <strong style={{
                                             color: "#0c4a6e",
                                             fontSize: 14,
-                                            fontWeight: 700
+                                            fontWeight: 700,
+                                            display: "block",
+                                            marginBottom: 8
                                         }}>
                                             Consejos para una reseña útil:
                                         </strong>
                                         <ul style={{
-                                            margin: "8px 0 0 0",
-                                            paddingLeft: 16,
+                                            margin: 0,
+                                            paddingLeft: 18,
                                             fontSize: 13,
                                             color: "#0369a1",
-                                            lineHeight: 1.5
+                                            lineHeight: 1.6,
+                                            fontWeight: 500
                                         }}>
                                             <li>Sé específico sobre la metodología y claridad</li>
-                                            <li>Menciona la dificultad y tiempo requerido</li>
-                                            <li>Comenta si el material es útil y accesible</li>
+                                            <li>Mencioná la dificultad y tiempo requerido</li>
+                                            <li>Comentá si el material es útil y accesible</li>
                                             <li>Sé constructivo y honesto en tus comentarios</li>
                                         </ul>
                                     </div>
@@ -1179,72 +1186,90 @@ export default function AuthModal_HacerResenia({
                     {/* Botones */}
                     <div style={{
                         display: "flex",
-                        gap: 10,
+                        gap: 12,
                         justifyContent: "flex-end",
-                        marginTop: 8,
-                        paddingTop: 16,
-                        borderTop: "1px solid #e5e7eb"
+                        paddingTop: 20,
+                        borderTop: "2px solid #f1f5f9"
                     }}>
                         <button
                             onClick={onClose}
                             disabled={isSubmitting}
                             style={{
-                                height: 44,
-                                padding: "0 20px",
+                                height: 48,
+                                padding: "0 24px",
                                 borderRadius: 10,
-                                border: "1px solid #d1d5db",
+                                border: "2px solid #e2e8f0",
                                 background: "#fff",
                                 cursor: isSubmitting ? "not-allowed" : "pointer",
                                 fontWeight: 600,
-                                opacity: isSubmitting ? 0.7 : 1,
+                                fontSize: 14,
+                                opacity: isSubmitting ? 0.5 : 1,
                                 transition: "all 0.2s ease",
-                                color: "#374151"
+                                color: "#64748b",
+                                fontFamily: "'Inter', sans-serif"
                             }}
+                            onMouseEnter={(e) => !isSubmitting && (e.currentTarget.style.background = "#f8fafc")}
+                            onMouseLeave={(e) => !isSubmitting && (e.currentTarget.style.background = "#fff")}
                         >
                             Cancelar
                         </button>
                         <button
                             onClick={save}
-                            disabled={isSubmitting || !form.selectedEntity || !form.selectedMateria}
+                            disabled={isSubmitting || !form.selectedEntity || !form.selectedMateria || wordFilterError}
                             style={{
-                                height: 44,
-                                padding: "0 24px",
+                                height: 48,
+                                padding: "0 28px",
                                 borderRadius: 10,
-                                background: (isSubmitting || !form.selectedEntity || !form.selectedMateria)
+                                background: (isSubmitting || !form.selectedEntity || !form.selectedMateria || wordFilterError)
                                     ? "linear-gradient(135deg, #9ca3af 0%, #6b7280 100%)"
-                                    : "linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%)",
+                                    : "linear-gradient(135deg, #2563eb 0%, #1e40af 100%)",
                                 color: "#fff",
                                 border: "none",
-                                cursor: (isSubmitting || !form.selectedEntity || !form.selectedMateria) ? "not-allowed" : "pointer",
+                                cursor: (isSubmitting || !form.selectedEntity || !form.selectedMateria || wordFilterError) ? "not-allowed" : "pointer",
                                 fontWeight: 700,
+                                fontSize: 14,
                                 display: "flex",
                                 alignItems: "center",
-                                gap: 8,
-                                boxShadow: (isSubmitting || !form.selectedEntity || !form.selectedMateria)
+                                gap: 10,
+                                boxShadow: (isSubmitting || !form.selectedEntity || !form.selectedMateria || wordFilterError)
                                     ? "none"
-                                    : "0 4px 12px rgba(59, 130, 246, 0.4)",
-                                transition: "all 0.2s ease"
+                                    : "0 4px 16px rgba(37, 99, 235, 0.4)",
+                                transition: "all 0.2s ease",
+                                fontFamily: "'Inter', sans-serif"
+                            }}
+                            onMouseEnter={(e) => {
+                                if (!isSubmitting && form.selectedEntity && form.selectedMateria && !wordFilterError) {
+                                    e.currentTarget.style.transform = "translateY(-2px)";
+                                    e.currentTarget.style.boxShadow = "0 8px 24px rgba(37, 99, 235, 0.5)";
+                                }
+                            }}
+                            onMouseLeave={(e) => {
+                                if (!isSubmitting && form.selectedEntity && form.selectedMateria && !wordFilterError) {
+                                    e.currentTarget.style.transform = "translateY(0)";
+                                    e.currentTarget.style.boxShadow = "0 4px 16px rgba(37, 99, 235, 0.4)";
+                                }
                             }}
                         >
-                            {isSubmitting && (
-                                <div style={{
-                                    width: 16,
-                                    height: 16,
-                                    border: "2px solid transparent",
-                                    borderTop: "2px solid #fff",
-                                    borderRadius: "50%",
-                                    animation: "spin 1s linear infinite"
-                                }} />
+                            {isSubmitting ? (
+                                <>
+                                    <FontAwesomeIcon icon={faSpinner} spin />
+                                    Enviando...
+                                </>
+                            ) : (
+                                <>
+                                    <FontAwesomeIcon icon={faCheck} />
+                                    Publicar reseña
+                                </>
                             )}
-                            {isSubmitting ? "Enviando..." : "Publicar reseña"}
                         </button>
                     </div>
 
                     <style>
                         {`
-                            @keyframes spin {
-                                0% { transform: rotate(0deg); }
-                                100% { transform: rotate(360deg); }
+                            @keyframes shake {
+                                0%, 100% { transform: translateX(0); }
+                                25% { transform: translateX(-8px); }
+                                75% { transform: translateX(8px); }
                             }
                         `}
                     </style>

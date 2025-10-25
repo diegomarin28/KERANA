@@ -1,16 +1,22 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '../supabase';
-import { Card } from '../components/ui/Card';
-import { Button } from '../components/ui/Button';
 import { followersAPI } from '../api/followers';
-import { FollowersList } from '../components/FollowersList';
+import { useMentorStatus } from '../hooks/useMentorStatus';
+import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
+import {
+    faEdit,
+    faFileAlt,
+    faStar,
+    faCoins,
+    faGraduationCap
+} from '@fortawesome/free-solid-svg-icons';
+import { faLinkedin } from '@fortawesome/free-brands-svg-icons';
 
 export default function Profile() {
     const [profile, setProfile] = useState(null);
     const [loading, setLoading] = useState(true);
     const [userId, setUserId] = useState(null);
-    const [tab, setTab] = useState('perfil');
     const [stats, setStats] = useState({
         apuntesSubidos: 0,
         reseñasEscritas: 0,
@@ -19,6 +25,7 @@ export default function Profile() {
     });
     const [avatarOk, setAvatarOk] = useState(true);
     const navigate = useNavigate();
+    const { isMentor, loading: mentorLoading } = useMentorStatus(true);
 
     useEffect(() => {
         fetchProfile();
@@ -132,17 +139,6 @@ export default function Profile() {
         }));
     };
 
-    if (loading) {
-        return (
-            <div style={pageStyle}>
-                <div style={centerStyle}>
-                    <div style={spinnerStyle}></div>
-                    <p style={{ marginTop: 16, color: '#64748b' }}>Cargando perfil...</p>
-                </div>
-            </div>
-        );
-    }
-
     function getAppAvatarSrc(raw) {
         const url = (raw || "").trim();
         const isHttp = /^https?:\/\//.test(url);
@@ -150,397 +146,496 @@ export default function Profile() {
         return isSupabasePublic ? url : "";
     }
 
+    if (loading) {
+        return (
+            <div style={{
+                minHeight: '100vh',
+                background: 'linear-gradient(180deg, #f8fafc 0%, #ffffff 100%)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                fontFamily: 'Inter, sans-serif',
+            }}>
+                <div style={{ textAlign: 'center' }}>
+                    <div style={{
+                        width: 40,
+                        height: 40,
+                        border: '3px solid #f1f5f9',
+                        borderTop: '3px solid #2563eb',
+                        borderRadius: '50%',
+                        animation: 'spin 0.8s linear infinite',
+                        margin: '0 auto 12px',
+                    }} />
+                    <p style={{
+                        color: '#64748b',
+                        fontSize: '14px',
+                        fontWeight: 500
+                    }}>
+                        Cargando perfil...
+                    </p>
+                </div>
+            </div>
+        );
+    }
+
     return (
-        <div style={pageStyle}>
-            <div style={{ maxWidth: 900, margin: '0 auto' }}>
-                <div style={tabsStyle}>
-                    {[
-                        { id: 'perfil', label: '👤 Perfil' },
-                    ].map(t => (
-                        <button
-                            key={t.id}
-                            onClick={() => setTab(t.id)}
-                            style={{
-                                ...tabButtonStyle,
-                                background: tab === t.id ? '#2563EB' : 'white',
-                                color: tab === t.id ? 'white' : '#374151',
-                                border: tab === t.id ? '1px solid #2563EB' : '1px solid #D1D5DB'
-                            }}
-                        >
-                            {t.label}
-                        </button>
-                    ))}
+        <div style={{
+            minHeight: '100vh',
+            background: 'linear-gradient(180deg, #f8fafc 0%, #ffffff 100%)',
+            padding: 'clamp(24px, 4vw, 48px) 20px',
+            fontFamily: 'Inter, sans-serif',
+        }}>
+            <div style={{
+                maxWidth: '960px',
+                margin: '0 auto'
+            }}>
+                {/* Header Card */}
+                <div style={{
+                    background: '#fff',
+                    borderRadius: '16px',
+                    overflow: 'hidden',
+                    marginBottom: '20px',
+                    border: '2px solid #f1f5f9',
+                    boxShadow: '0 2px 8px rgba(0,0,0,0.04)',
+                }}>
+                    {/* Cover */}
+                    <div style={{
+                        height: '100px',
+                        background: 'linear-gradient(135deg, #13346b 0%, #2563eb 60%, #0ea5a3 100%)',
+                    }} />
+
+                    {/* Profile Info */}
+                    <div style={{
+                        padding: '0 24px 24px 24px',
+                        marginTop: '-40px',
+                    }}>
+                        <div style={{
+                            display: 'flex',
+                            justifyContent: 'space-between',
+                            alignItems: 'flex-start',
+                            gap: '20px',
+                            flexWrap: 'wrap',
+                        }}>
+                            {/* Avatar + Info */}
+                            <div style={{
+                                display: 'flex',
+                                gap: '20px',
+                                alignItems: 'flex-start',
+                                flex: 1,
+                                minWidth: 0,
+                            }}>
+                                {/* Avatar */}
+                                <div style={{
+                                    width: '80px',
+                                    height: '80px',
+                                    borderRadius: '50%',
+                                    overflow: 'hidden',
+                                    border: '4px solid #fff',
+                                    boxShadow: '0 4px 12px rgba(0,0,0,0.1)',
+                                    flexShrink: 0,
+                                }}>
+                                    {(() => {
+                                        const avatarSrc = getAppAvatarSrc(profile?.foto);
+                                        return avatarSrc && avatarOk ? (
+                                            <img
+                                                src={avatarSrc}
+                                                alt={profile?.nombre || "Usuario"}
+                                                onError={() => setAvatarOk(false)}
+                                                style={{
+                                                    width: '100%',
+                                                    height: '100%',
+                                                    objectFit: 'cover',
+                                                }}
+                                                loading="lazy"
+                                                referrerPolicy="no-referrer"
+                                            />
+                                        ) : (
+                                            <div style={{
+                                                width: '100%',
+                                                height: '100%',
+                                                background: 'linear-gradient(135deg, #3b82f6 0%, #1e40af 100%)',
+                                                display: 'flex',
+                                                alignItems: 'center',
+                                                justifyContent: 'center',
+                                                fontSize: '32px',
+                                                fontWeight: 800,
+                                                color: '#fff',
+                                            }}>
+                                                {(profile?.username?.[0] || profile?.nombre?.[0] || "U").toUpperCase()}
+                                            </div>
+                                        );
+                                    })()}
+                                </div>
+
+                                {/* Name + Username + Bio + Links + Stats */}
+                                <div style={{ flex: 1, minWidth: 0, paddingTop: '8px' }}>
+                                    <div style={{
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        gap: '8px',
+                                        marginBottom: '4px',
+                                    }}>
+                                        <h1 style={{
+                                            margin: 0,
+                                            fontSize: '24px',
+                                            fontWeight: 800,
+                                            color: '#0f172a',
+                                            letterSpacing: '-0.02em',
+                                        }}>
+                                            {profile?.nombre || 'Usuario'}
+                                        </h1>
+                                        {isMentor && !mentorLoading && (
+                                            <div style={{
+                                                display: 'inline-flex',
+                                                alignItems: 'center',
+                                                gap: '4px',
+                                                padding: '3px 8px',
+                                                background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
+                                                borderRadius: '12px',
+                                                fontSize: '11px',
+                                                fontWeight: 700,
+                                                color: '#fff',
+                                                textTransform: 'uppercase',
+                                                letterSpacing: '0.3px',
+                                            }}>
+                                                <FontAwesomeIcon icon={faGraduationCap} style={{ fontSize: '10px' }} />
+                                                Mentor
+                                            </div>
+                                        )}
+                                    </div>
+
+                                    <p style={{
+                                        margin: '0 0 12px 0',
+                                        fontSize: '15px',
+                                        color: '#64748b',
+                                        fontWeight: 500,
+                                    }}>
+                                        @{profile?.username || 'usuario'}
+                                    </p>
+
+                                    {/* Bio */}
+                                    {profile?.bio && (
+                                        <p style={{
+                                            margin: '0 0 12px 0',
+                                            fontSize: '14px',
+                                            color: '#475569',
+                                            lineHeight: 1.6,
+                                            fontWeight: 400,
+                                        }}>
+                                            {profile.bio}
+                                        </p>
+                                    )}
+
+                                    {/* LinkedIn */}
+                                    {profile?.linkedin && (
+                                        <a
+                                            href={profile.linkedin}
+                                            target="_blank"
+                                            rel="noopener noreferrer"
+                                            style={{
+                                                display: 'inline-flex',
+                                                alignItems: 'center',
+                                                gap: '6px',
+                                                padding: '6px 12px',
+                                                background: '#f8fafc',
+                                                border: '2px solid #e2e8f0',
+                                                borderRadius: '8px',
+                                                fontSize: '13px',
+                                                fontWeight: 600,
+                                                color: '#0a66c2',
+                                                textDecoration: 'none',
+                                                transition: 'all 0.2s ease',
+                                                marginBottom: '12px',
+                                            }}
+                                            onMouseEnter={(e) => {
+                                                e.currentTarget.style.background = '#0a66c2';
+                                                e.currentTarget.style.color = '#fff';
+                                                e.currentTarget.style.borderColor = '#0a66c2';
+                                            }}
+                                            onMouseLeave={(e) => {
+                                                e.currentTarget.style.background = '#f8fafc';
+                                                e.currentTarget.style.color = '#0a66c2';
+                                                e.currentTarget.style.borderColor = '#e2e8f0';
+                                            }}
+                                        >
+                                            <FontAwesomeIcon icon={faLinkedin} />
+                                            LinkedIn
+                                        </a>
+                                    )}
+
+                                    {/* Créditos Badge */}
+                                    <div style={{
+                                        display: 'inline-flex',
+                                        alignItems: 'center',
+                                        gap: '6px',
+                                        padding: '6px 12px',
+                                        background: 'linear-gradient(135deg, #fef3c7 0%, #fde68a 100%)',
+                                        border: '2px solid #fcd34d',
+                                        borderRadius: '20px',
+                                        marginBottom: '12px',
+                                    }}>
+                                        <FontAwesomeIcon icon={faCoins} style={{
+                                            color: '#f59e0b',
+                                            fontSize: '14px'
+                                        }} />
+                                        <span style={{
+                                            color: '#92400e',
+                                            fontSize: '13px',
+                                            fontWeight: 700,
+                                        }}>
+                                            {profile?.creditos ?? 10} créditos
+                                        </span>
+                                    </div>
+
+                                    {/* Stats */}
+                                    <div style={{
+                                        display: 'flex',
+                                        gap: '20px',
+                                        flexWrap: 'wrap',
+                                    }}>
+                                        <div
+                                            onClick={() => navigate('/followers')}
+                                            style={{
+                                                cursor: 'pointer',
+                                                transition: 'opacity 0.2s ease',
+                                            }}
+                                            onMouseEnter={(e) => {
+                                                e.currentTarget.style.opacity = '0.7';
+                                            }}
+                                            onMouseLeave={(e) => {
+                                                e.currentTarget.style.opacity = '1';
+                                            }}
+                                        >
+                                            <span style={{
+                                                fontSize: '16px',
+                                                fontWeight: 800,
+                                                color: '#0f172a',
+                                                marginRight: '4px',
+                                            }}>
+                                                {stats.seguidores}
+                                            </span>
+                                            <span style={{
+                                                fontSize: '14px',
+                                                color: '#64748b',
+                                                fontWeight: 500,
+                                            }}>
+                                                seguidores
+                                            </span>
+                                        </div>
+
+                                        <div
+                                            onClick={() => navigate('/followers')}
+                                            style={{
+                                                cursor: 'pointer',
+                                                transition: 'opacity 0.2s ease',
+                                            }}
+                                            onMouseEnter={(e) => {
+                                                e.currentTarget.style.opacity = '0.7';
+                                            }}
+                                            onMouseLeave={(e) => {
+                                                e.currentTarget.style.opacity = '1';
+                                            }}
+                                        >
+                                            <span style={{
+                                                fontSize: '16px',
+                                                fontWeight: 800,
+                                                color: '#0f172a',
+                                                marginRight: '4px',
+                                            }}>
+                                                {stats.siguiendo}
+                                            </span>
+                                            <span style={{
+                                                fontSize: '14px',
+                                                color: '#64748b',
+                                                fontWeight: 500,
+                                            }}>
+                                                siguiendo
+                                            </span>
+                                        </div>
+
+                                        <div>
+                                            <span style={{
+                                                fontSize: '16px',
+                                                fontWeight: 800,
+                                                color: '#0f172a',
+                                                marginRight: '4px',
+                                            }}>
+                                                {stats.apuntesSubidos}
+                                            </span>
+                                            <span style={{
+                                                fontSize: '14px',
+                                                color: '#64748b',
+                                                fontWeight: 500,
+                                            }}>
+                                                apuntes
+                                            </span>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            {/* Botón Editar */}
+                            <button
+                                onClick={() => navigate('/edit-profile')}
+                                style={{
+                                    display: 'inline-flex',
+                                    alignItems: 'center',
+                                    gap: '6px',
+                                    padding: '10px 20px',
+                                    background: '#2563eb',
+                                    color: '#fff',
+                                    border: 'none',
+                                    borderRadius: '10px',
+                                    fontSize: '14px',
+                                    fontWeight: 700,
+                                    cursor: 'pointer',
+                                    transition: 'all 0.2s ease',
+                                    marginTop: '8px',
+                                }}
+                                onMouseEnter={(e) => {
+                                    e.currentTarget.style.background = '#1e40af';
+                                    e.currentTarget.style.transform = 'translateY(-2px)';
+                                    e.currentTarget.style.boxShadow = '0 8px 24px rgba(37, 99, 235, 0.25)';
+                                }}
+                                onMouseLeave={(e) => {
+                                    e.currentTarget.style.background = '#2563eb';
+                                    e.currentTarget.style.transform = 'translateY(0)';
+                                    e.currentTarget.style.boxShadow = 'none';
+                                }}
+                            >
+                                <FontAwesomeIcon icon={faEdit} />
+                                Editar Perfil
+                            </button>
+                        </div>
+                    </div>
                 </div>
 
-                {tab === 'perfil' && (
-                    <>
-                        <Card style={profileHeaderStyle}>
-                            <div style={headerContentStyle}>
-                                <div style={leftSectionStyle}>
-                                    <div style={avatarStyle}>
-                                        {(() => {
-                                            const avatarSrc = getAppAvatarSrc(profile?.foto);
-                                            return avatarSrc && avatarOk ? (
-                                                <img
-                                                    src={avatarSrc}
-                                                    alt={profile?.nombre || "Usuario"}
-                                                    onError={() => setAvatarOk(false)}
-                                                    style={avatarImageStyle}
-                                                    loading="lazy"
-                                                    referrerPolicy="no-referrer"
-                                                />
-                                            ) : (
-                                                <div style={avatarPlaceholderStyle}>
-                                                    {(profile?.username?.[0] || profile?.nombre?.[0] || "U").toUpperCase()}
-                                                </div>
-                                            );
-                                        })()}
-                                    </div>
-
-                                    <div style={profileInfoStyle}>
-                                        <h1 style={profileNameStyle}>{profile?.nombre || 'Usuario'}</h1>
-                                        <p style={profileUsernameStyle}>@{profile?.username || 'usuario'}</p>
-                                        <p style={profileEmailStyle}>{profile?.correo}</p>
-
-                                        <div style={creditsContainerStyle}>
-                                            <span style={creditsTextStyle}>{profile?.creditos ?? 10} créditos</span>
-                                        </div>
-
-                                        <div style={headerStatsStyle}>
-                                            <div
-                                                style={{ ...headerStatItemStyle, cursor: 'pointer' }}
-                                                onClick={(e) => {
-                                                    e.stopPropagation();
-                                                    navigate('/followers');
-                                                }}
-                                                onMouseEnter={(e) => {
-                                                    e.currentTarget.style.opacity = '0.7';
-                                                }}
-                                                onMouseLeave={(e) => {
-                                                    e.currentTarget.style.opacity = '1';
-                                                }}
-                                            >
-                                                <div style={headerStatNumberStyle}>{stats.seguidores}</div>
-                                                <div style={headerStatLabelStyle}>Seguidores</div>
-                                            </div>
-                                            <div
-                                                style={{ ...headerStatItemStyle, cursor: 'pointer' }}
-                                                onClick={(e) => {
-                                                    e.stopPropagation();
-                                                    navigate('/followers');
-                                                }}
-                                                onMouseEnter={(e) => {
-                                                    e.currentTarget.style.opacity = '0.7';
-                                                }}
-                                                onMouseLeave={(e) => {
-                                                    e.currentTarget.style.opacity = '1';
-                                                }}
-                                            >
-                                                <div style={headerStatNumberStyle}>{stats.siguiendo}</div>
-                                                <div style={headerStatLabelStyle}>Siguiendo</div>
-                                            </div>
-                                        </div>
-
-                                        <div style={actionsStyle}>
-                                            <EditProfileButton />
-                                        </div>
-                                    </div>
-                                </div>
-
-                                <div style={rightSectionStyle}>
-                                    <Card style={contentStatsCardStyle}>
-                                        <h3 style={sectionTitleStyle}>Mi Contenido</h3>
-                                        <div style={contentStatsGridStyle}>
-                                            <div style={contentStatItemStyle}>
-                                                <div style={contentStatNumberStyle}>{stats.apuntesSubidos}</div>
-                                                <div style={contentStatLabelStyle}>Apuntes Subidos</div>
-                                            </div>
-                                            <div style={contentStatItemStyle}>
-                                                <div style={contentStatNumberStyle}>{stats.reseñasEscritas}</div>
-                                                <div style={contentStatLabelStyle}>Reseñas Escritas</div>
-                                            </div>
-                                        </div>
-                                    </Card>
-                                </div>
+                {/* Stats Grid */}
+                <div style={{
+                    display: 'grid',
+                    gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))',
+                    gap: '16px',
+                }}>
+                    {/* Apuntes Subidos */}
+                    <div style={{
+                        background: '#fff',
+                        borderRadius: '12px',
+                        padding: '20px',
+                        border: '2px solid #f1f5f9',
+                        boxShadow: '0 2px 8px rgba(0,0,0,0.04)',
+                        transition: 'all 0.3s ease',
+                    }}
+                         onMouseEnter={(e) => {
+                             e.currentTarget.style.transform = 'translateY(-4px)';
+                             e.currentTarget.style.boxShadow = '0 12px 32px rgba(0,0,0,0.08)';
+                             e.currentTarget.style.borderColor = '#2563eb';
+                         }}
+                         onMouseLeave={(e) => {
+                             e.currentTarget.style.transform = 'translateY(0)';
+                             e.currentTarget.style.boxShadow = '0 2px 8px rgba(0,0,0,0.04)';
+                             e.currentTarget.style.borderColor = '#f1f5f9';
+                         }}>
+                        <div style={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '12px',
+                            marginBottom: '8px',
+                        }}>
+                            <div style={{
+                                width: '40px',
+                                height: '40px',
+                                background: 'linear-gradient(135deg, #2563eb 0%, #1e40af 100%)',
+                                borderRadius: '10px',
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                color: '#fff',
+                                fontSize: '18px',
+                            }}>
+                                <FontAwesomeIcon icon={faFileAlt} />
                             </div>
-                        </Card>
-
-                        <Card style={activityCardStyle}>
-                            <h3 style={sectionTitleStyle}>Actividad Reciente</h3>
-                            <div style={activityStyle}>
-                                <div style={notificationItemStyle}>
-                                    <div style={notificationIconStyle}>💰</div>
-                                    <div style={notificationContentStyle}>
-                                        <div style={notificationTextStyle}>
-                                            Recibiste <strong>10 créditos</strong> de bienvenida
-                                        </div>
-                                        <div style={notificationTimeStyle}>Hace unos momentos</div>
-                                    </div>
-                                    <div style={notificationBadgeStyle}>Nuevo</div>
-                                </div>
+                            <div style={{
+                                fontSize: '28px',
+                                fontWeight: 800,
+                                color: '#0f172a',
+                                lineHeight: 1,
+                            }}>
+                                {stats.apuntesSubidos}
                             </div>
-                        </Card>
-                    </>
-                )}
+                        </div>
+                        <div style={{
+                            fontSize: '13px',
+                            fontWeight: 600,
+                            color: '#64748b',
+                        }}>
+                            Apuntes Subidos
+                        </div>
+                    </div>
+
+                    {/* Reseñas Escritas */}
+                    <div style={{
+                        background: '#fff',
+                        borderRadius: '12px',
+                        padding: '20px',
+                        border: '2px solid #f1f5f9',
+                        boxShadow: '0 2px 8px rgba(0,0,0,0.04)',
+                        transition: 'all 0.3s ease',
+                    }}
+                         onMouseEnter={(e) => {
+                             e.currentTarget.style.transform = 'translateY(-4px)';
+                             e.currentTarget.style.boxShadow = '0 12px 32px rgba(0,0,0,0.08)';
+                             e.currentTarget.style.borderColor = '#f59e0b';
+                         }}
+                         onMouseLeave={(e) => {
+                             e.currentTarget.style.transform = 'translateY(0)';
+                             e.currentTarget.style.boxShadow = '0 2px 8px rgba(0,0,0,0.04)';
+                             e.currentTarget.style.borderColor = '#f1f5f9';
+                         }}>
+                        <div style={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '12px',
+                            marginBottom: '8px',
+                        }}>
+                            <div style={{
+                                width: '40px',
+                                height: '40px',
+                                background: 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)',
+                                borderRadius: '10px',
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                color: '#fff',
+                                fontSize: '18px',
+                            }}>
+                                <FontAwesomeIcon icon={faStar} />
+                            </div>
+                            <div style={{
+                                fontSize: '28px',
+                                fontWeight: 800,
+                                color: '#0f172a',
+                                lineHeight: 1,
+                            }}>
+                                {stats.reseñasEscritas}
+                            </div>
+                        </div>
+                        <div style={{
+                            fontSize: '13px',
+                            fontWeight: 600,
+                            color: '#64748b',
+                        }}>
+                            Reseñas Escritas
+                        </div>
+                    </div>
+                </div>
             </div>
+
+            <style>{`
+                @keyframes spin {
+                    from { transform: rotate(0deg); }
+                    to { transform: rotate(360deg); }
+                }
+            `}</style>
         </div>
     );
 }
-
-function EditProfileButton() {
-    const [isHovered, setIsHovered] = useState(false);
-
-    return (
-        <button
-            onClick={() => (window.location.href = '/edit-profile')}
-            style={isHovered ? editButtonHoverStyle : editButtonStyle}
-            onMouseEnter={() => setIsHovered(true)}
-            onMouseLeave={() => setIsHovered(false)}
-        >
-            Editar Perfil
-        </button>
-    );
-}
-
-// ESTILOS
-const pageStyle = {
-    minHeight: '100vh',
-    background: 'linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%)',
-    padding: '14px 12px',
-};
-
-const centerStyle = {
-    display: 'flex',
-    flexDirection: 'column',
-    justifyContent: 'center',
-    alignItems: 'center',
-    minHeight: '50vh',
-};
-
-const spinnerStyle = {
-    width: 32,
-    height: 32,
-    border: '2px solid #f3f4f6',
-    borderTop: '2px solid #2563eb',
-    borderRadius: '50%',
-    animation: 'spin 1s linear infinite',
-};
-
-const tabsStyle = {
-    display: 'flex',
-    gap: 8,
-    marginBottom: 24,
-    justifyContent: 'center',
-    flexWrap: 'wrap'
-};
-
-const tabButtonStyle = {
-    padding: '10px 20px',
-    borderRadius: 8,
-    fontWeight: 600,
-    fontSize: 14,
-    cursor: 'pointer',
-    transition: 'all 0.2s ease',
-    border: '1px solid'
-};
-
-const profileHeaderStyle = {
-    padding: '22px',
-    marginBottom: '15px',
-    background: 'linear-gradient(135deg, #1e40af 0%, #2563eb 100%)',
-    color: 'white',
-    borderRadius: '18px',
-    border: '2px solid rgba(255,255,255,0.2)',
-};
-
-const headerContentStyle = {
-    display: 'flex',
-    gap: '24px',
-    alignItems: 'flex-start',
-};
-
-const leftSectionStyle = {
-    flex: 1,
-    display: 'flex',
-    gap: '20px',
-    alignItems: 'flex-start',
-};
-
-const rightSectionStyle = {
-    width: 480,
-    flexShrink: 0,
-};
-
-const avatarStyle = {
-    width: 80,
-    height: 80,
-    borderRadius: '50%',
-    overflow: 'hidden',
-    border: '4px solid rgba(255,255,255,0.3)',
-    flexShrink: 0,
-};
-
-const avatarImageStyle = {
-    width: '100%',
-    height: '100%',
-    objectFit: 'cover',
-};
-
-const avatarPlaceholderStyle = {
-    width: '100%',
-    height: '100%',
-    background: 'rgba(255,255,255,0.2)',
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-    fontSize: '32px',
-    fontWeight: 'bold',
-    color: 'white',
-};
-
-const profileInfoStyle = { flex: 1 };
-
-const profileNameStyle = {
-    margin: '0 0 6px 0',
-    fontSize: '28px',
-    fontWeight: '800',
-};
-
-const profileUsernameStyle = {
-    margin: '0 0 6px 0',
-    fontSize: '16px',
-    opacity: 0.9,
-};
-
-const profileEmailStyle = {
-    margin: '0 0 12px 0',
-    fontSize: '14px',
-    opacity: 0.8,
-};
-
-const creditsContainerStyle = { marginBottom: '16px' };
-const creditsTextStyle = {
-    display: 'inline-flex',
-    alignItems: 'center',
-    gap: '6px',
-    padding: '6px 12px',
-    fontSize: '14px',
-    fontWeight: '600',
-    borderRadius: '20px',
-    color: 'white',
-    background: 'rgba(255, 255, 255, 0.2)',
-    border: '1px solid rgba(255, 255, 255, 0.3)',
-    backdropFilter: 'blur(10px)',
-};
-
-const headerStatsStyle = {
-    display: 'flex',
-    alignItems: 'center',
-    gap: '24px',
-    flexWrap: 'wrap',
-    marginBottom: '16px',
-};
-const headerStatItemStyle = { textAlign: 'center' };
-const headerStatNumberStyle = { fontSize: '22px', fontWeight: '800', marginBottom: '2px' };
-const headerStatLabelStyle = { fontSize: '12px', opacity: 0.9, fontWeight: '600' };
-const actionsStyle = { display: 'flex', gap: '10px' };
-
-const editButtonStyle = {
-    padding: '10px 20px',
-    borderRadius: '6px',
-    border: '2px solid white',
-    background: 'transparent',
-    color: 'white',
-    fontWeight: '600',
-    cursor: 'pointer',
-    fontSize: '13px',
-    transition: 'all 0.2s ease',
-};
-const editButtonHoverStyle = { ...editButtonStyle, background: 'white', color: '#2563eb' };
-
-const contentStatsCardStyle = {
-    padding: '20px',
-    background: 'white',
-    borderRadius: '12px',
-    border: '1px solid rgba(255,255,255,0.3)',
-    boxShadow: '0 4px 20px rgba(0, 0, 0, 0.1)',
-    height: '100%',
-};
-
-const activityCardStyle = {
-    padding: '24px',
-    background: 'white',
-    borderRadius: '12px',
-    border: '1px solid #e2e8f0',
-    boxShadow: '0 4px 6px rgba(0, 0, 0, 0.05)',
-};
-
-const sectionTitleStyle = {
-    margin: '0 0 16px 0',
-    fontSize: '18px',
-    fontWeight: '700',
-    color: '#1e293b',
-    borderBottom: '1px solid #e2e8f0',
-    paddingBottom: '8px',
-};
-
-const contentStatsGridStyle = {
-    display: 'grid',
-    gridTemplateColumns: '1fr 1fr',
-    gap: '16px',
-};
-const contentStatItemStyle = {
-    textAlign: 'center',
-    padding: '20px 16px',
-    background: '#f8fafc',
-    borderRadius: '8px',
-    border: '1px solid #e2e8f0',
-};
-const contentStatNumberStyle = {
-    fontSize: '32px',
-    fontWeight: '800',
-    color: '#1e40af',
-    marginBottom: '6px',
-};
-const contentStatLabelStyle = { fontSize: '14px', color: '#64748b', fontWeight: '600' };
-
-const activityStyle = { display: 'grid', gap: '16px' };
-const notificationItemStyle = {
-    display: 'flex',
-    alignItems: 'flex-start',
-    gap: '12px',
-    padding: '16px',
-    background: 'white',
-    borderRadius: '8px',
-    border: '1px solid #e2e8f0',
-    marginBottom: '8px',
-    position: 'relative',
-    transition: 'all 0.2s ease',
-    cursor: 'pointer',
-};
-const notificationIconStyle = {
-    fontSize: '18px',
-    flexShrink: 0,
-    marginTop: '2px',
-    background: '#f1f5f9',
-    borderRadius: '6px',
-    width: '32px',
-    height: '32px',
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-};
-const notificationContentStyle = { flex: 1 };
-const notificationTextStyle = { fontWeight: '600', color: '#334155', fontSize: '14px', marginBottom: '4px' };
-const notificationTimeStyle = { fontSize: '12px', color: '#64748b' };
-const notificationBadgeStyle = {
-    background: '#dc2626',
-    color: 'white',
-    fontSize: '10px',
-    fontWeight: '700',
-    padding: '2px 6px',
-    borderRadius: '4px',
-    position: 'absolute',
-    top: '12px',
-    right: '12px',
-};
