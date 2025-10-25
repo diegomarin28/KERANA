@@ -11,3 +11,4 @@ Queremos ayudarlos para que puedan avanzar de forma más amena en sus carreras y
 - Orientar a los alumnos en la elección de profesores
 - Proveer de apuntes a los alumnos interesados
 
+# Build fix
