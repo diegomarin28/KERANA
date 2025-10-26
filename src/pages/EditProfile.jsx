@@ -1,14 +1,35 @@
 import { useEffect, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { supabase } from '../supabase';
-import { Card } from '../components/UI/Card';
-import { Button } from '../components/UI/Button';
+import { Card } from '../components/ui/Card';
+import { Button } from '../components/ui/Button';
 import { useAvatar } from '../contexts/AvatarContext';
+import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
+import {
+    faUser,
+    faLock,
+    faTrash,
+    faIdCard,
+    faAt,
+    faAlignLeft,
+    faCamera,
+    faCheck,
+    faTimes,
+    faUpload,
+    faExclamationTriangle,
+    faInfoCircle,
+    faCheckCircle,
+    faTimesCircle,
+    faCog
+} from '@fortawesome/free-solid-svg-icons';
+import { faLinkedin } from '@fortawesome/free-brands-svg-icons';
 
 export default function EditProfile() {
     const [formData, setFormData] = useState({
         nombre: '',
         username: '',
+        bio: '',
+        linkedin: '',
     });
     const [passwordData, setPasswordData] = useState({
         currentPassword: '',
@@ -44,7 +65,7 @@ export default function EditProfile() {
 
             const { data, error } = await supabase
                 .from('usuario')
-                .select('nombre, username, fecha_creado, last_username_change')
+                .select('nombre, username, bio, linkedin, fecha_creado, last_username_change')
                 .eq('correo', user.email)
                 .single();
 
@@ -53,6 +74,8 @@ export default function EditProfile() {
             setFormData({
                 nombre: data.nombre || '',
                 username: data.username || '',
+                bio: data.bio || '',
+                linkedin: data.linkedin || '',
                 originalUsername: data.username || '',
             });
 
@@ -94,6 +117,8 @@ export default function EditProfile() {
 
             const updateData = {
                 nombre: formData.nombre.trim(),
+                bio: formData.bio.trim(),
+                linkedin: formData.linkedin.trim(),
             };
 
             if (changedUsername) {
@@ -141,7 +166,6 @@ export default function EditProfile() {
         setMessage({ type: '', text: '' });
 
         try {
-            // Validaciones
             if (!passwordData.currentPassword) {
                 setMessage({ type: 'error', text: 'Debes ingresar tu contraseña actual' });
                 return;
@@ -157,7 +181,6 @@ export default function EditProfile() {
                 return;
             }
 
-            // Verificar contraseña actual reautenticando
             const { data: { user } } = await supabase.auth.getUser();
 
             const { error: signInError } = await supabase.auth.signInWithPassword({
@@ -170,7 +193,6 @@ export default function EditProfile() {
                 return;
             }
 
-            // Cambiar contraseña
             const { error } = await supabase.auth.updateUser({
                 password: passwordData.newPassword
             });
@@ -179,7 +201,6 @@ export default function EditProfile() {
 
             setMessage({ type: 'success', text: 'Contraseña actualizada correctamente' });
 
-            // Limpiar formulario
             setPasswordData({
                 currentPassword: '',
                 newPassword: '',
@@ -199,14 +220,12 @@ export default function EditProfile() {
     };
 
     const handleDeleteAccount = async () => {
-        // SOLO muestra el modal de confirmación
         setMessage({
             type: 'delete_confirmation',
             text: '¿Estás seguro de que querés eliminar tu cuenta? Esta acción no se puede deshacer.'
         });
     };
 
-    // NUEVA FUNCIÓN: Confirmar eliminación después del modal
     const confirmDeleteAccount = async () => {
         setSaving(true);
         setMessage({ type: '', text: '' });
@@ -215,9 +234,6 @@ export default function EditProfile() {
             const { data: { user } } = await supabase.auth.getUser();
             if (!user) throw new Error('No hay usuario logueado');
 
-            console.log('🔍 Usuario Auth:', user.id);
-
-            // Obtener el ID numérico del usuario
             const { data: usuarioData, error: usuarioError } = await supabase
                 .from('usuario')
                 .select('id_usuario')
@@ -229,23 +245,15 @@ export default function EditProfile() {
             }
 
             const usuarioId = usuarioData.id_usuario;
-            console.log('🔍 ID Usuario encontrado:', usuarioId);
-
-            // 1. ELIMINAR DATOS RELACIONADOS
-            console.log('🗑️ Eliminando datos relacionados...');
 
             const deleteOperations = [
-                // Tablas que usan id_usuario (BIGINT)
                 supabase.from('apunte_fav').delete().eq('id_usuario', usuarioId),
                 supabase.from('usuario_fav').delete().eq('id_usuario', usuarioId),
                 supabase.from('apunte').delete().eq('id_usuario', usuarioId),
-
-                // Tablas que usan user_id/auth_id (UUID)
                 supabase.from('rating').delete().eq('user_id', user.id),
                 supabase.from('mentor_aplicacion').delete().eq('id_usuario', user.id),
             ];
 
-            // Agregar eliminaciones de mentor si existe
             const { data: mentorData } = await supabase
                 .from('mentor')
                 .select('id_mentor')
@@ -260,45 +268,21 @@ export default function EditProfile() {
                 );
             }
 
-            const results = await Promise.allSettled(deleteOperations);
+            await Promise.allSettled(deleteOperations);
 
-            // Verificar errores pero continuar de todas formas
-            const errors = results.filter(result => result.status === 'rejected');
-            if (errors.length > 0) {
-                console.warn('⚠️ Algunas eliminaciones fallaron:', errors);
-            }
-
-            // 2. ELIMINAR USUARIO DE TU TABLA
-            console.log('🗑️ Eliminando usuario de la base...');
             const { error: deleteError } = await supabase
                 .from('usuario')
                 .delete()
                 .eq('auth_id', user.id);
 
             if (deleteError) {
-                console.error('❌ Error eliminando usuario:', deleteError);
                 throw new Error('No se pudo eliminar tu cuenta de la base de datos');
             }
 
-            // 3. CERRAR SESIÓN (NO podemos eliminar de Auth desde frontend)
-            console.log('🚪 Cerrando sesión...');
             await supabase.auth.signOut();
-
-            // Intentar eliminar el usuario de Auth (puede fallar en frontend)
-            try {
-                const { error: deleteAuthError } = await supabase.auth.admin.deleteUser(user.id);
-                if (deleteAuthError) {
-                    console.log('⚠️ No se pudo eliminar de Auth (normal en frontend):', deleteAuthError);
-                } else {
-                    console.log('✅ Usuario eliminado de Auth');
-                }
-            } catch (authError) {
-                console.log('⚠️ Eliminación de Auth falló (esperado en frontend)');
-            }
 
             setMessage({ type: 'success', text: 'Cuenta eliminada correctamente. Redirigiendo...' });
 
-            // Limpiar localStorage
             localStorage.removeItem('kerana_username_cache');
             localStorage.removeItem('kerana_name_cache');
             localStorage.removeItem('kerana_remember');
@@ -306,7 +290,7 @@ export default function EditProfile() {
             setTimeout(() => navigate('/'), 2000);
 
         } catch (err) {
-            console.error('❌ Error eliminando cuenta:', err);
+            console.error('Error eliminando cuenta:', err);
             setMessage({
                 type: 'error',
                 text: 'Cuenta parcialmente eliminada. Contacta soporte para eliminación completa.'
@@ -316,7 +300,6 @@ export default function EditProfile() {
         }
     };
 
-    // Función para cancelar eliminación
     const cancelDelete = () => {
         setMessage({ type: '', text: '' });
     };
@@ -326,7 +309,7 @@ export default function EditProfile() {
             <div style={pageStyle}>
                 <div style={centerStyle}>
                     <div style={spinnerStyle}></div>
-                    <p style={{ marginTop: 16, color: '#64748b' }}>Cargando...</p>
+                    <p style={{ marginTop: 16, color: '#64748b', fontFamily: 'Inter, sans-serif' }}>Cargando...</p>
                 </div>
             </div>
         );
@@ -336,29 +319,34 @@ export default function EditProfile() {
         <div style={pageStyle}>
             <div style={{ maxWidth: 600, margin: '0 auto' }}>
                 <div style={headerStyle}>
-                    <h1 style={titleStyle}>Configuración de Perfil</h1>
+                    <h1 style={titleStyle}>
+                        <FontAwesomeIcon icon={faCog} style={{ marginRight: 8 }} />
+                        Configuración de Perfil
+                    </h1>
                     <p style={subtitleStyle}>Gestioná tu información personal, contraseña y cuenta</p>
                 </div>
 
-                {/* Tabs */}
                 <div style={tabsContainerStyle}>
                     <button
                         onClick={() => setActiveTab('profile')}
                         style={activeTab === 'profile' ? activeTabStyle : tabStyle}
                     >
-                        👤 Información Personal
+                        <FontAwesomeIcon icon={faUser} style={{ marginRight: 6 }} />
+                        Información Personal
                     </button>
                     <button
                         onClick={() => setActiveTab('password')}
                         style={activeTab === 'password' ? activeTabStyle : tabStyle}
                     >
-                        🔐 Contraseña
+                        <FontAwesomeIcon icon={faLock} style={{ marginRight: 6 }} />
+                        Contraseña
                     </button>
                     <button
                         onClick={() => setActiveTab('delete')}
                         style={activeTab === 'delete' ? activeTabStyle : tabStyle}
                     >
-                        🗑️ Eliminar Cuenta
+                        <FontAwesomeIcon icon={faTrash} style={{ marginRight: 6 }} />
+                        Eliminar Cuenta
                     </button>
                 </div>
 
@@ -369,85 +357,136 @@ export default function EditProfile() {
                             background: message.type === 'success' ? '#dcfce7' : '#fee2e2',
                             color: message.type === 'success' ? '#166534' : '#991b1b',
                         }}>
+                            <FontAwesomeIcon
+                                icon={message.type === 'success' ? faCheckCircle : faTimesCircle}
+                                style={{ marginRight: 8 }}
+                            />
                             {message.text}
                         </div>
                     )}
 
                     {activeTab === 'profile' && (
                         <>
-                        <div style={{ marginBottom: 24 }}>
-                            <AvatarChangeInline />
-                        </div>
-                        <form onSubmit={handleProfileSubmit} style={formStyle}>
-
-                        <div style={inputGroupStyle}>
-                                <label style={labelStyle}>Nombre completo</label>
-                                <input
-                                    type="text"
-                                    value={formData.nombre}
-                                    onChange={(e) => setFormData(prev => ({
-                                        ...prev,
-                                        nombre: e.target.value
-                                    }))}
-                                    style={inputStyle}
-                                    placeholder="Tu nombre completo"
-                                    required
-                                />
+                            <div style={{ marginBottom: 24 }}>
+                                <AvatarChangeInline />
                             </div>
+                            <form onSubmit={handleProfileSubmit} style={formStyle}>
 
-                            <div style={inputGroupStyle}>
-                                <label style={labelStyle}>
-                                    Usuario
-                                    {!canChangeUsername && (
-                                        <span style={warningStyle}>
+                                <div style={inputGroupStyle}>
+                                    <label style={labelStyle}>
+                                        <FontAwesomeIcon icon={faIdCard} style={{ marginRight: 6 }} />
+                                        Nombre completo
+                                    </label>
+                                    <input
+                                        type="text"
+                                        value={formData.nombre}
+                                        onChange={(e) => setFormData(prev => ({
+                                            ...prev,
+                                            nombre: e.target.value
+                                        }))}
+                                        style={inputStyle}
+                                        placeholder="Tu nombre completo"
+                                        required
+                                    />
+                                </div>
+
+                                <div style={inputGroupStyle}>
+                                    <label style={labelStyle}>
+                                        <FontAwesomeIcon icon={faAt} style={{ marginRight: 6 }} />
+                                        Usuario
+                                        {!canChangeUsername && (
+                                            <span style={warningStyle}>
                                             (Podrás cambiar nuevamente en 7 días)
                                         </span>
+                                        )}
+                                    </label>
+                                    <input
+                                        type="text"
+                                        value={formData.username}
+                                        onChange={(e) => setFormData(prev => ({
+                                            ...prev,
+                                            username: e.target.value.toLowerCase()
+                                        }))}
+                                        style={inputStyle}
+                                        placeholder="nombredeusuario"
+                                        disabled={!canChangeUsername}
+                                        required
+                                    />
+                                    {!canChangeUsername && (
+                                        <p style={helpTextStyle}>
+                                            El nombre de usuario solo se puede cambiar una vez por semana.
+                                        </p>
                                     )}
-                                </label>
-                                <input
-                                    type="text"
-                                    value={formData.username}
-                                    onChange={(e) => setFormData(prev => ({
-                                        ...prev,
-                                        username: e.target.value.toLowerCase()
-                                    }))}
-                                    style={inputStyle}
-                                    placeholder="nombredeusuario"
-                                    disabled={!canChangeUsername}
-                                    required
-                                />
-                                {!canChangeUsername && (
-                                    <p style={helpTextStyle}>
-                                        El nombre de usuario solo se puede cambiar una vez por semana.
-                                    </p>
-                                )}
-                            </div>
+                                </div>
 
-                            <div style={buttonsStyle}>
-                                <Button
-                                    type="submit"
-                                    disabled={saving}
-                                    style={{ flex: 1 }}
-                                >
-                                    {saving ? 'Guardando...' : 'Guardar Cambios'}
-                                </Button>
-                                <Button
-                                    type="button"
-                                    variant="outline"
-                                    onClick={() => navigate('/profile')}
-                                    style={{ flex: 1 }}
-                                >
-                                    Cancelar
-                                </Button>
-                            </div>
-                        </form>
+                                <div style={inputGroupStyle}>
+                                    <label style={labelStyle}>
+                                        <FontAwesomeIcon icon={faAlignLeft} style={{ marginRight: 6 }} />
+                                        Biografía
+                                    </label>
+                                    <textarea
+                                        value={formData.bio}
+                                        onChange={(e) => setFormData(prev => ({
+                                            ...prev,
+                                            bio: e.target.value
+                                        }))}
+                                        style={{...inputStyle, minHeight: 100, resize: 'vertical', fontFamily: 'Inter, sans-serif'}}
+                                        placeholder="Contanos un poco sobre vos..."
+                                        maxLength={500}
+                                    />
+                                    <p style={helpTextStyle}>
+                                        {formData.bio.length}/500 caracteres
+                                    </p>
+                                </div>
+
+                                <div style={inputGroupStyle}>
+                                    <label style={labelStyle}>
+                                        <FontAwesomeIcon icon={faLinkedin} style={{ marginRight: 6 }} />
+                                        LinkedIn
+                                    </label>
+                                    <input
+                                        type="url"
+                                        value={formData.linkedin}
+                                        onChange={(e) => setFormData(prev => ({
+                                            ...prev,
+                                            linkedin: e.target.value
+                                        }))}
+                                        style={inputStyle}
+                                        placeholder="https://linkedin.com/in/tu-perfil"
+                                    />
+                                    <p style={helpTextStyle}>
+                                        URL completa de tu perfil de LinkedIn
+                                    </p>
+                                </div>
+
+                                <div style={buttonsStyle}>
+                                    <Button
+                                        type="submit"
+                                        disabled={saving}
+                                        style={{ flex: 1 }}
+                                    >
+                                        {saving ? 'Guardando...' : 'Guardar Cambios'}
+                                    </Button>
+                                    <Button
+                                        type="button"
+                                        variant="outline"
+                                        onClick={() => navigate('/profile')}
+                                        style={{ flex: 1 }}
+                                    >
+                                        Cancelar
+                                    </Button>
+                                </div>
+                            </form>
                         </>
                     )}
 
                     {activeTab === 'password' && (
                         <form onSubmit={handlePasswordSubmit} style={formStyle}>
                             <div style={inputGroupStyle}>
-                                <label style={labelStyle}>Contraseña actual</label>
+                                <label style={labelStyle}>
+                                    <FontAwesomeIcon icon={faLock} style={{ marginRight: 6 }} />
+                                    Contraseña actual
+                                </label>
                                 <input
                                     type="password"
                                     value={passwordData.currentPassword}
@@ -462,7 +501,10 @@ export default function EditProfile() {
                             </div>
 
                             <div style={inputGroupStyle}>
-                                <label style={labelStyle}>Nueva contraseña</label>
+                                <label style={labelStyle}>
+                                    <FontAwesomeIcon icon={faLock} style={{ marginRight: 6 }} />
+                                    Nueva contraseña
+                                </label>
                                 <input
                                     type="password"
                                     value={passwordData.newPassword}
@@ -477,7 +519,10 @@ export default function EditProfile() {
                             </div>
 
                             <div style={inputGroupStyle}>
-                                <label style={labelStyle}>Confirmar nueva contraseña</label>
+                                <label style={labelStyle}>
+                                    <FontAwesomeIcon icon={faCheck} style={{ marginRight: 6 }} />
+                                    Confirmar nueva contraseña
+                                </label>
                                 <input
                                     type="password"
                                     value={passwordData.confirmPassword}
@@ -493,7 +538,8 @@ export default function EditProfile() {
 
                             <div style={passwordHelpStyle}>
                                 <p style={helpTextStyle}>
-                                    💡 <strong>Requisitos de contraseña:</strong>
+                                    <FontAwesomeIcon icon={faInfoCircle} style={{ marginRight: 6 }} />
+                                    <strong>Requisitos de contraseña:</strong>
                                 </p>
                                 <ul style={helpListStyle}>
                                     <li>Mínimo 6 caracteres</li>
@@ -521,13 +567,14 @@ export default function EditProfile() {
                         </form>
                     )}
 
-                    {/*Aca arranca lo de eliminar cuenta*/}
                     {activeTab === 'delete' && (
                         <div style={deleteSectionStyle}>
                             {message.type === 'delete_confirmation' ? (
-                                // VISTA DE CONFIRMACIÓN (NO modal)
                                 <div style={confirmationSectionStyle}>
-                                    <h3 style={warningTitleStyle}>⚠️ Confirmar Eliminación</h3>
+                                    <h3 style={warningTitleStyle}>
+                                        <FontAwesomeIcon icon={faExclamationTriangle} style={{ marginRight: 8 }} />
+                                        Confirmar Eliminación
+                                    </h3>
                                     <p style={warningTextStyle}>
                                         ¿Estás seguro de que querés eliminar tu cuenta? Esta acción no se puede deshacer.
                                     </p>
@@ -556,9 +603,11 @@ export default function EditProfile() {
                                     </div>
                                 </div>
                             ) : (
-// VISTA NORMAL DE ELIMINACIÓN - SOLO EL BOTÓN ROJO
                                 <div style={warningSectionStyle}>
-                                    <h3 style={warningTitleStyle}>⚠️ Eliminar Cuenta Permanentemente</h3>
+                                    <h3 style={warningTitleStyle}>
+                                        <FontAwesomeIcon icon={faExclamationTriangle} style={{ marginRight: 8 }} />
+                                        Eliminar Cuenta Permanentemente
+                                    </h3>
                                     <p style={warningTextStyle}>
                                         Esta acción <strong>no se puede deshacer</strong>. Se eliminarán todos tus datos:
                                     </p>
@@ -580,6 +629,7 @@ export default function EditProfile() {
                                             onMouseEnter={(e) => e.target.style.background = '#b91c1c'}
                                             onMouseLeave={(e) => e.target.style.background = '#dc2626'}
                                         >
+                                            <FontAwesomeIcon icon={faTrash} style={{ marginRight: 8 }} />
                                             Eliminar mi cuenta
                                         </button>
                                     </div>
@@ -624,7 +674,6 @@ function AvatarChangeInline() {
 
             setCurrentAvatar(profile.foto);
 
-            // Obtener cambios en los últimos 7 días
             const sevenDaysAgo = new Date();
             sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
 
@@ -659,11 +708,11 @@ function AvatarChangeInline() {
         const file = e.target.files?.[0];
         if (!file) return;
         if (!file.type.startsWith("image/")) {
-            setMessage("❌ Debe ser una imagen");
+            setMessage("Debe ser una imagen");
             return;
         }
         if (file.size > 5 * 1024 * 1024) {
-            setMessage("❌ Máximo 5MB");
+            setMessage("Máximo 5MB");
             return;
         }
         const fr = new FileReader();
@@ -674,11 +723,11 @@ function AvatarChangeInline() {
 
     const onClickSubir = () => {
         if (!canChange) {
-            setMessage("❌ Debes esperar para cambiar tu foto");
+            setMessage("Debes esperar para cambiar tu foto");
             return;
         }
         if (!preview) {
-            setMessage("❌ Elegí una imagen primero");
+            setMessage("Elegí una imagen primero");
             return;
         }
         setOpenConfirm(true);
@@ -702,7 +751,6 @@ function AvatarChangeInline() {
                 .maybeSingle();
             if (perErr || !perfil) throw new Error("Perfil no encontrado");
 
-            // Subir al bucket 'avatars'
             const ext = file.name.split(".").pop();
             const fileName = `${user.id}/avatar-${Date.now()}.${ext}`;
             const { error: upErr } = await supabase.storage
@@ -710,18 +758,15 @@ function AvatarChangeInline() {
                 .upload(fileName, file, { cacheControl: "3600", upsert: false });
             if (upErr) throw upErr;
 
-            // URL pública
             const { data: pub } = supabase.storage.from("avatars").getPublicUrl(fileName);
             const publicUrl = pub?.publicUrl || "";
 
-            // Update BD
             const { error: updErr } = await supabase
                 .from("usuario")
                 .update({ foto: publicUrl })
                 .eq("id_usuario", perfil.id_usuario);
             if (updErr) throw updErr;
 
-            // Registrar cambio
             await supabase
                 .from('avatar_changes')
                 .insert({
@@ -730,7 +775,6 @@ function AvatarChangeInline() {
                     new_photo: publicUrl
                 });
 
-            // Eliminar anterior (si era del mismo bucket)
             if (perfil.foto && perfil.foto.includes("/storage/v1/object/public/avatars/")) {
                 const oldPath = perfil.foto.split("/avatars/")[1];
                 if (oldPath) {
@@ -741,22 +785,19 @@ function AvatarChangeInline() {
             setCurrentAvatar(publicUrl);
             setPreview(null);
             setOpenConfirm(false);
-            setMessage("✅ Avatar actualizado");
+            setMessage("Avatar actualizado");
 
-            // Actualizar contexto
             updateAvatar(publicUrl);
 
-            // Recargar status
             setTimeout(() => {
                 checkAvatarStatus();
                 setMessage("");
-                // Limpiar input
                 const el = document.getElementById("avatar-upload-inline");
                 if (el) el.value = "";
             }, 1500);
         } catch (e) {
             console.error(e);
-            setMessage(`❌ ${e.message}`);
+            setMessage(`Error: ${e.message}`);
         } finally {
             setUploading(false);
         }
@@ -774,11 +815,11 @@ function AvatarChangeInline() {
 
     return (
         <div style={{ marginBottom: 28 }}>
-            <label style={{ fontWeight: 700, color: "#0f172a", fontSize: 15, display: "block", marginBottom: 12 }}>
-                📸 Foto de perfil
+            <label style={{ fontWeight: 700, color: "#0f172a", fontSize: 15, display: "block", marginBottom: 12, fontFamily: 'Inter, sans-serif' }}>
+                <FontAwesomeIcon icon={faCamera} style={{ marginRight: 6 }} />
+                Foto de perfil
             </label>
 
-            {/* Avatar actual + info */}
             <div style={{
                 display: "flex",
                 alignItems: "center",
@@ -834,29 +875,29 @@ function AvatarChangeInline() {
                 </div>
 
                 <div style={{ flex: 1 }}>
-                    <div style={{ fontSize: 14, fontWeight: 600, color: "#0f172a", marginBottom: 6 }}>
-                        {preview ? '🔍 Vista previa' : '📷 Foto actual'}
+                    <div style={{ fontSize: 14, fontWeight: 600, color: "#0f172a", marginBottom: 6, fontFamily: 'Inter, sans-serif' }}>
+                        {preview ? 'Vista previa' : 'Foto actual'}
                     </div>
-                    <div style={{ fontSize: 12, color: "#64748b", marginBottom: 4 }}>
+                    <div style={{ fontSize: 12, color: "#64748b", marginBottom: 4, fontFamily: 'Inter, sans-serif' }}>
                         {canChange ? (
                             <span style={{ color: '#10b981', fontWeight: 600 }}>
-                                ✅ {changesLeft} {changesLeft === 1 ? 'cambio disponible' : 'cambios disponibles'}
+                                <FontAwesomeIcon icon={faCheck} style={{ marginRight: 4 }} />
+                                {changesLeft} {changesLeft === 1 ? 'cambio disponible' : 'cambios disponibles'}
                             </span>
                         ) : (
                             <span style={{ color: '#ef4444', fontWeight: 600 }}>
-                                ⏳ Próximo cambio: {nextChangeDate ? formatDate(nextChangeDate) : 'Calculando...'}
+                                Próximo cambio: {nextChangeDate ? formatDate(nextChangeDate) : 'Calculando...'}
                             </span>
                         )}
                     </div>
                     {preview && (
-                        <div style={{ fontSize: 11, color: '#6b7280', fontStyle: 'italic' }}>
-                            👆 Hacé click en la imagen para verla en grande
+                        <div style={{ fontSize: 11, color: '#6b7280', fontStyle: 'italic', fontFamily: 'Inter, sans-serif' }}>
+                            Hacé click en la imagen para verla en grande
                         </div>
                     )}
                 </div>
             </div>
 
-            {/* Información de límites */}
             <div style={{
                 padding: '12px 14px',
                 background: '#eff6ff',
@@ -866,9 +907,11 @@ function AvatarChangeInline() {
                 fontSize: 12,
                 color: '#1e40af',
                 lineHeight: 1.6,
+                fontFamily: 'Inter, sans-serif'
             }}>
                 <div style={{ fontWeight: 700, marginBottom: 6, display: 'flex', alignItems: 'center', gap: 6 }}>
-                    ℹ️ Límites de cambio
+                    <FontAwesomeIcon icon={faInfoCircle} />
+                    Límites de cambio
                 </div>
                 <div style={{ paddingLeft: 8 }}>
                     • Podés cambiar tu foto <strong>2 veces</strong><br />
@@ -882,18 +925,18 @@ function AvatarChangeInline() {
                     padding: '10px 14px',
                     marginBottom: 14,
                     borderRadius: 8,
-                    background: message.includes("✅") ? "#d1fae5" : "#fee2e2",
-                    color: message.includes("✅") ? "#065f46" : "#991b1b",
+                    background: message.includes("actualizado") ? "#d1fae5" : "#fee2e2",
+                    color: message.includes("actualizado") ? "#065f46" : "#991b1b",
                     fontSize: 13,
                     fontWeight: 600,
                     textAlign: "center",
-                    border: `2px solid ${message.includes("✅") ? "#6ee7b7" : "#fecaca"}`,
+                    border: `2px solid ${message.includes("actualizado") ? "#6ee7b7" : "#fecaca"}`,
+                    fontFamily: 'Inter, sans-serif'
                 }}>
                     {message}
                 </div>
             )}
 
-            {/* Input + Botones */}
             <div style={{ display: "flex", gap: 10, alignItems: "stretch" }}>
                 <input
                     id="avatar-upload-inline"
@@ -910,6 +953,7 @@ function AvatarChangeInline() {
                         background: canChange && !uploading ? "#fff" : "#f3f4f6",
                         cursor: canChange && !uploading ? "pointer" : "not-allowed",
                         opacity: canChange && !uploading ? 1 : 0.6,
+                        fontFamily: 'Inter, sans-serif'
                     }}
                 />
                 {preview && (
@@ -931,11 +975,13 @@ function AvatarChangeInline() {
                             borderRadius: 8,
                             cursor: "pointer",
                             transition: "all 0.2s ease",
+                            fontFamily: 'Inter, sans-serif'
                         }}
                         onMouseEnter={(e) => e.target.style.background = "#f9fafb"}
                         onMouseLeave={(e) => e.target.style.background = "#fff"}
                     >
-                        ✕ Cancelar
+                        <FontAwesomeIcon icon={faTimes} style={{ marginRight: 4 }} />
+                        Cancelar
                     </button>
                 )}
                 <button
@@ -952,6 +998,7 @@ function AvatarChangeInline() {
                         borderRadius: 8,
                         cursor: (!preview || uploading || !canChange) ? "not-allowed" : "pointer",
                         transition: "all 0.2s ease",
+                        fontFamily: 'Inter, sans-serif'
                     }}
                     onMouseEnter={(e) => {
                         if (preview && !uploading && canChange) {
@@ -964,11 +1011,11 @@ function AvatarChangeInline() {
                         }
                     }}
                 >
-                    {uploading ? "⏳ Subiendo..." : "📤 Subir"}
+                    <FontAwesomeIcon icon={faUpload} style={{ marginRight: 4 }} />
+                    {uploading ? "Subiendo..." : "Subir"}
                 </button>
             </div>
 
-            {/* Modal de confirmación */}
             {openConfirm && preview && (
                 <div
                     onClick={() => !uploading && setOpenConfirm(false)}
@@ -994,10 +1041,12 @@ function AvatarChangeInline() {
                             textAlign: "center",
                             boxShadow: "0 20px 60px rgba(0,0,0,0.3)",
                             cursor: "default",
+                            fontFamily: 'Inter, sans-serif'
                         }}
                     >
                         <div style={{ fontSize: 18, fontWeight: 700, marginBottom: 16, color: "#0f172a" }}>
-                            ⚠️ Confirmar nuevo avatar
+                            <FontAwesomeIcon icon={faExclamationTriangle} style={{ marginRight: 8, color: '#f59e0b' }} />
+                            Confirmar nuevo avatar
                         </div>
                         <div style={{
                             width: 120,
@@ -1014,7 +1063,8 @@ function AvatarChangeInline() {
                             ¿Estás seguro que querés cambiar tu foto de perfil?
                             {changesLeft <= 1 && (
                                 <span style={{ display: "block", marginTop: 8, color: "#ef4444", fontWeight: 600 }}>
-                                    ⚠️ Te {changesLeft === 1 ? "queda 1 cambio" : "quedan 0 cambios"} disponible{changesLeft !== 1 ? "s" : ""}
+                                    <FontAwesomeIcon icon={faExclamationTriangle} style={{ marginRight: 4 }} />
+                                    Te {changesLeft === 1 ? "queda 1 cambio" : "quedan 0 cambios"} disponible{changesLeft !== 1 ? "s" : ""}
                                 </span>
                             )}
                         </p>
@@ -1033,8 +1083,10 @@ function AvatarChangeInline() {
                                     borderRadius: 8,
                                     cursor: uploading ? "not-allowed" : "pointer",
                                     opacity: uploading ? 0.5 : 1,
+                                    fontFamily: 'Inter, sans-serif'
                                 }}
                             >
+                                <FontAwesomeIcon icon={faTimes} style={{ marginRight: 4 }} />
                                 Cancelar
                             </button>
                             <button
@@ -1050,16 +1102,17 @@ function AvatarChangeInline() {
                                     border: "none",
                                     borderRadius: 8,
                                     cursor: uploading ? "not-allowed" : "pointer",
+                                    fontFamily: 'Inter, sans-serif'
                                 }}
                             >
-                                {uploading ? "⏳ Subiendo..." : "✅ Confirmar"}
+                                <FontAwesomeIcon icon={faCheck} style={{ marginRight: 4 }} />
+                                {uploading ? "Subiendo..." : "Confirmar"}
                             </button>
                         </div>
                     </div>
                 </div>
             )}
 
-            {/* Modal para ver imagen grande */}
             {showFullImage && (currentAvatar || preview) && (
                 <div
                     onClick={() => setShowFullImage(false)}
@@ -1105,7 +1158,7 @@ function AvatarChangeInline() {
                             onMouseEnter={(e) => e.target.style.background = "rgba(255, 255, 255, 0.3)"}
                             onMouseLeave={(e) => e.target.style.background = "rgba(255, 255, 255, 0.2)"}
                         >
-                            ✕
+                            <FontAwesomeIcon icon={faTimes} />
                         </button>
                         <img
                             src={preview || currentAvatar}
@@ -1124,11 +1177,11 @@ function AvatarChangeInline() {
     );
 }
 
-// Estilos
 const pageStyle = {
     minHeight: '100vh',
     background: 'linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%)',
     padding: '20px 16px',
+    fontFamily: 'Inter, sans-serif',
 };
 
 const centerStyle = {
@@ -1158,12 +1211,14 @@ const titleStyle = {
     fontWeight: '800',
     color: '#0b1e3a',
     margin: '0 0 8px 0',
+    fontFamily: 'Inter, sans-serif',
 };
 
 const subtitleStyle = {
     fontSize: '16px',
     color: '#64748b',
     margin: 0,
+    fontFamily: 'Inter, sans-serif',
 };
 
 const tabsContainerStyle = {
@@ -1187,6 +1242,7 @@ const tabStyle = {
     color: '#64748b',
     transition: 'all 0.2s ease',
     fontSize: '14px',
+    fontFamily: 'Inter, sans-serif',
 };
 
 const activeTabStyle = {
@@ -1215,6 +1271,7 @@ const labelStyle = {
     fontWeight: '600',
     color: '#374151',
     fontSize: '14px',
+    fontFamily: 'Inter, sans-serif',
 };
 
 const inputStyle = {
@@ -1224,6 +1281,7 @@ const inputStyle = {
     fontSize: '15px',
     background: '#fff',
     transition: 'border-color 0.2s',
+    fontFamily: 'Inter, sans-serif',
 };
 
 const warningStyle = {
@@ -1237,6 +1295,7 @@ const helpTextStyle = {
     fontSize: '12px',
     color: '#6b7280',
     margin: '4px 0 0 0',
+    fontFamily: 'Inter, sans-serif',
 };
 
 const passwordHelpStyle = {
@@ -1251,6 +1310,7 @@ const helpListStyle = {
     paddingLeft: '16px',
     color: '#6b7280',
     fontSize: '12px',
+    fontFamily: 'Inter, sans-serif',
 };
 
 const messageStyle = {
@@ -1259,6 +1319,7 @@ const messageStyle = {
     textAlign: 'center',
     fontWeight: '500',
     marginBottom: '24px',
+    fontFamily: 'Inter, sans-serif',
 };
 
 const buttonsStyle = {
@@ -1267,7 +1328,6 @@ const buttonsStyle = {
     marginTop: '8px',
 };
 
-// Nuevos estilos para la sección de eliminar cuenta
 const deleteSectionStyle = {
     display: 'grid',
     gap: '24px',
@@ -1286,12 +1346,14 @@ const warningTitleStyle = {
     color: '#dc2626',
     margin: '0 0 16px 0',
     textAlign: 'center',
+    fontFamily: 'Inter, sans-serif',
 };
 
 const warningTextStyle = {
     color: '#7f1d1d',
     margin: '0 0 12px 0',
     lineHeight: '1.5',
+    fontFamily: 'Inter, sans-serif',
 };
 
 const warningListStyle = {
@@ -1299,6 +1361,7 @@ const warningListStyle = {
     paddingLeft: '20px',
     margin: '12px 0',
     lineHeight: '1.6',
+    fontFamily: 'Inter, sans-serif',
 };
 
 const confirmationSectionStyle = {
@@ -1308,7 +1371,6 @@ const confirmationSectionStyle = {
     border: '1px solid #fecaca',
     textAlign: 'center',
 };
-
 
 const singleButtonStyle = {
     display: 'flex',
@@ -1327,6 +1389,7 @@ const deleteButtonStyle = {
     fontSize: '16px',
     transition: 'all 0.2s ease',
     minWidth: '200px',
+    fontFamily: 'Inter, sans-serif',
 };
 
 const deleteButtonDisabledStyle = {
@@ -1347,6 +1410,7 @@ const cancelButtonStyle = {
     fontSize: '16px',
     transition: 'all 0.2s ease',
     flex: 1,
+    fontFamily: 'Inter, sans-serif',
 };
 
 const modalButtonsStyle = {

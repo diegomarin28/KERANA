@@ -3,19 +3,20 @@ import { useNavigate } from 'react-router-dom';
 import { supabase } from '../supabase';
 import { Card } from '../components/UI/Card';
 import { FollowersList } from '../components/FollowersList';
+import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
+import { faUsers, faUserCheck, faArrowLeft } from '@fortawesome/free-solid-svg-icons';
 
 export default function FollowersPage() {
     const [userId, setUserId] = useState(null);
     const [loading, setLoading] = useState(true);
     const [tab, setTab] = useState('me-siguen');
-    const [counts, setCounts] = useState({ seguidores: 0, siguiendo: 0 }); // ← MOVER ACÁ
+    const [counts, setCounts] = useState({ seguidores: 0, siguiendo: 0 });
     const navigate = useNavigate();
 
     useEffect(() => {
         fetchUserId();
     }, []);
 
-    // ← MOVER ACÁ (antes del if loading)
     useEffect(() => {
         if (!userId) return;
 
@@ -71,7 +72,7 @@ export default function FollowersPage() {
             <div style={pageStyle}>
                 <div style={centerStyle}>
                     <div style={spinnerStyle}></div>
-                    <p style={{ marginTop: 16, color: '#64748b' }}>Cargando...</p>
+                    <p style={{ marginTop: 16, color: '#64748b', fontFamily: 'Inter, sans-serif' }}>Cargando...</p>
                 </div>
             </div>
         );
@@ -86,7 +87,8 @@ export default function FollowersPage() {
                         onClick={() => navigate('/profile')}
                         style={backButtonStyle}
                     >
-                        ← Volver
+                        <FontAwesomeIcon icon={faArrowLeft} style={{ marginRight: 8 }} />
+                        Volver
                     </button>
                     <h1 style={titleStyle}>Seguidores</h1>
                 </div>
@@ -94,8 +96,18 @@ export default function FollowersPage() {
                 {/* Tabs */}
                 <div style={tabsStyle}>
                     {[
-                        { id: 'me-siguen', label: `💥 Seguidores (${counts.seguidores})` },
-                        { id: 'sigo', label: `✔️ Seguidos (${counts.siguiendo})` }
+                        {
+                            id: 'me-siguen',
+                            label: 'Seguidores',
+                            icon: faUsers,
+                            count: counts.seguidores
+                        },
+                        {
+                            id: 'sigo',
+                            label: 'Siguiendo',
+                            icon: faUserCheck,
+                            count: counts.siguiendo
+                        }
                     ].map(t => (
                         <button
                             key={t.id}
@@ -104,10 +116,11 @@ export default function FollowersPage() {
                                 ...tabButtonStyle,
                                 background: tab === t.id ? '#2563EB' : 'white',
                                 color: tab === t.id ? 'white' : '#374151',
-                                border: tab === t.id ? '1px solid #2563EB' : '1px solid #D1D5DB'
+                                border: tab === t.id ? '2px solid #2563EB' : '2px solid #D1D5DB'
                             }}
                         >
-                            {t.label}
+                            <FontAwesomeIcon icon={t.icon} style={{ marginRight: 8 }} />
+                            {t.label} ({t.count})
                         </button>
                     ))}
                 </div>
@@ -126,11 +139,11 @@ export default function FollowersPage() {
     );
 }
 
-// ESTILOS (igual que antes)
 const pageStyle = {
     minHeight: '100vh',
     background: 'linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%)',
     padding: '20px 12px',
+    fontFamily: 'Inter, sans-serif',
 };
 
 const centerStyle = {
@@ -151,23 +164,27 @@ const spinnerStyle = {
 };
 
 const backButtonStyle = {
-    padding: '8px 16px',
-    borderRadius: 6,
-    border: '1px solid #D1D5DB',
+    padding: '10px 18px',
+    borderRadius: 10,
+    border: '2px solid #e2e8f0',
     background: 'white',
-    color: '#111827',
+    color: '#374151',
     fontWeight: 600,
     fontSize: 14,
     cursor: 'pointer',
     transition: 'all 0.2s ease',
     marginBottom: 16,
+    fontFamily: 'Inter, sans-serif',
+    display: 'inline-flex',
+    alignItems: 'center',
 };
 
 const titleStyle = {
     margin: '0 0 24px 0',
     fontSize: 32,
     fontWeight: 800,
-    color: '#111827',
+    color: '#0f172a',
+    fontFamily: 'Inter, sans-serif',
 };
 
 const tabsStyle = {
@@ -180,18 +197,21 @@ const tabsStyle = {
 
 const tabButtonStyle = {
     padding: '12px 24px',
-    borderRadius: 8,
+    borderRadius: 10,
     fontWeight: 600,
     fontSize: 15,
     cursor: 'pointer',
     transition: 'all 0.2s ease',
-    border: '1px solid'
+    border: '2px solid',
+    fontFamily: 'Inter, sans-serif',
+    display: 'inline-flex',
+    alignItems: 'center',
 };
 
 const cardStyle = {
     padding: '24px',
     background: 'white',
     borderRadius: '12px',
-    border: '1px solid #e2e8f0',
+    border: '2px solid #e2e8f0',
     boxShadow: '0 4px 6px rgba(0, 0, 0, 0.05)',
 };

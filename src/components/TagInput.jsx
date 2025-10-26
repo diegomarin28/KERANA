@@ -1,5 +1,5 @@
 import { useState } from "react"
-import { Chip } from "../components/UI/Chip"
+import { Chip } from "../../components/UI/Chip"
 
 export default function TagInput({ value = [], onChange, placeholder="Agregar etiqueta y Enter" }) {
     const [draft, setDraft] = useState("")

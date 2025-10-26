@@ -4,7 +4,7 @@ import { useNotificationsContext } from '../contexts/NotificationsContext';
 import { useTabBadge } from '../hooks/useTabBadge';
 import { useSeguidores } from '../hooks/useSeguidores';
 
-export default function NotificationBadge({ inHero = true }) {  // 👈 NUEVA PROP
+export default function NotificationBadge({ inHero = true }) {
     const [isOpen, setIsOpen] = useState(false);
     const [shouldAnimate, setShouldAnimate] = useState(false);
     const [showUnfollowConfirm, setShowUnfollowConfirm] = useState(null);

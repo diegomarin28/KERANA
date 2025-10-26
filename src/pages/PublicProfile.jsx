@@ -3,6 +3,20 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { publicProfileAPI } from '../api/database';
 import { useSeguidores } from '../hooks/useSeguidores';
 import ApunteCard from "../components/ApunteCard.jsx";
+import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
+import {
+    faUserPlus,
+    faUserCheck,
+    faShare,
+    faCalendar,
+    faChevronLeft,
+    faChevronRight,
+    faFilter,
+    faArrowLeft,
+    faGraduationCap,
+    faStar
+} from '@fortawesome/free-solid-svg-icons';
+import { faLinkedin } from '@fortawesome/free-brands-svg-icons';
 
 export default function PublicProfile() {
     const { username } = useParams();
@@ -15,6 +29,7 @@ export default function PublicProfile() {
     const [tab, setTab] = useState('apuntes');
     const [avatarOk, setAvatarOk] = useState(true);
     const [showShareTooltip, setShowShareTooltip] = useState(false);
+    const [showFullImage, setShowFullImage] = useState(false);
 
     const [showAllNotes, setShowAllNotes] = useState(false);
     const [allNotes, setAllNotes] = useState([]);
@@ -179,19 +194,19 @@ export default function PublicProfile() {
         const monthsAgo = (new Date() - memberDate) / (1000 * 60 * 60 * 24 * 30);
 
         if (monthsAgo >= 6) {
-            badges.push({ icon: '🚀', label: 'Early Adopter', color: '#8B5CF6' });
+            badges.push({ icon: 'rocket', label: 'Early Adopter', color: '#8B5CF6' });
         }
 
         if (stats.apuntes >= 10) {
-            badges.push({ icon: '📚', label: 'Bookworm', color: '#10B981' });
+            badges.push({ icon: 'book', label: 'Bookworm', color: '#10B981' });
         }
 
         if (stats.apuntes >= 20) {
-            badges.push({ icon: '🥇', label: 'Top Contributor', color: '#F59E0B' });
+            badges.push({ icon: 'trophy', label: 'Top Contributor', color: '#F59E0B' });
         }
 
         if (mentorInfo) {
-            badges.push({ icon: '🎓', label: 'Mentor Verificado', color: '#0A66C2' });
+            badges.push({ icon: faGraduationCap, label: 'Mentor Verificado', color: '#10B981' });
         }
 
         return badges;
@@ -209,7 +224,7 @@ export default function PublicProfile() {
             <div style={pageStyle}>
                 <div style={centerStyle}>
                     <div style={spinnerStyle}></div>
-                    <p style={{ marginTop: 16, color: '#64748b', fontSize: 15 }}>Cargando perfil...</p>
+                    <p style={{ marginTop: 16, color: '#64748b', fontSize: 15, fontFamily: 'Inter, sans-serif' }}>Cargando perfil...</p>
                 </div>
             </div>
         );
@@ -220,10 +235,11 @@ export default function PublicProfile() {
             <div style={pageStyle}>
                 <div style={centerStyle}>
                     <div style={{ fontSize: '4rem', marginBottom: 20 }}>😕</div>
-                    <h2 style={{ margin: '0 0 12px 0', fontSize: 24, color: '#111827' }}>Usuario no encontrado</h2>
-                    <p style={{ margin: '0 0 20px 0', color: '#6B7280' }}>Este perfil no existe o es privado</p>
+                    <h2 style={{ margin: '0 0 12px 0', fontSize: 24, color: '#111827', fontFamily: 'Inter, sans-serif' }}>Usuario no encontrado</h2>
+                    <p style={{ margin: '0 0 20px 0', color: '#6B7280', fontFamily: 'Inter, sans-serif' }}>Este perfil no existe o es privado</p>
                     <button onClick={() => navigate(-1)} style={backButtonStyle}>
-                        ← Volver
+                        <FontAwesomeIcon icon={faArrowLeft} style={{ marginRight: 8 }} />
+                        Volver
                     </button>
                 </div>
             </div>
@@ -249,8 +265,21 @@ export default function PublicProfile() {
                     <div style={coverPhotoStyle}></div>
 
                     <div style={profileHeaderWrapperStyle}>
-                        {/* Avatar */}
-                        <div style={avatarWrapperStyle}>
+                        {/* Avatar CLICKEABLE */}
+                        <div
+                            onClick={() => avatarSrc && setShowFullImage(true)}
+                            style={avatarWrapperStyle}
+                            onMouseEnter={(e) => {
+                                if (avatarSrc) {
+                                    e.currentTarget.style.transform = 'scale(1.05)';
+                                    e.currentTarget.style.boxShadow = '0 6px 16px rgba(0,0,0,0.18)';
+                                }
+                            }}
+                            onMouseLeave={(e) => {
+                                e.currentTarget.style.transform = 'scale(1)';
+                                e.currentTarget.style.boxShadow = '0 4px 12px rgba(0,0,0,0.15)';
+                            }}
+                        >
                             {avatarSrc && avatarOk ? (
                                 <img
                                     src={avatarSrc}
@@ -272,12 +301,27 @@ export default function PublicProfile() {
 
                                 <p style={usernameStyle}>@{profile.username}</p>
 
+                                {/* BIO */}
+                                {profile.bio && (
+                                    <p style={bioStyle}>
+                                        {profile.bio}
+                                    </p>
+                                )}
+
                                 {/* Badges */}
                                 {badges.length > 0 && (
                                     <div style={badgesContainerStyle}>
                                         {badges.map((badge, idx) => (
                                             <div key={idx} style={{ ...badgeStyle, borderColor: badge.color }}>
-                                                <span style={{ fontSize: 14 }}>{badge.icon}</span>
+                                                {typeof badge.icon === 'string' ? (
+                                                    <span style={{ fontSize: 14 }}>
+                                                        {badge.icon === 'rocket' && '🚀'}
+                                                        {badge.icon === 'book' && '📚'}
+                                                        {badge.icon === 'trophy' && '🥇'}
+                                                    </span>
+                                                ) : (
+                                                    <FontAwesomeIcon icon={badge.icon} style={{ fontSize: 14 }} />
+                                                )}
                                                 <span style={{ color: badge.color }}>{badge.label}</span>
                                             </div>
                                         ))}
@@ -287,28 +331,28 @@ export default function PublicProfile() {
                                 {/* Meta info */}
                                 <div style={metaInfoStyle}>
                                     <div style={metaItemStyle}>
-                                        <svg style={{ width: 16, height: 16 }} fill="currentColor" viewBox="0 0 20 20">
-                                            <path fillRule="evenodd" d="M6 2a1 1 0 00-1 1v1H4a2 2 0 00-2 2v10a2 2 0 002 2h12a2 2 0 002-2V6a2 2 0 00-2-2h-1V3a1 1 0 10-2 0v1H7V3a1 1 0 00-1-1zm0 5a1 1 0 000 2h8a1 1 0 100-2H6z" clipRule="evenodd" />
-                                        </svg>
+                                        <FontAwesomeIcon icon={faCalendar} style={{ width: 16, height: 16 }} />
                                         Miembro desde {formatMemberSince(profile.fecha_creado)}
                                     </div>
 
-                                    {/* LinkedIn placeholder */}
-                                    <div style={metaItemStyle}>
-                                        <svg style={{ width: 16, height: 16 }} fill="currentColor" viewBox="0 0 20 20">
-                                            <path d="M11 3a1 1 0 100 2h2.586l-6.293 6.293a1 1 0 101.414 1.414L15 6.414V9a1 1 0 102 0V4a1 1 0 00-1-1h-5z" />
-                                            <path d="M5 5a2 2 0 00-2 2v8a2 2 0 002 2h8a2 2 0 002-2v-3a1 1 0 10-2 0v3H5V7h3a1 1 0 000-2H5z" />
-                                        </svg>
-                                        LinkedIn (próximamente)
-                                    </div>
+                                    {/* LINKEDIN REAL */}
+                                    {profile.linkedin && (
+                                        <a
+                                            href={profile.linkedin}
+                                            target="_blank"
+                                            rel="noopener noreferrer"
+                                            style={linkedinLinkStyle}
+                                            onMouseEnter={(e) => e.currentTarget.style.color = '#004182'}
+                                            onMouseLeave={(e) => e.currentTarget.style.color = '#0a66c2'}
+                                        >
+                                            <FontAwesomeIcon icon={faLinkedin} style={{ width: 16, height: 16 }} />
+                                            Ver perfil de LinkedIn
+                                        </a>
+                                    )}
                                 </div>
 
                                 {profile.mostrar_email && (
                                     <div style={emailContainerStyle}>
-                                        <svg style={{ width: 14, height: 14 }} fill="currentColor" viewBox="0 0 20 20">
-                                            <path d="M2.003 5.884L10 9.882l7.997-3.998A2 2 0 0016 4H4a2 2 0 00-1.997 1.884z"></path>
-                                            <path d="M18 8.118l-8 4-8-4V14a2 2 0 002 2h12a2 2 0 002-2V8.118z"></path>
-                                        </svg>
                                         {profile.correo}
                                     </div>
                                 )}
@@ -328,25 +372,21 @@ export default function PublicProfile() {
                                     disabled={loadingFollow}
                                     style={{
                                         ...followButtonStyle,
-                                        background: siguiendo ? '#F3F4F6' : '#0A66C2',
+                                        background: siguiendo ? '#F3F4F6' : '#2563eb',
                                         color: siguiendo ? '#111827' : 'white',
-                                        border: siguiendo ? '2px solid #D1D5DB' : '2px solid #0A66C2'
+                                        border: siguiendo ? '2px solid #D1D5DB' : '2px solid #2563eb'
                                     }}
                                 >
                                     {loadingFollow ? (
                                         <div style={buttonSpinnerStyle}></div>
                                     ) : siguiendo ? (
                                         <>
-                                            <svg style={{ width: 16, height: 16, marginRight: 6 }} fill="currentColor" viewBox="0 0 20 20">
-                                                <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd"></path>
-                                            </svg>
+                                            <FontAwesomeIcon icon={faUserCheck} style={{ marginRight: 6 }} />
                                             Siguiendo
                                         </>
                                     ) : (
                                         <>
-                                            <svg style={{ width: 16, height: 16, marginRight: 6 }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-                                            </svg>
+                                            <FontAwesomeIcon icon={faUserPlus} style={{ marginRight: 6 }} />
                                             Seguir
                                         </>
                                     )}
@@ -359,9 +399,7 @@ export default function PublicProfile() {
                                         style={shareButtonStyle}
                                         title="Compartir perfil"
                                     >
-                                        <svg style={{ width: 18, height: 18 }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.368 2.684 3 3 0 00-5.368-2.684z" />
-                                        </svg>
+                                        <FontAwesomeIcon icon={faShare} />
                                     </button>
                                     {showShareTooltip && (
                                         <div style={tooltipStyle}>
@@ -382,13 +420,13 @@ export default function PublicProfile() {
                             onClick={() => setTab(t)}
                             style={{
                                 ...tabButtonStyle,
-                                background: tab === t ? '#0A66C2' : 'transparent',
+                                background: tab === t ? '#2563eb' : 'transparent',
                                 color: tab === t ? 'white' : '#666',
-                                borderBottom: tab === t ? '3px solid #0A66C2' : '3px solid transparent'
+                                borderBottom: tab === t ? '3px solid #2563eb' : '3px solid transparent'
                             }}
                         >
-                            {t === 'apuntes' && `📚 Apuntes`}
-                            {t === 'mentorias' && `🎓 Mentorías`}
+                            {t === 'apuntes' && `Apuntes`}
+                            {t === 'mentorias' && `Mentorías`}
                         </button>
                     ))}
                 </div>
@@ -404,9 +442,7 @@ export default function PublicProfile() {
                                             <div style={verTodosHeaderStyle}>
                                                 <button onClick={handleVerTodos} style={verMasButtonStyle}>
                                                     Ver todos los apuntes ({stats.apuntes})
-                                                    <svg style={{ width: 16, height: 16, marginLeft: 6 }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-                                                    </svg>
+                                                    <FontAwesomeIcon icon={faChevronRight} style={{ marginLeft: 6 }} />
                                                 </button>
                                             </div>
                                         )}
@@ -418,7 +454,7 @@ export default function PublicProfile() {
                                                     onMouseEnter={(e) => e.target.style.transform = 'translateY(-50%) scale(1.1)'}
                                                     onMouseLeave={(e) => e.target.style.transform = 'translateY(-50%) scale(1)'}
                                                 >
-                                                    ‹
+                                                    <FontAwesomeIcon icon={faChevronLeft} />
                                                 </button>
                                             )}
 
@@ -437,7 +473,7 @@ export default function PublicProfile() {
                                                     onMouseEnter={(e) => e.target.style.transform = 'translateY(-50%) scale(1.1)'}
                                                     onMouseLeave={(e) => e.target.style.transform = 'translateY(-50%) scale(1)'}
                                                 >
-                                                    ›
+                                                    <FontAwesomeIcon icon={faChevronRight} />
                                                 </button>
                                             )}
                                         </div>
@@ -462,9 +498,7 @@ export default function PublicProfile() {
                                         </p>
                                     </div>
                                     <button onClick={() => setShowAllNotes(false)} style={backToRecentButtonStyle}>
-                                        <svg style={{ width: 16, height: 16, marginRight: 6 }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
-                                        </svg>
+                                        <FontAwesomeIcon icon={faChevronLeft} style={{ marginRight: 6 }} />
                                         Volver
                                     </button>
                                 </div>
@@ -472,18 +506,16 @@ export default function PublicProfile() {
                                 {userSubjects.length > 0 && (
                                     <div style={filtersContainerStyle}>
                                         <span style={filterLabelStyle}>
-                                            <svg style={{ width: 16, height: 16, marginRight: 6 }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z" />
-                                            </svg>
+                                            <FontAwesomeIcon icon={faFilter} style={{ marginRight: 6 }} />
                                             Filtrar por materia:
                                         </span>
                                         <button
                                             onClick={() => handleFilterBySubject(null)}
                                             style={{
                                                 ...filterChipStyle,
-                                                background: selectedSubject === null ? '#0A66C2' : 'white',
+                                                background: selectedSubject === null ? '#2563eb' : 'white',
                                                 color: selectedSubject === null ? 'white' : '#666',
-                                                border: selectedSubject === null ? '2px solid #0A66C2' : '2px solid #E5E7EB'
+                                                border: selectedSubject === null ? '2px solid #2563eb' : '2px solid #E5E7EB'
                                             }}
                                         >
                                             Todas
@@ -494,9 +526,9 @@ export default function PublicProfile() {
                                                 onClick={() => handleFilterBySubject(materia.id_materia)}
                                                 style={{
                                                     ...filterChipStyle,
-                                                    background: selectedSubject === materia.id_materia ? '#0A66C2' : 'white',
+                                                    background: selectedSubject === materia.id_materia ? '#2563eb' : 'white',
                                                     color: selectedSubject === materia.id_materia ? 'white' : '#666',
-                                                    border: selectedSubject === materia.id_materia ? '2px solid #0A66C2' : '2px solid #E5E7EB'
+                                                    border: selectedSubject === materia.id_materia ? '2px solid #2563eb' : '2px solid #E5E7EB'
                                                 }}
                                             >
                                                 {materia.nombre_materia}
@@ -543,12 +575,12 @@ export default function PublicProfile() {
                         <div style={mentorCardStyle}>
                             {mentorInfo.estrellas_mentor && (
                                 <div style={mentorRatingStyle}>
-                                    <span style={{ fontSize: 24 }}>⭐</span>
+                                    <FontAwesomeIcon icon={faStar} style={{ fontSize: 24, color: '#f59e0b' }} />
                                     <div>
-                                        <div style={{ fontSize: 28, fontWeight: 700, color: '#0A66C2' }}>
+                                        <div style={{ fontSize: 28, fontWeight: 700, color: '#f59e0b', fontFamily: 'Inter, sans-serif' }}>
                                             {mentorInfo.estrellas_mentor.toFixed(1)}
                                         </div>
-                                        <div style={{ fontSize: 13, color: '#666' }}>Calificación</div>
+                                        <div style={{ fontSize: 13, color: '#666', fontFamily: 'Inter, sans-serif' }}>Calificación</div>
                                     </div>
                                 </div>
                             )}
@@ -556,7 +588,9 @@ export default function PublicProfile() {
                             <div style={mentorMateriasGridStyle}>
                                 {mentorInfo.materias?.map(m => (
                                     <div key={m.id_materia} style={mentorMateriaCardStyle}>
-                                        <div style={mentorMateriaIconStyle}>📚</div>
+                                        <div style={mentorMateriaIconStyle}>
+                                            <FontAwesomeIcon icon={faGraduationCap} />
+                                        </div>
                                         <div>
                                             <div style={mentorMateriaTitleStyle}>{m.materia.nombre_materia}</div>
                                             {m.materia.semestre && (
@@ -571,7 +605,7 @@ export default function PublicProfile() {
                 )}
             </div>
 
-            {/* Modal */}
+            {/* Modal Unfollow */}
             {showUnfollowModal && (
                 <div style={modalOverlayStyle} onClick={() => setShowUnfollowModal(false)}>
                     <div style={modalContentStyle} onClick={(e) => e.stopPropagation()}>
@@ -608,6 +642,69 @@ export default function PublicProfile() {
                     </div>
                 </div>
             )}
+
+            {/* Modal Avatar Grande */}
+            {showFullImage && avatarSrc && (
+                <div
+                    onClick={() => setShowFullImage(false)}
+                    style={{
+                        position: "fixed",
+                        inset: 0,
+                        background: "rgba(0, 0, 0, 0.9)",
+                        backdropFilter: "blur(8px)",
+                        zIndex: 9999,
+                        display: "grid",
+                        placeItems: "center",
+                        padding: 20,
+                        cursor: "pointer",
+                    }}
+                >
+                    <div
+                        onClick={(e) => e.stopPropagation()}
+                        style={{
+                            position: "relative",
+                            maxWidth: "90vw",
+                            maxHeight: "90vh",
+                            cursor: "default",
+                        }}
+                    >
+                        <button
+                            onClick={() => setShowFullImage(false)}
+                            style={{
+                                position: "absolute",
+                                top: -50,
+                                right: 0,
+                                background: "rgba(255, 255, 255, 0.2)",
+                                border: "none",
+                                borderRadius: "50%",
+                                width: 40,
+                                height: 40,
+                                color: "#fff",
+                                fontSize: 24,
+                                cursor: "pointer",
+                                display: "grid",
+                                placeItems: "center",
+                                transition: "all 0.2s ease",
+                                fontWeight: 'bold',
+                            }}
+                            onMouseEnter={(e) => e.target.style.background = "rgba(255, 255, 255, 0.3)"}
+                            onMouseLeave={(e) => e.target.style.background = "rgba(255, 255, 255, 0.2)"}
+                        >
+                            ✕
+                        </button>
+                        <img
+                            src={avatarSrc}
+                            alt="Avatar"
+                            style={{
+                                maxWidth: "100%",
+                                maxHeight: "90vh",
+                                borderRadius: 16,
+                                boxShadow: "0 20px 60px rgba(0, 0, 0, 0.5)",
+                            }}
+                        />
+                    </div>
+                </div>
+            )}
         </div>
     );
 }
@@ -616,8 +713,8 @@ export default function PublicProfile() {
 function StatInline({ number, label }) {
     return (
         <div style={{ display: 'flex', alignItems: 'baseline', gap: 4 }}>
-            <span style={{ fontSize: 15, fontWeight: 700, color: '#111827' }}>{number}</span>
-            <span style={{ fontSize: 14, color: '#666' }}>{label}</span>
+            <span style={{ fontSize: 15, fontWeight: 700, color: '#111827', fontFamily: 'Inter, sans-serif' }}>{number}</span>
+            <span style={{ fontSize: 14, color: '#666', fontFamily: 'Inter, sans-serif' }}>{label}</span>
         </div>
     );
 }
@@ -627,8 +724,9 @@ function StatInline({ number, label }) {
 // ==========================================
 const pageStyle = {
     minHeight: '100vh',
-    background: '#F3F2EF',
+    background: 'linear-gradient(180deg, #f8fafc 0%, #ffffff 100%)',
     paddingBottom: 40,
+    fontFamily: 'Inter, sans-serif',
 };
 
 const containerStyle = {
@@ -649,7 +747,7 @@ const spinnerStyle = {
     width: 40,
     height: 40,
     border: '3px solid #f3f4f6',
-    borderTop: '3px solid #0A66C2',
+    borderTop: '3px solid #2563eb',
     borderRadius: '50%',
     animation: 'spin 0.8s linear infinite',
 };
@@ -673,7 +771,7 @@ const coverContainerStyle = {
 
 const coverPhotoStyle = {
     height: 120,
-    background: 'linear-gradient(135deg, #0A66C2 0%, #004182 50%, #00325B 100%)',
+    background: '#13346b',
     position: 'relative',
 };
 
@@ -692,6 +790,8 @@ const avatarWrapperStyle = {
     marginTop: -60,
     marginBottom: 16,
     background: 'white',
+    cursor: 'pointer',
+    transition: 'all 0.2s ease',
 };
 
 const avatarImageStyle = {
@@ -703,7 +803,7 @@ const avatarImageStyle = {
 const avatarPlaceholderStyle = {
     width: '100%',
     height: '100%',
-    background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+    background: 'linear-gradient(135deg, #2563eb 0%, #1e40af 100%)',
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
@@ -731,6 +831,7 @@ const nameStyle = {
     fontWeight: 700,
     color: '#000000E6',
     letterSpacing: '-0.5px',
+    fontFamily: 'Inter, sans-serif',
 };
 
 const usernameStyle = {
@@ -738,6 +839,16 @@ const usernameStyle = {
     fontSize: 16,
     color: '#666',
     fontWeight: 500,
+    fontFamily: 'Inter, sans-serif',
+};
+
+const bioStyle = {
+    margin: '0 0 12px 0',
+    fontSize: 15,
+    color: '#475569',
+    lineHeight: 1.6,
+    fontWeight: 400,
+    fontFamily: 'Inter, sans-serif',
 };
 
 const badgesContainerStyle = {
@@ -758,6 +869,7 @@ const badgeStyle = {
     background: 'white',
     border: '2px solid',
     transition: 'all 0.2s ease',
+    fontFamily: 'Inter, sans-serif',
 };
 
 const metaInfoStyle = {
@@ -773,6 +885,19 @@ const metaItemStyle = {
     gap: 8,
     fontSize: 14,
     color: '#666',
+    fontFamily: 'Inter, sans-serif',
+};
+
+const linkedinLinkStyle = {
+    display: 'flex',
+    alignItems: 'center',
+    gap: 8,
+    fontSize: 14,
+    color: '#0a66c2',
+    textDecoration: 'none',
+    fontWeight: 500,
+    transition: 'color 0.2s ease',
+    fontFamily: 'Inter, sans-serif',
 };
 
 const emailContainerStyle = {
@@ -782,6 +907,7 @@ const emailContainerStyle = {
     fontSize: 14,
     color: '#666',
     marginBottom: 12,
+    fontFamily: 'Inter, sans-serif',
 };
 
 const statsInlineStyle = {
@@ -811,6 +937,7 @@ const followButtonStyle = {
     minWidth: 140,
     height: 40,
     boxShadow: '0 1px 4px rgba(0,0,0,0.1)',
+    fontFamily: 'Inter, sans-serif',
 };
 
 const shareButtonStyle = {
@@ -842,6 +969,7 @@ const tooltipStyle = {
     whiteSpace: 'nowrap',
     boxShadow: '0 4px 12px rgba(0,0,0,0.2)',
     zIndex: 100,
+    fontFamily: 'Inter, sans-serif',
 };
 
 const tabsContainerStyle = {
@@ -865,6 +993,7 @@ const tabButtonStyle = {
     display: 'flex',
     alignItems: 'center',
     gap: 6,
+    fontFamily: 'Inter, sans-serif',
 };
 
 const verTodosHeaderStyle = {
@@ -876,8 +1005,8 @@ const verTodosHeaderStyle = {
 const verMasButtonStyle = {
     padding: '10px 20px',
     background: 'white',
-    color: '#0A66C2',
-    border: '2px solid #0A66C2',
+    color: '#2563eb',
+    border: '2px solid #2563eb',
     borderRadius: 24,
     fontWeight: 600,
     fontSize: 14,
@@ -886,6 +1015,7 @@ const verMasButtonStyle = {
     display: 'flex',
     alignItems: 'center',
     boxShadow: '0 1px 4px rgba(0,0,0,0.1)',
+    fontFamily: 'Inter, sans-serif',
 };
 
 const sectionHeaderStyle = {
@@ -904,12 +1034,14 @@ const sectionTitleStyle = {
     fontWeight: 700,
     color: '#000000E6',
     letterSpacing: '-0.3px',
+    fontFamily: 'Inter, sans-serif',
 };
 
 const sectionSubtitleStyle = {
     margin: '4px 0 0 0',
     fontSize: 14,
     color: '#666',
+    fontFamily: 'Inter, sans-serif',
 };
 
 const backToRecentButtonStyle = {
@@ -924,6 +1056,7 @@ const backToRecentButtonStyle = {
     transition: 'all 0.2s ease',
     display: 'flex',
     alignItems: 'center',
+    fontFamily: 'Inter, sans-serif',
 };
 
 const carouselWrapperStyle = {
@@ -956,8 +1089,8 @@ const carouselArrowStyle = {
     borderRadius: '50%',
     background: 'white',
     border: '2px solid #E5E7EB',
-    color: '#0A66C2',
-    fontSize: 28,
+    color: '#2563eb',
+    fontSize: 20,
     fontWeight: 'bold',
     cursor: 'pointer',
     display: 'flex',
@@ -986,6 +1119,7 @@ const filterLabelStyle = {
     color: '#666',
     display: 'flex',
     alignItems: 'center',
+    fontFamily: 'Inter, sans-serif',
 };
 
 const filterChipStyle = {
@@ -996,6 +1130,7 @@ const filterChipStyle = {
     cursor: 'pointer',
     transition: 'all 0.2s ease',
     border: '2px solid',
+    fontFamily: 'Inter, sans-serif',
 };
 
 const notesGridStyle = {
@@ -1023,12 +1158,14 @@ const emptyTitleStyle = {
     fontSize: 20,
     fontWeight: 700,
     color: '#111827',
+    fontFamily: 'Inter, sans-serif',
 };
 
 const emptyDescStyle = {
     margin: 0,
     color: '#666',
     fontSize: 15,
+    fontFamily: 'Inter, sans-serif',
 };
 
 const mentorCardStyle = {
@@ -1067,7 +1204,7 @@ const mentorMateriaCardStyle = {
 };
 
 const mentorMateriaIconStyle = {
-    fontSize: 28,
+    fontSize: 24,
     width: 48,
     height: 48,
     background: 'white',
@@ -1075,7 +1212,8 @@ const mentorMateriaIconStyle = {
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
-    border: '2px solid #E5E7EB',
+    border: '2px solid #10b981',
+    color: '#10b981',
 };
 
 const mentorMateriaTitleStyle = {
@@ -1083,25 +1221,30 @@ const mentorMateriaTitleStyle = {
     fontWeight: 700,
     color: '#111827',
     lineHeight: 1.3,
+    fontFamily: 'Inter, sans-serif',
 };
 
 const mentorMateriaSemestreStyle = {
     fontSize: 13,
     color: '#666',
     marginTop: 2,
+    fontFamily: 'Inter, sans-serif',
 };
 
 const backButtonStyle = {
     padding: '12px 24px',
-    background: '#0A66C2',
+    background: '#2563eb',
     color: 'white',
     border: 'none',
     borderRadius: 24,
     fontWeight: 600,
     cursor: 'pointer',
     fontSize: 15,
-    boxShadow: '0 2px 8px rgba(10, 102, 194, 0.3)',
+    boxShadow: '0 2px 8px rgba(37, 99, 235, 0.3)',
     transition: 'all 0.2s ease',
+    fontFamily: 'Inter, sans-serif',
+    display: 'inline-flex',
+    alignItems: 'center',
 };
 
 const modalOverlayStyle = {
@@ -1126,6 +1269,7 @@ const modalContentStyle = {
     width: '90%',
     boxShadow: '0 20px 60px rgba(0,0,0,0.3)',
     textAlign: 'center',
+    fontFamily: 'Inter, sans-serif',
 };
 
 const modalAvatarContainerStyle = {
@@ -1146,7 +1290,7 @@ const modalAvatarStyle = {
 const modalAvatarPlaceholderStyle = {
     width: '100%',
     height: '100%',
-    background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+    background: 'linear-gradient(135deg, #2563eb 0%, #1e40af 100%)',
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
@@ -1160,6 +1304,7 @@ const modalTitleStyle = {
     fontSize: 18,
     fontWeight: 600,
     color: '#111827',
+    fontFamily: 'Inter, sans-serif',
 };
 
 const modalButtonsStyle = {
@@ -1178,6 +1323,7 @@ const modalConfirmButtonStyle = {
     fontSize: 14,
     cursor: 'pointer',
     transition: 'all 0.2s ease',
+    fontFamily: 'Inter, sans-serif',
 };
 
 const modalCancelButtonStyle = {
@@ -1190,4 +1336,5 @@ const modalCancelButtonStyle = {
     fontSize: 14,
     cursor: 'pointer',
     transition: 'all 0.2s ease',
+    fontFamily: 'Inter, sans-serif',
 };

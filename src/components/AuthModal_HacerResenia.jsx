@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { ratingsAPI } from "../api/database";
+import { ratingsAPI } from "../api/Database";
 import { supabase } from "../supabase";
 import { validarComentario } from "../utils/wordFilter";
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
@@ -14,26 +14,38 @@ import {
     faLightbulb,
     faExclamationTriangle,
     faSpinner,
-    faLock
+    faLock,
+    faHeart,
+    faFire,
+    faComments,
+    faClipboardList,
+    faBolt,
+    faHandshake,
+    faChartLine,
+    faBook,
+    faMicrophone,
+    faQuestionCircle,
+    faDoorOpen,
+    faClipboard
 } from '@fortawesome/free-solid-svg-icons';
 
-// Tags disponibles con iconos Font Awesome
+// Tags disponibles con iconos Font Awesome (solo free-solid)
 const AVAILABLE_TAGS = [
     // Positivos
-    { id: 'muy-claro', label: 'Muy claro', type: 'positive', icon: 'sparkles' },
-    { id: 'querido', label: 'Querido', type: 'positive', icon: 'heart' },
-    { id: 'apasionado', label: 'Apasionado', type: 'positive', icon: 'fire' },
-    { id: 'disponible', label: 'Disponible', type: 'positive', icon: 'comments' },
-    { id: 'ordenado', label: 'Ordenado', type: 'positive', icon: 'list' },
-    { id: 'dinamico', label: 'Dinámico', type: 'positive', icon: 'bolt' },
-    { id: 'cercano', label: 'Cercano', type: 'positive', icon: 'handshake' },
+    { id: 'muy-claro', label: 'Muy claro', type: 'positive', icon: faLightbulb },
+    { id: 'querido', label: 'Querido', type: 'positive', icon: faHeart },
+    { id: 'apasionado', label: 'Apasionado', type: 'positive', icon: faFire },
+    { id: 'disponible', label: 'Disponible', type: 'positive', icon: faComments },
+    { id: 'ordenado', label: 'Ordenado', type: 'positive', icon: faClipboardList },
+    { id: 'dinamico', label: 'Dinámico', type: 'positive', icon: faBolt },
+    { id: 'cercano', label: 'Cercano', type: 'positive', icon: faHandshake },
     // Negativos/Desafiantes
-    { id: 'califica-duro', label: 'Califica duro', type: 'negative', icon: 'chart-line' },
-    { id: 'mucha-tarea', label: 'Mucha tarea', type: 'negative', icon: 'book' },
-    { id: 'participacion', label: 'Participación', type: 'negative', icon: 'microphone' },
-    { id: 'confuso', label: 'Confuso', type: 'negative', icon: 'question' },
-    { id: 'lejano', label: 'Lejano', type: 'negative', icon: 'door-open' },
-    { id: 'examenes-dificiles', label: 'Exámenes difíciles', type: 'negative', icon: 'clipboard' }
+    { id: 'califica-duro', label: 'Califica duro', type: 'negative', icon: faChartLine },
+    { id: 'mucha-tarea', label: 'Mucha tarea', type: 'negative', icon: faBook },
+    { id: 'participacion', label: 'Participación', type: 'negative', icon: faMicrophone },
+    { id: 'confuso', label: 'Confuso', type: 'negative', icon: faQuestionCircle },
+    { id: 'lejano', label: 'Lejano', type: 'negative', icon: faDoorOpen },
+    { id: 'examenes-dificiles', label: 'Exámenes difíciles', type: 'negative', icon: faClipboard }
 ];
 
 // Componente de estrellas interactivo con Font Awesome
@@ -598,6 +610,7 @@ export default function AuthModal_HacerResenia({
                     onClick={(e) => e.stopPropagation()}
                     style={{
                         width: "min(720px, 92vw)",
+                        maxWidth: "100%",
                         background: "#fff",
                         borderRadius: 16,
                         border: "2px solid #e2e8f0",
@@ -607,7 +620,9 @@ export default function AuthModal_HacerResenia({
                         gap: 20,
                         maxHeight: "90vh",
                         overflowY: "auto",
-                        pointerEvents: "auto"
+                        overflowX: "hidden",
+                        pointerEvents: "auto",
+                        boxSizing: "border-box"
                     }}>
 
                     {/* Header */}
@@ -767,7 +782,7 @@ export default function AuthModal_HacerResenia({
 
                             {!form.selectedEntity ? (
                                 <>
-                                    <div style={{ position: "relative" }}>
+                                    <div style={{ position: "relative", width: "100%", maxWidth: "100%" }}>
                                         <FontAwesomeIcon
                                             icon={faSearch}
                                             style={{
@@ -776,7 +791,8 @@ export default function AuthModal_HacerResenia({
                                                 top: "50%",
                                                 transform: "translateY(-50%)",
                                                 color: "#94a3b8",
-                                                fontSize: 16
+                                                fontSize: 16,
+                                                pointerEvents: "none"
                                             }}
                                         />
                                         <input
@@ -788,7 +804,7 @@ export default function AuthModal_HacerResenia({
                                                 if (errors.selectedEntity) setErrors({...errors, selectedEntity: ""});
                                             }}
                                             onFocus={() => setShowSuggestions(true)}
-                                            placeholder={`Escribí el nombre del ${form.tipo}...`}
+                                            placeholder={`Escribí el nombre...`}
                                             style={{
                                                 width: "100%",
                                                 height: 48,
@@ -800,7 +816,8 @@ export default function AuthModal_HacerResenia({
                                                 fontSize: 14,
                                                 fontWeight: 500,
                                                 fontFamily: "'Inter', sans-serif",
-                                                color: "#0f172a"
+                                                color: "#0f172a",
+                                                boxSizing: "border-box"
                                             }}
                                         />
                                     </div>
@@ -1001,10 +1018,17 @@ export default function AuthModal_HacerResenia({
                                                     fontWeight: isSelected ? 600 : 500,
                                                     fontSize: 13,
                                                     transition: "all 0.2s ease",
-                                                    opacity: form.selectedTags.length >= 3 && !isSelected ? 0.5 : 1
+                                                    opacity: form.selectedTags.length >= 3 && !isSelected ? 0.5 : 1,
+                                                    display: "flex",
+                                                    alignItems: "center",
+                                                    gap: 8
                                                 }}
                                                 disabled={form.selectedTags.length >= 3 && !isSelected}
                                             >
+                                                <FontAwesomeIcon
+                                                    icon={tag.icon}
+                                                    style={{ fontSize: 14 }}
+                                                />
                                                 {tag.label}
                                             </button>
                                         );

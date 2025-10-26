@@ -1,4 +1,3 @@
-// AuthGuard.jsx - VERSIÓN MEJORADA
 import { useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { supabase } from '../supabase';
