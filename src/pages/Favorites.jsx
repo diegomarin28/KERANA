@@ -28,6 +28,7 @@ export default function Favorites() {
             let allFavorites = [];
 
             // === APUNTES FAVORITOS ===
+            // === APUNTES FAVORITOS ===
             const { data: notesFav, error: notesFavError } = await supabase
                 .from('apunte_fav')
                 .select('id_usuario, id_apunte')
@@ -365,8 +366,8 @@ export default function Favorites() {
                 <div
                     style={{
                         display: 'grid',
-                        gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 280px))',
-                        gap: 20
+                        gridTemplateColumns: 'repeat(auto-fill, minmax(230px, 1fr))',
+                        gap: 16
                     }}
                 >
                     {filteredItems.map(item => (
@@ -376,20 +377,15 @@ export default function Favorites() {
                                 note={item.note}
                             />
                         ) : item.type === 'mentor' ? (
-                            <div
-                                key={`${item.type}-${item.favId}`}
-                                style={{
-                                    display: 'flex',
-                                    justifyContent: 'center',
-                                    alignItems: 'flex-start'
-                                }}
-                            >
-                                <div style={{ width: '100%', maxWidth: 280 }}>
+                                <div
+                                    key={`${item.type}-${item.favId}`}
+                                    style={{ gridColumn: 'span 2' }}
+                                >
                                     <MentorCard
+                                        key={`${item.type}-${item.favId}`}
                                         mentor={item.mentor}
                                     />
                                 </div>
-                            </div>
                         ) : (
                             <Card
                                 key={`${item.type}-${item.favId}`}

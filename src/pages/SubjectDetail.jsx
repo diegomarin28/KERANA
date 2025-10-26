@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { supabase } from '../supabase';
-import { ratingsAPI } from '../api/Database';
+import { ratingsAPI } from '../api/database';
 import ProfessorCarousel from '../components/ProfessorCarousel';
 import MentorCarousel from '../components/MentorCarousel';
 import NotesModal from '../components/NotesModal';

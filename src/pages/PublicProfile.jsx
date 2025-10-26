@@ -14,7 +14,13 @@ import {
     faFilter,
     faArrowLeft,
     faGraduationCap,
-    faStar
+    faStar,
+    faRocket,
+    faBook,
+    faTrophy,
+    faFaceFrown,
+    faFileLines,
+    faSearch
 } from '@fortawesome/free-solid-svg-icons';
 import { faLinkedin } from '@fortawesome/free-brands-svg-icons';
 
@@ -194,15 +200,15 @@ export default function PublicProfile() {
         const monthsAgo = (new Date() - memberDate) / (1000 * 60 * 60 * 24 * 30);
 
         if (monthsAgo >= 6) {
-            badges.push({ icon: 'rocket', label: 'Early Adopter', color: '#8B5CF6' });
+            badges.push({ icon: faRocket, label: 'Early Adopter', color: '#8B5CF6' });
         }
 
         if (stats.apuntes >= 10) {
-            badges.push({ icon: 'book', label: 'Bookworm', color: '#10B981' });
+            badges.push({ icon: faBook, label: 'Bookworm', color: '#10B981' });
         }
 
         if (stats.apuntes >= 20) {
-            badges.push({ icon: 'trophy', label: 'Top Contributor', color: '#F59E0B' });
+            badges.push({ icon: faTrophy, label: 'Top Contributor', color: '#F59E0B' });
         }
 
         if (mentorInfo) {
@@ -234,7 +240,7 @@ export default function PublicProfile() {
         return (
             <div style={pageStyle}>
                 <div style={centerStyle}>
-                    <div style={{ fontSize: '4rem', marginBottom: 20 }}>😕</div>
+                    <FontAwesomeIcon icon={faFaceFrown} style={{ fontSize: 64, color: '#94a3b8', marginBottom: 20 }} />
                     <h2 style={{ margin: '0 0 12px 0', fontSize: 24, color: '#111827', fontFamily: 'Inter, sans-serif' }}>Usuario no encontrado</h2>
                     <p style={{ margin: '0 0 20px 0', color: '#6B7280', fontFamily: 'Inter, sans-serif' }}>Este perfil no existe o es privado</p>
                     <button onClick={() => navigate(-1)} style={backButtonStyle}>
@@ -313,15 +319,7 @@ export default function PublicProfile() {
                                     <div style={badgesContainerStyle}>
                                         {badges.map((badge, idx) => (
                                             <div key={idx} style={{ ...badgeStyle, borderColor: badge.color }}>
-                                                {typeof badge.icon === 'string' ? (
-                                                    <span style={{ fontSize: 14 }}>
-                                                        {badge.icon === 'rocket' && '🚀'}
-                                                        {badge.icon === 'book' && '📚'}
-                                                        {badge.icon === 'trophy' && '🥇'}
-                                                    </span>
-                                                ) : (
-                                                    <FontAwesomeIcon icon={badge.icon} style={{ fontSize: 14 }} />
-                                                )}
+                                                <FontAwesomeIcon icon={badge.icon} style={{ fontSize: 14 }} />
                                                 <span style={{ color: badge.color }}>{badge.label}</span>
                                             </div>
                                         ))}
@@ -330,12 +328,8 @@ export default function PublicProfile() {
 
                                 {/* Meta info */}
                                 <div style={metaInfoStyle}>
-                                    <div style={metaItemStyle}>
-                                        <FontAwesomeIcon icon={faCalendar} style={{ width: 16, height: 16 }} />
-                                        Miembro desde {formatMemberSince(profile.fecha_creado)}
-                                    </div>
 
-                                    {/* LINKEDIN REAL */}
+                                    {/* LINKEDIN */}
                                     {profile.linkedin && (
                                         <a
                                             href={profile.linkedin}
@@ -359,9 +353,9 @@ export default function PublicProfile() {
 
                                 {/* Stats inline */}
                                 <div style={statsInlineStyle}>
-                                    <StatInline number={stats?.seguidores || 0} label="Seguidores" />
-                                    <StatInline number={stats?.siguiendo || 0} label="Siguiendo" />
-                                    <StatInline number={stats?.apuntes || 0} label="Apuntes" />
+                                    <StatInline number={stats?.seguidores || 0} label="seguidores" />
+                                    <StatInline number={stats?.siguiendo || 0} label="siguiendo" />
+                                    <StatInline number={stats?.apuntes || 0} label="apuntes" />
                                 </div>
                             </div>
 
@@ -480,7 +474,7 @@ export default function PublicProfile() {
                                     </>
                                 ) : (
                                     <div style={emptyStateStyle}>
-                                        <div style={emptyIconStyle}>📚</div>
+                                        <FontAwesomeIcon icon={faBook} style={emptyIconStyle} />
                                         <h3 style={emptyTitleStyle}>Sin apuntes aún</h3>
                                         <p style={emptyDescStyle}>
                                             {profile.nombre.split(' ')[0]} aún no ha compartido apuntes.
@@ -549,7 +543,7 @@ export default function PublicProfile() {
                                     </div>
                                 ) : (
                                     <div style={emptyStateStyle}>
-                                        <div style={emptyIconStyle}>🔍</div>
+                                        <FontAwesomeIcon icon={faSearch} style={emptyIconStyle} />
                                         <h3 style={emptyTitleStyle}>No se encontraron apuntes</h3>
                                         <p style={emptyDescStyle}>
                                             {selectedSubject
@@ -686,6 +680,7 @@ export default function PublicProfile() {
                                 placeItems: "center",
                                 transition: "all 0.2s ease",
                                 fontWeight: 'bold',
+                                fontFamily: 'Inter, sans-serif',
                             }}
                             onMouseEnter={(e) => e.target.style.background = "rgba(255, 255, 255, 0.3)"}
                             onMouseLeave={(e) => e.target.style.background = "rgba(255, 255, 255, 0.2)"}
@@ -1075,8 +1070,7 @@ const carouselContainerStyle = {
 };
 
 const carouselItemStyle = {
-    minWidth: 280,
-    maxWidth: 280,
+    minWidth: 360,
     flexShrink: 0,
 };
 
@@ -1136,7 +1130,7 @@ const filterChipStyle = {
 const notesGridStyle = {
     display: 'grid',
     gap: 16,
-    gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 280px))',
+    gridTemplateColumns: 'repeat(auto-fill, minmax(360px, 1fr))',
 };
 
 const emptyStateStyle = {
@@ -1148,9 +1142,9 @@ const emptyStateStyle = {
 };
 
 const emptyIconStyle = {
-    fontSize: '4rem',
+    fontSize: 64,
+    color: '#94a3b8',
     marginBottom: 16,
-    opacity: 0.5,
 };
 
 const emptyTitleStyle = {
@@ -1337,4 +1331,4 @@ const modalCancelButtonStyle = {
     cursor: 'pointer',
     transition: 'all 0.2s ease',
     fontFamily: 'Inter, sans-serif',
-};
+}
