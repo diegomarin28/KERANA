@@ -1,5 +1,4 @@
 import { useEffect, useState } from 'react';
-import { Link } from 'react-router-dom';
 import { Card } from '../components/UI/Card';
 import { Button } from '../components/UI/Button';
 import { supabase } from '../supabase';
@@ -28,7 +27,6 @@ export default function Favorites() {
 
             let allFavorites = [];
 
-            // === APUNTES FAVORITOS ===
             // === APUNTES FAVORITOS ===
             const { data: notesFav, error: notesFavError } = await supabase
                 .from('apunte_fav')
@@ -367,8 +365,8 @@ export default function Favorites() {
                 <div
                     style={{
                         display: 'grid',
-                        gridTemplateColumns: 'repeat(auto-fill, minmax(230px, 1fr))',
-                        gap: 16
+                        gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 280px))',
+                        gap: 20
                     }}
                 >
                     {filteredItems.map(item => (
@@ -378,15 +376,20 @@ export default function Favorites() {
                                 note={item.note}
                             />
                         ) : item.type === 'mentor' ? (
-                                <div
-                                    key={`${item.type}-${item.favId}`}
-                                    style={{ gridColumn: 'span 2' }}
-                                >
+                            <div
+                                key={`${item.type}-${item.favId}`}
+                                style={{
+                                    display: 'flex',
+                                    justifyContent: 'center',
+                                    alignItems: 'flex-start'
+                                }}
+                            >
+                                <div style={{ width: '100%', maxWidth: 280 }}>
                                     <MentorCard
-                                        key={`${item.type}-${item.favId}`}
                                         mentor={item.mentor}
                                     />
                                 </div>
+                            </div>
                         ) : (
                             <Card
                                 key={`${item.type}-${item.favId}`}
