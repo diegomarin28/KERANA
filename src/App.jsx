@@ -1,4 +1,3 @@
-// src/App.jsx
 import { BrowserRouter, Routes, Route, Navigate, useLocation, useNavigate } from "react-router-dom";
 import { lazy, Suspense, useEffect } from "react";
 import Header from "./components/Header.jsx";
@@ -152,7 +151,6 @@ function AppRoutes() {
                     {/* Búsqueda y exploración */}
                     <Route path="/search" element={<SearchResults />} />
                     <Route path="/cursos/buscar" element={<CourseSearch />} />
-                    <Route path="/test/followers" element={<FollowersPage />} />
 
                     {/* Mentoría */}
                     <Route path="/mentor/calendar" element={<MyCalendar />} />

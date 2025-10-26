@@ -1,5 +1,4 @@
 import { useEffect, useState } from 'react';
-import { Link } from 'react-router-dom';
 import { Card } from '../components/UI/Card';
 import { Button } from '../components/UI/Button';
 import { supabase } from '../supabase';

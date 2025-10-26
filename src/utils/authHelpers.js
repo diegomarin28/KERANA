@@ -1,4 +1,3 @@
-// utils/authHelpers.js
 import { supabase } from '../supabase';
 
 /** Verifica si un username está disponible (case-insensitive) */

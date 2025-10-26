@@ -1,4 +1,3 @@
-// src/utils/exportUserData.js
 import { supabase } from '../supabase';
 
 /**

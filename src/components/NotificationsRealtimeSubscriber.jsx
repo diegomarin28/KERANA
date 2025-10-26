@@ -6,6 +6,7 @@ import { useNotifications } from './NotificationProvider';
 import { useNotificationSettings } from '../hooks/useNotificationSettings';
 
 const POLLING_INTERVAL = 10000; // 10 segundos
+const MAX_CONSECUTIVE_ERRORS = 3; // ✅ NUEVO: Máximo de errores consecutivos
 
 let audioContext = null;
 let audioUnlocked = false;
@@ -18,12 +19,14 @@ export default function NotificationsRealtimeSubscriber() {
     const lastCheckRef = useRef(new Date());
     const miUsuarioIdRef = useRef(null);
     const isOnlineRef = useRef(navigator.onLine);
+    const consecutiveErrorsRef = useRef(0); // ✅ NUEVO: Contador de errores consecutivos
 
     // 🌐 Detectar cambios de conexión
     useEffect(() => {
         const handleOnline = () => {
             console.log('🌐 Conexión restaurada');
             isOnlineRef.current = true;
+            consecutiveErrorsRef.current = 0; // ✅ Resetear errores
             lastCheckRef.current = new Date(Date.now() - 30000);
         };
 
@@ -32,14 +35,29 @@ export default function NotificationsRealtimeSubscriber() {
             isOnlineRef.current = false;
         };
 
+        // ✅ NUEVO: Detectar cuando vuelve de suspensión
+        const handleVisibilityChange = () => {
+            if (!document.hidden && isOnlineRef.current) {
+                console.log('👁️ Pestaña visible, verificando autenticación...');
+                consecutiveErrorsRef.current = 0;
+                // Recargar notificaciones al volver
+                setTimeout(() => {
+                    cargarNotificaciones();
+                    contarNoLeidas();
+                }, 1000);
+            }
+        };
+
         window.addEventListener('online', handleOnline);
         window.addEventListener('offline', handleOffline);
+        document.addEventListener('visibilitychange', handleVisibilityChange);
 
         return () => {
             window.removeEventListener('online', handleOnline);
             window.removeEventListener('offline', handleOffline);
+            document.removeEventListener('visibilitychange', handleVisibilityChange);
         };
-    }, []);
+    }, [cargarNotificaciones, contarNoLeidas]);
 
     // 🔓 Desbloquear audio
     useEffect(() => {
@@ -105,6 +123,24 @@ export default function NotificationsRealtimeSubscriber() {
                         return;
                     }
 
+                    // ✅ NUEVO: Si hay muchos errores consecutivos, pausar polling temporalmente
+                    if (consecutiveErrorsRef.current >= MAX_CONSECUTIVE_ERRORS) {
+                        console.log(`⏸️ Polling pausado temporalmente (${consecutiveErrorsRef.current} errores consecutivos)`);
+
+                        // Intentar renovar sesión
+                        try {
+                            const { data: session } = await supabase.auth.getSession();
+                            if (!session?.session) {
+                                console.log('🔄 Sesión expirada, solicitando refresh...');
+                                await supabase.auth.refreshSession();
+                            }
+                            consecutiveErrorsRef.current = 0;
+                        } catch (err) {
+                            console.log('⚠️ No se pudo renovar sesión:', err.message);
+                        }
+                        return;
+                    }
+
                     try {
                         const { data: nuevasNotifs, error } = await supabase
                             .from('notificaciones')
@@ -122,9 +158,20 @@ export default function NotificationsRealtimeSubscriber() {
                             .order('creado_en', { ascending: false });
 
                         if (error) {
-                            console.error('❌ Error en polling:', error);
+                            // ✅ NUEVO: Manejo específico de errores
+                            if (error.code === 'PGRST301' || error.message?.includes('JWT')) {
+                                console.log('⚠️ Token expirado, intentando renovar...');
+                                consecutiveErrorsRef.current++;
+                                return;
+                            }
+
+                            console.log('⚠️ Error en polling (no crítico):', error.message);
+                            consecutiveErrorsRef.current++;
                             return;
                         }
+
+                        // ✅ Operación exitosa, resetear contador
+                        consecutiveErrorsRef.current = 0;
 
                         if (nuevasNotifs && nuevasNotifs.length > 0) {
                             lastCheckRef.current = new Date();
@@ -142,14 +189,12 @@ export default function NotificationsRealtimeSubscriber() {
                                 }
 
                                 if (shouldShowToast) {
-                                    // 🎨 FORMATO MEJORADO - OPCIÓN 1
                                     const emisorNombre = notif.emisor?.nombre || 'Alguien';
                                     const emisorUsername = notif.emisor?.username;
 
                                     let mensajeFormateado = notif.mensaje;
                                     let urlDestino = notif.url || (emisorUsername ? `/user/${emisorUsername}` : null);
 
-                                    // Extraer acción del mensaje según tipo
                                     if (notif.tipo === 'nuevo_seguidor') {
                                         mensajeFormateado = 'empezó a seguirte';
                                     } else if (notif.tipo === 'nuevo_apunte_seguido') {
@@ -177,13 +222,21 @@ export default function NotificationsRealtimeSubscriber() {
                                         type: 'info',
                                         duration: 5000,
                                         avatar: notif.emisor?.foto,
-                                        url: urlDestino, // ✅ URL para navegación
+                                        url: urlDestino,
                                     });
                                 }
                             }
                         }
                     } catch (error) {
-                        console.error('❌ Error en checkForNewNotifications:', error);
+                        // ✅ NUEVO: Manejo de errores de red
+                        if (error.message?.includes('Failed to fetch') ||
+                            error.message?.includes('NetworkError')) {
+                            console.log('⚠️ Error de red (no crítico)');
+                            consecutiveErrorsRef.current++;
+                        } else {
+                            console.log('⚠️ Error inesperado en polling:', error.message);
+                            consecutiveErrorsRef.current++;
+                        }
                     }
                 };
 
@@ -191,7 +244,7 @@ export default function NotificationsRealtimeSubscriber() {
                 intervalRef.current = setInterval(checkForNewNotifications, POLLING_INTERVAL);
 
             } catch (error) {
-                console.error('❌ Error en setupPolling:', error);
+                console.log('⚠️ Error en setupPolling (no crítico):', error.message);
             }
         };
 
@@ -211,14 +264,10 @@ export default function NotificationsRealtimeSubscriber() {
 
 // 🔊 Función para reproducir sonido según tipo
 function playSound(tipo = 'default') {
-    if (!audioUnlocked) {
-        console.log('⚠️ Audio aún no desbloqueado. Esperando interacción del usuario...');
-        return;
-    }
+    if (!audioUnlocked) return;
 
     try {
         if (!audioContext) return;
-
         const now = audioContext.currentTime;
 
         switch (tipo) {
@@ -227,27 +276,22 @@ function playSound(tipo = 'default') {
                 playNote(659, now + 0.1, 0.15, 0.2);
                 playNote(784, now + 0.2, 0.2, 0.3);
                 break;
-
             case 'solicitud_aceptada':
                 playNote(880, now, 0.25, 0.15);
                 playNote(1047, now + 0.1, 0.3, 0.25);
                 break;
-
             case 'nuevo_comentario':
                 playNote(700, now, 0.2, 0.1);
                 playNote(900, now + 0.05, 0.15, 0.1);
                 break;
-
             case 'nuevo_like':
                 playNote(1200, now, 0.25, 0.08);
                 playNote(1400, now + 0.06, 0.2, 0.08);
                 break;
-
             case 'nueva_resena':
                 playNote(800, now, 0.2, 0.15);
                 playNote(1000, now + 0.1, 0.2, 0.15);
                 break;
-
             case 'mentor_acepto':
             case 'mentor_aprobado':
                 playNote(523, now, 0.15, 0.12);
@@ -255,32 +299,26 @@ function playSound(tipo = 'default') {
                 playNote(784, now + 0.2, 0.15, 0.12);
                 playNote(1047, now + 0.3, 0.25, 0.2);
                 break;
-
             case 'nuevo_apunte':
                 playNote(600, now, 0.2, 0.12);
                 playNote(800, now + 0.08, 0.2, 0.12);
                 playNote(900, now + 0.16, 0.25, 0.15);
                 break;
-
             case 'apunte_aprobado':
                 playNote(700, now, 0.2, 0.1);
                 playNote(900, now + 0.08, 0.2, 0.1);
                 playNote(1100, now + 0.16, 0.3, 0.2);
                 break;
-
             case 'system':
             case 'update':
                 playNote(900, now, 0.25, 0.2);
                 break;
-
             default:
                 playNote(800, now, 0.2, 0.15);
                 playNote(1000, now + 0.1, 0.2, 0.15);
         }
-
-        console.log(`🔔 Sonido reproducido: ${tipo}`);
     } catch (error) {
-        console.log('⚠️ Error al reproducir sonido:', error);
+        // Silenciar errores de audio
     }
 }
 
