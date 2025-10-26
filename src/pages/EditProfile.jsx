@@ -1,8 +1,8 @@
 import { useEffect, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { supabase } from '../supabase';
-import { Card } from '../components/ui/Card';
-import { Button } from '../components/ui/Button';
+import { Card } from '../components/UI/Card';
+import { Button } from '../components/UI/Button';
 import { useAvatar } from '../contexts/AvatarContext';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import {
