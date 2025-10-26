@@ -1,4 +1,3 @@
-// src/api/Database.js
 import { supabase } from '../supabase'
 import emailjs from '@emailjs/browser';
 import { validarComentario } from '../utils/wordFilter';

@@ -6,6 +6,8 @@ import AuthGuard from "./components/AuthGuard";
 import Equipo from "./pages/Equipo";
 import { AvatarProvider } from './contexts/AvatarContext';
 import { ConnectionMonitor } from './components/ConnectionMonitor';
+import ErrorBoundary from './components/ErrorBoundary';
+import AuthSessionManager from './components/AuthSessionManager';
 
 // Componentes lazy
 const HelpCenter = lazy(() => import("./pages/HelpCenter"));
@@ -239,7 +241,10 @@ export default function App() {
             <AvatarProvider sidebarStats={{ credits, seguidores, siguiendo, apuntes }}>
                 <NotificationProvider>
                     <NotificationsProvider>
-                        <NotificationsRealtimeSubscriber />
+                        <AuthSessionManager />
+                        <ErrorBoundary>
+                            <NotificationsRealtimeSubscriber />
+                        </ErrorBoundary>
                         <PrivacyBanner />
                         <ConnectionMonitor />
                         <MentorOnboardingModal
