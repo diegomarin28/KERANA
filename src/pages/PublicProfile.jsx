@@ -315,9 +315,9 @@ export default function PublicProfile() {
 
                                 {/* Stats inline */}
                                 <div style={statsInlineStyle}>
-                                    <StatInline number={stats?.seguidores || 0} label="seguidores" />
-                                    <StatInline number={stats?.siguiendo || 0} label="siguiendo" />
-                                    <StatInline number={stats?.apuntes || 0} label="apuntes" />
+                                    <StatInline number={stats?.seguidores || 0} label="Seguidores" />
+                                    <StatInline number={stats?.siguiendo || 0} label="Siguiendo" />
+                                    <StatInline number={stats?.apuntes || 0} label="Apuntes" />
                                 </div>
                             </div>
 
@@ -942,7 +942,8 @@ const carouselContainerStyle = {
 };
 
 const carouselItemStyle = {
-    minWidth: 360,
+    minWidth: 280,
+    maxWidth: 280,
     flexShrink: 0,
 };
 
@@ -1000,7 +1001,7 @@ const filterChipStyle = {
 const notesGridStyle = {
     display: 'grid',
     gap: 16,
-    gridTemplateColumns: 'repeat(auto-fill, minmax(360px, 1fr))',
+    gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 280px))',
 };
 
 const emptyStateStyle = {
