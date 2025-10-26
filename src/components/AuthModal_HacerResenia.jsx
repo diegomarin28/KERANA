@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { ratingsAPI } from "../api/Database";
+import { ratingsAPI } from "../api/database";
 import { supabase } from "../supabase";
 import { validarComentario } from "../utils/wordFilter";
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
