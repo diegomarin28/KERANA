@@ -1,4 +1,4 @@
-import { Link } from "react-router-dom"
+import npm{ Link } from "react-router-dom"
 import { Card } from "../components/UI/Card"
 import { Chip } from "../components/UI/Chip"
 
