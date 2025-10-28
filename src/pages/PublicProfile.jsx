@@ -7,8 +7,7 @@ import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import {
     faUserPlus,
     faUserCheck,
-    faShare,
-    faCalendar,
+    faShareNodes,
     faChevronLeft,
     faChevronRight,
     faFilter,
@@ -19,7 +18,6 @@ import {
     faBook,
     faTrophy,
     faFaceFrown,
-    faFileLines,
     faSearch
 } from '@fortawesome/free-solid-svg-icons';
 import { faLinkedin } from '@fortawesome/free-brands-svg-icons';
@@ -218,13 +216,6 @@ export default function PublicProfile() {
         return badges;
     };
 
-    const formatMemberSince = (dateString) => {
-        const date = new Date(dateString);
-        const months = ['enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio',
-            'julio', 'agosto', 'septiembre', 'octubre', 'noviembre', 'diciembre'];
-        return `${months[date.getMonth()]} ${date.getFullYear()}`;
-    };
-
     if (loading) {
         return (
             <div style={pageStyle}>
@@ -326,24 +317,26 @@ export default function PublicProfile() {
                                     </div>
                                 )}
 
-                                {/* Meta info */}
-                                <div style={metaInfoStyle}>
-
-                                    {/* LINKEDIN */}
-                                    {profile.linkedin && (
-                                        <a
-                                            href={profile.linkedin}
-                                            target="_blank"
-                                            rel="noopener noreferrer"
-                                            style={linkedinLinkStyle}
-                                            onMouseEnter={(e) => e.currentTarget.style.color = '#004182'}
-                                            onMouseLeave={(e) => e.currentTarget.style.color = '#0a66c2'}
-                                        >
-                                            <FontAwesomeIcon icon={faLinkedin} style={{ width: 16, height: 16 }} />
-                                            Ver perfil de LinkedIn
-                                        </a>
-                                    )}
-                                </div>
+                                {/* LINKEDIN BUTTON */}
+                                {profile.linkedin && (
+                                    <a
+                                        href={profile.linkedin}
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                        style={linkedinButtonStyle}
+                                        onMouseEnter={(e) => {
+                                            e.currentTarget.style.background = '#0a66c2';
+                                            e.currentTarget.style.color = 'white';
+                                        }}
+                                        onMouseLeave={(e) => {
+                                            e.currentTarget.style.background = 'white';
+                                            e.currentTarget.style.color = '#0a66c2';
+                                        }}
+                                    >
+                                        <FontAwesomeIcon icon={faLinkedin} style={{ fontSize: 16 }} />
+                                        Ver LinkedIn
+                                    </a>
+                                )}
 
                                 {profile.mostrar_email && (
                                     <div style={emailContainerStyle}>
@@ -393,7 +386,7 @@ export default function PublicProfile() {
                                         style={shareButtonStyle}
                                         title="Compartir perfil"
                                     >
-                                        <FontAwesomeIcon icon={faShare} />
+                                        <FontAwesomeIcon icon={faShareNodes} />
                                     </button>
                                     {showShareTooltip && (
                                         <div style={tooltipStyle}>
@@ -867,31 +860,21 @@ const badgeStyle = {
     fontFamily: 'Inter, sans-serif',
 };
 
-const metaInfoStyle = {
-    display: 'flex',
-    flexDirection: 'column',
-    gap: 8,
-    marginBottom: 12,
-};
-
-const metaItemStyle = {
-    display: 'flex',
+const linkedinButtonStyle = {
+    display: 'inline-flex',
     alignItems: 'center',
-    gap: 8,
-    fontSize: 14,
-    color: '#666',
-    fontFamily: 'Inter, sans-serif',
-};
-
-const linkedinLinkStyle = {
-    display: 'flex',
-    alignItems: 'center',
-    gap: 8,
-    fontSize: 14,
+    gap: 6,                           // ← Reducido de 8 a 6
+    padding: '6px 16px',              // ← Reducido de '10px 20px'
+    background: 'white',
     color: '#0a66c2',
+    border: '2px solid #0a66c2',
+    borderRadius: 6,                  // ← Cambiado de 24 (redondeado) a 6 (rectangular)
+    fontSize: 14,                     // ← Reducido de 14 a 13
+    fontWeight: 600,
     textDecoration: 'none',
-    fontWeight: 500,
-    transition: 'color 0.2s ease',
+    transition: 'all 0.2s ease',
+    marginBottom: 12,
+    boxShadow: '0 1px 3px rgba(0,0,0,0.08)',  // ← Sombra más sutil
     fontFamily: 'Inter, sans-serif',
 };
 
