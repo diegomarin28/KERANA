@@ -7,6 +7,7 @@ import AuthGuard from "./components/AuthGuard";
 import Equipo from "./pages/Equipo";
 import { AvatarProvider } from './contexts/AvatarContext';
 import { ConnectionMonitor } from './components/ConnectionMonitor';
+import GlobalCalendar from './pages/GlobalCalendar';
 
 // Componentes lazy
 const HelpCenter = lazy(() => import("./pages/HelpCenter"));
@@ -63,6 +64,7 @@ import { MentorOnboardingModal } from './components/MentorOnboardingModal';
 import { MentorWelcomeModal } from './components/MentorWelcomeModal';
 import CreditsSuccess from './pages/CreditsSuccess';
 import CreditsFailure from './pages/CreditsFailure';
+import {useExpiredReservationsCleanup} from "./hooks/useExpiredReservationsCleanup.js";
 
 
 
@@ -93,6 +95,8 @@ function RouteDebugger() {
 function AppRoutes() {
     const location = useLocation();
     const navigate = useNavigate();
+
+    useExpiredReservationsCleanup();
 
     const params = new URLSearchParams(location.search);
     const openAuth = params.get("auth") === "signin" || params.get("completeProfile") === "1";
@@ -211,6 +215,9 @@ function AppRoutes() {
                     <Route path="/upload" element={<AuthGuard requireAuth={true}><Upload /></AuthGuard>} />
                     <Route path="/contact" element={<Contact />} />
                     <Route path="/mentores/postular" element={<AuthGuard requireAuth={true}><MentorApply /></AuthGuard>} />
+
+                    {/* Nueva ruta para el calendario global */}
+                    <Route path="/calendario-global" element={<GlobalCalendar />} />
 
                     {/* 404 */}
                     <Route path="*" element={
