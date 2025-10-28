@@ -193,18 +193,20 @@ export default function AuthModal_HacerResenia({
                                                    open,
                                                    onClose,
                                                    onSave,
-                                                   preSelectedEntity = null
+                                                   preSelectedEntity = null,
+                                                   initialData = null,
+                                                   isEditing = false
                                                }) {
     const isPreSelected = !!preSelectedEntity;
 
     const [form, setForm] = useState({
-        tipo: preSelectedEntity?.tipo || "profesor",
-        selectedEntity: preSelectedEntity || null,
-        selectedMateria: null,
-        rating: 5,
-        selectedTags: [],
-        texto: "",
-        workload: "Medio"
+        tipo: initialData?.tipo || preSelectedEntity?.tipo || "profesor",
+        selectedEntity: initialData?.selectedEntity || preSelectedEntity || null,
+        selectedMateria: initialData?.selectedMateria || null,
+        rating: initialData?.rating || 5,
+        selectedTags: initialData?.selectedTags || [],
+        texto: initialData?.texto || "",
+        workload: initialData?.workload || "Medio"
     });
 
     const [errors, setErrors] = useState({});
@@ -219,6 +221,10 @@ export default function AuthModal_HacerResenia({
 
     const [materias, setMaterias] = useState([]);
     const [loadingMaterias, setLoadingMaterias] = useState(false);
+
+    const [currentUserId, setCurrentUserId] = useState(null);
+    const [currentUserMentorIds, setCurrentUserMentorIds] = useState([]);
+
 
     useEffect(() => {
         if (isPreSelected) return;
@@ -281,6 +287,11 @@ export default function AuthModal_HacerResenia({
                                 const nombreNormalized = normalizeText(nombreCompleto);
 
                                 if (nombreNormalized.includes(termNormalized)) {
+                                    // Filtrar al usuario actual si es mentor
+                                    if (currentUserMentorIds.includes(m.id_mentor)) {
+                                        return; // No agregar el mentor actual a los resultados
+                                    }
+
                                     const usuarioKey = `${m.id_usuario}`;
                                     const existing = mentoresMap.get(usuarioKey);
                                     if (!existing || m.id_mentor > existing.id) {
@@ -311,7 +322,51 @@ export default function AuthModal_HacerResenia({
         }, 300);
 
         return () => clearTimeout(debounce);
-    }, [searchTerm, form.tipo, isPreSelected]);
+    }, [searchTerm, form.tipo, isPreSelected, currentUserMentorIds]);
+
+    // Obtener el usuario actual y sus ids de mentor si es mentor
+    useEffect(() => {
+        const getCurrentUser = async () => {
+            try {
+                const { data: { user }, error: authError } = await supabase.auth.getUser();
+
+                if (authError || !user) {
+                    console.error('Error obteniendo usuario:', authError);
+                    return;
+                }
+
+                // Obtener id_usuario desde la tabla usuario usando auth_id
+                const { data: usuarioData, error: usuarioError } = await supabase
+                    .from('usuario')
+                    .select('id_usuario')
+                    .eq('auth_id', user.id)
+                    .single();
+
+                if (usuarioError || !usuarioData) {
+                    console.error('Error obteniendo id_usuario:', usuarioError);
+                    return;
+                }
+
+                setCurrentUserId(usuarioData.id_usuario);
+
+                // Si estamos en modo mentor, obtener todos los id_mentor del usuario
+                if (form.tipo === 'mentor') {
+                    const { data: mentorData, error: mentorError } = await supabase
+                        .from('mentor')
+                        .select('id_mentor')
+                        .eq('id_usuario', usuarioData.id_usuario);
+
+                    if (!mentorError && mentorData) {
+                        setCurrentUserMentorIds(mentorData.map(m => m.id_mentor));
+                    }
+                }
+            } catch (error) {
+                console.error('Error en getCurrentUser:', error);
+            }
+        };
+
+        getCurrentUser();
+    }, [form.tipo]);
 
     useEffect(() => {
         if (!form.selectedEntity) {
@@ -520,28 +575,14 @@ export default function AuthModal_HacerResenia({
         setIsSubmitting(true);
 
         try {
-            const { data, error } = await ratingsAPI.createRating(
-                form.tipo,
-                form.selectedEntity.id,
-                form.rating,
-                form.texto,
-                {
-                    workload: form.workload,
-                    materia_id: form.selectedMateria.id,
-                    tags: form.selectedTags
-                }
-            );
-
-            if (error) {
-                setToast({ message: 'Error al enviar reseña: ' + error.message, type: 'error' });
-            } else {
-                setToast({ message: '¡Reseña enviada correctamente!', type: 'success' });
-
+            if (isEditing && initialData?.ratingId) {
+                // Modo edición
                 if (onSave) {
-                    onSave({
-                        ...form,
-                        id: data?.id,
-                        fecha: new Date().toISOString()
+                    await onSave({
+                        rating: form.rating,
+                        texto: form.texto,
+                        workload: form.workload,
+                        selectedTags: form.selectedTags
                     });
                 }
 
@@ -560,11 +601,53 @@ export default function AuthModal_HacerResenia({
                     setWordFilterError(null);
                     onClose();
                 }, 1500);
-            }
+            } else {
+                // Modo creación (código original)
+                const { data, error } = await ratingsAPI.createRating(
+                    form.tipo,
+                    form.selectedEntity.id,
+                    form.rating,
+                    form.texto,
+                    {
+                        workload: form.workload,
+                        materia_id: form.selectedMateria.id,
+                        tags: form.selectedTags
+                    }
+                );
 
+                if (error) {
+                    setToast({ message: 'Error al enviar reseña: ' + error.message, type: 'error' });
+                } else {
+                    setToast({ message: '¡Reseña enviada correctamente!', type: 'success' });
+
+                    if (onSave) {
+                        onSave({
+                            ...form,
+                            id: data?.id,
+                            fecha: new Date().toISOString()
+                        });
+                    }
+
+                    setTimeout(() => {
+                        setForm({
+                            tipo: isPreSelected ? preSelectedEntity.tipo : "profesor",
+                            selectedEntity: isPreSelected ? preSelectedEntity : null,
+                            selectedMateria: null,
+                            rating: 5,
+                            selectedTags: [],
+                            texto: "",
+                            workload: "Medio"
+                        });
+                        setSearchTerm("");
+                        setErrors({});
+                        setWordFilterError(null);
+                        onClose();
+                    }, 1500);
+                }
+            }
         } catch (error) {
-            console.error("Error al enviar reseña:", error);
-            setToast({ message: 'Error inesperado al enviar la reseña', type: 'error' });
+            console.error("Error al procesar reseña:", error);
+            setToast({ message: 'Error inesperado al procesar la reseña', type: 'error' });
         } finally {
             setIsSubmitting(false);
         }
@@ -639,9 +722,12 @@ export default function AuthModal_HacerResenia({
                             fontWeight: 700,
                             color: "#0f172a"
                         }}>
-                            {isPreSelected
-                                ? `Reseñar a ${form.selectedEntity.nombre}`
-                                : "Crear reseña"
+                            {isEditing
+                                ? `Editar reseña de ${form.selectedEntity.nombre}`
+                                : (isPreSelected
+                                        ? `Reseñar a ${form.selectedEntity.nombre}`
+                                        : "Crear reseña"
+                                )
                             }
                         </h3>
                         <button
@@ -774,7 +860,7 @@ export default function AuthModal_HacerResenia({
                     )}
 
                     {/* Buscador */}
-                    {!isPreSelected && (
+                    {!isPreSelected && !isEditing && (
                         <label style={{ display: "grid", gap: 10, position: "relative" }}>
                             <span style={{ fontWeight: 600, fontSize: 14, color: "#0f172a" }}>
                                 Buscar {form.tipo} <span style={{color: "#ef4444"}}>*</span>
@@ -926,7 +1012,7 @@ export default function AuthModal_HacerResenia({
                     )}
 
                     {/* Selector de materia */}
-                    {form.selectedEntity && (
+                    {form.selectedEntity && !isEditing &&(
                         <label style={{ display: "grid", gap: 10 }}>
                             <span style={{ fontWeight: 600, fontSize: 14, color: "#0f172a" }}>
                                 Materia <span style={{color: "#ef4444"}}>*</span>
@@ -968,6 +1054,25 @@ export default function AuthModal_HacerResenia({
                                 </span>
                             )}
                         </label>
+                    )}
+
+                    {/* En modo edición, mostrar materia como texto no editable */}
+                    {isEditing && form.selectedMateria && (
+                        <div style={{
+                            padding: '14px 16px',
+                            background: '#f8fafc',
+                            border: '2px solid #e2e8f0',
+                            borderRadius: 10,
+                            display: 'grid',
+                            gap: 6
+                        }}>
+        <span style={{ fontSize: 13, color: '#64748b', fontWeight: 600 }}>
+            Materia
+        </span>
+                            <span style={{ fontSize: 15, color: '#0f172a', fontWeight: 700 }}>
+            {form.selectedMateria.nombre}
+        </span>
+                        </div>
                     )}
 
                     {/* Calificación y Tags */}

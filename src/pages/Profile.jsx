@@ -4,6 +4,7 @@ import { supabase } from '../supabase';
 import { followersAPI } from '../api/followers';
 import { useMentorStatus } from '../hooks/useMentorStatus';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
+import MisReseniasModal from '../components/MisReseniasModal';
 import {
     faEdit,
     faFileAlt,
@@ -30,6 +31,7 @@ export default function Profile() {
     const [showFullImage, setShowFullImage] = useState(false);
     const navigate = useNavigate();
     const { isMentor, loading: mentorLoading } = useMentorStatus(true);
+    const [showReseniasModal, setShowReseniasModal] = useState(false);
 
     useEffect(() => {
         fetchProfile();
@@ -105,20 +107,10 @@ export default function Profile() {
                 .select('*', { count: 'exact', head: true })
                 .eq('id_usuario', id);
 
-            const [evaluaResult, calificaResult] = await Promise.all([
-                supabase
-                    .from('evalua')
-                    .select('*', { count: 'exact', head: true })
-                    .eq('id_usuario', id),
-                supabase
-                    .from('califica')
-                    .select('*', { count: 'exact', head: true })
-                    .eq('id_usuario', id)
-            ]);
-
-            const totalReseñas =
-                (evaluaResult.error ? 0 : (evaluaResult.count || 0)) +
-                (calificaResult.error ? 0 : (calificaResult.count || 0));
+            const { count: totalReseñas } = await supabase
+                .from('rating')
+                .select('*', { count: 'exact', head: true })
+                .eq('user_id', id);
 
             const { seguidores, siguiendo } = await followersAPI.obtenerContadores(id);
 
@@ -645,15 +637,19 @@ export default function Profile() {
                         </div>
                     </div>
 
-                    {/* Reseñas Escritas */}
-                    <div style={{
-                        background: '#fff',
-                        borderRadius: '16px',
-                        padding: '24px',
-                        border: '2px solid #f1f5f9',
-                        boxShadow: '0 2px 8px rgba(0,0,0,0.04)',
-                        transition: 'all 0.3s ease',
-                    }}
+                    {/* Reseñas Escritas - CLICKEABLE */}
+                    <div
+                        onClick={() => setShowReseniasModal(true)}
+                        style={{
+                            background: '#fff',
+                            borderRadius: '16px',
+                            padding: '24px',
+                            border: '2px solid #f1f5f9',
+                            boxShadow: '0 2px 8px rgba(0,0,0,0.04)',
+                            transition: 'all 0.3s ease',
+                            cursor: 'pointer',
+                        }}
+
                          onMouseEnter={(e) => {
                              e.currentTarget.style.transform = 'translateY(-4px)';
                              e.currentTarget.style.boxShadow = '0 12px 32px rgba(0,0,0,0.08)';
@@ -706,6 +702,13 @@ export default function Profile() {
                     </div>
                 </div>
             </div>
+
+            {/* Modal de Mis Reseñas */}
+            <MisReseniasModal
+                open={showReseniasModal}
+                onClose={() => setShowReseniasModal(false)}
+            />
+
 
             {/* Modal Avatar Imagen Grande */}
             {showFullImage && avatarSrc && (
