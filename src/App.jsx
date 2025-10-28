@@ -215,7 +215,8 @@ function AppRoutes() {
                     <Route path="/contact" element={<Contact />} />
                     <Route path="/mentores/postular" element={<AuthGuard requireAuth={true}><MentorApply /></AuthGuard>} />
 
-
+                    {/* Nueva ruta para el calendario global */}
+                    <Route path="/calendario-global" element={<GlobalCalendar />} />
 
                     {/* 404 */}
                     <Route path="*" element={
