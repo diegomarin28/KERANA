@@ -1,0 +1,431 @@
+/* GlobalCalendar.css */
+
+.global-calendar-container {
+    display: flex;
+    gap: 2rem;
+    padding: 2rem;
+    max-width: 1400px;
+    margin: 0 auto;
+    min-height: 600px;
+}
+
+.loading {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    min-height: 400px;
+    font-size: 1.2rem;
+    color: #666;
+}
+
+/* ========== SECCIÓN CALENDARIO (IZQUIERDA) ========== */
+.calendar-section {
+    flex: 1;
+    background: white;
+    border-radius: 16px;
+    padding: 2rem;
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+}
+
+.calendar-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 2rem;
+}
+
+.calendar-title {
+    font-size: 1.5rem;
+    font-weight: 700;
+    margin: 0;
+}
+
+.nav-button {
+    background: #f3f4f6;
+    border: none;
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    font-size: 1.2rem;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.nav-button:hover {
+    background: #e5e7eb;
+    transform: scale(1.05);
+}
+
+.calendar-grid {
+    display: grid;
+    grid-template-columns: repeat(7, 1fr);
+    gap: 0.5rem;
+}
+
+.calendar-day-header {
+    text-align: center;
+    font-weight: 600;
+    font-size: 0.75rem;
+    color: #6b7280;
+    padding: 0.5rem;
+}
+
+.calendar-day {
+    aspect-ratio: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    border-radius: 8px;
+    cursor: pointer;
+    transition: all 0.2s;
+    padding: 0.5rem;
+    position: relative;
+}
+
+.calendar-day.empty {
+    cursor: default;
+}
+
+.calendar-day:not(.empty):hover {
+    background: #f9fafb;
+    transform: scale(1.05);
+}
+
+.calendar-day.has-availability {
+    background: #ede9fe;
+    cursor: pointer;
+}
+
+.calendar-day.has-availability:hover {
+    background: #ddd6fe;
+}
+
+.calendar-day.selected {
+    background: #7c3aed;
+    color: white;
+}
+
+.calendar-day.selected .mentor-indicator {
+    color: white;
+}
+
+.calendar-day.today {
+    border: 2px solid #3b82f6;
+}
+
+.day-number {
+    font-size: 1rem;
+    font-weight: 600;
+    margin-bottom: 0.25rem;
+}
+
+.mentor-indicator {
+    font-size: 0.65rem;
+    color: #7c3aed;
+    font-weight: 500;
+    text-align: center;
+}
+
+.calendar-legend {
+    margin-top: 2rem;
+    padding-top: 1rem;
+    border-top: 1px solid #e5e7eb;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 1rem;
+}
+
+.legend-item {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    font-size: 0.875rem;
+    color: #6b7280;
+}
+
+.legend-color {
+    width: 20px;
+    height: 20px;
+    border-radius: 4px;
+}
+
+.legend-color.available {
+    background: #ede9fe;
+}
+
+.legend-color.selected {
+    background: #7c3aed;
+}
+
+.legend-color.today {
+    border: 2px solid #3b82f6;
+    background: white;
+}
+
+/* ========== SECCIÓN MENTORES (DERECHA) ========== */
+.mentors-section {
+    flex: 0 0 400px;
+    background: white;
+    border-radius: 16px;
+    padding: 2rem;
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+    max-height: 700px;
+    display: flex;
+    flex-direction: column;
+}
+
+.mentors-header {
+    margin-bottom: 1.5rem;
+}
+
+.date-title {
+    font-size: 1.5rem;
+    font-weight: 700;
+    margin: 0 0 0.5rem 0;
+}
+
+.mentors-count {
+    color: #6b7280;
+    margin: 0;
+}
+
+.mentors-list {
+    overflow-y: auto;
+    flex: 1;
+}
+
+.no-mentors {
+    text-align: center;
+    padding: 3rem 1rem;
+    color: #6b7280;
+}
+
+.no-mentors p {
+    margin: 0.5rem 0;
+}
+
+.suggestion {
+    font-size: 0.875rem;
+    color: #9ca3af;
+}
+
+.mentor-card {
+    background: #f9fafb;
+    border-radius: 12px;
+    padding: 1.5rem;
+    margin-bottom: 1rem;
+    border: 2px solid transparent;
+    transition: all 0.2s;
+}
+
+.mentor-card:hover {
+    border-color: #7c3aed;
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(124, 58, 237, 0.15);
+}
+
+.mentor-name {
+    font-size: 1.125rem;
+    font-weight: 600;
+    margin: 0 0 1rem 0;
+}
+
+.mentor-slots {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+    margin-bottom: 1rem;
+}
+
+.slot-button {
+    background: white;
+    border: 1px solid #d1d5db;
+    padding: 0.5rem 1rem;
+    border-radius: 6px;
+    font-size: 0.875rem;
+    font-weight: 500;
+    color: #374151;
+    cursor: default;
+}
+
+.book-button {
+    width: 100%;
+    background: #7c3aed;
+    color: white;
+    border: none;
+    padding: 0.75rem 1rem;
+    border-radius: 8px;
+    font-weight: 600;
+    font-size: 1rem;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.book-button:hover {
+    background: #6d28d9;
+    transform: translateY(-1px);
+    box-shadow: 0 4px 12px rgba(124, 58, 237, 0.3);
+}
+
+/* ========== MODAL DE CALENDLY ========== */
+.calendly-modal-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0, 0, 0, 0.6);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 1000;
+    padding: 1rem;
+}
+
+.calendly-modal {
+    background: white;
+    border-radius: 16px;
+    max-width: 800px;
+    width: 100%;
+    max-height: 90vh;
+    display: flex;
+    flex-direction: column;
+    box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1);
+}
+
+.calendly-modal-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 1.5rem;
+    border-bottom: 1px solid #e5e7eb;
+}
+
+.calendly-modal-header h3 {
+    margin: 0;
+    font-size: 1.25rem;
+    font-weight: 600;
+}
+
+.close-button {
+    background: none;
+    border: none;
+    font-size: 1.5rem;
+    cursor: pointer;
+    color: #6b7280;
+    width: 32px;
+    height: 32px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 4px;
+    transition: all 0.2s;
+}
+
+.close-button:hover {
+    background: #f3f4f6;
+    color: #374151;
+}
+
+.calendly-modal-body {
+    padding: 1.5rem;
+    overflow-y: auto;
+    flex: 1;
+}
+
+.reservation-info {
+    background: #fef3c7;
+    border: 1px solid #fbbf24;
+    border-radius: 8px;
+    padding: 1rem;
+    margin-bottom: 1rem;
+    font-size: 0.875rem;
+    line-height: 1.6;
+}
+
+.calendly-modal-footer {
+    display: flex;
+    gap: 1rem;
+    padding: 1.5rem;
+    border-top: 1px solid #e5e7eb;
+}
+
+.confirm-button,
+.cancel-button {
+    flex: 1;
+    padding: 0.75rem 1.5rem;
+    border-radius: 8px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.confirm-button {
+    background: #10b981;
+    color: white;
+    border: none;
+}
+
+.confirm-button:hover {
+    background: #059669;
+    transform: translateY(-1px);
+    box-shadow: 0 4px 12px rgba(16, 185, 129, 0.3);
+}
+
+.cancel-button {
+    background: white;
+    color: #6b7280;
+    border: 1px solid #d1d5db;
+}
+
+.cancel-button:hover {
+    background: #f9fafb;
+    border-color: #9ca3af;
+}
+
+/* ========== RESPONSIVE ========== */
+@media (max-width: 1024px) {
+    .global-calendar-container {
+        flex-direction: column;
+    }
+
+    .mentors-section {
+        flex: 1;
+        max-height: none;
+    }
+}
+
+@media (max-width: 640px) {
+    .global-calendar-container {
+        padding: 1rem;
+        gap: 1rem;
+    }
+
+    .calendar-section,
+    .mentors-section {
+        padding: 1rem;
+    }
+
+    .calendar-title {
+        font-size: 1.25rem;
+    }
+
+    .calendar-day-header {
+        font-size: 0.65rem;
+    }
+
+    .day-number {
+        font-size: 0.875rem;
+    }
+
+    .mentor-indicator {
+        font-size: 0.6rem;
+    }
+
+    .calendly-modal {
+        max-width: 100%;
+        max-height: 100vh;
+        border-radius: 0;
+    }
+}
