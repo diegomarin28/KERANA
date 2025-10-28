@@ -1,11 +1,11 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '../../supabase';
-import { mentorAPI } from '../../api/database';
-import { Card } from '../../components/ui/Card';
-import { Button } from '../../components/ui/Button';
+import { Card } from '../../components/UI/Card';
+import { Button } from '../../components/UI/Button';
 import { useMentorPayment } from '../../hooks/useMentorPayment';
 import { MentorWelcomeModal } from '../../components/MentorWelcomeModal';
 import { useMentorStatus } from '../../hooks/useMentorStatus';
+import { SuccessModal } from '../../components/SuccessModal';
 
 const LOCALIDADES = {
     montevideo: [
@@ -26,18 +26,17 @@ const LOCALIDADES = {
 
 export default function IAmMentor() {
     const [activeTab, setActiveTab] = useState('materias');
-    const [loading, setLoading] = useState(false);
+    const [mentorships, setMentorships] = useState([]);
+    const [loading, setLoading] = useState(true);
     const [error, setError] = useState('');
     const [showWelcome, setShowWelcome] = useState(false);
-    const [saving, setSaving] = useState(false);
-    const [confirmDelete, setConfirmDelete] = useState(null);
-    const [notification, setNotification] = useState(null);
+    const [proximasSesiones, setProximasSesiones] = useState([]);
+    const [loadingSesiones, setLoadingSesiones] = useState(false);
 
-    const { isMentor, mentorData: mentorStatusData, loading: mentorLoading, refetch } = useMentorStatus();
+    const { isMentor, mentorData: mentorStatusData, loading: mentorLoading } = useMentorStatus();
     const { paymentData, hasPaymentConfigured, savePaymentData } = useMentorPayment();
 
     const mentorData = mentorStatusData?.[0] || null;
-    const mentorships = mentorData?.mentor_materia || [];
 
     const [configForm, setConfigForm] = useState({
         maxAlumnos: null,
@@ -48,31 +47,31 @@ export default function IAmMentor() {
         direccion: ''
     });
 
-    const [perfilForm, setPerfilForm] = useState({
-        linkedin: '',
-        bio: ''
-    });
-
     const [pagoForm, setPagoForm] = useState({
         mpEmail: ''
     });
 
-    // Sistema de notificaciones
-    const showNotification = (message, type = 'success') => {
-        setNotification({ message, type });
-        setTimeout(() => setNotification(null), 3500);
-    };
+    const [saving, setSaving] = useState(false);
+    const [successModal, setSuccessModal] = useState({ open: false, message: '' });
 
     useEffect(() => {
-        if (mentorData?.id_mentor) {
+        if (mentorData) {
             fetchMentorDetails();
         }
-    }, [mentorData?.id_mentor]);
+    }, [mentorData]);
+
+    useEffect(() => {
+        if (paymentData?.mp_email) {
+            setPagoForm({ mpEmail: paymentData.mp_email });
+        }
+    }, [paymentData]);
 
     const fetchMentorDetails = async () => {
         if (!mentorData?.id_mentor) return;
 
         try {
+            setLoading(true);
+
             const { data: fullMentor, error: fullMentorError } = await supabase
                 .from('mentor')
                 .select('*')
@@ -81,6 +80,7 @@ export default function IAmMentor() {
 
             if (fullMentorError) {
                 console.error('Error cargando datos completos del mentor:', fullMentorError);
+                setLoading(false);
                 return;
             }
 
@@ -94,54 +94,84 @@ export default function IAmMentor() {
                     direccion: fullMentor.direccion || ''
                 });
 
-                setPerfilForm({
-                    linkedin: fullMentor.linkedin || '',
-                    bio: fullMentor.bio || ''
-                });
-
                 if (!fullMentor.onboarding_bienvenida_vista) {
                     setShowWelcome(true);
                 }
             }
+
+            setMentorships(mentorData.mentor_materia || []);
+
         } catch (err) {
             console.error('Error cargando detalles del mentor:', err);
+            setError('Error al cargar tus datos de mentor');
+        } finally {
+            setLoading(false);
         }
     };
 
-    const handleRemoveMentorship = (mentorshipId, materiaName) => {
-        setConfirmDelete({ id: mentorshipId, name: materiaName });
+    const fetchProximasSesiones = async () => {
+        if (!mentorData?.id_mentor) return;
+
+        try {
+            setLoadingSesiones(true);
+
+            const { data: sesiones, error } = await supabase
+                .from('mentor_sesion')
+                .select(`
+                    id_sesion,
+                    fecha_hora,
+                    duracion_minutos,
+                    estado,
+                    precio,
+                    notas_alumno,
+                    alumno:id_alumno(nombre, foto),
+                    materia:id_materia(nombre_materia)
+                `)
+                .eq('id_mentor', mentorData.id_mentor)
+                .in('estado', ['pendiente', 'confirmada'])
+                .gte('fecha_hora', new Date().toISOString())
+                .order('fecha_hora', { ascending: true })
+                .limit(10);
+
+            if (error) throw error;
+
+            setProximasSesiones(sesiones || []);
+        } catch (err) {
+            console.error('Error cargando sesiones:', err);
+        } finally {
+            setLoadingSesiones(false);
+        }
     };
 
-    const confirmRemoveMentorship = async () => {
-        if (!confirmDelete) return;
+    useEffect(() => {
+        if (activeTab === 'proximas' && mentorData?.id_mentor) {
+            fetchProximasSesiones();
+        }
+    }, [activeTab, mentorData]);
+
+    const handleRemoveMentorship = async (mentorshipId, materiaName) => {
+        if (!confirm(`¿Estás seguro que querés dejar de ser mentor de ${materiaName}?`)) {
+            return;
+        }
 
         try {
             const { error } = await supabase
                 .from('mentor_materia')
                 .delete()
-                .eq('id', confirmDelete.id);
+                .eq('id', mentorshipId);
 
             if (error) throw error;
 
-            const materiaName = confirmDelete.name;
-            setConfirmDelete(null);
-
-            showNotification(`Te diste de baja exitosamente de ${materiaName}`, 'success');
-
-            setTimeout(async () => {
-                await refetch();
-            }, 1000);
+            setMentorships(prev => prev.filter(m => m.id !== mentorshipId));
+            setSuccessModal({ open: true, message: 'Te diste de baja exitosamente' });
 
         } catch (err) {
             console.error('Error eliminando mentoría:', err);
-            showNotification('Error al darte de baja. Intentá de nuevo.', 'error');
-            setConfirmDelete(null);
+            alert('Error al darte de baja');
         }
     };
 
     const handleSaveConfig = async () => {
-        if (!mentorData?.id_mentor) return;
-
         try {
             setSaving(true);
 
@@ -159,37 +189,11 @@ export default function IAmMentor() {
 
             if (error) throw error;
 
-            showNotification('Configuración guardada exitosamente', 'success');
+            setSuccessModal({ open: true, message: 'Configuración guardada exitosamente' });
 
         } catch (err) {
             console.error('Error guardando config:', err);
-            showNotification('Error al guardar configuración', 'error');
-        } finally {
-            setSaving(false);
-        }
-    };
-
-    const handleSavePerfil = async () => {
-        if (!mentorData?.id_mentor) return;
-
-        try {
-            setSaving(true);
-
-            const { error } = await supabase
-                .from('mentor')
-                .update({
-                    linkedin: perfilForm.linkedin,
-                    bio: perfilForm.bio
-                })
-                .eq('id_mentor', mentorData.id_mentor);
-
-            if (error) throw error;
-
-            showNotification('Perfil actualizado exitosamente', 'success');
-
-        } catch (err) {
-            console.error('Error guardando perfil:', err);
-            showNotification('Error al guardar perfil', 'error');
+            alert('Error al guardar configuración');
         } finally {
             setSaving(false);
         }
@@ -197,7 +201,7 @@ export default function IAmMentor() {
 
     const handleSavePago = async () => {
         if (!pagoForm.mpEmail.trim()) {
-            showNotification('Ingresá tu email de Mercado Pago', 'error');
+            alert('Ingresá tu email de Mercado Pago');
             return;
         }
 
@@ -207,14 +211,14 @@ export default function IAmMentor() {
             const result = await savePaymentData({ mpEmail: pagoForm.mpEmail });
 
             if (result.success) {
-                showNotification('Método de pago configurado. ¡Ya podés recibir solicitudes!', 'success');
+                setSuccessModal({ open: true, message: 'Método de pago configurado. ¡Ya podés recibir solicitudes de clases!' });
             } else {
-                showNotification('Error al guardar método de pago', 'error');
+                alert('Error al guardar método de pago: ' + result.error);
             }
 
         } catch (err) {
             console.error('Error guardando pago:', err);
-            showNotification('Error al guardar método de pago', 'error');
+            alert('Error al guardar método de pago');
         } finally {
             setSaving(false);
         }
@@ -223,15 +227,36 @@ export default function IAmMentor() {
     const handleCloseWelcome = async () => {
         setShowWelcome(false);
 
-        if (mentorData?.id_mentor) {
-            await supabase
-                .from('mentor')
-                .update({ onboarding_bienvenida_vista: true })
-                .eq('id_mentor', mentorData.id_mentor);
+        if (mentorData) {
+            try {
+                const { error } = await supabase
+                    .from('mentor')
+                    .update({ onboarding_bienvenida_vista: true })
+                    .eq('id_mentor', mentorData.id_mentor);
+
+                if (error) {
+                    console.error('Error marcando bienvenida como vista:', error);
+                }
+            } catch (err) {
+                console.error('Error en handleCloseWelcome:', err);
+            }
         }
     };
 
-    if (mentorLoading) {
+    const formatFecha = (fechaStr) => {
+        const fecha = new Date(fechaStr);
+        const opciones = {
+            weekday: 'long',
+            year: 'numeric',
+            month: 'long',
+            day: 'numeric',
+            hour: '2-digit',
+            minute: '2-digit'
+        };
+        return fecha.toLocaleDateString('es-UY', opciones);
+    };
+
+    if (mentorLoading || loading) {
         return (
             <div style={pageStyle}>
                 <div style={centerStyle}>
@@ -242,7 +267,7 @@ export default function IAmMentor() {
         );
     }
 
-    if (!mentorData) {
+    if (!isMentor || !mentorData) {
         return (
             <div style={pageStyle}>
                 <div style={containerStyle}>
@@ -260,26 +285,6 @@ export default function IAmMentor() {
 
     return (
         <div style={pageStyle}>
-            {/* Sistema de notificaciones */}
-            {notification && (
-                <div style={{
-                    ...notificationStyle,
-                    background: notification.type === 'success' ? '#D1FAE5' : '#FEE2E2',
-                    borderColor: notification.type === 'success' ? '#10B981' : '#EF4444'
-                }}>
-                    <span style={{ fontSize: 20 }}>
-                        {notification.type === 'success' ? '✅' : '❌'}
-                    </span>
-                    <span style={{
-                        flex: 1,
-                        color: notification.type === 'success' ? '#065F46' : '#991B1B',
-                        fontWeight: 600
-                    }}>
-                        {notification.message}
-                    </span>
-                </div>
-            )}
-
             <div style={containerStyle}>
                 <div style={headerContainerStyle}>
                     <div>
@@ -324,6 +329,16 @@ export default function IAmMentor() {
                         📚 Materias
                     </button>
                     <button
+                        onClick={() => setActiveTab('proximas')}
+                        style={{
+                            ...tabButtonStyle,
+                            background: activeTab === 'proximas' ? '#10B981' : 'transparent',
+                            color: activeTab === 'proximas' ? 'white' : '#6B7280'
+                        }}
+                    >
+                        📅 Próximas Mentorías
+                    </button>
+                    <button
                         onClick={() => setActiveTab('config')}
                         style={{
                             ...tabButtonStyle,
@@ -332,16 +347,6 @@ export default function IAmMentor() {
                         }}
                     >
                         ⚙️ Configuración
-                    </button>
-                    <button
-                        onClick={() => setActiveTab('perfil')}
-                        style={{
-                            ...tabButtonStyle,
-                            background: activeTab === 'perfil' ? '#10B981' : 'transparent',
-                            color: activeTab === 'perfil' ? 'white' : '#6B7280'
-                        }}
-                    >
-                        👤 Perfil Público
                     </button>
                     <button
                         onClick={() => setActiveTab('pago')}
@@ -369,31 +374,8 @@ export default function IAmMentor() {
                 <div style={{ marginTop: 24 }}>
                     {activeTab === 'materias' && (
                         <div>
-                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
-                                <div>
-                                    <h2 style={sectionTitleStyle}>Mis Materias</h2>
-                                    <p style={sectionSubtitleStyle}>Materias en las que sos mentor actualmente</p>
-                                </div>
-                                <button
-                                    onClick={() => window.location.href = '/mentores/postular'}
-                                    style={{
-                                        background: '#10B981',
-                                        color: '#fff',
-                                        border: 'none',
-                                        padding: '10px 20px',
-                                        borderRadius: '8px',
-                                        fontSize: '14px',
-                                        fontWeight: '600',
-                                        cursor: 'pointer',
-                                        whiteSpace: 'nowrap',
-                                        transition: 'background 0.2s ease'
-                                    }}
-                                    onMouseEnter={(e) => e.target.style.background = '#059669'}
-                                    onMouseLeave={(e) => e.target.style.background = '#10B981'}
-                                >
-                                    + Agregar Materia
-                                </button>
-                            </div>
+                            <h2 style={sectionTitleStyle}>Mis Materias</h2>
+                            <p style={sectionSubtitleStyle}>Materias en las que sos mentor actualmente</p>
 
                             {mentorships.length === 0 ? (
                                 <Card style={{ padding: 40, textAlign: 'center', marginTop: 20 }}>
@@ -410,33 +392,122 @@ export default function IAmMentor() {
                                             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                                                 <div>
                                                     <h3 style={{ margin: '0 0 6px 0', fontSize: 18, fontWeight: 600 }}>
-                                                        {mentorship.materia?.nombre_materia || 'Sin nombre'}
+                                                        {mentorship.materia.nombre_materia}
                                                     </h3>
                                                     <p style={{ color: '#6b7280', margin: 0, fontSize: 14 }}>
-                                                        Semestre: {mentorship.materia?.semestre || 'N/A'}
+                                                        Semestre: {mentorship.materia.semestre}
                                                     </p>
                                                 </div>
-                                                <button
+                                                <Button
                                                     onClick={() => handleRemoveMentorship(
                                                         mentorship.id,
-                                                        mentorship.materia?.nombre_materia || 'esta materia'
+                                                        mentorship.materia.nombre_materia
                                                     )}
                                                     style={{
                                                         background: '#dc2626',
                                                         color: '#fff',
-                                                        border: 'none',
-                                                        padding: '8px 16px',
-                                                        borderRadius: '8px',
-                                                        fontSize: '14px',
-                                                        fontWeight: '600',
-                                                        cursor: 'pointer',
-                                                        transition: 'background 0.2s ease'
+                                                        border: 'none'
                                                     }}
-                                                    onMouseEnter={(e) => e.target.style.background = '#991b1b'}
-                                                    onMouseLeave={(e) => e.target.style.background = '#dc2626'}
                                                 >
                                                     Darme de baja
-                                                </button>
+                                                </Button>
+                                            </div>
+                                        </Card>
+                                    ))}
+                                </div>
+                            )}
+                        </div>
+                    )}
+
+                    {activeTab === 'proximas' && (
+                        <div>
+                            <h2 style={sectionTitleStyle}>Próximas Mentorías</h2>
+                            <p style={sectionSubtitleStyle}>Sesiones confirmadas y pendientes</p>
+
+                            {loadingSesiones ? (
+                                <div style={centerStyle}>
+                                    <div style={spinnerStyle}></div>
+                                </div>
+                            ) : proximasSesiones.length === 0 ? (
+                                <Card style={{ padding: 40, textAlign: 'center', marginTop: 20 }}>
+                                    <div style={{ fontSize: 48, marginBottom: 16 }}>📅</div>
+                                    <h3 style={{ margin: '0 0 12px 0' }}>No tenés mentorías programadas</h3>
+                                    <p style={{ color: '#6b7280', margin: 0 }}>
+                                        Cuando los alumnos agenden clases, aparecerán aquí
+                                    </p>
+                                </Card>
+                            ) : (
+                                <div style={{ display: 'grid', gap: 16, marginTop: 20 }}>
+                                    {proximasSesiones.map(sesion => (
+                                        <Card key={sesion.id_sesion} style={{ padding: 20 }}>
+                                            <div style={{ display: 'flex', gap: 16, alignItems: 'flex-start' }}>
+                                                {sesion.alumno?.foto ? (
+                                                    <img
+                                                        src={sesion.alumno.foto}
+                                                        alt={sesion.alumno.nombre}
+                                                        style={{
+                                                            width: 48,
+                                                            height: 48,
+                                                            borderRadius: '50%',
+                                                            objectFit: 'cover'
+                                                        }}
+                                                    />
+                                                ) : (
+                                                    <div style={{
+                                                        width: 48,
+                                                        height: 48,
+                                                        borderRadius: '50%',
+                                                        background: '#10B981',
+                                                        display: 'flex',
+                                                        alignItems: 'center',
+                                                        justifyContent: 'center',
+                                                        color: 'white',
+                                                        fontWeight: 700,
+                                                        fontSize: 18
+                                                    }}>
+                                                        {sesion.alumno?.nombre?.[0] || '?'}
+                                                    </div>
+                                                )}
+                                                <div style={{ flex: 1 }}>
+                                                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 8 }}>
+                                                        <div>
+                                                            <h3 style={{ margin: '0 0 4px 0', fontSize: 16, fontWeight: 600 }}>
+                                                                {sesion.alumno?.nombre || 'Alumno'}
+                                                            </h3>
+                                                            <p style={{ margin: '0 0 4px 0', color: '#10B981', fontSize: 14, fontWeight: 600 }}>
+                                                                {sesion.materia?.nombre_materia || 'Materia'}
+                                                            </p>
+                                                        </div>
+                                                        <span style={{
+                                                            padding: '4px 12px',
+                                                            background: sesion.estado === 'confirmada' ? '#D1FAE5' : '#FEF3C7',
+                                                            color: sesion.estado === 'confirmada' ? '#065F46' : '#92400E',
+                                                            borderRadius: 12,
+                                                            fontSize: 12,
+                                                            fontWeight: 600
+                                                        }}>
+                                                            {sesion.estado === 'confirmada' ? '✓ Confirmada' : '⏳ Pendiente'}
+                                                        </span>
+                                                    </div>
+                                                    <div style={{ fontSize: 14, color: '#6b7280', marginBottom: 8 }}>
+                                                        📅 {formatFecha(sesion.fecha_hora)}
+                                                    </div>
+                                                    <div style={{ fontSize: 14, color: '#6b7280' }}>
+                                                        ⏱️ Duración: {sesion.duracion_minutos} minutos · 💰 ${sesion.precio}
+                                                    </div>
+                                                    {sesion.notas_alumno && (
+                                                        <div style={{
+                                                            marginTop: 12,
+                                                            padding: 12,
+                                                            background: '#F9FAFB',
+                                                            borderRadius: 8,
+                                                            fontSize: 13,
+                                                            color: '#374151'
+                                                        }}>
+                                                            <strong>Nota del alumno:</strong> {sesion.notas_alumno}
+                                                        </div>
+                                                    )}
+                                                </div>
                                             </div>
                                         </Card>
                                     ))}
@@ -556,47 +627,6 @@ export default function IAmMentor() {
                         </div>
                     )}
 
-                    {activeTab === 'perfil' && (
-                        <div>
-                            <h2 style={sectionTitleStyle}>Perfil Público</h2>
-                            <p style={sectionSubtitleStyle}>Esta información aparece en tu perfil de mentor</p>
-
-                            <Card style={{ padding: 24, marginTop: 20 }}>
-                                <div style={formStyle}>
-                                    <div style={fieldStyle}>
-                                        <label style={labelStyle}>LinkedIn (opcional)</label>
-                                        <input
-                                            type="url"
-                                            placeholder="https://linkedin.com/in/tu-perfil"
-                                            value={perfilForm.linkedin}
-                                            onChange={(e) => setPerfilForm({ ...perfilForm, linkedin: e.target.value })}
-                                            style={inputStyle}
-                                        />
-                                    </div>
-
-                                    <div style={fieldStyle}>
-                                        <label style={labelStyle}>Biografía</label>
-                                        <textarea
-                                            placeholder="Contá un poco sobre vos, tu experiencia y por qué te gusta enseñar..."
-                                            value={perfilForm.bio}
-                                            onChange={(e) => setPerfilForm({ ...perfilForm, bio: e.target.value })}
-                                            rows={5}
-                                            maxLength={500}
-                                            style={{ ...inputStyle, resize: 'vertical' }}
-                                        />
-                                        <small style={{ fontSize: 13, color: '#6B7280' }}>
-                                            {perfilForm.bio.length}/500 caracteres
-                                        </small>
-                                    </div>
-
-                                    <button onClick={handleSavePerfil} disabled={saving} style={saveButtonStyle}>
-                                        {saving ? 'Guardando...' : 'Guardar Perfil'}
-                                    </button>
-                                </div>
-                            </Card>
-                        </div>
-                    )}
-
                     {activeTab === 'pago' && (
                         <div>
                             <h2 style={sectionTitleStyle}>Método de Pago</h2>
@@ -646,7 +676,7 @@ export default function IAmMentor() {
                                     <div style={{ padding: 16, background: '#FEF3C7', border: '2px solid #F59E0B', borderRadius: 12 }}>
                                         <p style={{ margin: 0, fontSize: 14, color: '#92400E' }}>
                                             ⚠️ <strong>Importante:</strong> Asegurate de tener una cuenta activa en Mercado Pago.
-                                            Si no tenés una, podés crearla en <a href="https://www.mercadopago.com.uy" target="_blank" rel="noreferrer" style={{ color: '#10B981', fontWeight: 600 }}>mercadopago.com.uy</a>
+                                            Si no tenés una, podés crearla en <a href="https://www.mercadopago.com.uy" target="_blank" style={{ color: '#10B981', fontWeight: 600 }}>mercadopago.com.uy</a>
                                         </p>
                                     </div>
 
@@ -717,42 +747,11 @@ export default function IAmMentor() {
             </div>
 
             <MentorWelcomeModal open={showWelcome} onClose={handleCloseWelcome} />
-
-            {/* Modal de confirmación */}
-            {confirmDelete && (
-                <div style={modalOverlayStyle}>
-                    <div style={modalContentStyle}>
-                        <div style={{ textAlign: 'center', marginBottom: 24 }}>
-                            <div style={{ fontSize: 48, marginBottom: 16 }}>⚠️</div>
-                            <h2 style={{ margin: '0 0 12px 0', fontSize: 20, fontWeight: 700, color: '#111827' }}>
-                                ¿Estás seguro?
-                            </h2>
-                            <p style={{ margin: 0, fontSize: 15, color: '#6B7280', lineHeight: 1.6 }}>
-                                Vas a dejar de ser mentor de <strong>{confirmDelete.name}</strong>.
-                                <br />
-                                Esta acción no se puede deshacer.
-                            </p>
-                        </div>
-
-                        <div style={{ display: 'flex', gap: 12, justifyContent: 'center' }}>
-                            <button
-                                onClick={() => setConfirmDelete(null)}
-                                style={cancelButtonStyle}
-                            >
-                                Cancelar
-                            </button>
-                            <button
-                                onClick={confirmRemoveMentorship}
-                                style={confirmButtonStyle}
-                                onMouseEnter={(e) => e.target.style.background = '#991b1b'}
-                                onMouseLeave={(e) => e.target.style.background = '#dc2626'}
-                            >
-                                Sí, darme de baja
-                            </button>
-                        </div>
-                    </div>
-                </div>
-            )}
+            <SuccessModal
+                open={successModal.open}
+                onClose={() => setSuccessModal({ open: false, message: '' })}
+                message={successModal.message}
+            />
         </div>
     );
 }
@@ -802,23 +801,6 @@ const subtitleStyle = {
     margin: 0,
     fontSize: 15,
     color: '#6B7280'
-};
-
-const notificationStyle = {
-    position: 'fixed',
-    top: 20,
-    right: 20,
-    zIndex: 9999,
-    display: 'flex',
-    alignItems: 'center',
-    gap: 12,
-    padding: '16px 20px',
-    borderRadius: 12,
-    border: '2px solid',
-    boxShadow: '0 10px 15px -3px rgba(0, 0, 0, 0.1)',
-    minWidth: 320,
-    maxWidth: 500,
-    animation: 'slideIn 0.3s ease-out'
 };
 
 const warningBannerStyle = {
@@ -999,51 +981,4 @@ const listTermsStyle = {
     fontSize: 14,
     lineHeight: 1.8,
     color: '#4B5563'
-};
-
-const modalOverlayStyle = {
-    position: 'fixed',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    background: 'rgba(0, 0, 0, 0.5)',
-    display: 'flex',
-    justifyContent: 'center',
-    alignItems: 'center',
-    zIndex: 1000,
-    padding: 16
-};
-
-const modalContentStyle = {
-    background: 'white',
-    borderRadius: 16,
-    padding: 32,
-    maxWidth: 440,
-    width: '100%',
-    boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)'
-};
-
-const cancelButtonStyle = {
-    padding: '12px 24px',
-    background: '#F3F4F6',
-    color: '#374151',
-    border: 'none',
-    borderRadius: 8,
-    fontWeight: 600,
-    fontSize: 15,
-    cursor: 'pointer',
-    transition: 'all 0.2s ease'
-};
-
-const confirmButtonStyle = {
-    padding: '12px 24px',
-    background: '#dc2626',
-    color: 'white',
-    border: 'none',
-    borderRadius: 8,
-    fontWeight: 600,
-    fontSize: 15,
-    cursor: 'pointer',
-    transition: 'all 0.2s ease'
 };

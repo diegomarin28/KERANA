@@ -1,4 +1,3 @@
-// src/api/Database.js
 import { supabase } from '../supabase'
 import emailjs from '@emailjs/browser';
 import { validarComentario } from '../utils/wordFilter';
@@ -1497,15 +1496,17 @@ export const publicProfileAPI = {
         const { data, error } = await supabase
             .from('usuario')
             .select(`
-                id_usuario,
-                nombre,
-                username,
-                foto,
-                correo,
-                perfil_publico,
-                mostrar_email,
-                fecha_creado
-            `)
+                    id_usuario,
+                    nombre,
+                    username,
+                    foto,
+                    correo,
+                    perfil_publico,
+                    mostrar_email,
+                    fecha_creado,
+                    bio,
+                    linkedin
+                `)
             .eq('username', username.toLowerCase())
             .maybeSingle();
 

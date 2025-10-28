@@ -1,4 +1,3 @@
-// src/pages/Notifications.jsx
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useNotificationsContext } from '../contexts/NotificationsContext';

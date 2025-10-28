@@ -1,4 +1,3 @@
-// src/pages/Subjects.jsx
 import { useEffect, useState, useMemo } from "react";
 import { subjectsAPI } from "../api/database";
 

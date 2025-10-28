@@ -1,4 +1,3 @@
-// src/utils/notificationStorage.js
 
 const LAST_VISIT_KEY = 'kerana_last_notification_visit';
 const SEEN_NOTIFICATIONS_KEY = 'kerana_seen_notifications';

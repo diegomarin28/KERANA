@@ -152,6 +152,7 @@ export default function FolderView() {
             `)
                 .eq("comprador_id", profile.id_usuario);
 
+
             // ✅ Obtener apuntes que YA están en esta carpeta
             const { data: notesInFolder } = await foldersAPI.getNotesInFolder(parseInt(id));
             const idsEnCarpeta = new Set(notesInFolder?.map(n => n.compra_id) || []);
@@ -392,12 +393,15 @@ export default function FolderView() {
                     creditos,
                     estrellas,
                     file_path,
+                    file_name,
+                    thumbnail_path, 
                     materia:id_materia(id_materia, nombre_materia),
                     usuario:id_usuario(nombre)
                 `)
                 .in("id_apunte", apIds);
 
             const urls = {};
+            const thumbnailUrls = {};
             if (apuntes?.length > 0) {
                 for (const apunte of apuntes) {
                     if (apunte.file_path) {
@@ -409,7 +413,9 @@ export default function FolderView() {
                             urls[apunte.id_apunte] = signedData.signedUrl;
                         }
                     }
+
                 }
+
             }
 
             const mapApunte = new Map(apuntes?.map(a => [a.id_apunte, a]) || []);
@@ -429,6 +435,8 @@ export default function FolderView() {
                     usuario: apunte?.usuario || { nombre: "Anónimo" },
                     materia: apunte?.materia || { nombre_materia: "Sin materia" },
                     signedUrl: urls[compra?.apunte_id] || null,
+                    thumbnail_path: apunte?.thumbnail_path || null,
+                    file_name: apunte?.file_name || null,
                     agregado_en: nif.agregado_en
                 };
             });

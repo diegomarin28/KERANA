@@ -8,8 +8,10 @@ import {
     faEdit,
     faFileAlt,
     faStar,
-    faCoins,
-    faGraduationCap
+    faCreditCard,
+    faGraduationCap,
+    faUsers,
+    faUserFriends
 } from '@fortawesome/free-solid-svg-icons';
 import { faLinkedin } from '@fortawesome/free-brands-svg-icons';
 
@@ -21,9 +23,11 @@ export default function Profile() {
         apuntesSubidos: 0,
         reseñasEscritas: 0,
         seguidores: 0,
-        siguiendo: 0
+        siguiendo: 0,
+        alumnosMentor: 0
     });
     const [avatarOk, setAvatarOk] = useState(true);
+    const [showFullImage, setShowFullImage] = useState(false);
     const navigate = useNavigate();
     const { isMentor, loading: mentorLoading } = useMentorStatus(true);
 
@@ -118,11 +122,31 @@ export default function Profile() {
 
             const { seguidores, siguiendo } = await followersAPI.obtenerContadores(id);
 
+            const { data: mentorData } = await supabase
+                .from('mentor')
+                .select('id_mentor')
+                .eq('id_usuario', id)
+                .maybeSingle();
+
+            let alumnosMentor = 0;
+            if (mentorData) {
+                const { data: sesionesData } = await supabase
+                    .from('mentor_sesion')
+                    .select('id_alumno')
+                    .eq('id_mentor', mentorData.id_mentor);
+
+                if (sesionesData) {
+                    const alumnosUnicos = new Set(sesionesData.map(s => s.id_alumno));
+                    alumnosMentor = alumnosUnicos.size;
+                }
+            }
+
             setStats({
                 apuntesSubidos: apuntesCount || 0,
                 reseñasEscritas: totalReseñas,
                 seguidores,
-                siguiendo
+                siguiendo,
+                alumnosMentor
             });
         } catch (error) {
             console.error('Error cargando estadísticas:', error);
@@ -178,6 +202,8 @@ export default function Profile() {
         );
     }
 
+    const avatarSrc = getAppAvatarSrc(profile?.foto);
+
     return (
         <div style={{
             minHeight: '100vh',
@@ -198,280 +224,78 @@ export default function Profile() {
                     border: '2px solid #f1f5f9',
                     boxShadow: '0 2px 8px rgba(0,0,0,0.04)',
                 }}>
-                    {/* Cover */}
+                    {/* Cover - AZUL LIMPIO */}
                     <div style={{
-                        height: '100px',
-                        background: 'linear-gradient(135deg, #13346b 0%, #2563eb 60%, #0ea5a3 100%)',
+                        height: '120px',
+                        background: '#13346b',
                     }} />
 
                     {/* Profile Info */}
                     <div style={{
-                        padding: '0 24px 24px 24px',
-                        marginTop: '-40px',
+                        padding: '0 32px 32px 32px',
+                        marginTop: '-60px',
                     }}>
                         <div style={{
                             display: 'flex',
                             justifyContent: 'space-between',
                             alignItems: 'flex-start',
-                            gap: '20px',
+                            gap: '24px',
                             flexWrap: 'wrap',
+                            marginBottom: '24px',
                         }}>
-                            {/* Avatar + Info */}
-                            <div style={{
-                                display: 'flex',
-                                gap: '20px',
-                                alignItems: 'flex-start',
-                                flex: 1,
-                                minWidth: 0,
-                            }}>
-                                {/* Avatar */}
-                                <div style={{
-                                    width: '80px',
-                                    height: '80px',
+                            {/* Avatar Clickeable */}
+                            <div
+                                onClick={() => avatarSrc && setShowFullImage(true)}
+                                style={{
+                                    width: '120px',
+                                    height: '120px',
                                     borderRadius: '50%',
                                     overflow: 'hidden',
-                                    border: '4px solid #fff',
-                                    boxShadow: '0 4px 12px rgba(0,0,0,0.1)',
+                                    border: '5px solid #fff',
+                                    boxShadow: '0 8px 24px rgba(0,0,0,0.12)',
                                     flexShrink: 0,
-                                }}>
-                                    {(() => {
-                                        const avatarSrc = getAppAvatarSrc(profile?.foto);
-                                        return avatarSrc && avatarOk ? (
-                                            <img
-                                                src={avatarSrc}
-                                                alt={profile?.nombre || "Usuario"}
-                                                onError={() => setAvatarOk(false)}
-                                                style={{
-                                                    width: '100%',
-                                                    height: '100%',
-                                                    objectFit: 'cover',
-                                                }}
-                                                loading="lazy"
-                                                referrerPolicy="no-referrer"
-                                            />
-                                        ) : (
-                                            <div style={{
-                                                width: '100%',
-                                                height: '100%',
-                                                background: 'linear-gradient(135deg, #3b82f6 0%, #1e40af 100%)',
-                                                display: 'flex',
-                                                alignItems: 'center',
-                                                justifyContent: 'center',
-                                                fontSize: '32px',
-                                                fontWeight: 800,
-                                                color: '#fff',
-                                            }}>
-                                                {(profile?.username?.[0] || profile?.nombre?.[0] || "U").toUpperCase()}
-                                            </div>
-                                        );
-                                    })()}
-                                </div>
-
-                                {/* Name + Username + Bio + Links + Stats */}
-                                <div style={{ flex: 1, minWidth: 0, paddingTop: '8px' }}>
+                                    cursor: avatarSrc ? 'pointer' : 'default',
+                                    transition: 'all 0.2s ease',
+                                }}
+                                onMouseEnter={(e) => {
+                                    if (avatarSrc) {
+                                        e.currentTarget.style.transform = 'scale(1.05)';
+                                        e.currentTarget.style.boxShadow = '0 12px 32px rgba(0,0,0,0.16)';
+                                    }
+                                }}
+                                onMouseLeave={(e) => {
+                                    e.currentTarget.style.transform = 'scale(1)';
+                                    e.currentTarget.style.boxShadow = '0 8px 24px rgba(0,0,0,0.12)';
+                                }}
+                            >
+                                {avatarSrc && avatarOk ? (
+                                    <img
+                                        src={avatarSrc}
+                                        alt={profile?.nombre || "Usuario"}
+                                        onError={() => setAvatarOk(false)}
+                                        style={{
+                                            width: '100%',
+                                            height: '100%',
+                                            objectFit: 'cover',
+                                        }}
+                                        loading="lazy"
+                                        referrerPolicy="no-referrer"
+                                    />
+                                ) : (
                                     <div style={{
+                                        width: '100%',
+                                        height: '100%',
+                                        background: 'linear-gradient(135deg, #2563eb 0%, #1e40af 100%)',
                                         display: 'flex',
                                         alignItems: 'center',
-                                        gap: '8px',
-                                        marginBottom: '4px',
+                                        justifyContent: 'center',
+                                        fontSize: '48px',
+                                        fontWeight: 800,
+                                        color: '#fff',
                                     }}>
-                                        <h1 style={{
-                                            margin: 0,
-                                            fontSize: '24px',
-                                            fontWeight: 800,
-                                            color: '#0f172a',
-                                            letterSpacing: '-0.02em',
-                                        }}>
-                                            {profile?.nombre || 'Usuario'}
-                                        </h1>
-                                        {isMentor && !mentorLoading && (
-                                            <div style={{
-                                                display: 'inline-flex',
-                                                alignItems: 'center',
-                                                gap: '4px',
-                                                padding: '3px 8px',
-                                                background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
-                                                borderRadius: '12px',
-                                                fontSize: '11px',
-                                                fontWeight: 700,
-                                                color: '#fff',
-                                                textTransform: 'uppercase',
-                                                letterSpacing: '0.3px',
-                                            }}>
-                                                <FontAwesomeIcon icon={faGraduationCap} style={{ fontSize: '10px' }} />
-                                                Mentor
-                                            </div>
-                                        )}
+                                        {(profile?.username?.[0] || profile?.nombre?.[0] || "U").toUpperCase()}
                                     </div>
-
-                                    <p style={{
-                                        margin: '0 0 12px 0',
-                                        fontSize: '15px',
-                                        color: '#64748b',
-                                        fontWeight: 500,
-                                    }}>
-                                        @{profile?.username || 'usuario'}
-                                    </p>
-
-                                    {/* Bio */}
-                                    {profile?.bio && (
-                                        <p style={{
-                                            margin: '0 0 12px 0',
-                                            fontSize: '14px',
-                                            color: '#475569',
-                                            lineHeight: 1.6,
-                                            fontWeight: 400,
-                                        }}>
-                                            {profile.bio}
-                                        </p>
-                                    )}
-
-                                    {/* LinkedIn */}
-                                    {profile?.linkedin && (
-                                        <a
-                                            href={profile.linkedin}
-                                            target="_blank"
-                                            rel="noopener noreferrer"
-                                            style={{
-                                                display: 'inline-flex',
-                                                alignItems: 'center',
-                                                gap: '6px',
-                                                padding: '6px 12px',
-                                                background: '#f8fafc',
-                                                border: '2px solid #e2e8f0',
-                                                borderRadius: '8px',
-                                                fontSize: '13px',
-                                                fontWeight: 600,
-                                                color: '#0a66c2',
-                                                textDecoration: 'none',
-                                                transition: 'all 0.2s ease',
-                                                marginBottom: '12px',
-                                            }}
-                                            onMouseEnter={(e) => {
-                                                e.currentTarget.style.background = '#0a66c2';
-                                                e.currentTarget.style.color = '#fff';
-                                                e.currentTarget.style.borderColor = '#0a66c2';
-                                            }}
-                                            onMouseLeave={(e) => {
-                                                e.currentTarget.style.background = '#f8fafc';
-                                                e.currentTarget.style.color = '#0a66c2';
-                                                e.currentTarget.style.borderColor = '#e2e8f0';
-                                            }}
-                                        >
-                                            <FontAwesomeIcon icon={faLinkedin} />
-                                            LinkedIn
-                                        </a>
-                                    )}
-
-                                    {/* Créditos Badge */}
-                                    <div style={{
-                                        display: 'inline-flex',
-                                        alignItems: 'center',
-                                        gap: '6px',
-                                        padding: '6px 12px',
-                                        background: 'linear-gradient(135deg, #fef3c7 0%, #fde68a 100%)',
-                                        border: '2px solid #fcd34d',
-                                        borderRadius: '20px',
-                                        marginBottom: '12px',
-                                    }}>
-                                        <FontAwesomeIcon icon={faCoins} style={{
-                                            color: '#f59e0b',
-                                            fontSize: '14px'
-                                        }} />
-                                        <span style={{
-                                            color: '#92400e',
-                                            fontSize: '13px',
-                                            fontWeight: 700,
-                                        }}>
-                                            {profile?.creditos ?? 10} créditos
-                                        </span>
-                                    </div>
-
-                                    {/* Stats */}
-                                    <div style={{
-                                        display: 'flex',
-                                        gap: '20px',
-                                        flexWrap: 'wrap',
-                                    }}>
-                                        <div
-                                            onClick={() => navigate('/followers')}
-                                            style={{
-                                                cursor: 'pointer',
-                                                transition: 'opacity 0.2s ease',
-                                            }}
-                                            onMouseEnter={(e) => {
-                                                e.currentTarget.style.opacity = '0.7';
-                                            }}
-                                            onMouseLeave={(e) => {
-                                                e.currentTarget.style.opacity = '1';
-                                            }}
-                                        >
-                                            <span style={{
-                                                fontSize: '16px',
-                                                fontWeight: 800,
-                                                color: '#0f172a',
-                                                marginRight: '4px',
-                                            }}>
-                                                {stats.seguidores}
-                                            </span>
-                                            <span style={{
-                                                fontSize: '14px',
-                                                color: '#64748b',
-                                                fontWeight: 500,
-                                            }}>
-                                                seguidores
-                                            </span>
-                                        </div>
-
-                                        <div
-                                            onClick={() => navigate('/followers')}
-                                            style={{
-                                                cursor: 'pointer',
-                                                transition: 'opacity 0.2s ease',
-                                            }}
-                                            onMouseEnter={(e) => {
-                                                e.currentTarget.style.opacity = '0.7';
-                                            }}
-                                            onMouseLeave={(e) => {
-                                                e.currentTarget.style.opacity = '1';
-                                            }}
-                                        >
-                                            <span style={{
-                                                fontSize: '16px',
-                                                fontWeight: 800,
-                                                color: '#0f172a',
-                                                marginRight: '4px',
-                                            }}>
-                                                {stats.siguiendo}
-                                            </span>
-                                            <span style={{
-                                                fontSize: '14px',
-                                                color: '#64748b',
-                                                fontWeight: 500,
-                                            }}>
-                                                siguiendo
-                                            </span>
-                                        </div>
-
-                                        <div>
-                                            <span style={{
-                                                fontSize: '16px',
-                                                fontWeight: 800,
-                                                color: '#0f172a',
-                                                marginRight: '4px',
-                                            }}>
-                                                {stats.apuntesSubidos}
-                                            </span>
-                                            <span style={{
-                                                fontSize: '14px',
-                                                color: '#64748b',
-                                                fontWeight: 500,
-                                            }}>
-                                                apuntes
-                                            </span>
-                                        </div>
-                                    </div>
-                                </div>
+                                )}
                             </div>
 
                             {/* Botón Editar */}
@@ -480,103 +304,352 @@ export default function Profile() {
                                 style={{
                                     display: 'inline-flex',
                                     alignItems: 'center',
-                                    gap: '6px',
-                                    padding: '10px 20px',
+                                    gap: '8px',
+                                    padding: '12px 24px',
                                     background: '#2563eb',
                                     color: '#fff',
                                     border: 'none',
-                                    borderRadius: '10px',
-                                    fontSize: '14px',
+                                    borderRadius: '12px',
+                                    fontSize: '15px',
                                     fontWeight: 700,
                                     cursor: 'pointer',
                                     transition: 'all 0.2s ease',
-                                    marginTop: '8px',
+                                    boxShadow: '0 2px 8px rgba(37, 99, 235, 0.2)',
                                 }}
                                 onMouseEnter={(e) => {
                                     e.currentTarget.style.background = '#1e40af';
                                     e.currentTarget.style.transform = 'translateY(-2px)';
-                                    e.currentTarget.style.boxShadow = '0 8px 24px rgba(37, 99, 235, 0.25)';
+                                    e.currentTarget.style.boxShadow = '0 4px 16px rgba(37, 99, 235, 0.3)';
                                 }}
                                 onMouseLeave={(e) => {
                                     e.currentTarget.style.background = '#2563eb';
                                     e.currentTarget.style.transform = 'translateY(0)';
-                                    e.currentTarget.style.boxShadow = 'none';
+                                    e.currentTarget.style.boxShadow = '0 2px 8px rgba(37, 99, 235, 0.2)';
                                 }}
                             >
                                 <FontAwesomeIcon icon={faEdit} />
                                 Editar Perfil
                             </button>
                         </div>
+
+                        {/* Badge Mentor ARRIBA del nombre */}
+                        {isMentor && !mentorLoading && (
+                            <div style={{
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                gap: '6px',
+                                padding: '6px 14px',
+                                background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
+                                borderRadius: '20px',
+                                fontSize: '13px',
+                                fontWeight: 700,
+                                color: '#fff',
+                                marginBottom: '12px',
+                                boxShadow: '0 2px 8px rgba(16, 185, 129, 0.25)',
+                            }}>
+                                <FontAwesomeIcon icon={faGraduationCap} style={{ fontSize: '12px' }} />
+                                Mentor Verificado
+                            </div>
+                        )}
+
+                        {/* Nombre */}
+                        <h1 style={{
+                            margin: '0 0 8px 0',
+                            fontSize: '32px',
+                            fontWeight: 800,
+                            color: '#0f172a',
+                            letterSpacing: '-0.02em',
+                        }}>
+                            {profile?.nombre || 'Usuario'}
+                        </h1>
+
+                        {/* Username */}
+                        <p style={{
+                            margin: '0 0 16px 0',
+                            fontSize: '17px',
+                            color: '#64748b',
+                            fontWeight: 500,
+                        }}>
+                            @{profile?.username || 'usuario'}
+                        </p>
+
+                        {/* Bio */}
+                        {profile?.bio && (
+                            <p style={{
+                                margin: '0 0 16px 0',
+                                fontSize: '15px',
+                                color: '#475569',
+                                lineHeight: 1.7,
+                                fontWeight: 400,
+                                maxWidth: '600px',
+                            }}>
+                                {profile.bio}
+                            </p>
+                        )}
+
+                        {/* LinkedIn */}
+                        {profile?.linkedin && (
+                            <a
+                                href={profile.linkedin}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                style={{
+                                    display: 'inline-flex',
+                                    alignItems: 'center',
+                                    gap: '8px',
+                                    padding: '8px 16px',
+                                    background: '#fff',
+                                    border: '2px solid #0a66c2',
+                                    borderRadius: '10px',
+                                    fontSize: '14px',
+                                    fontWeight: 600,
+                                    color: '#0a66c2',
+                                    textDecoration: 'none',
+                                    transition: 'all 0.2s ease',
+                                    marginBottom: '24px',
+                                }}
+                                onMouseEnter={(e) => {
+                                    e.currentTarget.style.background = '#0a66c2';
+                                    e.currentTarget.style.color = '#fff';
+                                    e.currentTarget.style.transform = 'translateY(-2px)';
+                                    e.currentTarget.style.boxShadow = '0 4px 12px rgba(10, 102, 194, 0.25)';
+                                }}
+                                onMouseLeave={(e) => {
+                                    e.currentTarget.style.background = '#fff';
+                                    e.currentTarget.style.color = '#0a66c2';
+                                    e.currentTarget.style.transform = 'translateY(0)';
+                                    e.currentTarget.style.boxShadow = 'none';
+                                }}
+                            >
+                                <FontAwesomeIcon icon={faLinkedin} style={{ fontSize: '16px' }} />
+                                Ver perfil de LinkedIn
+                            </a>
+                        )}
+
+                        {/* Stats Grid */}
+                        <div style={{
+                            display: 'grid',
+                            gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))',
+                            gap: '16px',
+                            paddingTop: '24px',
+                            borderTop: '2px solid #f1f5f9',
+                        }}>
+                            {/* Seguidores */}
+                            <div
+                                onClick={() => navigate('/followers')}
+                                style={{
+                                    cursor: 'pointer',
+                                    padding: '12px',
+                                    borderRadius: '12px',
+                                    transition: 'all 0.2s ease',
+                                }}
+                                onMouseEnter={(e) => {
+                                    e.currentTarget.style.background = '#f8fafc';
+                                }}
+                                onMouseLeave={(e) => {
+                                    e.currentTarget.style.background = 'transparent';
+                                }}
+                            >
+                                <div style={{
+                                    fontSize: '24px',
+                                    fontWeight: 800,
+                                    color: '#0f172a',
+                                    marginBottom: '4px',
+                                }}>
+                                    {stats.seguidores}
+                                </div>
+                                <div style={{
+                                    fontSize: '13px',
+                                    color: '#64748b',
+                                    fontWeight: 600,
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    gap: '6px',
+                                }}>
+                                    <FontAwesomeIcon icon={faUsers} style={{ fontSize: '12px' }} />
+                                    Seguidores
+                                </div>
+                            </div>
+
+                            {/* Siguiendo */}
+                            <div
+                                onClick={() => navigate('/followers')}
+                                style={{
+                                    cursor: 'pointer',
+                                    padding: '12px',
+                                    borderRadius: '12px',
+                                    transition: 'all 0.2s ease',
+                                }}
+                                onMouseEnter={(e) => {
+                                    e.currentTarget.style.background = '#f8fafc';
+                                }}
+                                onMouseLeave={(e) => {
+                                    e.currentTarget.style.background = 'transparent';
+                                }}
+                            >
+                                <div style={{
+                                    fontSize: '24px',
+                                    fontWeight: 800,
+                                    color: '#0f172a',
+                                    marginBottom: '4px',
+                                }}>
+                                    {stats.siguiendo}
+                                </div>
+                                <div style={{
+                                    fontSize: '13px',
+                                    color: '#64748b',
+                                    fontWeight: 600,
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    gap: '6px',
+                                }}>
+                                    <FontAwesomeIcon icon={faUserFriends} style={{ fontSize: '12px' }} />
+                                    Siguiendo
+                                </div>
+                            </div>
+
+                            {/* Créditos - Clickeable */}
+                            <div
+                                onClick={() => navigate('/credits')}
+                                style={{
+                                    cursor: 'pointer',
+                                    padding: '12px',
+                                    borderRadius: '12px',
+                                    transition: 'all 0.2s ease',
+                                }}
+                                onMouseEnter={(e) => {
+                                    e.currentTarget.style.background = '#fef3c7';
+                                }}
+                                onMouseLeave={(e) => {
+                                    e.currentTarget.style.background = 'transparent';
+                                }}
+                            >
+                                <div style={{
+                                    fontSize: '24px',
+                                    fontWeight: 800,
+                                    color: '#0f172a',
+                                    marginBottom: '4px',
+                                }}>
+                                    {profile?.creditos ?? 10}
+                                </div>
+                                <div style={{
+                                    fontSize: '13px',
+                                    color: '#f59e0b',
+                                    fontWeight: 600,
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    gap: '6px',
+                                }}>
+                                    <FontAwesomeIcon icon={faCreditCard} style={{ fontSize: '12px' }} />
+                                    Créditos
+                                </div>
+                            </div>
+
+                            {/* Alumnos si es mentor */}
+                            {isMentor && !mentorLoading && stats.alumnosMentor > 0 && (
+                                <div style={{
+                                    padding: '12px',
+                                    borderRadius: '12px',
+                                }}>
+                                    <div style={{
+                                        fontSize: '24px',
+                                        fontWeight: 800,
+                                        color: '#0f172a',
+                                        marginBottom: '4px',
+                                    }}>
+                                        {stats.alumnosMentor}
+                                    </div>
+                                    <div style={{
+                                        fontSize: '13px',
+                                        color: '#10b981',
+                                        fontWeight: 600,
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        gap: '6px',
+                                    }}>
+                                        <FontAwesomeIcon icon={faGraduationCap} style={{ fontSize: '12px' }} />
+                                        {stats.alumnosMentor === 1 ? 'Alumno' : 'Alumnos'}
+                                    </div>
+                                </div>
+                            )}
+                        </div>
                     </div>
                 </div>
 
-                {/* Stats Grid */}
+                {/* Stats Cards */}
                 <div style={{
                     display: 'grid',
-                    gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))',
+                    gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))',
                     gap: '16px',
                 }}>
-                    {/* Apuntes Subidos */}
-                    <div style={{
-                        background: '#fff',
-                        borderRadius: '12px',
-                        padding: '20px',
-                        border: '2px solid #f1f5f9',
-                        boxShadow: '0 2px 8px rgba(0,0,0,0.04)',
-                        transition: 'all 0.3s ease',
-                    }}
-                         onMouseEnter={(e) => {
-                             e.currentTarget.style.transform = 'translateY(-4px)';
-                             e.currentTarget.style.boxShadow = '0 12px 32px rgba(0,0,0,0.08)';
-                             e.currentTarget.style.borderColor = '#2563eb';
-                         }}
-                         onMouseLeave={(e) => {
-                             e.currentTarget.style.transform = 'translateY(0)';
-                             e.currentTarget.style.boxShadow = '0 2px 8px rgba(0,0,0,0.04)';
-                             e.currentTarget.style.borderColor = '#f1f5f9';
-                         }}>
+                    {/* Apuntes Subidos - CLICKEABLE */}
+                    <div
+                        onClick={() => navigate('/my_papers')}
+                        style={{
+                            background: '#fff',
+                            borderRadius: '16px',
+                            padding: '24px',
+                            border: '2px solid #f1f5f9',
+                            boxShadow: '0 2px 8px rgba(0,0,0,0.04)',
+                            transition: 'all 0.3s ease',
+                            cursor: 'pointer',
+                        }}
+                        onMouseEnter={(e) => {
+                            e.currentTarget.style.transform = 'translateY(-4px)';
+                            e.currentTarget.style.boxShadow = '0 12px 32px rgba(0,0,0,0.08)';
+                            e.currentTarget.style.borderColor = '#2563eb';
+                        }}
+                        onMouseLeave={(e) => {
+                            e.currentTarget.style.transform = 'translateY(0)';
+                            e.currentTarget.style.boxShadow = '0 2px 8px rgba(0,0,0,0.04)';
+                            e.currentTarget.style.borderColor = '#f1f5f9';
+                        }}
+                    >
                         <div style={{
                             display: 'flex',
                             alignItems: 'center',
-                            gap: '12px',
-                            marginBottom: '8px',
+                            gap: '16px',
                         }}>
                             <div style={{
-                                width: '40px',
-                                height: '40px',
+                                width: '56px',
+                                height: '56px',
                                 background: 'linear-gradient(135deg, #2563eb 0%, #1e40af 100%)',
-                                borderRadius: '10px',
+                                borderRadius: '14px',
                                 display: 'flex',
                                 alignItems: 'center',
                                 justifyContent: 'center',
                                 color: '#fff',
-                                fontSize: '18px',
+                                fontSize: '24px',
+                                flexShrink: 0,
                             }}>
                                 <FontAwesomeIcon icon={faFileAlt} />
                             </div>
-                            <div style={{
-                                fontSize: '28px',
-                                fontWeight: 800,
-                                color: '#0f172a',
-                                lineHeight: 1,
-                            }}>
-                                {stats.apuntesSubidos}
+                            <div>
+                                <div style={{
+                                    fontSize: '36px',
+                                    fontWeight: 800,
+                                    color: '#0f172a',
+                                    lineHeight: 1,
+                                    marginBottom: '6px',
+                                }}>
+                                    {stats.apuntesSubidos}
+                                </div>
+                                <div style={{
+                                    fontSize: '14px',
+                                    fontWeight: 600,
+                                    color: '#64748b',
+                                }}>
+                                    Apuntes Subidos
+                                </div>
                             </div>
-                        </div>
-                        <div style={{
-                            fontSize: '13px',
-                            fontWeight: 600,
-                            color: '#64748b',
-                        }}>
-                            Apuntes Subidos
                         </div>
                     </div>
 
                     {/* Reseñas Escritas */}
                     <div style={{
                         background: '#fff',
-                        borderRadius: '12px',
-                        padding: '20px',
+                        borderRadius: '16px',
+                        padding: '24px',
                         border: '2px solid #f1f5f9',
                         boxShadow: '0 2px 8px rgba(0,0,0,0.04)',
                         transition: 'all 0.3s ease',
@@ -590,45 +663,112 @@ export default function Profile() {
                              e.currentTarget.style.transform = 'translateY(0)';
                              e.currentTarget.style.boxShadow = '0 2px 8px rgba(0,0,0,0.04)';
                              e.currentTarget.style.borderColor = '#f1f5f9';
-                         }}>
+                         }}
+                    >
                         <div style={{
                             display: 'flex',
                             alignItems: 'center',
-                            gap: '12px',
-                            marginBottom: '8px',
+                            gap: '16px',
                         }}>
                             <div style={{
-                                width: '40px',
-                                height: '40px',
+                                width: '56px',
+                                height: '56px',
                                 background: 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)',
-                                borderRadius: '10px',
+                                borderRadius: '14px',
                                 display: 'flex',
                                 alignItems: 'center',
                                 justifyContent: 'center',
                                 color: '#fff',
-                                fontSize: '18px',
+                                fontSize: '24px',
+                                flexShrink: 0,
                             }}>
                                 <FontAwesomeIcon icon={faStar} />
                             </div>
-                            <div style={{
-                                fontSize: '28px',
-                                fontWeight: 800,
-                                color: '#0f172a',
-                                lineHeight: 1,
-                            }}>
-                                {stats.reseñasEscritas}
+                            <div>
+                                <div style={{
+                                    fontSize: '36px',
+                                    fontWeight: 800,
+                                    color: '#0f172a',
+                                    lineHeight: 1,
+                                    marginBottom: '6px',
+                                }}>
+                                    {stats.reseñasEscritas}
+                                </div>
+                                <div style={{
+                                    fontSize: '14px',
+                                    fontWeight: 600,
+                                    color: '#64748b',
+                                }}>
+                                    Reseñas Escritas
+                                </div>
                             </div>
-                        </div>
-                        <div style={{
-                            fontSize: '13px',
-                            fontWeight: 600,
-                            color: '#64748b',
-                        }}>
-                            Reseñas Escritas
                         </div>
                     </div>
                 </div>
             </div>
+
+            {/* Modal Avatar Imagen Grande */}
+            {showFullImage && avatarSrc && (
+                <div
+                    onClick={() => setShowFullImage(false)}
+                    style={{
+                        position: "fixed",
+                        inset: 0,
+                        background: "rgba(0, 0, 0, 0.9)",
+                        backdropFilter: "blur(8px)",
+                        zIndex: 9999,
+                        display: "grid",
+                        placeItems: "center",
+                        padding: 20,
+                        cursor: "pointer",
+                    }}
+                >
+                    <div
+                        onClick={(e) => e.stopPropagation()}
+                        style={{
+                            position: "relative",
+                            maxWidth: "90vw",
+                            maxHeight: "90vh",
+                            cursor: "default",
+                        }}
+                    >
+                        <button
+                            onClick={() => setShowFullImage(false)}
+                            style={{
+                                position: "absolute",
+                                top: -50,
+                                right: 0,
+                                background: "rgba(255, 255, 255, 0.2)",
+                                border: "none",
+                                borderRadius: "50%",
+                                width: 40,
+                                height: 40,
+                                color: "#fff",
+                                fontSize: 24,
+                                cursor: "pointer",
+                                display: "grid",
+                                placeItems: "center",
+                                transition: "all 0.2s ease",
+                                fontWeight: 'bold',
+                            }}
+                            onMouseEnter={(e) => e.target.style.background = "rgba(255, 255, 255, 0.3)"}
+                            onMouseLeave={(e) => e.target.style.background = "rgba(255, 255, 255, 0.2)"}
+                        >
+                            ✕
+                        </button>
+                        <img
+                            src={avatarSrc}
+                            alt="Avatar"
+                            style={{
+                                maxWidth: "100%",
+                                maxHeight: "90vh",
+                                borderRadius: 16,
+                                boxShadow: "0 20px 60px rgba(0, 0, 0, 0.5)",
+                            }}
+                        />
+                    </div>
+                </div>
+            )}
 
             <style>{`
                 @keyframes spin {

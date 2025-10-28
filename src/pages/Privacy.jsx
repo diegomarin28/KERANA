@@ -1,4 +1,3 @@
-// src/pages/Privacy.jsx
 import { Card } from '../components/UI/Card';
 
 export default function Privacy() {

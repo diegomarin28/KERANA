@@ -1,4 +1,3 @@
-// src/App.jsx
 import { BrowserRouter, Routes, Route, Navigate, useLocation, useNavigate } from "react-router-dom";
 import { lazy, Suspense, useEffect } from "react";
 import Header from "./components/Header.jsx";
@@ -7,6 +6,8 @@ import AuthGuard from "./components/AuthGuard";
 import Equipo from "./pages/Equipo";
 import { AvatarProvider } from './contexts/AvatarContext';
 import { ConnectionMonitor } from './components/ConnectionMonitor';
+import ErrorBoundary from './components/ErrorBoundary';
+import AuthSessionManager from './components/AuthSessionManager';
 
 // Componentes lazy
 const HelpCenter = lazy(() => import("./pages/HelpCenter"));
@@ -152,7 +153,6 @@ function AppRoutes() {
                     {/* Búsqueda y exploración */}
                     <Route path="/search" element={<SearchResults />} />
                     <Route path="/cursos/buscar" element={<CourseSearch />} />
-                    <Route path="/test/followers" element={<FollowersPage />} />
 
                     {/* Mentoría */}
                     <Route path="/mentor/calendar" element={<MyCalendar />} />
@@ -241,7 +241,10 @@ export default function App() {
             <AvatarProvider sidebarStats={{ credits, seguidores, siguiendo, apuntes }}>
                 <NotificationProvider>
                     <NotificationsProvider>
-                        <NotificationsRealtimeSubscriber />
+                        <AuthSessionManager />
+                        <ErrorBoundary>
+                            <NotificationsRealtimeSubscriber />
+                        </ErrorBoundary>
                         <PrivacyBanner />
                         <ConnectionMonitor />
                         <MentorOnboardingModal

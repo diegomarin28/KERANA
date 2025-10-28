@@ -108,11 +108,6 @@ const NotificationContainer = () => {
 const NotificationItem = ({ notification, onClose }) => {
     // 🔗 Función para navegar al perfil
     const handleClick = (e) => {
-        console.log('🖱️ Click en notificación:', {
-            username: notification.username,
-            url: notification.url,
-            notification
-        });
 
         if (notification.username) {
             window.location.href = `/user/${notification.username}`;
@@ -125,12 +120,6 @@ const NotificationItem = ({ notification, onClose }) => {
 
     const isClickable = !!(notification.username || notification.url);
 
-    console.log('🔍 NotificationItem render:', {
-        username: notification.username,
-        url: notification.url,
-        isClickable,
-        title: notification.title
-    });
 
     const getStyles = (type) => {
         const baseStyle = {

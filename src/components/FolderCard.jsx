@@ -1,5 +1,5 @@
 import { useNavigate } from "react-router-dom";
-import { Card } from "./ui/Card";
+import { Card } from "./UI/Card";
 import { useState, useRef, useEffect } from "react";
 
 export function FolderCard({ folder, semestres, onDragStart, onDragOver, onDrop, isDragging, onDelete, onRename }) {

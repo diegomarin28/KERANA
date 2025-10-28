@@ -1,7 +1,9 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '../supabase';
-import PDFThumbnail from './PDFThumbnail';
+import ApunteCard from './ApunteCard';
+import PDFThumbnail from '../components/PDFThumbnail';
+
 
 export default function NotesModal({ materiaId, materiaNombre, onClose }) {
     const navigate = useNavigate();
@@ -28,6 +30,7 @@ export default function NotesModal({ materiaId, materiaNombre, onClose }) {
                     descripcion,
                     creditos,
                     file_path,
+                    thumbnail_path,
                     created_at,
                     id_usuario,
                     usuario:id_usuario(nombre, username)
@@ -276,116 +279,19 @@ export default function NotesModal({ materiaId, materiaNombre, onClose }) {
                     ) : viewMode === 'grid' ? (
                         <div style={{
                             display: 'grid',
-                            gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))',
-                            gap: 16
+                            gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 280px))',
+                            gap: 20,
+                            justifyContent: 'center'
                         }}>
                             {sortedApuntes.map((apunte) => (
-                                <div
+                                <ApunteCard
                                     key={apunte.id_apunte}
-                                    onClick={() => handleNoteClick(apunte)}
-                                    style={{
-                                        background: '#fff',
-                                        borderRadius: 12,
-                                        border: '1px solid #e5e7eb',
-                                        padding: 12,
-                                        cursor: 'pointer',
-                                        transition: 'all 0.2s ease',
-                                        display: 'flex',
-                                        flexDirection: 'column',
-                                        gap: 8
+                                    note={{
+                                        ...apunte,
+                                        likes_count: apunte.likes,
+                                        materia: { nombre_materia: materiaNombre }
                                     }}
-                                    onMouseEnter={(e) => {
-                                        e.currentTarget.style.boxShadow = '0 4px 12px rgba(0,0,0,0.1)';
-                                        e.currentTarget.style.transform = 'translateY(-2px)';
-                                    }}
-                                    onMouseLeave={(e) => {
-                                        e.currentTarget.style.boxShadow = 'none';
-                                        e.currentTarget.style.transform = 'translateY(0)';
-                                    }}
-                                >
-                                    {/* Thumbnail */}
-                                    <div style={{
-                                        width: '100%',
-                                        aspectRatio: '3/4',
-                                        background: '#f3f4f6',
-                                        borderRadius: 8,
-                                        overflow: 'hidden'
-                                    }}>
-                                        {apunte.signedUrl ? (
-                                            <PDFThumbnail
-                                                url={apunte.signedUrl}
-                                                width={200}
-                                                height={267}
-                                            />
-                                        ) : (
-                                            <div style={{
-                                                width: '100%',
-                                                height: '100%',
-                                                display: 'flex',
-                                                alignItems: 'center',
-                                                justifyContent: 'center',
-                                                fontSize: 48
-                                            }}>
-                                                📄
-                                            </div>
-                                        )}
-                                    </div>
-
-                                    {/* Info */}
-                                    <h4 style={{
-                                        margin: 0,
-                                        fontSize: 14,
-                                        fontWeight: 600,
-                                        overflow: 'hidden',
-                                        textOverflow: 'ellipsis',
-                                        whiteSpace: 'nowrap'
-                                    }}>
-                                        {apunte.titulo}
-                                    </h4>
-
-                                    <div style={{ fontSize: 12, color: '#6b7280' }}>
-                                        Por {apunte.usuario?.nombre || 'Anónimo'}
-                                    </div>
-
-                                    {/* Likes y dislikes */}
-                                    <div style={{
-                                        display: 'flex',
-                                        alignItems: 'center',
-                                        gap: 12,
-                                        fontSize: 13,
-                                        paddingTop: 8,
-                                        borderTop: '1px solid #f3f4f6'
-                                    }}>
-                                        <div style={{
-                                            display: 'flex',
-                                            alignItems: 'center',
-                                            gap: 4,
-                                            color: '#2563eb'
-                                        }}>
-                                            👍 <span style={{ fontWeight: 600 }}>{apunte.likes}</span>
-                                        </div>
-                                        <div style={{
-                                            display: 'flex',
-                                            alignItems: 'center',
-                                            gap: 4,
-                                            color: '#ef4444'
-                                        }}>
-                                            👎 <span style={{ fontWeight: 600 }}>{apunte.dislikes}</span>
-                                        </div>
-                                    </div>
-
-                                    <div style={{
-                                        fontSize: 13,
-                                        fontWeight: 600,
-                                        color: '#2563eb'
-                                    }}>
-                                        {apunte.creditos} 💰
-                                    </div>
-
-                                    <div style={{ fontSize: 11, color: '#9ca3af' }}>
-                                        {new Date(apunte.created_at).toLocaleDateString('es-UY')}
-                                    </div>
-                                </div>
+                                />
                             ))}
                         </div>
                     ) : (

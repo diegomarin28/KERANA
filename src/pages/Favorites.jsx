@@ -1,12 +1,19 @@
 import { useEffect, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
+import {
+    faHeart,
+    faBook,
+    faGraduationCap,
+    faFilter,
+    faRotateRight,
+    faSpinner
+} from '@fortawesome/free-solid-svg-icons';
 import { Card } from '../components/UI/Card';
 import { Button } from '../components/UI/Button';
 import { supabase } from '../supabase';
 import { getOrCreateUserProfile } from '../api/userService';
 import ApunteCard from '../components/ApunteCard';
 import { MentorCard } from '../components/MentorCard';
-
 
 export default function Favorites() {
     const [items, setItems] = useState([]);
@@ -22,13 +29,11 @@ export default function Favorites() {
         setLoading(true);
         setErrorMsg('');
         try {
-            // Perfil (bigint)
             const userProfile = await getOrCreateUserProfile();
             const userId = userProfile.id_usuario;
 
             let allFavorites = [];
 
-            // === APUNTES FAVORITOS ===
             // === APUNTES FAVORITOS ===
             const { data: notesFav, error: notesFavError } = await supabase
                 .from('apunte_fav')
@@ -45,17 +50,17 @@ export default function Favorites() {
                 const { data: apuntes, error: apuntesError } = await supabase
                     .from('apunte')
                     .select(`
-                               id_apunte,
-                                titulo,
-                                descripcion,
-                                creditos,
-                                estrellas,
-                                id_materia,
-                                id_usuario,
-                                file_path,
-                                materia:id_materia(nombre_materia),
-                                thumbnail_path
-                            `)
+                        id_apunte,
+                        titulo,
+                        descripcion,
+                        creditos,
+                        estrellas,
+                        id_materia,
+                        id_usuario,
+                        file_path,
+                        materia:id_materia(nombre_materia),
+                        thumbnail_path
+                    `)
                     .in('id_apunte', apIds);
 
                 if (apuntesError) {
@@ -64,7 +69,6 @@ export default function Favorites() {
                 }
                 console.log('Apuntes cargados:', apuntes);
 
-                // Contar likes por apunte
                 const { data: likesData, error: likesError } = await supabase
                     .from('likes')
                     .select('id_apunte')
@@ -75,13 +79,11 @@ export default function Favorites() {
                     console.error('Error cargando likes:', likesError);
                 }
 
-                // Crear un mapa de conteo de likes
                 const likesCountMap = {};
                 likesData?.forEach(like => {
                     likesCountMap[like.id_apunte] = (likesCountMap[like.id_apunte] || 0) + 1;
                 });
 
-                // autor (opcional)
                 let userMap = {};
                 const uIds = [...new Set((apuntes || []).map(a => a.id_usuario).filter(Boolean))];
                 if (uIds.length) {
@@ -121,7 +123,7 @@ export default function Favorites() {
                                 materia: a.materia,
                                 usuario: { nombre: userMap[a.id_usuario] || 'Anónimo' },
                                 id_usuario: a.id_usuario,
-                                likes_count: likesCountMap[a.id_apunte] || 0  // ← NUEVO
+                                likes_count: likesCountMap[a.id_apunte] || 0
                             }
                         } : null;
                     })
@@ -131,10 +133,9 @@ export default function Favorites() {
 
             // === MENTORES FAVORITOS ===
             const { data: auth } = await supabase.auth.getUser();
-            const uid = auth?.user?.id; // uuid requerido por RLS
+            const uid = auth?.user?.id;
             let mentorItems = [];
             if (uid) {
-                // Obtener el id_usuario del usuario actual
                 const { data: usuarioData } = await supabase
                     .from('usuario')
                     .select('id_usuario')
@@ -159,7 +160,6 @@ export default function Favorites() {
                             .select('id_mentor, id_usuario, estrellas_mentor, contacto, descripcion')
                             .in('id_mentor', mIds);
 
-                        // Obtener datos del usuario (nombre, username) para cada mentor
                         const userIds = (mentors || []).map(m => m.id_usuario).filter(Boolean);
                         let mentorUserData = {};
                         if (userIds.length > 0) {
@@ -192,19 +192,15 @@ export default function Favorites() {
                                         estrellas_mentor: m.estrellas_mentor || 0,
                                         descripcion: m.descripcion || '',
                                         foto: userData.foto || null,
-                                        materias: [], // se cargan después en MentorCard
+                                        materias: [],
                                     }
                                 };
-
                             })
                             .filter(Boolean);
                     }
                 }
             }
             allFavorites = [...allFavorites, ...mentorItems];
-
-            // (OPCIONAL) Cursos favoritos → hoy tu tabla usuario_fav apunta a usuario,
-            // no a profesor_curso. Si querés cursos, mejor crear curso_fav(id_usuario, id_profesor).
 
             setItems(allFavorites);
         } catch (error) {
@@ -219,14 +215,12 @@ export default function Favorites() {
             let tableName;
             let field;
             if (type === 'note') {
-                // favId lo generamos como `${id_usuario}-${id_apunte}`
                 const [u, a] = String(favId).split('-').map(x => Number(x));
                 tableName = 'apunte_fav';
                 field = { id_usuario: u, id_apunte: a };
                 const { error } = await supabase.from(tableName).delete().match(field);
                 if (error) throw error;
             } else if (type === 'mentor') {
-                // favId es `${id_usuario}-${id_mentor}`
                 const [u, m] = String(favId).split('-').map(x => Number(x));
                 tableName = 'mentor_fav';
                 const { error } = await supabase
@@ -235,7 +229,6 @@ export default function Favorites() {
                     .match({ id_usuario: u, id_mentor: m });
                 if (error) throw error;
             } else {
-                // otro tipo → usuario_fav (estructura actual apunta a usuario)
                 tableName = 'usuario_fav';
                 const { error } = await supabase.from(tableName).delete().eq('id_favorito', favId);
                 if (error) throw error;
@@ -249,10 +242,10 @@ export default function Favorites() {
 
     const getTypeIcon = (type) => {
         switch (type) {
-            case 'course': return '📚';
-            case 'note': return '📝';
-            case 'mentor': return '💡';
-            default: return '⭐';
+            case 'course': return faBook;
+            case 'note': return faBook;
+            case 'mentor': return faGraduationCap;
+            default: return faHeart;
         }
     };
 
@@ -277,88 +270,258 @@ export default function Favorites() {
                 alignItems: "center",
                 justifyContent: "center",
                 flexDirection: "column",
-                gap: 16
+                gap: 20,
+                background: '#f8fafc'
             }}>
-                <div style={{
-                    width: 40,
-                    height: 40,
-                    border: "3px solid #f3f4f6",
-                    borderTop: "3px solid #2563eb",
-                    borderRadius: "50%",
-                    animation: "spin 1s linear infinite"
-                }} />
-                <p style={{ color: "#6b7280", margin: 0 }}>Cargando favoritos…</p>
+                <FontAwesomeIcon
+                    icon={faSpinner}
+                    spin
+                    style={{
+                        fontSize: 40,
+                        color: '#2563eb'
+                    }}
+                />
+                <p style={{
+                    color: "#64748b",
+                    margin: 0,
+                    fontSize: 15,
+                    fontWeight: 500
+                }}>
+                    Cargando favoritos...
+                </p>
             </div>
         );
     }
 
     return (
-        <div style={{ padding: 20, maxWidth: 1000, margin: '0 auto' }}>
-            <header style={{ marginBottom: 30 }}>
-                <h1 style={{ fontSize: 28, fontWeight: 700, margin: '0 0 8px 0', color: '#0b1e3a' }}>
-                    Mis Favoritos
-                </h1>
-                <p style={{ color: '#64748b', margin: 0 }}>
-                    Todos tus cursos, apuntes y mentores favoritos en un solo lugar
+        <div style={{
+            padding: '20px',
+            maxWidth: 1200,
+            margin: '0 auto',
+            background: '#f8fafc',
+            minHeight: '100vh'
+        }}>
+            {/* Header */}
+            <header style={{
+                marginBottom: 12,
+                background: '#ffffff',
+                padding: '16px 20px',
+                borderRadius: '12px',
+                border: '2px solid #f1f5f9',
+                boxShadow: '0 2px 8px rgba(0,0,0,0.04)'
+            }}>
+                <div style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 10,
+                    marginBottom: 6
+                }}>
+                    <div style={{
+                        width: 32,
+                        height: 32,
+                        borderRadius: '8px',
+                        background: 'linear-gradient(135deg, #2563eb 0%, #1e40af 100%)',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center'
+                    }}>
+                        <FontAwesomeIcon
+                            icon={faHeart}
+                            style={{
+                                fontSize: 16,
+                                color: '#ffffff'
+                            }}
+                        />
+                    </div>
+                    <h1 style={{
+                        fontSize: '22px',
+                        fontWeight: 700,
+                        margin: 0,
+                        color: '#13346b',
+                        fontFamily: 'Inter, sans-serif'
+                    }}>
+                        Mis Favoritos
+                    </h1>
+                </div>
+                <p style={{
+                    color: '#64748b',
+                    margin: 0,
+                    fontSize: 13,
+                    fontWeight: 500,
+                    lineHeight: 1.4
+                }}>
+                    Todos tus apuntes y mentores favoritos en un solo lugar
                 </p>
             </header>
 
             {/* Filtros */}
-            <div style={{ display: 'flex', gap: 8, marginBottom: 24, flexWrap: 'wrap' }}>
+            <div style={{
+                display: 'flex',
+                gap: 10,
+                marginBottom: 12,
+                flexWrap: 'wrap',
+                background: '#ffffff',
+                padding: '16px',
+                borderRadius: '12px',
+                border: '2px solid #f1f5f9'
+            }}>
                 {[
-                    { key: 'all', label: 'Todos', count: items.length },
-                    { key: 'course', label: 'Cursos', count: items.filter(i => i.type === 'course').length },
-                    { key: 'note', label: 'Apuntes', count: items.filter(i => i.type === 'note').length },
-                    { key: 'mentor', label: 'Mentores', count: items.filter(i => i.type === 'mentor').length }
+                    { key: 'all', label: 'Todos', icon: faFilter, count: items.length },
+                    { key: 'course', label: 'Cursos', icon: faBook, count: items.filter(i => i.type === 'course').length },
+                    { key: 'note', label: 'Apuntes', icon: faBook, count: items.filter(i => i.type === 'note').length },
+                    { key: 'mentor', label: 'Mentores', icon: faGraduationCap, count: items.filter(i => i.type === 'mentor').length }
                 ].map(filter => (
-                    <Button
+                    <button
                         key={filter.key}
-                        variant={activeFilter === filter.key ? 'primary' : 'secondary'}
                         onClick={() => setActiveFilter(filter.key)}
-                        style={{ fontSize: 14 }}
+                        style={{
+                            background: activeFilter === filter.key ? '#2563eb' : '#ffffff',
+                            color: activeFilter === filter.key ? '#ffffff' : '#64748b',
+                            border: `2px solid ${activeFilter === filter.key ? '#2563eb' : '#e2e8f0'}`,
+                            borderRadius: '10px',
+                            padding: '10px 18px',
+                            fontSize: 14,
+                            fontWeight: 600,
+                            cursor: 'pointer',
+                            transition: 'all 0.2s ease',
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: 8,
+                            fontFamily: 'Inter, sans-serif'
+                        }}
+                        onMouseEnter={(e) => {
+                            if (activeFilter !== filter.key) {
+                                e.currentTarget.style.background = '#f8fafc';
+                                e.currentTarget.style.borderColor = '#2563eb';
+                            }
+                        }}
+                        onMouseLeave={(e) => {
+                            if (activeFilter !== filter.key) {
+                                e.currentTarget.style.background = '#ffffff';
+                                e.currentTarget.style.borderColor = '#e2e8f0';
+                            }
+                        }}
                     >
-                        {filter.label} ({filter.count})
-                    </Button>
+                        <FontAwesomeIcon icon={filter.icon} />
+                        <span>{filter.label}</span>
+                        <span style={{
+                            background: activeFilter === filter.key ? 'rgba(255,255,255,0.2)' : '#f1f5f9',
+                            color: activeFilter === filter.key ? '#ffffff' : '#64748b',
+                            padding: '2px 8px',
+                            borderRadius: '8px',
+                            fontSize: 12,
+                            fontWeight: 700
+                        }}>
+                            {filter.count}
+                        </span>
+                    </button>
                 ))}
             </div>
 
+            {/* Error */}
             {errorMsg && (
                 <Card style={{
                     background: '#fef2f2',
-                    border: '1px solid #fecaca',
-                    color: '#dc2626',
-                    padding: 16,
-                    marginBottom: 20
+                    border: '2px solid #fecaca',
+                    padding: 20,
+                    marginBottom: 24
                 }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                        <span>{errorMsg}</span>
-                        <Button variant="ghost" onClick={load} style={{ marginLeft: 10 }}>
+                    <div style={{
+                        display: 'flex',
+                        justifyContent: 'space-between',
+                        alignItems: 'center',
+                        gap: 16
+                    }}>
+                        <span style={{
+                            color: '#dc2626',
+                            fontSize: 14,
+                            fontWeight: 500
+                        }}>
+                            {errorMsg}
+                        </span>
+                        <button
+                            onClick={load}
+                            style={{
+                                background: '#dc2626',
+                                color: '#ffffff',
+                                border: 'none',
+                                borderRadius: '8px',
+                                padding: '8px 16px',
+                                fontSize: 13,
+                                fontWeight: 600,
+                                cursor: 'pointer',
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: 8,
+                                transition: 'all 0.2s ease'
+                            }}
+                            onMouseEnter={(e) => e.currentTarget.style.background = '#b91c1c'}
+                            onMouseLeave={(e) => e.currentTarget.style.background = '#dc2626'}
+                        >
+                            <FontAwesomeIcon icon={faRotateRight} />
                             Reintentar
-                        </Button>
+                        </button>
                     </div>
                 </Card>
             )}
 
+            {/* Empty State */}
             {filteredItems.length === 0 ? (
-                <Card style={{ textAlign: 'center', padding: 60, background: '#f8fafc' }}>
-                    <div style={{ fontSize: 48, marginBottom: 16 }}>⭐</div>
-                    <h3 style={{ margin: '0 0 12px 0', color: '#334155' }}>
+                <Card style={{
+                    textAlign: 'center',
+                    padding: '80px 40px',
+                    background: '#ffffff',
+                    border: '2px solid #f1f5f9'
+                }}>
+                    <div style={{
+                        width: 80,
+                        height: 80,
+                        borderRadius: '20px',
+                        background: 'linear-gradient(135deg, #f1f5f9 0%, #e2e8f0 100%)',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        margin: '0 auto 24px'
+                    }}>
+                        <FontAwesomeIcon
+                            icon={faHeart}
+                            style={{
+                                fontSize: 40,
+                                color: '#cbd5e1'
+                            }}
+                        />
+                    </div>
+                    <h3 style={{
+                        margin: '0 0 12px 0',
+                        color: '#13346b',
+                        fontSize: 24,
+                        fontWeight: 700,
+                        fontFamily: 'Inter, sans-serif'
+                    }}>
                         {activeFilter === 'all' ? 'No tenés favoritos' : `No tenés ${getTypeLabel(activeFilter).toLowerCase()}s favoritos`}
                     </h3>
                     <p style={{
                         color: '#64748b',
-                        margin: '0 0 20px 0',
+                        margin: '0 0 28px 0',
                         maxWidth: 400,
                         marginLeft: 'auto',
-                        marginRight: 'auto'
+                        marginRight: 'auto',
+                        fontSize: 15,
+                        lineHeight: 1.6,
+                        fontWeight: 500
                     }}>
                         {activeFilter === 'all'
-                            ? 'Guardá cursos, apuntes y mentores que te interesen para encontrarlos fácilmente después.'
+                            ? 'Guardá apuntes y mentores que te interesen para encontrarlos fácilmente después.'
                             : `Explorá ${getTypeLabel(activeFilter).toLowerCase()}s y agregalos a favoritos.`}
                     </p>
                     <Button
                         variant="primary"
-                        onClick={() => window.location.href = `/${activeFilter === 'all' ? 'cursos' : activeFilter + 's'}`}
+                        onClick={() => window.location.href = `/${activeFilter === 'all' ? 'apuntes' : activeFilter + 's'}`}
+                        style={{
+                            padding: '12px 24px',
+                            fontSize: 15,
+                            fontWeight: 600
+                        }}
                     >
                         Explorar {activeFilter === 'all' ? 'Contenido' : getTypeLabel(activeFilter) + 's'}
                     </Button>
@@ -367,8 +530,8 @@ export default function Favorites() {
                 <div
                     style={{
                         display: 'grid',
-                        gridTemplateColumns: 'repeat(auto-fill, minmax(230px, 1fr))',
-                        gap: 16
+                        gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))',
+                        gap: 20
                     }}
                 >
                     {filteredItems.map(item => (
@@ -378,21 +541,22 @@ export default function Favorites() {
                                 note={item.note}
                             />
                         ) : item.type === 'mentor' ? (
-                                <div
+                            <div
+                                key={`${item.type}-${item.favId}`}
+                                style={{ gridColumn: 'span 2' }}
+                            >
+                                <MentorCard
                                     key={`${item.type}-${item.favId}`}
-                                    style={{ gridColumn: 'span 2' }}
-                                >
-                                    <MentorCard
-                                        key={`${item.type}-${item.favId}`}
-                                        mentor={item.mentor}
-                                    />
-                                </div>
+                                    mentor={item.mentor}
+                                />
+                            </div>
                         ) : (
                             <Card
                                 key={`${item.type}-${item.favId}`}
                                 style={{
                                     padding: 20,
-                                    border: '1px solid #e5e7eb'
+                                    border: '2px solid #f1f5f9',
+                                    background: '#ffffff'
                                 }}
                             >
                                 {/* otros tipos, si los hubiera */}
@@ -400,7 +564,6 @@ export default function Favorites() {
                         )
                     ))}
                 </div>
-
             )}
         </div>
     );
