@@ -33,32 +33,59 @@ export default function AuthCallback() {
                 if (!isMounted) return;
 
                 setMessage("Configurando tu perfil...");
+
+                // Verificar si el perfil existe y si está completo
                 const { data: existingProfile } = await supabase
                     .from("usuario")
-                    .select("id_usuario, username")
+                    .select("id_usuario, username, foto, bio")
                     .eq("auth_id", session.user.id)
                     .maybeSingle();
 
                 if (existingProfile) {
-                    console.log("✅ Perfil ya existe, redirigiendo...");
+                    console.log("✅ Perfil ya existe");
+
+                    // Verificar si necesita completar el perfil
+                    const needsSetup = !existingProfile.foto || !existingProfile.bio;
+
+                    if (needsSetup) {
+                        console.log("📝 Perfil incompleto, redirigiendo a setup...");
+                        setStatus("success");
+                        setMessage("¡Bienvenido! Completá tu perfil...");
+
+                        setTimeout(() => {
+                            if (isMounted) {
+                                navigate("/profile/setup", { replace: true });
+                            }
+                        }, 1500);
+                    } else {
+                        console.log("✅ Perfil completo, redirigiendo a home...");
+                        setStatus("success");
+                        setMessage("¡Autenticación exitosa!");
+
+                        setTimeout(() => {
+                            if (isMounted) {
+                                navigate("/", { replace: true });
+                            }
+                        }, 800);
+                    }
                 } else {
                     console.log("🆕 Creando nuevo perfil...");
                     const profileResult = await createOrUpdateUserProfile(session.user);
+
                     if (profileResult.error) {
                         console.warn("⚠️ Error creando perfil:", profileResult.error);
                     }
+
+                    // Nuevo usuario siempre va a setup
+                    setStatus("success");
+                    setMessage("¡Cuenta creada! Completá tu perfil...");
+
+                    setTimeout(() => {
+                        if (isMounted) {
+                            navigate("/profile/setup", { replace: true });
+                        }
+                    }, 1500);
                 }
-
-                if (!isMounted) return;
-
-                setStatus("success");
-                setMessage("¡Autenticación exitosa!");
-
-                setTimeout(() => {
-                    if (isMounted) {
-                        navigate("/", { replace: true });
-                    }
-                }, 800);
 
             } catch (error) {
                 console.error("❌ Error en AuthCallback:", error);
@@ -133,7 +160,7 @@ export default function AuthCallback() {
                     </div>
 
                     <h2 style={{...titleStyle, color: '#10b981'}}>¡Todo listo!</h2>
-                    <p style={subtitleStyle}>Redirigiendo a tu cuenta...</p>
+                    <p style={subtitleStyle}>{message}</p>
                 </div>
             )}
 
