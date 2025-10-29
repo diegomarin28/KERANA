@@ -1,4 +1,5 @@
 import { useNavigate } from "react-router-dom";
+import { supabase } from "../supabase";
 import { Card } from "../components/UI/Card";
 import PDFThumbnail from "../components/PDFThumbnail";
 
@@ -6,6 +7,21 @@ export default function ApunteCard({ note, currentUserId }) {
     const navigate = useNavigate();
 
     if (!note) return null;
+
+    const handleClick = async (e) => {
+        e.preventDefault();
+
+        // Verificar si hay sesión activa
+        const { data: { session } } = await supabase.auth.getSession();
+
+        if (!session) {
+            // No hay sesión → abrir modal de login con returnUrl
+            navigate(`/?auth=signin&return=/apuntes/${note.id_apunte}`);
+        } else {
+            // Hay sesión → ir directo al apunte
+            navigate(`/apuntes/${note.id_apunte}`);
+        }
+    };
 
     return (
         <Card
@@ -15,10 +31,7 @@ export default function ApunteCard({ note, currentUserId }) {
                 transition: 'transform 0.2s, box-shadow 0.2s',
                 overflow: 'hidden'
             }}
-            onClick={(e) => {
-                e.preventDefault();
-                navigate(`/apuntes/${note.id_apunte}`);
-            }}
+            onClick={handleClick}
             onMouseEnter={(e) => {
                 e.currentTarget.style.transform = 'translateY(-4px)';
                 e.currentTarget.style.boxShadow = '0 8px 16px rgba(0,0,0,0.1)';
@@ -28,7 +41,7 @@ export default function ApunteCard({ note, currentUserId }) {
                 e.currentTarget.style.boxShadow = 'none';
             }}
         >
-            {/* Vista previa del PDF - igual que Notes */}
+            {/* Vista previa del PDF */}
             <PDFThumbnail
                 url={note.signedUrl || null}
                 thumbnailPath={note.thumbnail_path}

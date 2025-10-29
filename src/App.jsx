@@ -7,8 +7,6 @@ import AuthGuard from "./components/AuthGuard";
 import Equipo from "./pages/Equipo";
 import { AvatarProvider } from './contexts/AvatarContext';
 import { ConnectionMonitor } from './components/ConnectionMonitor';
-import ErrorBoundary from './components/ErrorBoundary';
-import AuthSessionManager from './components/AuthSessionManager';
 import GlobalCalendar from './pages/GlobalCalendar';
 
 // Componentes lazy
@@ -240,7 +238,11 @@ function AppRoutes() {
     );
 }
 
+import ErrorBoundary from './components/ErrorBoundary';
+import AuthSessionManager from './components/AuthSessionManager';
+
 export default function App() {
+
     const { credits, seguidores, siguiendo, apuntes, loading: loadingStats } = useSidebarStats();
     const { showModal, loading: loadingOnboarding, completeOnboarding } = useMentorOnboarding();
 
