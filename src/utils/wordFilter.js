@@ -5,7 +5,7 @@ const PALABRAS_PROHIBIDAS = [
     'pelotudo', 'pelotuda', 'boludo', 'boluda', 'forro', 'forra',
     'gil', 'gila', 'mogolico', 'mogolica', 'idiota', 'imbecil',
     'tarado', 'tarada', 'retrasado', 'retrasada', 'mogolico', 'trolo', 'fuck', 'shit', 'asshole', 'bitch', 'idiot, ' +
-    'motherfucker',
+    'motherfucker', 'carajo',
 
     // Variantes con números/símbolos
     'mrd', 'h.d.p', 'put@', 'put4', 'c0ncha', 'p3lotudo',

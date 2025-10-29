@@ -1,6 +1,6 @@
 import { useEffect, useState, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import {calendlyAPI, publicProfileAPI} from '../api/database';
+import {publicProfileAPI} from '../api/database';
 import { useSeguidores } from '../hooks/useSeguidores';
 import ApunteCard from '../components/ApunteCard';
 import {supabase} from "../supabase.js";
