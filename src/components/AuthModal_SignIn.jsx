@@ -1,37 +1,60 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { supabase } from "../supabase";
 import { createOrUpdateUserProfile, ensureUniqueUsername } from "../utils/authHelpers";
 
 export default function AuthModal_SignIn({ open, onClose, onSignedIn }) {
-    const [mode, setMode] = useState("login"); // login | signup
+    const [mode, setMode] = useState("login");
     const [email, setEmail] = useState("");
-    const [name, setName] = useState("");     // nombre completo
-    const [username, setUsername] = useState(""); // único
+    const [name, setName] = useState("");
+    const [username, setUsername] = useState("");
     const [pwd, setPwd] = useState("");
     const [showPwd, setShowPwd] = useState(false);
     const [loading, setLoading] = useState(false);
     const [msg, setMsg] = useState({ type: "", text: "" });
     const [acceptedTerms, setAcceptedTerms] = useState(false);
     const [showTermsModal, setShowTermsModal] = useState(false);
+    const [showSuccessModal, setShowSuccessModal] = useState(false); // 🆕 Modal de éxito
+
+    // ✨ Errores específicos por campo
+    const [fieldErrors, setFieldErrors] = useState({
+        name: "",
+        username: "",
+        email: "",
+        password: "",
+        terms: ""
+    });
+
+    // 🔒 Bloquear scroll del body cuando el modal está abierto
+    useEffect(() => {
+        if (open) {
+            document.body.style.overflow = 'hidden';
+        } else {
+            document.body.style.overflow = 'unset';
+        }
+        return () => {
+            document.body.style.overflow = 'unset';
+        };
+    }, [open]);
 
     if (!open) return null;
 
     const reset = () => {
         setEmail(""); setName(""); setUsername(""); setPwd("");
         setMsg({ type: "", text: "" });
+        setFieldErrors({ name: "", username: "", email: "", password: "", terms: "" });
         setShowPwd(false);
+        setAcceptedTerms(false);
     };
 
     const onCloseModal = () => { reset(); onClose?.(); };
 
     async function handleLogin(e) {
         e.preventDefault();
-        setLoading(true); setMsg({ type: "", text: "" });
+        setLoading(true);
+        setMsg({ type: "", text: "" });
+        setFieldErrors({ name: "", username: "", email: "", password: "", terms: "" });
+
         try {
-            console.log('Intentando login con:', {
-                email: email.trim(),
-                passwordLength: pwd.length
-            });
             const { data, error } = await supabase.auth.signInWithPassword({
                 email: email.trim().toLowerCase(),
                 password: pwd,
@@ -39,16 +62,17 @@ export default function AuthModal_SignIn({ open, onClose, onSignedIn }) {
 
             if (error) {
                 if (error.message?.includes("Invalid login credentials")) {
-                    setMsg({
-                        type: "error",
-                        text: "Email o contraseña incorrectos. Si creaste la cuenta con Google, usá 'Continuar con Google'."
+                    setFieldErrors({
+                        ...fieldErrors,
+                        email: "Email o contraseña incorrectos",
+                        password: "Email o contraseña incorrectos"
                     });
                 } else if (error.message?.includes("Email not confirmed")) {
-                    setMsg({ type: "warn", text: "Verificá tu email antes de iniciar sesión." });
+                    setFieldErrors({ ...fieldErrors, email: "Verificá tu email antes de iniciar sesión" });
                 } else if (error.status === 500) {
-                    setMsg({
-                        type: "error",
-                        text: "Error del servidor. Si creaste la cuenta con Google, usá 'Continuar con Google'."
+                    setFieldErrors({
+                        ...fieldErrors,
+                        email: "Si creaste la cuenta con Google, usá 'Continuar con Google'"
                     });
                 }
                 else {
@@ -68,67 +92,124 @@ export default function AuthModal_SignIn({ open, onClose, onSignedIn }) {
     async function handleSignup(e) {
         e.preventDefault();
         setMsg({ type: "", text: "" });
+        setFieldErrors({ name: "", username: "", email: "", password: "", terms: "" });
 
-        if (!name.trim() || !email.trim() || !pwd || !username.trim()) {
-            setMsg({ type: "error", text: "Completá todos los campos." });
+        // Validaciones básicas
+        if (!name.trim()) {
+            setFieldErrors({ ...fieldErrors, name: "El nombre es obligatorio" });
+            return;
+        }
+        if (!username.trim()) {
+            setFieldErrors({ ...fieldErrors, username: "El usuario es obligatorio" });
+            return;
+        }
+        if (!email.trim()) {
+            setFieldErrors({ ...fieldErrors, email: "El email es obligatorio" });
+            return;
+        }
+        if (!pwd) {
+            setFieldErrors({ ...fieldErrors, password: "La contraseña es obligatoria" });
             return;
         }
         if (pwd.length < 6) {
-            setMsg({ type: "error", text: "La contraseña debe tener al menos 6 caracteres." });
+            setFieldErrors({ ...fieldErrors, password: "La contraseña debe tener al menos 6 caracteres" });
             return;
         }
+
+        // ✅ Validar también mínimo 8 caracteres (por si Supabase lo requiere)
+        if (pwd.length < 8) {
+            setFieldErrors({ ...fieldErrors, password: "La contraseña debe tener al menos 8 caracteres" });
+            return;
+        }
+
+        // ✅ Validación de contraseña: minúscula, mayúscula y número
+        const passwordRegex = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d).+$/;
+        if (!passwordRegex.test(pwd)) {
+            setFieldErrors({
+                ...fieldErrors,
+                password: "Debe contener al menos: una minúscula (a-z), una mayúscula (A-Z) y un número (0-9)"
+            });
+            return;
+        }
+
         if (!acceptedTerms) {
-            setMsg({ type: "error", text: "Debés aceptar los términos y condiciones para crear una cuenta." });
+            setFieldErrors({ ...fieldErrors, terms: "Debés aceptar los términos y condiciones" });
             return;
         }
 
         setLoading(true);
         try {
-            console.log('🔍 Intentando signup con:', {
-                email: email.trim(),
-                name: name.trim(),
-                username: username.trim(),
-                passwordLength: pwd.length
-            });
-
             const ok = await ensureUniqueUsername(username.trim());
             if (!ok) {
-                setMsg({ type: "error", text: "Ese @usuario ya existe. Probá con otro." });
+                setFieldErrors({ ...fieldErrors, username: "Este usuario ya existe. Probá con otro" });
                 setLoading(false);
                 return;
             }
 
-            // 👇 PROBÁ SIN LOS OPTIONS PRIMERO
-            const { data: authData, error: authError } = await supabase.auth.signUp({
-                email: email.trim(),
-                password: pwd,
-                data: { name: name.trim(), username: username.trim() },
-                emailRedirectTo: `${window.location.origin}/auth/callback`,
+            // ✅ Verificar si el email ya existe ANTES de intentar signup
+            const { data: existingUsers, error: checkError } = await supabase
+                .from('usuario')
+                .select('correo')
+                .eq('correo', email.trim().toLowerCase())
+                .maybeSingle();
 
+            if (checkError && checkError.code !== 'PGRST116') {
+                console.error('Error verificando email:', checkError);
+            }
+
+            if (existingUsers) {
+                setFieldErrors({ ...fieldErrors, email: "Ya tienes una cuenta de Kerana con este email" });
+                setLoading(false);
+                return;
+            }
+
+            const { data: authData, error: authError } = await supabase.auth.signUp({
+                email: email.trim().toLowerCase(),
+                password: pwd,
+                options: {
+                    data: { name: name.trim(), username: username.trim() },
+                    emailRedirectTo: `${window.location.origin}/auth/callback`,
+                }
             });
 
-            console.log('🔍 Respuesta signup:', { authData, authError });
-
             if (authError) {
-                console.error('❌ Error detallado signup:', authError);
-                throw authError;
+                // Error: Email duplicado en auth
+                if (authError.message.includes('User already registered') ||
+                    authError.message.includes('already been registered') ||
+                    authError.message.includes('already exists') ||
+                    authError.message.includes('duplicate')) {
+                    setFieldErrors({ ...fieldErrors, email: "Ya tienes una cuenta de Kerana con este email" });
+                }
+                // Error: Contraseña muy corta
+                else if (authError.message.includes('Password should be at least')) {
+                    setFieldErrors({ ...fieldErrors, password: "La contraseña debe tener al menos 8 caracteres" });
+                }
+                // Error: Contraseña débil (sin mayúsculas/números)
+                else if (authError.message.includes('Password should contain') ||
+                    authError.message.includes('abcdefghijklmnopqrstuvwxyz')) {
+                    setFieldErrors({
+                        ...fieldErrors,
+                        password: "Debe contener al menos: una minúscula (a-z), una mayúscula (A-Z) y un número (0-9)"
+                    });
+                }
+                else {
+                    // Cualquier otro error de Supabase
+                    setFieldErrors({ ...fieldErrors, password: "Error: " + authError.message });
+                }
+                setLoading(false);
+                return;
             }
 
             if (authData.user) {
-                console.log('✅ Usuario creado, creando perfil...');
                 await createOrUpdateUserProfile(authData.user, {
                     name: name.trim(),
                     username: username.trim(),
                 });
             }
 
-            setMsg({
-                type: "success",
-                text: "¡Cuenta creada! Revisá tu correo para confirmar.",
-            });
-            setMode("login");
+            setShowSuccessModal(true);
         } catch (error) {
-            console.error('❌ Error general signup:', error);
+            console.error('Error general signup:', error);
             setMsg({
                 type: "error",
                 text: `No se pudo crear la cuenta. Error: ${error.message}`
@@ -188,17 +269,25 @@ export default function AuthModal_SignIn({ open, onClose, onSignedIn }) {
                                     label="Nombre y apellido"
                                     type="text"
                                     value={name}
-                                    onChange={setName}
+                                    onChange={(val) => {
+                                        setName(val);
+                                        if (fieldErrors.name) setFieldErrors({...fieldErrors, name: ""});
+                                    }}
                                     placeholder="Tu nombre"
                                     icon="👤"
+                                    error={fieldErrors.name}
                                 />
                                 <Field
                                     label="Usuario"
                                     type="text"
                                     value={username}
-                                    onChange={setUsername}
+                                    onChange={(val) => {
+                                        setUsername(val);
+                                        if (fieldErrors.username) setFieldErrors({...fieldErrors, username: ""});
+                                    }}
                                     placeholder="usuario"
                                     icon="🔵"
+                                    error={fieldErrors.username}
                                 />
                             </>
                         )}
@@ -207,18 +296,26 @@ export default function AuthModal_SignIn({ open, onClose, onSignedIn }) {
                             label="Email"
                             type="email"
                             value={email}
-                            onChange={setEmail}
+                            onChange={(val) => {
+                                setEmail(val);
+                                if (fieldErrors.email) setFieldErrors({...fieldErrors, email: ""});
+                            }}
                             placeholder="tu@correo.com"
                             icon="✉️"
+                            error={fieldErrors.email}
                         />
 
                         <Field
                             label="Contraseña"
                             type={showPwd ? "text" : "password"}
                             value={pwd}
-                            onChange={setPwd}
+                            onChange={(val) => {
+                                setPwd(val);
+                                if (fieldErrors.password) setFieldErrors({...fieldErrors, password: ""});
+                            }}
                             placeholder="••••••••"
-                            icon="🔒"
+                            icon="🔑"
+                            error={fieldErrors.password}
                             rightAdornment={
                                 <button
                                     type="button"
@@ -231,28 +328,45 @@ export default function AuthModal_SignIn({ open, onClose, onSignedIn }) {
                             }
                         />
 
-                        {/* TÉRMINOS Y CONDICIONES - Solo en registro */}
                         {mode === "signup" && (
-                            <div style={termsContainer}>
-                                <label style={termsLabel}>
-                                    <input
-                                        type="checkbox"
-                                        checked={acceptedTerms}
-                                        onChange={(e) => setAcceptedTerms(e.target.checked)}
-                                        style={checkboxStyle}
-                                    />
-                                    <span>
-                                        Acepto los{' '}
-                                        <button
-                                            type="button"
-                                            onClick={() => setShowTermsModal(true)}
-                                            style={termsLink}
-                                        >
-                                            términos y condiciones
-                                        </button>
-                                    </span>
-                                </label>
-                            </div>
+                            <>
+                                {!fieldErrors.password && (
+                                    <p style={{
+                                        margin: "0 0 8px 0",
+                                        fontSize: "12px",
+                                        color: "#64748b",
+                                        lineHeight: 1.4
+                                    }}>
+                                        Mínimo 8 caracteres: minúsculas, mayúsculas y números
+                                    </p>
+                                )}
+                                <div style={termsContainer}>
+                                    <label style={termsLabel}>
+                                        <input
+                                            type="checkbox"
+                                            checked={acceptedTerms}
+                                            onChange={(e) => {
+                                                setAcceptedTerms(e.target.checked);
+                                                if (fieldErrors.terms) setFieldErrors({...fieldErrors, terms: ""});
+                                            }}
+                                            style={checkboxStyle}
+                                        />
+                                        <span>
+                                            Acepto los{' '}
+                                            <button
+                                                type="button"
+                                                onClick={() => setShowTermsModal(true)}
+                                                style={termsLink}
+                                            >
+                                                términos y condiciones
+                                            </button>
+                                        </span>
+                                    </label>
+                                    {fieldErrors.terms && (
+                                        <div style={errorTextStyle}>{fieldErrors.terms}</div>
+                                    )}
+                                </div>
+                            </>
                         )}
 
                         <button type="submit" style={primaryBtn} disabled={loading}>
@@ -284,13 +398,20 @@ export default function AuthModal_SignIn({ open, onClose, onSignedIn }) {
                         setShowTermsModal(false);
                     }} />
                 )}
+                {showSuccessModal && (
+                    <SuccessModal onClose={() => {
+                        setShowSuccessModal(false);
+                        setMode("login");
+                        reset();
+                        onCloseModal();
+                    }} />
+                )}
                 <button onClick={onCloseModal} style={closeBtn} aria-label="Cerrar">✕</button>
             </div>
         </div>
     );
 }
 
-/** Componente del ícono de Google CORREGIDO */
 function GoogleIcon() {
     return (
         <svg width="18" height="18" viewBox="0 0 24 24">
@@ -302,12 +423,14 @@ function GoogleIcon() {
     );
 }
 
-/** UI bits (igual que antes pero con mejores estilos) */
-function Field({ label, type, value, onChange, placeholder, icon, rightAdornment }) {
+function Field({ label, type, value, onChange, placeholder, icon, rightAdornment, error }) {
     return (
         <label style={{ display: "grid", gap: 6 }}>
             <span style={labelCss}>{label}</span>
-            <div style={inputWrap}>
+            <div style={{
+                ...inputWrap,
+                borderColor: error ? "#dc2626" : "rgba(30, 64, 175, 0.15)"
+            }}>
                 <span style={inputIcon}>{icon}</span>
                 <input
                     style={inputCss}
@@ -319,6 +442,7 @@ function Field({ label, type, value, onChange, placeholder, icon, rightAdornment
                 />
                 {rightAdornment ? <span style={rightAdornmentWrap}>{rightAdornment}</span> : null}
             </div>
+            {error && <div style={errorTextStyle}>{error}</div>}
         </label>
     );
 }
@@ -345,22 +469,106 @@ function Alert({ type, text }) {
     );
 }
 
-/** 🎨 NUEVOS ESTILOS - Azul más oscuro y elegante */
-const BLU1 = "#1d4ed8";   // azul más oscuro
-const BLU2 = "#1e40af";   // azul más intenso
-const BLU3 = "rgba(30, 64, 175, 0.05)"; // fondo sutil
+function TermsModal({ onClose, onAccept }) {
+    return (
+        <div style={termsBackdrop}>
+            <div style={termsModal}>
+                <div style={termsHeader}>
+                    <h3 style={termsTitle}>Términos y Condiciones</h3>
+                    <button onClick={onClose} style={termsCloseBtn}>✕</button>
+                </div>
+
+                <div style={termsContent}>
+                    <h4>1. Protección de Datos Personales</h4>
+                    <p>
+                        De conformidad con la Ley N° 18.331 de Protección de Datos Personales de Uruguay,
+                        se informa que los datos personales proporcionados serán incorporados a una base
+                        de datos de la cual es responsable KERANA.
+                    </p>
+
+                    <h4>2. Finalidad del Tratamiento</h4>
+                    <p>
+                        Sus datos serán utilizados para: gestión de usuarios, publicación y compra de apuntes,
+                        comunicación entre usuarios, y mejora de nuestros servicios.
+                    </p>
+
+                    <h4>3. Derechos del Usuario</h4>
+                    <p>
+                        Usted tiene derecho a acceder, rectificar, actualizar y, cuando corresponda,
+                        suprimir sus datos personales. Para ejercer estos derechos, puede contactarnos
+                        a través de nuestro formulario de contacto.
+                    </p>
+
+                    <h4>4. Seguridad de la Información</h4>
+                    <p>
+                        Implementamos medidas de seguridad técnicas y organizativas para proteger
+                        sus datos personales contra accesos no autorizados, pérdida o destrucción.
+                    </p>
+
+                    <h4>5. Consentimiento</h4>
+                    <p>
+                        Al aceptar estos términos, otorga su consentimiento libre, expreso e informado
+                        para el tratamiento de sus datos personales conforme a lo establecido en la
+                        legislación uruguaya.
+                    </p>
+                </div>
+
+                <div style={termsFooter}>
+                    <button onClick={onClose} style={termsCancelBtn}>
+                        Cancelar
+                    </button>
+                    <button onClick={onAccept} style={termsAcceptBtn}>
+                        Aceptar Términos
+                    </button>
+                </div>
+            </div>
+        </div>
+    );
+}
+function SuccessModal({ onClose }) {
+    return (
+        <div style={successBackdrop}>
+            <div style={successModal}>
+                <div style={successIconContainer}>
+                    <svg width="80" height="80" viewBox="0 0 24 24" fill="none">
+                        <circle cx="12" cy="12" r="10" stroke="#10b981" strokeWidth="2" fill="none"/>
+                        <path d="M8 12l3 3l5-5" stroke="#10b981" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"/>
+                    </svg>
+                </div>
+
+                <h3 style={successTitle}>¡Cuenta creada!</h3>
+                <p style={successText}>
+                    Revisá tu correo para confirmar tu cuenta y empezar a usar Kerana.
+                </p>
+
+                <button onClick={onClose} style={successBtn}>
+                    Entendido
+                </button>
+            </div>
+        </div>
+    );
+}
+
+// ESTILOS
+const BLU1 = "#1d4ed8";
+const BLU2 = "#1e40af";
+const BLU3 = "rgba(30, 64, 175, 0.05)";
 
 const backdrop = {
     position: "fixed", inset: 0, background: "rgba(0,10,30,.65)",
-    backdropFilter: "blur(6px)", zIndex: 1001, display: "grid", placeItems: "center", //el header es 1000, pongo 1001
+    backdropFilter: "blur(6px)", zIndex: 1001, display: "grid", placeItems: "center",
 };
+
 const modal = {
     position: "relative",
-    width: "min(92vw, 440px)", // un poco más angosto
+    width: "min(92vw, 440px)",
+    maxHeight: "90vh",
     borderRadius: 20,
     overflow: "hidden",
     boxShadow: "0 25px 70px rgba(0,0,0,.4)",
     background: "white",
+    display: "flex",
+    flexDirection: "column"
 };
 
 const header = {
@@ -368,6 +576,7 @@ const header = {
     color: "white",
     padding: "28px 26px",
     textAlign: "center",
+    flexShrink: 0
 };
 
 const badge = {
@@ -398,7 +607,9 @@ const subtitle = {
 
 const body = {
     padding: 26,
-    background: BLU3
+    background: BLU3,
+    overflowY: "auto",
+    flexGrow: 1
 };
 
 const googleBtn = {
@@ -522,65 +733,7 @@ const plainIconBtn = {
     fontSize: 16,
     opacity: 0.7,
 };
-// COMPONENTE DE TÉRMINOS Y CONDICIONES
-function TermsModal({ onClose, onAccept }) {
-    return (
-        <div style={termsBackdrop}>
-            <div style={termsModal}>
-                <div style={termsHeader}>
-                    <h3 style={termsTitle}>Términos y Condiciones</h3>
-                    <button onClick={onClose} style={termsCloseBtn}>✕</button>
-                </div>
 
-                <div style={termsContent}>
-                    <h4>1. Protección de Datos Personales</h4>
-                    <p>
-                        De conformidad con la Ley N° 18.331 de Protección de Datos Personales de Uruguay,
-                        se informa que los datos personales proporcionados serán incorporados a una base
-                        de datos de la cual es responsable KERANA.
-                    </p>
-
-                    <h4>2. Finalidad del Tratamiento</h4>
-                    <p>
-                        Sus datos serán utilizados para: gestión de usuarios, publicación y compra de apuntes,
-                        comunicación entre usuarios, y mejora de nuestros servicios.
-                    </p>
-
-                    <h4>3. Derechos del Usuario</h4>
-                    <p>
-                        Usted tiene derecho a acceder, rectificar, actualizar y, cuando corresponda,
-                        suprimir sus datos personales. Para ejercer estos derechos, puede contactarnos
-                        a través de nuestro formulario de contacto.
-                    </p>
-
-                    <h4>4. Seguridad de la Información</h4>
-                    <p>
-                        Implementamos medidas de seguridad técnicas y organizativas para proteger
-                        sus datos personales contra accesos no autorizados, pérdida o destrucción.
-                    </p>
-
-                    <h4>5. Consentimiento</h4>
-                    <p>
-                        Al aceptar estos términos, otorga su consentimiento libre, expreso e informado
-                        para el tratamiento de sus datos personales conforme a lo establecido en la
-                        legislación uruguaya.
-                    </p>
-                </div>
-
-                <div style={termsFooter}>
-                    <button onClick={onClose} style={termsCancelBtn}>
-                        Cancelar
-                    </button>
-                    <button onClick={onAccept} style={termsAcceptBtn}>
-                        Aceptar Términos
-                    </button>
-                </div>
-            </div>
-        </div>
-    );
-}
-
-// NUEVOS ESTILOS PARA TÉRMINOS Y CONDICIONES
 const termsContainer = {
     margin: "8px 0"
 };
@@ -615,7 +768,7 @@ const termsBackdrop = {
     inset: 0,
     background: "rgba(0,10,30,.75)",
     backdropFilter: "blur(8px)",
-    zIndex: 70,
+    zIndex: 1002,
     display: "grid",
     placeItems: "center",
     padding: 20
@@ -697,28 +850,62 @@ const termsAcceptBtn = {
     fontWeight: 600
 };
 
-const rememberContainer = {
-    display: "flex",
-    justifyContent: "space-between",
-    alignItems: "center",
-    margin: "8px 0"
+const errorTextStyle = {
+    fontSize: 12,
+    color: "#dc2626",
+    marginTop: 4,
+    lineHeight: 1.4
+};
+const successBackdrop = {
+    position: "fixed",
+    inset: 0,
+    background: "rgba(0,10,30,.85)",
+    backdropFilter: "blur(8px)",
+    zIndex: 1003,
+    display: "grid",
+    placeItems: "center",
+    padding: 20
 };
 
-const rememberLabel = {
-    display: "flex",
-    alignItems: "center",
-    gap: 8,
-    fontSize: 14,
-    color: "#475569",
-    cursor: "pointer"
+const successModal = {
+    background: "white",
+    borderRadius: 20,
+    maxWidth: 440,
+    width: "100%",
+    padding: "48px 32px",
+    textAlign: "center",
+    boxShadow: "0 25px 80px rgba(0,0,0,0.4)"
 };
 
-const forgotLink = {
-    background: "none",
+const successIconContainer = {
+    margin: "0 auto 24px"
+};
+
+const successTitle = {
+    margin: "0 0 12px 0",
+    fontSize: 28,
+    fontWeight: 800,
+    color: "#10b981",
+    letterSpacing: "-0.5px"
+};
+
+const successText = {
+    margin: "0 0 32px 0",
+    fontSize: 16,
+    color: "#64748b",
+    lineHeight: 1.6
+};
+
+const successBtn = {
+    width: "100%",
+    padding: "14px 24px",
+    borderRadius: 12,
     border: "none",
-    color: "#2563eb",
+    background: "linear-gradient(135deg, #10b981 0%, #059669 100%)",
+    color: "white",
+    fontSize: 15,
+    fontWeight: 700,
     cursor: "pointer",
-    fontSize: 13,
-    textDecoration: "underline",
-    padding: 0
+    boxShadow: "0 8px 20px rgba(16, 185, 129, 0.3)",
+    transition: "all 0.2s ease"
 };
