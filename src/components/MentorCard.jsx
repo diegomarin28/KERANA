@@ -136,9 +136,9 @@ export function MentorCard({ mentor }) {
             <div
                 onClick={irAlPerfil}
                 style={{
-                    width: 280,
-                    height: 420,
-                    padding: 16,
+                    width: 240,
+                    height: 340,
+                    padding: 12,
                     background: '#fff',
                     borderRadius: 12,
                     border: '2px solid #f1f5f9',
@@ -160,16 +160,16 @@ export function MentorCard({ mentor }) {
             >
                 {/* Avatar */}
                 <div style={{
-                    width: 56,
-                    height: 56,
+                    width: 48,
+                    height: 48,
                     borderRadius: '50%',
                     background: mentor.foto ? 'transparent' : 'linear-gradient(135deg, #10B981 0%, #059669 100%)',
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'center',
                     overflow: 'hidden',
-                    margin: '0 auto 10px',
-                    border: '3px solid #10B981'
+                    margin: '0 auto 8px',
+                    border: '2px solid #10B981'
                 }}>
                     {mentor.foto ? (
                         <img
@@ -183,7 +183,7 @@ export function MentorCard({ mentor }) {
                         />
                     ) : (
                         <div style={{
-                            fontSize: 20,
+                            fontSize: 18,
                             fontWeight: 700,
                             color: '#fff'
                         }}>
@@ -194,8 +194,8 @@ export function MentorCard({ mentor }) {
 
                 {/* Nombre */}
                 <h3 style={{
-                    margin: '0 0 4px 0',
-                    fontSize: 15,
+                    margin: '0 0 3px 0',
+                    fontSize: 14,
                     fontWeight: 700,
                     textAlign: 'center',
                     color: '#13346b',
@@ -208,45 +208,45 @@ export function MentorCard({ mentor }) {
 
                 {/* Username */}
                 <p style={{
-                    margin: '0 0 8px 0',
-                    fontSize: 12,
+                    margin: '0 0 6px 0',
+                    fontSize: 11,
                     color: '#64748b',
                     textAlign: 'center',
                     fontWeight: 500,
-                    height: 16
+                    height: 14
                 }}>
                     {mentor.username ? `@${mentor.username}` : ''}
                 </p>
 
                 {/* Badge Mentor */}
                 <div style={{
-                    padding: '4px 10px',
+                    padding: '3px 8px',
                     background: '#d1fae5',
                     color: '#059669',
-                    borderRadius: 8,
-                    fontSize: 11,
+                    borderRadius: 6,
+                    fontSize: 10,
                     fontWeight: 700,
                     textAlign: 'center',
                     border: '1px solid #10B981',
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'center',
-                    gap: 4,
-                    marginBottom: 10
+                    gap: 3,
+                    marginBottom: 8
                 }}>
-                    <FontAwesomeIcon icon={faGraduationCap} style={{ fontSize: 11 }} />
+                    <FontAwesomeIcon icon={faGraduationCap} style={{ fontSize: 10 }} />
                     <span>MENTOR</span>
                 </div>
 
                 {/* Materias - ALTURA FIJA */}
                 <div style={{
-                    height: 50,
+                    height: 40,
                     display: 'flex',
                     flexDirection: 'column',
-                    gap: 4,
+                    gap: 3,
                     alignItems: 'center',
                     justifyContent: 'center',
-                    marginBottom: 10
+                    marginBottom: 8
                 }}>
                     {materiasDisplay.length > 0 ? (
                         <>
@@ -256,9 +256,9 @@ export function MentorCard({ mentor }) {
                                     style={{
                                         background: '#dbeafe',
                                         color: '#1e40af',
-                                        padding: '3px 10px',
-                                        borderRadius: 6,
-                                        fontSize: 11,
+                                        padding: '2px 8px',
+                                        borderRadius: 5,
+                                        fontSize: 10,
                                         fontWeight: 600,
                                         textAlign: 'center',
                                         overflow: 'hidden',
@@ -272,7 +272,7 @@ export function MentorCard({ mentor }) {
                             ))}
                             {hayMasMaterias && (
                                 <span style={{
-                                    fontSize: 10,
+                                    fontSize: 9,
                                     color: '#64748b',
                                     fontWeight: 500
                                 }}>
@@ -281,31 +281,31 @@ export function MentorCard({ mentor }) {
                             )}
                         </>
                     ) : (
-                        <span style={{ fontSize: 11, color: '#cbd5e1' }}>Sin materias</span>
+                        <span style={{ fontSize: 10, color: '#cbd5e1' }}>Sin materias</span>
                     )}
                 </div>
 
                 {/* Rating - ALTURA FIJA */}
                 <div style={{
-                    height: 60,
+                    height: 50,
                     display: 'flex',
                     flexDirection: 'column',
                     alignItems: 'center',
                     justifyContent: 'center',
-                    gap: 6,
-                    paddingTop: 10,
-                    paddingBottom: 10,
+                    gap: 5,
+                    paddingTop: 8,
+                    paddingBottom: 8,
                     borderTop: '1px solid #f1f5f9',
                     borderBottom: '1px solid #f1f5f9'
                 }}>
-                    <StarDisplay rating={estrellas} size={14} />
+                    <StarDisplay rating={estrellas} size={12} />
                     <div style={{
                         display: 'flex',
                         alignItems: 'center',
-                        gap: 4
+                        gap: 3
                     }}>
                         <span style={{
-                            fontSize: 13,
+                            fontSize: 12,
                             fontWeight: 700,
                             color: '#13346b'
                         }}>
@@ -313,7 +313,7 @@ export function MentorCard({ mentor }) {
                         </span>
                         {rating.cantidad > 0 && (
                             <span style={{
-                                fontSize: 11,
+                                fontSize: 10,
                                 color: '#64748b',
                                 fontWeight: 500
                             }}>
@@ -323,13 +323,13 @@ export function MentorCard({ mentor }) {
                     </div>
                 </div>
 
-                {/* Tags - ALTURA FIJA 75px para 3 badges */}
+                {/* Tags - ALTURA FIJA 60px para 3 badges */}
                 <div style={{
-                    height: 75,
+                    height: 60,
                     display: 'flex',
                     flexWrap: 'wrap',
-                    gap: 6,
-                    paddingTop: 10,
+                    gap: 4,
+                    paddingTop: 8,
                     justifyContent: 'center',
                     alignContent: 'flex-start'
                 }}>
@@ -341,10 +341,10 @@ export function MentorCard({ mentor }) {
                                 <div
                                     key={tagId}
                                     style={{
-                                        padding: '4px 10px',
+                                        padding: '3px 8px',
                                         background: '#eff6ff',
-                                        borderRadius: 6,
-                                        fontSize: 10,
+                                        borderRadius: 5,
+                                        fontSize: 9,
                                         color: '#1e40af',
                                         whiteSpace: 'nowrap',
                                         fontWeight: 600,
@@ -356,8 +356,8 @@ export function MentorCard({ mentor }) {
                             );
                         })
                     ) : (
-                        <span style={{ fontSize: 10, color: '#cbd5e1', marginTop: 10 }}>
-                            Sin características destacadas
+                        <span style={{ fontSize: 9, color: '#cbd5e1', marginTop: 8 }}>
+                            Sin características
                         </span>
                     )}
                 </div>
@@ -368,13 +368,13 @@ export function MentorCard({ mentor }) {
                     disabled={cargando}
                     style={{
                         width: '100%',
-                        padding: '10px 16px',
-                        borderRadius: '8px',
+                        padding: '8px 12px',
+                        borderRadius: '7px',
                         border: siguiendo ? '2px solid #10B981' : 'none',
                         background: siguiendo ? '#ffffff' : '#10B981',
                         color: siguiendo ? '#10B981' : '#ffffff',
                         fontWeight: 700,
-                        fontSize: 13,
+                        fontSize: 12,
                         cursor: cargando ? 'not-allowed' : 'pointer',
                         opacity: cargando ? 0.6 : 1,
                         transition: 'all 0.2s ease',
@@ -382,7 +382,7 @@ export function MentorCard({ mentor }) {
                         display: 'flex',
                         alignItems: 'center',
                         justifyContent: 'center',
-                        gap: 6,
+                        gap: 5,
                         fontFamily: 'Inter, sans-serif'
                     }}
                     onMouseEnter={(e) => {
@@ -396,7 +396,7 @@ export function MentorCard({ mentor }) {
                         }
                     }}
                 >
-                    <FontAwesomeIcon icon={siguiendo ? faUserCheck : faUserPlus} style={{ fontSize: 12 }} />
+                    <FontAwesomeIcon icon={siguiendo ? faUserCheck : faUserPlus} style={{ fontSize: 11 }} />
                     {cargando ? 'Procesando...' : siguiendo ? 'Siguiendo' : 'Seguir'}
                 </button>
             </div>
