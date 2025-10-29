@@ -1,21 +1,22 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
+import { faGraduationCap, faUserCheck, faUserPlus } from '@fortawesome/free-solid-svg-icons';
 import { supabase } from '../supabase';
 import { useSeguidores } from '../hooks/useSeguidores';
 import StarDisplay from './StarDisplay';
 
-// Tags disponibles para mentores (mismo que MentorCarousel)
 const AVAILABLE_TAGS = [
-    { id: 'muy-claro', label: '✨ Muy claro' },
-    { id: 'querido', label: '🎓 Querido por los estudiantes' },
-    { id: 'apasionado', label: '🔥 Apasionado' },
-    { id: 'disponible', label: '💬 Disponible' },
-    { id: 'ordenado', label: '📋 Ordenado' },
-    { id: 'dinamico', label: '⚡ Dinámico' },
-    { id: 'cercano', label: '🤝 Cercano' },
-    { id: 'paciente', label: '🧘 Paciente' },
-    { id: 'buenas-explicaciones', label: '💡 Buenas explicaciones' },
-    { id: 'ejemplos-claros', label: '📚 Buenos ejemplos' }
+    { id: 'muy-claro', label: 'Muy claro' },
+    { id: 'querido', label: 'Querido' },
+    { id: 'apasionado', label: 'Apasionado' },
+    { id: 'disponible', label: 'Disponible' },
+    { id: 'ordenado', label: 'Ordenado' },
+    { id: 'dinamico', label: 'Dinámico' },
+    { id: 'cercano', label: 'Cercano' },
+    { id: 'paciente', label: 'Paciente' },
+    { id: 'buenas-explicaciones', label: 'Buenas explicaciones' },
+    { id: 'ejemplos-claros', label: 'Buenos ejemplos' }
 ];
 
 export function MentorCard({ mentor }) {
@@ -32,7 +33,6 @@ export function MentorCard({ mentor }) {
             cargarMaterias();
         }
         cargarRating();
-        verificarSiSigue();
     }, [mentor.id_mentor]);
 
     const cargarMaterias = async () => {
@@ -62,7 +62,6 @@ export function MentorCard({ mentor }) {
                 const sum = reviewsData.reduce((acc, r) => acc + (r.estrellas || 0), 0);
                 const avg = +(sum / reviewsData.length).toFixed(1);
 
-                // Contar tags
                 const tagCounts = {};
                 reviewsData.forEach(review => {
                     if (review.tags && Array.isArray(review.tags)) {
@@ -87,36 +86,6 @@ export function MentorCard({ mentor }) {
             console.error('Error cargando rating:', error);
         }
     };
-
-    const verificarSiSigue = async () => {
-        try {
-            const { data: { user } } = await supabase.auth.getUser();
-            if (!user) return;
-
-            const { data: usuarioData } = await supabase
-                .from('usuario')
-                .select('id_usuario')
-                .eq('auth_id', user.id)
-                .single();
-
-            if (!usuarioData) return;
-
-            const { data: seguidorData } = await supabase
-                .from('seguidores')
-                .select('id, estado')
-                .eq('seguidor_id', usuarioData.id_usuario)
-                .eq('seguido_id', mentor.id_usuario)
-                .eq('estado', 'activo')
-                .maybeSingle();
-
-            if (seguidorData) {
-                setSiguiendo(true);
-            }
-        } catch (error) {
-            console.error('Error verificando si sigue al mentor:', error);
-        }
-    };
-
 
     const manejarSeguir = async (e) => {
         e.stopPropagation();
@@ -158,10 +127,7 @@ export function MentorCard({ mentor }) {
         navigate(`/mentor/${mentor.username || mentor.id_mentor}`);
     };
 
-
     const estrellas = mentor.estrellas_mentor || mentor.rating_promedio || rating.promedio || 0;
-
-    // Mostrar máximo 2 materias
     const materiasDisplay = materias.slice(0, 2);
     const hayMasMaterias = materias.length > 2;
 
@@ -170,38 +136,39 @@ export function MentorCard({ mentor }) {
             <div
                 onClick={irAlPerfil}
                 style={{
-                    minWidth: 260,
+                    width: 280,
+                    height: 420,
                     padding: 16,
                     background: '#fff',
                     borderRadius: 12,
-                    border: '1px solid #e5e7eb',
-                    boxShadow: '0 1px 3px rgba(0,0,0,0.05)',
+                    border: '2px solid #f1f5f9',
+                    boxShadow: '0 2px 8px rgba(0,0,0,0.04)',
                     display: 'flex',
                     flexDirection: 'column',
-                    gap: 10,
                     transition: 'all 0.2s ease',
-                    cursor: 'pointer'
+                    cursor: 'pointer',
+                    fontFamily: 'Inter, sans-serif'
                 }}
                 onMouseEnter={(e) => {
-                    e.currentTarget.style.boxShadow = '0 4px 12px rgba(0,0,0,0.1)';
-                    e.currentTarget.style.transform = 'translateY(-2px)';
+                    e.currentTarget.style.boxShadow = '0 8px 20px rgba(0,0,0,0.1)';
+                    e.currentTarget.style.transform = 'translateY(-3px)';
                 }}
                 onMouseLeave={(e) => {
-                    e.currentTarget.style.boxShadow = '0 1px 3px rgba(0,0,0,0.05)';
+                    e.currentTarget.style.boxShadow = '0 2px 8px rgba(0,0,0,0.04)';
                     e.currentTarget.style.transform = 'translateY(0)';
                 }}
             >
-                {/* Foto/Iniciales */}
+                {/* Avatar */}
                 <div style={{
-                    width: 64,
-                    height: 64,
+                    width: 56,
+                    height: 56,
                     borderRadius: '50%',
                     background: mentor.foto ? 'transparent' : 'linear-gradient(135deg, #10B981 0%, #059669 100%)',
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'center',
                     overflow: 'hidden',
-                    margin: '0 auto',
+                    margin: '0 auto 10px',
                     border: '3px solid #10B981'
                 }}>
                     {mentor.foto ? (
@@ -216,7 +183,7 @@ export function MentorCard({ mentor }) {
                         />
                     ) : (
                         <div style={{
-                            fontSize: 24,
+                            fontSize: 20,
                             fontWeight: 700,
                             color: '#fff'
                         }}>
@@ -227,131 +194,147 @@ export function MentorCard({ mentor }) {
 
                 {/* Nombre */}
                 <h3 style={{
-                    margin: 0,
-                    fontSize: 16,
-                    fontWeight: 600,
+                    margin: '0 0 4px 0',
+                    fontSize: 15,
+                    fontWeight: 700,
                     textAlign: 'center',
-                    color: '#1f2937'
+                    color: '#13346b',
+                    overflow: 'hidden',
+                    textOverflow: 'ellipsis',
+                    whiteSpace: 'nowrap'
                 }}>
                     {mentor.mentor_nombre}
                 </h3>
 
                 {/* Username */}
-                {mentor.username && (
-                    <p style={{
-                        margin: 0,
-                        fontSize: 13,
-                        color: '#6b7280',
-                        textAlign: 'center'
-                    }}>
-                        @{mentor.username}
-                    </p>
-                )}
-
-                {/* Badge de mentor con ícono */}
-                <div style={{
-                    padding: '4px 12px',
-                    background: '#f0fdf4',
-                    color: '#15803d',
-                    borderRadius: 12,
+                <p style={{
+                    margin: '0 0 8px 0',
                     fontSize: 12,
-                    fontWeight: 600,
+                    color: '#64748b',
                     textAlign: 'center',
-                    border: '1px solid #bbf7d0',
+                    fontWeight: 500,
+                    height: 16
+                }}>
+                    {mentor.username ? `@${mentor.username}` : ''}
+                </p>
+
+                {/* Badge Mentor */}
+                <div style={{
+                    padding: '4px 10px',
+                    background: '#d1fae5',
+                    color: '#059669',
+                    borderRadius: 8,
+                    fontSize: 11,
+                    fontWeight: 700,
+                    textAlign: 'center',
+                    border: '1px solid #10B981',
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'center',
-                    gap: 4
+                    gap: 4,
+                    marginBottom: 10
                 }}>
-                    <span>🎓</span>
-                    <span>Mentor</span>
+                    <FontAwesomeIcon icon={faGraduationCap} style={{ fontSize: 11 }} />
+                    <span>MENTOR</span>
                 </div>
 
-                {/* Materias (máximo 2) */}
-                {materiasDisplay.length > 0 && (
-                    <div style={{
-                        display: 'flex',
-                        flexDirection: 'column',
-                        gap: 4,
-                        alignItems: 'center'
-                    }}>
-                        {materiasDisplay.map((materia, idx) => (
-                            <span
-                                key={idx}
-                                style={{
-                                    background: '#EFF6FF',
-                                    color: '#1E40AF',
-                                    padding: '3px 10px',
-                                    borderRadius: 6,
-                                    fontSize: 11,
-                                    fontWeight: 600,
-                                    textAlign: 'center'
-                                }}
-                            >
-                                {materia}
-                            </span>
-                        ))}
-                        {hayMasMaterias && (
-                            <span style={{
-                                fontSize: 11,
-                                color: '#6b7280',
-                                fontWeight: 500
-                            }}>
-                                +{materias.length - 2} más
-                            </span>
-                        )}
-                    </div>
-                )}
-
-                {/* Rating con estrellas proporcionales */}
+                {/* Materias - ALTURA FIJA */}
                 <div style={{
+                    height: 50,
+                    display: 'flex',
+                    flexDirection: 'column',
+                    gap: 4,
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    marginBottom: 10
+                }}>
+                    {materiasDisplay.length > 0 ? (
+                        <>
+                            {materiasDisplay.map((materia, idx) => (
+                                <span
+                                    key={idx}
+                                    style={{
+                                        background: '#dbeafe',
+                                        color: '#1e40af',
+                                        padding: '3px 10px',
+                                        borderRadius: 6,
+                                        fontSize: 11,
+                                        fontWeight: 600,
+                                        textAlign: 'center',
+                                        overflow: 'hidden',
+                                        textOverflow: 'ellipsis',
+                                        whiteSpace: 'nowrap',
+                                        maxWidth: '100%'
+                                    }}
+                                >
+                                    {materia}
+                                </span>
+                            ))}
+                            {hayMasMaterias && (
+                                <span style={{
+                                    fontSize: 10,
+                                    color: '#64748b',
+                                    fontWeight: 500
+                                }}>
+                                    +{materias.length - 2} más
+                                </span>
+                            )}
+                        </>
+                    ) : (
+                        <span style={{ fontSize: 11, color: '#cbd5e1' }}>Sin materias</span>
+                    )}
+                </div>
+
+                {/* Rating - ALTURA FIJA */}
+                <div style={{
+                    height: 60,
                     display: 'flex',
                     flexDirection: 'column',
                     alignItems: 'center',
+                    justifyContent: 'center',
                     gap: 6,
-                    paddingTop: 8,
-                    borderTop: '1px solid #f3f4f6'
+                    paddingTop: 10,
+                    paddingBottom: 10,
+                    borderTop: '1px solid #f1f5f9',
+                    borderBottom: '1px solid #f1f5f9'
                 }}>
-                    {/* Estrellas con relleno parcial usando StarDisplay */}
-                    <StarDisplay rating={estrellas} size={18} />
-
-                    {/* Número y cantidad */}
+                    <StarDisplay rating={estrellas} size={14} />
                     <div style={{
                         display: 'flex',
                         alignItems: 'center',
-                        gap: 6
+                        gap: 4
                     }}>
-                    <span style={{
-                        fontSize: 14,
-                        fontWeight: 600,
-                        color: '#1f2937'
-                    }}>
-                        {estrellas > 0 ? estrellas.toFixed(1) : '—'}
-                    </span>
+                        <span style={{
+                            fontSize: 13,
+                            fontWeight: 700,
+                            color: '#13346b'
+                        }}>
+                            {estrellas > 0 ? estrellas.toFixed(1) : '—'}
+                        </span>
                         {rating.cantidad > 0 && (
                             <span style={{
-                                fontSize: 12,
-                                color: '#6b7280'
+                                fontSize: 11,
+                                color: '#64748b',
+                                fontWeight: 500
                             }}>
-                        ({rating.cantidad})
-                      </span>
+                                ({rating.cantidad})
+                            </span>
                         )}
                     </div>
                 </div>
 
-
-
-                {/* Top 3 Características */}
-                {rating.topTags.length > 0 && (
-                    <div style={{
-                        display: 'flex',
-                        flexWrap: 'wrap',
-                        gap: 6,
-                        paddingTop: 8,
-                        borderTop: '1px solid #f3f4f6',
-                        justifyContent: 'center'
-                    }}>
-                        {rating.topTags.map((tagId) => {
+                {/* Tags - ALTURA FIJA 75px para 3 badges */}
+                <div style={{
+                    height: 75,
+                    display: 'flex',
+                    flexWrap: 'wrap',
+                    gap: 6,
+                    paddingTop: 10,
+                    justifyContent: 'center',
+                    alignContent: 'flex-start'
+                }}>
+                    {rating.topTags.length > 0 ? (
+                        rating.topTags.map((tagId) => {
                             const tag = AVAILABLE_TAGS.find(t => t.id === tagId);
                             if (!tag) return null;
                             return (
@@ -360,81 +343,189 @@ export function MentorCard({ mentor }) {
                                     style={{
                                         padding: '4px 10px',
                                         background: '#eff6ff',
-                                        borderRadius: 8,
-                                        fontSize: 11,
+                                        borderRadius: 6,
+                                        fontSize: 10,
                                         color: '#1e40af',
                                         whiteSpace: 'nowrap',
-                                        fontWeight: 500,
-                                        flexShrink: 0
+                                        fontWeight: 600,
+                                        border: '1px solid #dbeafe'
                                     }}
                                 >
                                     {tag.label}
                                 </div>
                             );
-                        })}
-                    </div>
-                )}
+                        })
+                    ) : (
+                        <span style={{ fontSize: 10, color: '#cbd5e1', marginTop: 10 }}>
+                            Sin características destacadas
+                        </span>
+                    )}
+                </div>
 
-                {/* Botón de seguir */}
+                {/* Botón Seguir - al final */}
                 <button
                     onClick={manejarSeguir}
                     disabled={cargando}
                     style={{
                         width: '100%',
-                        padding: '8px 16px',
+                        padding: '10px 16px',
                         borderRadius: '8px',
-                        border: siguiendo ? '2px solid #10B981' : '2px solid #10B981',
-                        background: siguiendo ? 'white' : '#10B981',
-                        color: siguiendo ? '#10B981' : 'white',
-                        fontWeight: 600,
-                        fontSize: 14,
+                        border: siguiendo ? '2px solid #10B981' : 'none',
+                        background: siguiendo ? '#ffffff' : '#10B981',
+                        color: siguiendo ? '#10B981' : '#ffffff',
+                        fontWeight: 700,
+                        fontSize: 13,
                         cursor: cargando ? 'not-allowed' : 'pointer',
                         opacity: cargando ? 0.6 : 1,
                         transition: 'all 0.2s ease',
-                        marginTop: 8
+                        marginTop: 'auto',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        gap: 6,
+                        fontFamily: 'Inter, sans-serif'
                     }}
                     onMouseEnter={(e) => {
                         if (!cargando) {
-                            if (siguiendo) {
-                                e.currentTarget.style.background = '#f3f4f6';
-                            } else {
-                                e.currentTarget.style.background = '#059669';
-                            }
+                            e.currentTarget.style.background = siguiendo ? '#f8fafc' : '#059669';
                         }
                     }}
                     onMouseLeave={(e) => {
                         if (!cargando) {
-                            e.currentTarget.style.background = siguiendo ? 'white' : '#10B981';
+                            e.currentTarget.style.background = siguiendo ? '#ffffff' : '#10B981';
                         }
                     }}
                 >
-                    {cargando ? 'Procesando...' : siguiendo ? '✓ Siguiendo' : 'Seguir'}
+                    <FontAwesomeIcon icon={siguiendo ? faUserCheck : faUserPlus} style={{ fontSize: 12 }} />
+                    {cargando ? 'Procesando...' : siguiendo ? 'Siguiendo' : 'Seguir'}
                 </button>
             </div>
 
-            {/* Modal de dejar de seguir */}
+            {/* Modal dejar de seguir */}
             {showUnfollowModal && (
-                <div style={modalOverlayStyle} onClick={() => setShowUnfollowModal(false)}>
-                    <div style={modalContentStyle} onClick={(e) => e.stopPropagation()}>
-                        <div style={modalAvatarContainerStyle}>
+                <div
+                    style={{
+                        position: 'fixed',
+                        top: 0,
+                        left: 0,
+                        right: 0,
+                        bottom: 0,
+                        background: 'rgba(0, 0, 0, 0.6)',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        zIndex: 9999,
+                        backdropFilter: 'blur(4px)'
+                    }}
+                    onClick={() => setShowUnfollowModal(false)}
+                >
+                    <div
+                        style={{
+                            background: 'white',
+                            borderRadius: 16,
+                            padding: '28px 24px 24px 24px',
+                            maxWidth: 380,
+                            width: '90%',
+                            boxShadow: '0 20px 60px rgba(0,0,0,0.3)',
+                            textAlign: 'center',
+                            fontFamily: 'Inter, sans-serif'
+                        }}
+                        onClick={(e) => e.stopPropagation()}
+                    >
+                        <div style={{
+                            width: 72,
+                            height: 72,
+                            margin: '0 auto 16px auto',
+                            borderRadius: '50%',
+                            overflow: 'hidden',
+                            border: '3px solid #10B981'
+                        }}>
                             {mentor.foto ? (
-                                <img src={mentor.foto} alt={mentor.mentor_nombre} style={modalAvatarStyle} />
+                                <img
+                                    src={mentor.foto}
+                                    alt={mentor.mentor_nombre}
+                                    style={{
+                                        width: '100%',
+                                        height: '100%',
+                                        objectFit: 'cover'
+                                    }}
+                                />
                             ) : (
-                                <div style={modalAvatarPlaceholderStyle}>
+                                <div style={{
+                                    width: '100%',
+                                    height: '100%',
+                                    background: 'linear-gradient(135deg, #10B981 0%, #059669 100%)',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    justifyContent: 'center',
+                                    fontSize: 28,
+                                    fontWeight: 'bold',
+                                    color: 'white'
+                                }}>
                                     {(mentor.mentor_nombre?.[0] || 'M').toUpperCase()}
                                 </div>
                             )}
                         </div>
 
-                        <h3 style={modalTitleStyle}>
+                        <h3 style={{
+                            margin: '0 0 20px 0',
+                            fontSize: 17,
+                            fontWeight: 700,
+                            color: '#13346b'
+                        }}>
                             ¿Dejar de seguir a @{mentor.username}?
                         </h3>
 
-                        <div style={modalButtonsStyle}>
-                            <button onClick={confirmarDejarDeSeguir} disabled={cargando} style={modalConfirmButtonStyle}>
+                        <div style={{
+                            display: 'flex',
+                            flexDirection: 'column',
+                            gap: 10
+                        }}>
+                            <button
+                                onClick={confirmarDejarDeSeguir}
+                                disabled={cargando}
+                                style={{
+                                    padding: '12px 24px',
+                                    background: '#EF4444',
+                                    color: 'white',
+                                    border: 'none',
+                                    borderRadius: 8,
+                                    fontWeight: 700,
+                                    fontSize: 14,
+                                    cursor: cargando ? 'not-allowed' : 'pointer',
+                                    transition: 'all 0.2s ease',
+                                    opacity: cargando ? 0.6 : 1
+                                }}
+                                onMouseEnter={(e) => {
+                                    if (!cargando) e.currentTarget.style.background = '#DC2626';
+                                }}
+                                onMouseLeave={(e) => {
+                                    if (!cargando) e.currentTarget.style.background = '#EF4444';
+                                }}
+                            >
                                 {cargando ? 'Procesando...' : 'Dejar de seguir'}
                             </button>
-                            <button onClick={() => setShowUnfollowModal(false)} disabled={cargando} style={modalCancelButtonStyle}>
+                            <button
+                                onClick={() => setShowUnfollowModal(false)}
+                                disabled={cargando}
+                                style={{
+                                    padding: '12px 24px',
+                                    background: 'transparent',
+                                    color: '#64748b',
+                                    border: 'none',
+                                    borderRadius: 8,
+                                    fontWeight: 600,
+                                    fontSize: 14,
+                                    cursor: cargando ? 'not-allowed' : 'pointer',
+                                    transition: 'all 0.2s ease'
+                                }}
+                                onMouseEnter={(e) => {
+                                    if (!cargando) e.currentTarget.style.background = '#f8fafc';
+                                }}
+                                onMouseLeave={(e) => {
+                                    if (!cargando) e.currentTarget.style.background = 'transparent';
+                                }}
+                            >
                                 Cancelar
                             </button>
                         </div>
@@ -444,13 +535,3 @@ export function MentorCard({ mentor }) {
         </>
     );
 }
-
-const modalOverlayStyle = { position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0, 0, 0, 0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 9999, backdropFilter: 'blur(4px)' };
-const modalContentStyle = { background: 'white', borderRadius: 16, padding: '32px 24px 24px 24px', maxWidth: 400, width: '90%', boxShadow: '0 20px 60px rgba(0,0,0,0.3)', textAlign: 'center' };
-const modalAvatarContainerStyle = { width: 80, height: 80, margin: '0 auto 16px auto', borderRadius: '50%', overflow: 'hidden', border: '3px solid #10B981' };
-const modalAvatarStyle = { width: '100%', height: '100%', objectFit: 'cover' };
-const modalAvatarPlaceholderStyle = { width: '100%', height: '100%', background: 'linear-gradient(135deg, #10B981 0%, #059669 100%)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 32, fontWeight: 'bold', color: 'white' };
-const modalTitleStyle = { margin: '0 0 24px 0', fontSize: 18, fontWeight: 600, color: '#111827' };
-const modalButtonsStyle = { display: 'flex', flexDirection: 'column', gap: 10 };
-const modalConfirmButtonStyle = { padding: '12px 24px', background: '#EF4444', color: 'white', border: 'none', borderRadius: 8, fontWeight: 700, fontSize: 14, cursor: 'pointer', transition: 'all 0.2s ease' };
-const modalCancelButtonStyle = { padding: '12px 24px', background: 'transparent', color: '#6B7280', border: 'none', borderRadius: 8, fontWeight: 600, fontSize: 14, cursor: 'pointer', transition: 'all 0.2s ease' };

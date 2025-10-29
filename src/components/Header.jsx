@@ -441,9 +441,9 @@ export default function Header() {
                 <div
                     className="header-container"
                     style={{
-                        display: "flex",
+                        display: "grid",
                         alignItems: "center",
-                        justifyContent: "space-between",
+                        gridTemplateColumns: "1fr auto 1fr",
                         gap: 16,
                         height: 64,
                         padding: "0 20px",
@@ -575,7 +575,7 @@ export default function Header() {
                         )}
                     </nav>
 
-                    <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+                    <div style={{ display: "flex", alignItems: "center", gap: 12, justifyContent: "flex-end" }}>
                         {!user ? (
                             <HeaderAuthButtons />
                         ) : (
