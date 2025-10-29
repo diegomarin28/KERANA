@@ -47,6 +47,7 @@ const FollowersPage = lazy(() => import('./pages/FollowersPage.jsx'));
 const FolderView = lazy(() => import("./pages/FolderView"));
 const PublicProfileMentor = lazy(() => import("./pages/PublicProfileMentor"));
 const Credits = lazy(() => import("./pages/Credits"));
+const CreateProfile = lazy(() => import("./pages/CreateProfile"));
 
 
 // Componentes cargados inmediatamente
@@ -169,6 +170,7 @@ function AppRoutes() {
 
                     {/* Usuario - PROTEGIDAS */}
                     <Route path="/profile" element={<AuthGuard requireAuth={true}><Profile /></AuthGuard>} />
+                    <Route path="/profile/setup" element={<AuthGuard requireAuth={true}><CreateProfile /></AuthGuard>} />
                     <Route path="/edit-profile" element={<EditProfile />} />
                     <Route path="/panel" element={<AuthGuard requireAuth={true}><UserDashboard /></AuthGuard>} />
                     <Route path="/user-card" element={<UserCard />} />

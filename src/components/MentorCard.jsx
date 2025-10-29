@@ -32,6 +32,7 @@ export function MentorCard({ mentor }) {
             cargarMaterias();
         }
         cargarRating();
+        verificarSiSigue();
     }, [mentor.id_mentor]);
 
     const cargarMaterias = async () => {
@@ -86,6 +87,36 @@ export function MentorCard({ mentor }) {
             console.error('Error cargando rating:', error);
         }
     };
+
+    const verificarSiSigue = async () => {
+        try {
+            const { data: { user } } = await supabase.auth.getUser();
+            if (!user) return;
+
+            const { data: usuarioData } = await supabase
+                .from('usuario')
+                .select('id_usuario')
+                .eq('auth_id', user.id)
+                .single();
+
+            if (!usuarioData) return;
+
+            const { data: seguidorData } = await supabase
+                .from('seguidores')
+                .select('id, estado')
+                .eq('seguidor_id', usuarioData.id_usuario)
+                .eq('seguido_id', mentor.id_usuario)
+                .eq('estado', 'activo')
+                .maybeSingle();
+
+            if (seguidorData) {
+                setSiguiendo(true);
+            }
+        } catch (error) {
+            console.error('Error verificando si sigue al mentor:', error);
+        }
+    };
+
 
     const manejarSeguir = async (e) => {
         e.stopPropagation();
