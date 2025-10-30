@@ -11,25 +11,25 @@ export default function HelpCenter() {
             {
                 id: 'gen-1',
                 question: '¿Qué es KERANA?',
-                answer: 'KERANA es una plataforma educativa colaborativa donde estudiantes pueden compartir, comprar y vender apuntes, conectarse con mentores, y acceder a recursos académicos de calidad verificados por la comunidad.',
+                answer: 'KERANA es una plataforma educativa colaborativa donde estudiantes pueden compartir y comprar apuntes, conectarse con mentores, y acceder a recursos académicos de calidad verificados por la comunidad.',
                 icon: '🎓'
             },
             {
                 id: 'gen-2',
                 question: '¿Cómo creo una cuenta?',
-                answer: 'Hacer clic en "Crear cuenta" en el menú principal. Podés registrarte con tu email o mediante Google. Te recomendamos usar tu email institucional (@um.edu.uy) para verificación automática.',
+                answer: 'Hacer clic en "Crear cuenta" en el menú principal. Podés registrarte con tu email o mediante Google. Te recomendamos usar tu email institucional (@correo.um.edu.uy) para verificación automática.',
                 icon: '✨'
             },
             {
                 id: 'gen-3',
                 question: '¿Es gratis usar KERANA?',
-                answer: 'Sí, crear una cuenta y navegar el contenido es completamente gratis. Solo pagás cuando decidís comprar apuntes o cursos específicos usando créditos.',
+                answer: 'Sí, crear una cuenta y navegar el contenido es completamente gratis. Solo pagás cuando decidís comprar los créditos de la plataforma o cuándo decidís tener una clase particular con un mentor.',
                 icon: '💰'
             },
             {
                 id: 'gen-4',
                 question: '¿Cómo funciona el sistema de créditos?',
-                answer: 'Los créditos son la moneda de KERANA. 1 crédito = 1 dólar. Podés comprarlos en packs, ganarlos subiendo contenido popular, o recibirlos como mentor verificado.',
+                answer: 'Los créditos son la moneda de KERANA. 1 crédito = 2 pesos Uruguayos. Podés comprarlos en packs, ganarlos subiendo contenido popular, o realizando reseñas a profesores.',
                 icon: '💳'
             }
         ],
@@ -37,7 +37,7 @@ export default function HelpCenter() {
             {
                 id: 'acc-1',
                 question: '¿Cómo cambio mi contraseña?',
-                answer: 'Ve a Ajustes > Cuenta > Cambiar contraseña. Ingresá tu contraseña actual y la nueva. Si olvidaste tu contraseña, usá la opción "Olvidé mi contraseña" en el login.',
+                answer: 'Ve a Mi perfil > Editar Perfil > Contraseña. Ingresá tu contraseña actual y la nueva. Si olvidaste tu contraseña, usá la opción "Olvidé mi contraseña" en el login.',
                 icon: '🔒'
             },
             {
@@ -49,7 +49,7 @@ export default function HelpCenter() {
             {
                 id: 'acc-3',
                 question: '¿Cómo cambio mi foto de perfil?',
-                answer: 'Ve a tu perfil, hacé clic en tu avatar actual, y seleccioná "Cambiar foto". Podés subir imágenes JPG, PNG o WEBP de hasta 5MB.',
+                answer: 'Ve a Mi perfil > Editar Perfil > Información Personal, ahí haces click en "Seleccionar archivo" y elegís la foto de perfil de tu conveniencia. Promovemos el uso de imágenes formales aptas para la formalidad de la plataforma. Podés subir imágenes JPG, PNG o WEBP de hasta 5MB.',
                 icon: '📷'
             },
             {
@@ -69,19 +69,19 @@ export default function HelpCenter() {
             {
                 id: 'apt-1',
                 question: '¿Cómo subo apuntes?',
-                answer: 'Hacé clic en "Subir Apuntes" en el menú principal. Completá la información (asignatura, profesor, descripción), establecé un precio, y cargá tus archivos PDF. Esperá la aprobación del equipo (24-48hs).',
+                answer: 'Hacé clic en "Subir Apuntes" en el menú principal. Completá la información (asignatura, profesor, descripción), y cargá tus archivos PDF. Si está no cumple con las normas requeridas, se eliminará el apunte y con ello todos los créditos obtenidos por el mismo.',
                 icon: '📤'
             },
             {
                 id: 'apt-2',
                 question: '¿Qué formatos acepta la plataforma?',
-                answer: 'Aceptamos PDF (preferido), DOC, DOCX, PPT, PPTX, y archivos de imagen (JPG, PNG). Tamaño máximo: 50MB por archivo. Para videos, podés incluir enlaces de YouTube/Vimeo.',
+                answer: 'Aceptamos PDF. Tamaño máximo: 20MB por archivo. Para videos, podés incluir enlaces de YouTube/Vimeo.',
                 icon: '📄'
             },
             {
                 id: 'apt-3',
                 question: '¿Cuánto gano por vender apuntes?',
-                answer: 'Recibís el 70% del precio de venta en créditos. Por ejemplo, si vendés un apunte a 10 créditos, ganás 7 créditos por cada venta. KERANA retiene 30% por mantenimiento de la plataforma.',
+                answer: 'Recibís el 100% del precio de venta en créditos. Por ejemplo, si vendés un apunte a 10 créditos, ganás 10 créditos de manera inmediata. KERANA retiene 30% por mantenimiento de la plataforma. Además, podes recibir bonuses dependiendo si cumplís ciertos objetivos.',
                 icon: '💵'
             },
             {
