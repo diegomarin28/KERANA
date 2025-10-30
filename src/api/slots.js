@@ -7,46 +7,88 @@ export const slotsAPI = {
      * @param {string} mentorId - ID del mentor
      * @param {string} fecha - Fecha en formato YYYY-MM-DD
      * @param {Array<Object|string>} horarios - Array de horarios con duración o strings simples
-     *   Ejemplo: [{hora: '09:00', duracion: 60}, {hora: '10:30', duracion: 90}]
-     *   O simplemente: ['09:00', '10:30'] (usa duración por defecto)
+     *   Ejemplo: [{hora: '09:00', duracion: 60, modalidad: 'virtual', locacion: 'casa', max_alumnos: 3}]
      */
     async guardarSlotsManual(mentorId, fecha, slotsConDuracion, duracionDefault) {
-        const { data, error } = await supabase
-            .from('slots_disponibles')
-            .upsert(
-                slotsConDuracion.map(slot => ({
+        console.log('🔍 Guardando slots con datos:', {
+            mentorId,
+            fecha,
+            slotsConDuracion
+        });
+
+        try {
+            const slotsParaGuardar = slotsConDuracion.map(slot => {
+                const slotData = {
                     id_mentor: mentorId,
                     fecha: fecha,
                     hora: slot.hora,
                     duracion: slot.duracion || duracionDefault,
-                    modalidad: slot.modalidad || 'zoom', // 👈 Ahora se guardará
+                    modalidad: slot.modalidad || 'virtual',
                     disponible: true,
                     origen: 'manual'
-                })),
-                {
+                };
+
+                // Solo agregar campos opcionales si existen en la tabla
+                if (slot.locacion !== undefined) {
+                    slotData.locacion = slot.locacion;
+                }
+                if (slot.max_alumnos !== undefined) {
+                    slotData.max_alumnos = slot.max_alumnos;
+                }
+
+                console.log('📦 Slot preparado:', slotData);
+                return slotData;
+            });
+
+            const { data, error } = await supabase
+                .from('slots_disponibles')
+                .upsert(slotsParaGuardar, {
                     onConflict: 'id_mentor,fecha,hora',
                     ignoreDuplicates: false
-                }
-            );
+                });
 
-        return { data, error };
+            if (error) {
+                console.error('❌ Error de Supabase:', error);
+            } else {
+                console.log('✅ Slots guardados exitosamente:', data);
+            }
+
+            return { data, error };
+        } catch (err) {
+            console.error('❌ Error en guardarSlotsManual:', err);
+            return { data: null, error: err };
+        }
     },
+
     /**
      * Obtener slots configurados por el mentor en un rango de fechas
+     * INCLUYE tanto slots disponibles como reservados para que el mentor pueda verlos todos
      */
     async obtenerSlotsConfigurados(mentorId, fechaInicio, fechaFin) {
-        const { data, error } = await supabase
-            .from('slots_disponibles')
-            .select('id_slot, fecha, hora, duracion, modalidad, disponible') // 👈 Agregar modalidad
-            .eq('id_mentor', mentorId)
-            .gte('fecha', fechaInicio)
-            .lte('fecha', fechaFin)
-            .eq('disponible', true)
-            .order('fecha', { ascending: true })
-            .order('hora', { ascending: true });
+        try {
+            const { data, error } = await supabase
+                .from('slots_disponibles')
+                .select('*')
+                .eq('id_mentor', mentorId)
+                .gte('fecha', fechaInicio)
+                .lte('fecha', fechaFin)
+                // ✅ NO filtrar por disponible - traer TODOS los slots (disponibles y reservados)
+                .order('fecha', { ascending: true })
+                .order('hora', { ascending: true });
 
-        return { data, error };
+            if (error) {
+                console.error('❌ Error obteniendo slots:', error);
+                return { data: null, error };
+            }
+
+            console.log('📥 Slots obtenidos de la BD:', data);
+            return { data, error: null };
+        } catch (err) {
+            console.error('❌ Error en obtenerSlotsConfigurados:', err);
+            return { data: null, error: err };
+        }
     },
+
     /**
      * Eliminar todos los slots manuales de una fecha específica
      */

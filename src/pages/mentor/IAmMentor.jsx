@@ -88,7 +88,7 @@ export default function IAmMentor() {
                 setConfigForm({
                     maxAlumnos: fullMentor.max_alumnos,
                     localidad: fullMentor.localidad || '',
-                    aceptaZoom: fullMentor.acepta_zoom || false,
+                    aceptaVirtual: fullMentor.acepta_virtual || false,
                     aceptaPresencial: fullMentor.acepta_presencial || false,
                     lugarPresencial: fullMentor.lugar_presencial,
                     direccion: fullMentor.direccion || ''
@@ -180,7 +180,7 @@ export default function IAmMentor() {
                 .update({
                     max_alumnos: configForm.maxAlumnos,
                     localidad: configForm.localidad,
-                    acepta_zoom: configForm.aceptaZoom,
+                    acepta_virtual: configForm.aceptaVirtual,
                     acepta_presencial: configForm.aceptaPresencial,
                     lugar_presencial: configForm.lugarPresencial,
                     direccion: configForm.direccion
@@ -568,10 +568,10 @@ export default function IAmMentor() {
                                         <label style={checkboxLabelStyle}>
                                             <input
                                                 type="checkbox"
-                                                checked={configForm.aceptaZoom}
-                                                onChange={(e) => setConfigForm({ ...configForm, aceptaZoom: e.target.checked })}
+                                                checked={configForm.aceptaVirtual}
+                                                onChange={(e) => setConfigForm({ ...configForm, aceptaVirtual: e.target.checked })}
                                             />
-                                            Zoom (virtual) - $400 UYU
+                                            Virtual - $400 UYU
                                         </label>
                                         <label style={checkboxLabelStyle}>
                                             <input
