@@ -26,9 +26,11 @@ export default function MyCalendar() {
     const [currentMentorId, setCurrentMentorId] = useState(null);
     const [mentoriaDuration, setMentoriaDuration] = useState(60);
     const [slotDurations, setSlotDurations] = useState({});
+    const [slotMaxAlumnos, setSlotMaxAlumnos] = useState({});
+    const [slotDisponibilidad, setSlotDisponibilidad] = useState({});
     const [mentorInfo, setMentorInfo] = useState({
         max_alumnos: 1,
-        acepta_zoom: false,
+        acepta_virtual: false,
         acepta_presencial: false
     });
     const [slotLocaciones, setSlotLocaciones] = useState({});
@@ -77,7 +79,6 @@ export default function MyCalendar() {
 
     const loadMentorId = async () => {
         try {
-            // Obtener usuario autenticado actual
             const { data: { user }, error: userError } = await supabase.auth.getUser();
 
             if (userError || !user) {
@@ -88,16 +89,14 @@ export default function MyCalendar() {
 
             console.log('✅ Usuario autenticado UUID:', user.id);
 
-            // PASO 1: Obtener el id_usuario numérico desde la tabla usuario
             const { data: usuarioData, error: usuarioError } = await supabase
                 .from('usuario')
                 .select('id_usuario')
-                .eq('auth_id', user.id)  // Suponiendo que tienes una columna auth_id con el UUID
+                .eq('auth_id', user.id)
                 .maybeSingle();
 
             if (usuarioError || !usuarioData) {
                 console.error('❌ Error obteniendo usuario:', usuarioError);
-                // Intentar con email como fallback
                 const { data: usuarioByEmail, error: emailError } = await supabase
                     .from('usuario')
                     .select('id_usuario')
@@ -111,10 +110,9 @@ export default function MyCalendar() {
 
                 console.log('✅ Usuario encontrado por email:', usuarioByEmail);
 
-                // PASO 2: Buscar mentor con el id_usuario numérico
                 const { data: mentorData, error: mentorError } = await supabase
                     .from('mentor')
-                    .select('id_mentor, max_alumnos, acepta_zoom, acepta_presencial')
+                    .select('id_mentor, max_alumnos, acepta_virtual, acepta_presencial')
                     .eq('id_usuario', usuarioByEmail.id_usuario)
                     .maybeSingle();
 
@@ -129,7 +127,7 @@ export default function MyCalendar() {
                 setMentoriaDuration(60);
                 setMentorInfo({
                     max_alumnos: mentorData.max_alumnos || 1,
-                    acepta_zoom: mentorData.acepta_zoom || false,
+                    acepta_virtual: mentorData.acepta_virtual || false,
                     acepta_presencial: mentorData.acepta_presencial || false
                 });
                 return;
@@ -137,10 +135,9 @@ export default function MyCalendar() {
 
             console.log('✅ ID usuario numérico:', usuarioData.id_usuario);
 
-            // PASO 2: Obtener mentor con el id_usuario numérico
             const { data: mentorData, error: mentorError } = await supabase
                 .from('mentor')
-                .select('id_mentor, max_alumnos, acepta_zoom, acepta_presencial')
+                .select('id_mentor, max_alumnos, acepta_virtual, acepta_presencial')
                 .eq('id_usuario', usuarioData.id_usuario)
                 .maybeSingle();
 
@@ -155,7 +152,7 @@ export default function MyCalendar() {
             setMentoriaDuration(60);
             setMentorInfo({
                 max_alumnos: mentorData.max_alumnos || 1,
-                acepta_zoom: mentorData.acepta_zoom || false,
+                acepta_virtual: mentorData.acepta_virtual || false,
                 acepta_presencial: mentorData.acepta_presencial || false
             });
         } catch (err) {
@@ -182,33 +179,68 @@ export default function MyCalendar() {
             threeMonthsLater.toISOString().split('T')[0]
         );
 
+        console.log('🔍 DEBUG loadSavedSlots - Datos recibidos:', data);
+
         if (data) {
             const slotsByDate = {};
             const duracionesBySlot = {};
             const modalidadesBySlot = {};
-            const locacionesBySlot = {}; // ← NUEVO
+            const locacionesBySlot = {};
+            const maxAlumnosBySlot = {};
+            const disponibilidadBySlot = {};
 
             data.forEach(slot => {
-                if (!slotsByDate[slot.fecha]) slotsByDate[slot.fecha] = [];
-                slotsByDate[slot.fecha].push(slot.hora);
+                // Normalizar hora al formato HH:MM (sin segundos)
+                const horaOriginal = slot.hora;
+                const horaNormalizada = horaOriginal.slice(0, 5); // "11:00:00" -> "11:00"
 
-                const slotKey = `${slot.fecha}-${slot.hora}`;
+                const slotDateTime = new Date(`${slot.fecha}T${horaOriginal}`);
+
+                console.log('🔍 Procesando slot:', {
+                    fecha: slot.fecha,
+                    horaOriginal: horaOriginal,
+                    horaNormalizada: horaNormalizada,
+                    disponible: slot.disponible,
+                    esPasado: slotDateTime < now,
+                    seFiltra: slotDateTime < now && slot.disponible !== false
+                });
+
+                // Filtrar SOLO slots disponibles que ya pasaron
+                // Los slots reservados (disponible === false) se mantienen SIEMPRE visibles
+                if (slotDateTime < now && slot.disponible !== false) {
+                    console.log('❌ Slot filtrado (pasado y disponible)');
+                    return;
+                }
+
+                console.log('✅ Slot incluido');
+
+                if (!slotsByDate[slot.fecha]) slotsByDate[slot.fecha] = [];
+                slotsByDate[slot.fecha].push(horaNormalizada);
+
+                const slotKey = `${slot.fecha}-${horaNormalizada}`;
                 duracionesBySlot[slotKey] = slot.duracion || mentoriaDuration;
                 modalidadesBySlot[slotKey] = slot.modalidad || getDefaultModalidad();
-                locacionesBySlot[slotKey] = slot.locacion || null; // ← NUEVO
+                locacionesBySlot[slotKey] = slot.locacion || null;
+                maxAlumnosBySlot[slotKey] = slot.max_alumnos || mentorInfo.max_alumnos;
+                disponibilidadBySlot[slotKey] = slot.disponible;
             });
+
+            console.log('📊 Resultado final slotsByDate:', slotsByDate);
+            console.log('📊 Disponibilidad:', disponibilidadBySlot);
 
             setSavedSlots(slotsByDate);
             setSlotDurations(duracionesBySlot);
             setSlotModalidades(modalidadesBySlot);
-            setSlotLocaciones(locacionesBySlot); // ← NUEVO
+            setSlotLocaciones(locacionesBySlot);
+            setSlotMaxAlumnos(maxAlumnosBySlot);
+            setSlotDisponibilidad(disponibilidadBySlot);
         }
     };
 
     const getDefaultModalidad = () => {
-        if (mentorInfo.acepta_zoom) return 'zoom';
+        if (mentorInfo.acepta_virtual) return 'virtual';
         if (mentorInfo.acepta_presencial) return 'presencial';
-        return 'zoom';
+        return 'virtual';
     };
 
     const formatDateKey = (date) => `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
@@ -233,14 +265,12 @@ export default function MyCalendar() {
         setShowTimeSelector(true);
         const dateKey = formatDateKey(date);
 
-        // Cargar slots existentes o inicializar vacío
         const existingSlots = savedSlots[dateKey] ? [...savedSlots[dateKey]] : [];
         setSelectedSlots(prev => ({
             ...prev,
             [dateKey]: existingSlots
         }));
 
-        // Cargar duraciones y modalidades existentes
         if (existingSlots.length > 0) {
             existingSlots.forEach(hour => {
                 const slotKey = `${dateKey}-${hour}`;
@@ -309,7 +339,7 @@ export default function MyCalendar() {
                     delete newMod[slotKey];
                     return newMod;
                 });
-                setSlotLocaciones(prevLoc => { // ← NUEVO
+                setSlotLocaciones(prevLoc => {
                     const newLoc = { ...prevLoc };
                     delete newLoc[slotKey];
                     return newLoc;
@@ -330,7 +360,6 @@ export default function MyCalendar() {
                 [slotKey]: defaultModalidad
             }));
 
-            // ← NUEVO: Inicializar locación según modalidad
             setSlotLocaciones(prevLoc => ({
                 ...prevLoc,
                 [slotKey]: defaultModalidad === 'presencial' ? 'casa' : null
@@ -350,16 +379,10 @@ export default function MyCalendar() {
 
     const updateSlotLocacion = (dateKey, hour, locacion) => {
         const slotKey = `${dateKey}-${hour}`;
-        console.log('📍 Actualizando locación:', slotKey, 'a', locacion);
-
-        setSlotLocaciones(prev => {
-            const newLocaciones = {
-                ...prev,
-                [slotKey]: locacion
-            };
-            console.log('✅ Nuevas locaciones:', newLocaciones);
-            return newLocaciones;
-        });
+        setSlotLocaciones(prev => ({
+            ...prev,
+            [slotKey]: locacion
+        }));
     };
 
     const updateSlotDuration = (dateKey, hour, duration) => {
@@ -382,25 +405,18 @@ export default function MyCalendar() {
 
     const updateSlotModalidad = (dateKey, hour, modalidad) => {
         const slotKey = `${dateKey}-${hour}`;
-        console.log('🔄 Actualizando modalidad:', slotKey, 'a', modalidad);
 
-        setSlotModalidades(prev => {
-            const newModalidades = {
-                ...prev,
-                [slotKey]: modalidad
-            };
-            console.log('✅ Nuevas modalidades:', newModalidades);
-            return newModalidades;
-        });
+        setSlotModalidades(prev => ({
+            ...prev,
+            [slotKey]: modalidad
+        }));
 
-        // ← NUEVO: Si cambia a presencial, establecer locación por defecto
         if (modalidad === 'presencial') {
             setSlotLocaciones(prev => ({
                 ...prev,
                 [slotKey]: prev[slotKey] || 'casa'
             }));
         } else {
-            // Si cambia a zoom, limpiar locación
             setSlotLocaciones(prev => ({
                 ...prev,
                 [slotKey]: null
@@ -431,29 +447,15 @@ export default function MyCalendar() {
                 const slotKey = `${dateKey}-${hora}`;
                 const duracion = slotDurations[slotKey] || mentoriaDuration;
                 const modalidad = slotModalidades[slotKey] || getDefaultModalidad();
-                const locacion = slotLocaciones[slotKey] || null; // ← NUEVO
-
-                console.log(`📦 Preparando slot ${hora}:`, {
-                    slotKey,
-                    duracion,
-                    modalidad,
-                    locacion, // ← NUEVO
-                    max_alumnos: mentorInfo.max_alumnos
-                });
+                const locacion = slotLocaciones[slotKey] || null;
 
                 return {
                     hora,
                     duracion,
                     modalidad,
-                    locacion, // ← NUEVO
+                    locacion,
                     max_alumnos: mentorInfo.max_alumnos
                 };
-            });
-
-            console.log('🔍 DEBUG - Datos a guardar:', {
-                mentorId: currentMentorId,
-                fecha: dateKey,
-                slots: slotsConDuracion
             });
 
             const { error } = await slotsAPI.guardarSlotsManual(
@@ -850,8 +852,8 @@ export default function MyCalendar() {
                                             padding: '2px 6px',
                                             fontWeight: 700
                                         }}>
-                                    {slotCount}
-                                </span>
+                                            {slotCount}
+                                        </span>
                                     )}
                                 </div>
                             );
@@ -1026,9 +1028,9 @@ export default function MyCalendar() {
                                         alignItems: 'center',
                                         gap: 8
                                     }}>
-                                <span style={{ fontSize: 13, fontWeight: 600, color: '#64748b' }}>
-                                    👥 Capacidad máxima:
-                                </span>
+                                        <span style={{ fontSize: 13, fontWeight: 600, color: '#64748b' }}>
+                                            👥 Capacidad máxima:
+                                        </span>
                                         <span style={{
                                             background: 'linear-gradient(135deg, #dbeafe 0%, #bfdbfe 100%)',
                                             color: '#1e40af',
@@ -1037,8 +1039,8 @@ export default function MyCalendar() {
                                             fontSize: 12,
                                             fontWeight: 700
                                         }}>
-                                    {mentorInfo.max_alumnos} {mentorInfo.max_alumnos === 1 ? 'alumno' : 'alumnos'}
-                                </span>
+                                            {mentorInfo.max_alumnos} {mentorInfo.max_alumnos === 1 ? 'alumno' : 'alumnos'}
+                                        </span>
                                     </div>
 
                                     <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
@@ -1060,14 +1062,14 @@ export default function MyCalendar() {
                                                         justifyContent: 'space-between',
                                                         marginBottom: 8
                                                     }}>
-                                                <span style={{
-                                                    fontSize: 13,
-                                                    fontWeight: 700,
-                                                    color: '#0f172a'
-                                                }}>
-                                                    <FontAwesomeIcon icon={faClock} style={{ marginRight: 8, color: '#64748b' }} />
-                                                    {hour}
-                                                </span>
+                                                        <span style={{
+                                                            fontSize: 13,
+                                                            fontWeight: 700,
+                                                            color: '#0f172a'
+                                                        }}>
+                                                            <FontAwesomeIcon icon={faClock} style={{ marginRight: 8, color: '#64748b' }} />
+                                                            {hour}
+                                                        </span>
                                                         <select
                                                             value={currentDuration}
                                                             onChange={(e) => updateSlotDuration(dateKey, hour, Number(e.target.value))}
@@ -1097,18 +1099,18 @@ export default function MyCalendar() {
                                                         gap: 6,
                                                         marginTop: 8
                                                     }}>
-                                                        {mentorInfo.acepta_zoom && (
+                                                        {mentorInfo.acepta_virtual && (
                                                             <button
-                                                                onClick={() => updateSlotModalidad(dateKey, hour, 'zoom')}
+                                                                onClick={() => updateSlotModalidad(dateKey, hour, 'virtual')}
                                                                 style={{
                                                                     flex: 1,
                                                                     padding: '6px 10px',
                                                                     borderRadius: 6,
-                                                                    border: currentModalidad === 'zoom' ? '2px solid #2563eb' : '2px solid #e2e8f0',
-                                                                    background: currentModalidad === 'zoom'
+                                                                    border: currentModalidad === 'virtual' ? '2px solid #2563eb' : '2px solid #e2e8f0',
+                                                                    background: currentModalidad === 'virtual'
                                                                         ? 'linear-gradient(135deg, #dbeafe 0%, #bfdbfe 100%)'
                                                                         : '#fff',
-                                                                    color: currentModalidad === 'zoom' ? '#1e40af' : '#64748b',
+                                                                    color: currentModalidad === 'virtual' ? '#1e40af' : '#64748b',
                                                                     fontSize: 11,
                                                                     fontWeight: 700,
                                                                     cursor: 'pointer',
@@ -1116,7 +1118,7 @@ export default function MyCalendar() {
                                                                     fontFamily: 'Inter, sans-serif'
                                                                 }}
                                                             >
-                                                                💻 Zoom
+                                                                💻 Virtual
                                                             </button>
                                                         )}
                                                         {mentorInfo.acepta_presencial && (
@@ -1143,7 +1145,7 @@ export default function MyCalendar() {
                                                         )}
                                                     </div>
 
-                                                    {/* NUEVO: Selector de localización (solo si es presencial) */}
+                                                    {/* Selector de localización (solo si es presencial) */}
                                                     {currentModalidad === 'presencial' && (
                                                         <div style={{
                                                             display: 'flex',
@@ -1391,12 +1393,19 @@ export default function MyCalendar() {
                                                             {slots.sort().map(slot => {
                                                                 const slotKey = `${dateKey}-${slot}`;
                                                                 const duracion = slotDurations[slotKey] || mentoriaDuration;
-                                                                const modalidad = slotModalidades[slotKey] || 'zoom';
-                                                                const modalidadIcon = modalidad === 'zoom' ? '💻' : '🏢';
-                                                                const modalidadColor = modalidad === 'zoom'
-                                                                    ? 'linear-gradient(135deg, #dbeafe 0%, #bfdbfe 100%)'
-                                                                    : 'linear-gradient(135deg, #d1fae5 0%, #a7f3d0 100%)';
-                                                                const modalidadText = modalidad === 'zoom' ? '#1e40af' : '#065f46';
+                                                                const modalidad = slotModalidades[slotKey] || 'virtual';
+                                                                const locacion = slotLocaciones[slotKey];
+                                                                const disponible = slotDisponibilidad[slotKey] !== false;
+
+                                                                const modalidadIcon = modalidad === 'virtual' ? '💻' : '🏢';
+                                                                const modalidadColor = !disponible
+                                                                    ? '#fef3c7'
+                                                                    : modalidad === 'virtual'
+                                                                        ? 'linear-gradient(135deg, #dbeafe 0%, #bfdbfe 100%)'
+                                                                        : 'linear-gradient(135deg, #d1fae5 0%, #a7f3d0 100%)';
+                                                                const modalidadText = !disponible
+                                                                    ? '#92400e'
+                                                                    : modalidad === 'virtual' ? '#1e40af' : '#065f46';
 
                                                                 return (
                                                                     <div key={slot} style={{
@@ -1407,8 +1416,27 @@ export default function MyCalendar() {
                                                                         display: 'flex',
                                                                         flexDirection: 'column',
                                                                         gap: 4,
-                                                                        minWidth: '110px'
+                                                                        minWidth: '110px',
+                                                                        position: 'relative',
+                                                                        border: !disponible ? '2px solid #fbbf24' : 'none'
                                                                     }}>
+                                                                        {!disponible && (
+                                                                            <div style={{
+                                                                                position: 'absolute',
+                                                                                top: -8,
+                                                                                right: -8,
+                                                                                background: 'linear-gradient(135deg, #fbbf24 0%, #f59e0b 100%)',
+                                                                                color: 'white',
+                                                                                padding: '3px 8px',
+                                                                                borderRadius: 6,
+                                                                                fontSize: 9,
+                                                                                fontWeight: 700,
+                                                                                boxShadow: '0 2px 8px rgba(251, 191, 36, 0.4)',
+                                                                                letterSpacing: '0.3px'
+                                                                            }}>
+                                                                                RESERVADA
+                                                                            </div>
+                                                                        )}
                                                                         <div style={{
                                                                             fontSize: 12,
                                                                             fontWeight: 700,
@@ -1428,10 +1456,10 @@ export default function MyCalendar() {
                                                                             gap: 6
                                                                         }}>
                                                                             <span>
-                                                                                {modalidadIcon} {modalidad}
-                                                                                {modalidad === 'presencial' && slotLocaciones[slotKey] && (
+                                                                                {modalidadIcon} {modalidad.charAt(0).toUpperCase() + modalidad.slice(1)}
+                                                                                {modalidad === 'presencial' && locacion && (
                                                                                     <span style={{ marginLeft: 4 }}>
-                                                                                        • {slotLocaciones[slotKey] === 'casa' ? '🏠' : '🎓'}
+                                                                                        • {locacion === 'casa' ? '🏠 Casa' : '🎓 Facultad'}
                                                                                     </span>
                                                                                 )}
                                                                             </span>
@@ -1441,8 +1469,8 @@ export default function MyCalendar() {
                                                                                 borderRadius: 4,
                                                                                 fontWeight: 700
                                                                             }}>
-                                                                            👤 {mentorInfo.max_alumnos}
-                                                                        </span>
+                                                                                👤 {slotMaxAlumnos[slotKey] || mentorInfo.max_alumnos}
+                                                                            </span>
                                                                         </div>
                                                                     </div>
                                                                 );

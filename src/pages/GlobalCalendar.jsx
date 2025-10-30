@@ -22,6 +22,11 @@ export default function GlobalCalendar() {
     const [showConfirmModal, setShowConfirmModal] = useState(false);
     const [isBooking, setIsBooking] = useState(false);
 
+    // Estados para modales de resultado
+    const [showSuccessModal, setShowSuccessModal] = useState(false);
+    const [showErrorModal, setShowErrorModal] = useState(false);
+    const [errorMessage, setErrorMessage] = useState('');
+
     // Estados para el filtro de materias
     const [materias, setMaterias] = useState([]);
     const [selectedMateria, setSelectedMateria] = useState(null);
@@ -30,8 +35,39 @@ export default function GlobalCalendar() {
         'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'];
     const daysOfWeek = ['DOM', 'LUN', 'MAR', 'MIÉ', 'JUE', 'VIE', 'SÁB'];
 
+    // ✅ Configurar Supabase Realtime
     useEffect(() => {
         loadInitialData();
+
+        // Suscribirse a cambios en slots_disponibles
+        console.log('🔌 Configurando suscripción Realtime...');
+        const subscription = supabase
+            .channel('slots-disponibles-changes')
+            .on(
+                'postgres_changes',
+                {
+                    event: 'UPDATE',
+                    schema: 'public',
+                    table: 'slots_disponibles'
+                },
+                async (payload) => {
+                    console.log('🔄 Slot actualizado en tiempo real:', payload);
+                    // ✅ Recargar disponibilidad inmediatamente
+                    await loadAvailability();
+                }
+            )
+            .subscribe((status) => {
+                console.log('📡 Estado de suscripción Realtime:', status);
+                if (status === 'SUBSCRIBED') {
+                    console.log('✅ Suscripción Realtime activa');
+                }
+            });
+
+        // Cleanup: desuscribirse al desmontar
+        return () => {
+            console.log('🔌 Cerrando suscripción Realtime...');
+            supabase.removeChannel(subscription);
+        };
     }, [selectedMateria]);
 
     useEffect(() => {
@@ -165,7 +201,8 @@ export default function GlobalCalendar() {
                 duracion: slot.duracion,
                 modalidad: slot.modalidad,
                 disponible: slot.disponible,
-                max_alumnos: slot.mentor.max_alumnos
+                max_alumnos: slot.max_alumnos,
+                locacion: slot.locacion
             });
         });
 
@@ -244,10 +281,11 @@ export default function GlobalCalendar() {
 
     const handleBookSlot = (mentor, slot) => {
         if (!currentUserId) {
-            alert('Debes iniciar sesión para agendar una sesión');
+            setErrorMessage('Debes iniciar sesión para agendar una sesión');
+            setShowErrorModal(true);
             return;
         }
-        console.log('🔍 Mentor seleccionado:', mentor); // Para debuggear
+        console.log('🔍 Mentor seleccionado:', mentor);
         setSelectedMentor(mentor);
         setSelectedSlot(slot);
         setShowConfirmModal(true);
@@ -259,6 +297,24 @@ export default function GlobalCalendar() {
         setIsBooking(true);
 
         try {
+            // ✅ PASO 1: Verificar que el slot sigue disponible
+            const { data: slotActual, error: checkError } = await supabase
+                .from('slots_disponibles')
+                .select('disponible')
+                .eq('id_slot', selectedSlot.id_slot)
+                .single();
+
+            if (checkError || !slotActual?.disponible) {
+                setErrorMessage('Lo sentimos, este slot ya no está disponible. Alguien más lo reservó.');
+                setShowErrorModal(true);
+                setShowConfirmModal(false);
+                setSelectedMentor(null);
+                setSelectedSlot(null);
+                setIsBooking(false);
+                return;
+            }
+
+            // ✅ PASO 2: Registrar la sesión
             const fechaHora = `${formatDateKey(selectedDate)}T${selectedSlot.hora}`;
 
             const { data: sesionData, error: sesionError } = await sesionesAPI.registrarSesion(
@@ -271,29 +327,39 @@ export default function GlobalCalendar() {
 
             if (sesionError) {
                 console.error('Error creating session:', sesionError);
-                alert('Error al crear la sesión');
+                setErrorMessage('Error al crear la sesión. Por favor, intenta nuevamente.');
+                setShowErrorModal(true);
                 setIsBooking(false);
                 return;
             }
 
+            // ✅ PASO 3: Marcar slot como no disponible
+            // Esto disparará el evento Realtime para TODOS los clientes
             const { error: slotError } = await supabase
-                .from('slots_disponibles')
-                .update({ disponible: false })
-                .eq('id_slot', selectedSlot.id_slot);
+                .rpc('marcar_slot_no_disponible', { p_id_slot: selectedSlot.id_slot });
 
             if (slotError) {
                 console.error('Error updating slot:', slotError);
+                setErrorMessage('Error al actualizar el slot. Por favor, contacta al soporte.');
+                setShowErrorModal(true);
+                setIsBooking(false);
+                return;
             }
 
-            alert('¡Sesión agendada exitosamente!');
+            // ✅ Éxito
+            setShowSuccessModal(true);
             setShowConfirmModal(false);
             setSelectedMentor(null);
             setSelectedSlot(null);
-            await loadAvailability();
+
+            // ❌ REMOVIDO: No necesitamos recargar manualmente
+            // Realtime se encargará de actualizar todos los clientes
+            // await loadAvailability();
 
         } catch (error) {
             console.error('Error:', error);
-            alert('Error al agendar la sesión');
+            setErrorMessage('Error inesperado al agendar la sesión. Por favor, intenta nuevamente.');
+            setShowErrorModal(true);
         } finally {
             setIsBooking(false);
         }
@@ -366,8 +432,8 @@ export default function GlobalCalendar() {
                     <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
                         <FontAwesomeIcon icon={faFilter} style={{ color: '#2563eb', fontSize: 18 }} />
                         <span style={{ fontWeight: 700, fontSize: 16, color: '#0f172a' }}>
-                Filtrar por materia
-            </span>
+                            Filtrar por materia
+                        </span>
                     </div>
 
                     <div style={{ position: 'relative', minWidth: 250 }}>
@@ -423,9 +489,9 @@ export default function GlobalCalendar() {
                         alignItems: 'center',
                         justifyContent: 'space-between'
                     }}>
-            <span style={{ color: '#065f46', fontWeight: 600, fontSize: 14 }}>
-                📚 Filtrando por: {selectedMateriaName}
-            </span>
+                        <span style={{ color: '#065f46', fontWeight: 600, fontSize: 14 }}>
+                            📚 Filtrando por: {selectedMateriaName}
+                        </span>
                         <button
                             onClick={() => setSelectedMateria(null)}
                             style={{
@@ -547,7 +613,7 @@ export default function GlobalCalendar() {
                                         alignItems: 'center',
                                         justifyContent: 'center',
                                         borderRadius: 10,
-                                        cursor: isPast ? 'not-allowed' : 'pointer',  // ← Cambiado
+                                        cursor: isPast ? 'not-allowed' : 'pointer',
                                         background: isPast ? '#f9fafb' :
                                             selected ? 'linear-gradient(135deg, #2563eb 0%, #1e40af 100%)' :
                                                 hasAvailability ? 'linear-gradient(135deg, #d1fae5 0%, #a7f3d0 100%)' :
@@ -561,13 +627,13 @@ export default function GlobalCalendar() {
                                         boxShadow: selected ? '0 0 0 2px rgba(37, 99, 235, 0.2)' : 'none'
                                     }}
                                     onMouseEnter={e => {
-                                        if (!isPast && !selected) {  // ← Cambiado, removimos hasAvailability
+                                        if (!isPast && !selected) {
                                             e.target.style.transform = 'translateY(-2px)';
                                             e.target.style.boxShadow = '0 4px 12px rgba(0, 0, 0, 0.1)';
                                         }
                                     }}
                                     onMouseLeave={e => {
-                                        if (!isPast && !selected) {  // ← Cambiado
+                                        if (!isPast && !selected) {
                                             e.target.style.transform = 'translateY(0)';
                                             e.target.style.boxShadow = 'none';
                                         }
@@ -741,7 +807,7 @@ export default function GlobalCalendar() {
                                                 alignItems: 'center',
                                                 gap: 4
                                             }}>
-                                                👤 {mentor.maxAlumnos}
+                                                👤 Hasta {Math.max(...mentor.slots.map(s => s.max_alumnos))}
                                             </div>
                                         </div>
                                     </div>
@@ -752,12 +818,15 @@ export default function GlobalCalendar() {
                                         gap: 8
                                     }}>
                                         {mentor.slots.map(slot => {
-                                            const modalidadIcon = slot.modalidad === 'zoom' ? '💻' : '🏢';
-                                            const modalidadColor = slot.modalidad === 'zoom'
+                                            const modalidadIcon = slot.modalidad === 'virtual' ? '💻' : '🏢';
+                                            const modalidadColor = slot.modalidad === 'virtual'
                                                 ? 'linear-gradient(135deg, #dbeafe 0%, #bfdbfe 100%)'
                                                 : 'linear-gradient(135deg, #d1fae5 0%, #a7f3d0 100%)';
-                                            const modalidadText = slot.modalidad === 'zoom' ? '#1e40af' : '#065f46';
-                                            const modalidadBorder = slot.modalidad === 'zoom' ? '#93c5fd' : '#6ee7b7';
+                                            const modalidadText = slot.modalidad === 'virtual' ? '#1e40af' : '#065f46';
+                                            const modalidadBorder = slot.modalidad === 'virtual' ? '#93c5fd' : '#6ee7b7';
+                                            const locacionText = slot.modalidad === 'presencial' && slot.locacion
+                                                ? (slot.locacion === 'casa' ? '🏠' : '🎓')
+                                                : null;
 
                                             return (
                                                 <button
@@ -812,9 +881,13 @@ export default function GlobalCalendar() {
                                                         <span style={{
                                                             fontSize: 11,
                                                             fontWeight: 600,
-                                                            color: slot.disponible ? modalidadText : '#94a3b8'
+                                                            color: slot.disponible ? modalidadText : '#94a3b8',
+                                                            display: 'flex',
+                                                            alignItems: 'center',
+                                                            gap: 4
                                                         }}>
-                                                            {modalidadIcon} {slot.modalidad === 'zoom' ? 'Zoom' : 'Presencial'}
+                                                            {modalidadIcon} {slot.modalidad === 'virtual' ? 'Virtual' : 'Presencial'}
+                                                            {locacionText && <span>{locacionText}</span>}
                                                         </span>
                                                         <span style={{
                                                             fontSize: 10,
@@ -826,6 +899,16 @@ export default function GlobalCalendar() {
                                                         }}>
                                                             {slot.duracion}min
                                                         </span>
+                                                    </div>
+                                                    <div style={{
+                                                        fontSize: 10,
+                                                        fontWeight: 600,
+                                                        color: slot.disponible ? modalidadText : '#94a3b8',
+                                                        display: 'flex',
+                                                        alignItems: 'center',
+                                                        gap: 4
+                                                    }}>
+                                                        👤 {slot.max_alumnos} {slot.max_alumnos === 1 ? 'alumno' : 'alumnos'}
                                                     </div>
                                                     {!slot.disponible && (
                                                         <span style={{
@@ -976,21 +1059,29 @@ export default function GlobalCalendar() {
                                     gap: 8,
                                     marginBottom: 6
                                 }}>
-                                    {selectedSlot.modalidad === 'zoom' ? (
+                                    {selectedSlot.modalidad === 'virtual' ? (
                                         <FontAwesomeIcon icon={faVideo} style={{ color: '#64748b', fontSize: 14 }} />
                                     ) : (
                                         <FontAwesomeIcon icon={faBuilding} style={{ color: '#64748b', fontSize: 14 }} />
                                     )}
                                     <span style={{ color: '#64748b', fontSize: 13, fontWeight: 600 }}>Modalidad:</span>
                                 </div>
-                                <p style={{
+                                <div style={{
                                     margin: 0,
                                     fontWeight: 700,
                                     fontSize: 16,
-                                    color: selectedSlot.modalidad === 'zoom' ? '#1e40af' : '#065f46'
+                                    color: selectedSlot.modalidad === 'virtual' ? '#1e40af' : '#065f46',
+                                    display: 'flex',
+                                    flexDirection: 'column',
+                                    gap: 4
                                 }}>
-                                    {selectedSlot.modalidad === 'zoom' ? '💻 Zoom' : '🏢 Presencial'}
-                                </p>
+                                    <span>{selectedSlot.modalidad === 'virtual' ? '💻 Virtual' : '🏢 Presencial'}</span>
+                                    {selectedSlot.modalidad === 'presencial' && selectedSlot.locacion && (
+                                        <span style={{ fontSize: 14, opacity: 0.8 }}>
+                                            {selectedSlot.locacion === 'casa' ? '🏠 En casa del mentor' : '🎓 En la facultad'}
+                                        </span>
+                                    )}
+                                </div>
                             </div>
 
                             {/* Duración */}
@@ -1009,7 +1100,7 @@ export default function GlobalCalendar() {
                                 </p>
                             </div>
 
-                            {/* NUEVA SECCIÓN: Capacidad */}
+                            {/* Capacidad */}
                             <div>
                                 <div style={{
                                     display: 'flex',
@@ -1021,7 +1112,7 @@ export default function GlobalCalendar() {
                                     <span style={{ color: '#64748b', fontSize: 13, fontWeight: 600 }}>Capacidad:</span>
                                 </div>
                                 <p style={{ margin: 0, fontWeight: 700, fontSize: 16, color: '#0f172a' }}>
-                                    👤 {selectedMentor.maxAlumnos} {selectedMentor.maxAlumnos === 1 ? 'alumno' : 'alumnos'}
+                                    👤 {selectedSlot.max_alumnos} {selectedSlot.max_alumnos === 1 ? 'alumno' : 'alumnos'}
                                 </p>
                             </div>
                         </div>
@@ -1101,6 +1192,221 @@ export default function GlobalCalendar() {
                     </div>
                 </div>
             )}
+
+            {/* Modal de Éxito */}
+            {showSuccessModal && (
+                <div style={{
+                    position: 'fixed',
+                    top: 0,
+                    left: 0,
+                    right: 0,
+                    bottom: 0,
+                    background: 'rgba(0,0,0,0.7)',
+                    backdropFilter: 'blur(4px)',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    zIndex: 10000,
+                    padding: 20,
+                    animation: 'fadeIn 0.2s ease'
+                }}>
+                    <div style={{
+                        background: '#fff',
+                        borderRadius: 20,
+                        padding: 40,
+                        maxWidth: 420,
+                        width: '100%',
+                        boxShadow: '0 25px 80px rgba(0,0,0,0.3)',
+                        border: '3px solid #10b981',
+                        textAlign: 'center',
+                        animation: 'slideUp 0.3s ease'
+                    }}>
+                        <div style={{
+                            width: 80,
+                            height: 80,
+                            borderRadius: '50%',
+                            background: 'linear-gradient(135deg, #d1fae5 0%, #a7f3d0 100%)',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            margin: '0 auto 24px',
+                            animation: 'scaleIn 0.4s ease'
+                        }}>
+                            <FontAwesomeIcon icon={faCheckCircle} style={{ fontSize: 48, color: '#059669' }} />
+                        </div>
+
+                        <h3 style={{
+                            margin: '0 0 12px 0',
+                            fontSize: 26,
+                            fontWeight: 800,
+                            color: '#0f172a'
+                        }}>
+                            ¡Sesión agendada!
+                        </h3>
+
+                        <p style={{
+                            color: '#64748b',
+                            margin: '0 0 32px 0',
+                            fontSize: 15,
+                            lineHeight: 1.6,
+                            fontWeight: 500
+                        }}>
+                            Tu sesión ha sido confirmada exitosamente. Recibirás más detalles por correo.
+                        </p>
+
+                        <button
+                            onClick={() => setShowSuccessModal(false)}
+                            style={{
+                                width: '100%',
+                                padding: '16px',
+                                background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
+                                color: '#fff',
+                                border: 'none',
+                                borderRadius: 12,
+                                fontWeight: 700,
+                                fontSize: 16,
+                                cursor: 'pointer',
+                                transition: 'all 0.2s ease',
+                                fontFamily: 'Inter, sans-serif'
+                            }}
+                            onMouseEnter={e => {
+                                e.target.style.transform = 'translateY(-2px)';
+                                e.target.style.boxShadow = '0 8px 24px rgba(16, 185, 129, 0.4)';
+                            }}
+                            onMouseLeave={e => {
+                                e.target.style.transform = 'translateY(0)';
+                                e.target.style.boxShadow = 'none';
+                            }}
+                        >
+                            Entendido
+                        </button>
+                    </div>
+                </div>
+            )}
+
+            {/* Modal de Error */}
+            {showErrorModal && (
+                <div style={{
+                    position: 'fixed',
+                    top: 0,
+                    left: 0,
+                    right: 0,
+                    bottom: 0,
+                    background: 'rgba(0,0,0,0.7)',
+                    backdropFilter: 'blur(4px)',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    zIndex: 10000,
+                    padding: 20,
+                    animation: 'fadeIn 0.2s ease'
+                }}>
+                    <div style={{
+                        background: '#fff',
+                        borderRadius: 20,
+                        padding: 40,
+                        maxWidth: 420,
+                        width: '100%',
+                        boxShadow: '0 25px 80px rgba(0,0,0,0.3)',
+                        border: '3px solid #ef4444',
+                        textAlign: 'center',
+                        animation: 'slideUp 0.3s ease'
+                    }}>
+                        <div style={{
+                            width: 80,
+                            height: 80,
+                            borderRadius: '50%',
+                            background: 'linear-gradient(135deg, #fee2e2 0%, #fecaca 100%)',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            margin: '0 auto 24px',
+                            animation: 'shake 0.5s ease'
+                        }}>
+                            <FontAwesomeIcon icon={faTimes} style={{ fontSize: 48, color: '#dc2626' }} />
+                        </div>
+
+                        <h3 style={{
+                            margin: '0 0 12px 0',
+                            fontSize: 26,
+                            fontWeight: 800,
+                            color: '#0f172a'
+                        }}>
+                            Algo salió mal
+                        </h3>
+
+                        <p style={{
+                            color: '#64748b',
+                            margin: '0 0 32px 0',
+                            fontSize: 15,
+                            lineHeight: 1.6,
+                            fontWeight: 500
+                        }}>
+                            {errorMessage}
+                        </p>
+
+                        <button
+                            onClick={() => setShowErrorModal(false)}
+                            style={{
+                                width: '100%',
+                                padding: '16px',
+                                background: 'linear-gradient(135deg, #ef4444 0%, #dc2626 100%)',
+                                color: '#fff',
+                                border: 'none',
+                                borderRadius: 12,
+                                fontWeight: 700,
+                                fontSize: 16,
+                                cursor: 'pointer',
+                                transition: 'all 0.2s ease',
+                                fontFamily: 'Inter, sans-serif'
+                            }}
+                            onMouseEnter={e => {
+                                e.target.style.transform = 'translateY(-2px)';
+                                e.target.style.boxShadow = '0 8px 24px rgba(239, 68, 68, 0.4)';
+                            }}
+                            onMouseLeave={e => {
+                                e.target.style.transform = 'translateY(0)';
+                                e.target.style.boxShadow = 'none';
+                            }}
+                        >
+                            Cerrar
+                        </button>
+                    </div>
+                </div>
+            )}
+
+            <style>{`
+                @keyframes fadeIn {
+                    from { opacity: 0; }
+                    to { opacity: 1; }
+                }
+                
+                @keyframes slideUp {
+                    from {
+                        transform: translateY(20px);
+                        opacity: 0;
+                    }
+                    to {
+                        transform: translateY(0);
+                        opacity: 1;
+                    }
+                }
+                
+                @keyframes scaleIn {
+                    from {
+                        transform: scale(0);
+                    }
+                    to {
+                        transform: scale(1);
+                    }
+                }
+                
+                @keyframes shake {
+                    0%, 100% { transform: translateX(0); }
+                    25% { transform: translateX(-10px); }
+                    75% { transform: translateX(10px); }
+                }
+            `}</style>
         </div>
     );
 }
