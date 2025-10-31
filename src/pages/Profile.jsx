@@ -2,8 +2,11 @@ import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '../supabase';
 import { followersAPI } from '../api/followers';
+import { ratingsAPI } from '../api/database';
 import { useMentorStatus } from '../hooks/useMentorStatus';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
+import MisReseniasModal from '../components/MisReseniasModal';
+import AuthModal_HacerResenia from '../components/AuthModal_HacerResenia';
 import {
     faEdit,
     faFileAlt,
@@ -30,6 +33,9 @@ export default function Profile() {
     const [showFullImage, setShowFullImage] = useState(false);
     const navigate = useNavigate();
     const { isMentor, loading: mentorLoading } = useMentorStatus(true);
+    const [showReseniasModal, setShowReseniasModal] = useState(false);
+    const [showEditModal, setShowEditModal] = useState(false);
+    const [editingRating, setEditingRating] = useState(null);
 
     useEffect(() => {
         fetchProfile();
@@ -105,20 +111,10 @@ export default function Profile() {
                 .select('*', { count: 'exact', head: true })
                 .eq('id_usuario', id);
 
-            const [evaluaResult, calificaResult] = await Promise.all([
-                supabase
-                    .from('evalua')
-                    .select('*', { count: 'exact', head: true })
-                    .eq('id_usuario', id),
-                supabase
-                    .from('califica')
-                    .select('*', { count: 'exact', head: true })
-                    .eq('id_usuario', id)
-            ]);
-
-            const totalReseñas =
-                (evaluaResult.error ? 0 : (evaluaResult.count || 0)) +
-                (calificaResult.error ? 0 : (calificaResult.count || 0));
+            const { count: totalReseñas } = await supabase
+                .from('rating')
+                .select('*', { count: 'exact', head: true })
+                .eq('user_id', id);
 
             const { seguidores, siguiendo } = await followersAPI.obtenerContadores(id);
 
@@ -162,6 +158,45 @@ export default function Profile() {
             siguiendo
         }));
     };
+
+    const handleEditReview = (ratingData) => {
+        setEditingRating(ratingData);
+        setShowReseniasModal(false);
+
+        // Esperar a que se cierre completamente antes de abrir el de edición
+        setTimeout(() => {
+            setShowEditModal(true);
+        }, 400);
+    };
+
+    const handleSaveEdit = async (updatedData) => {
+        try {
+            const { error } = await ratingsAPI.updateRating(
+                editingRating.ratingId,
+                updatedData.rating,
+                updatedData.texto,
+                {
+                    workload: updatedData.workload,
+                    tags: updatedData.selectedTags,
+                    materia_id: updatedData.selectedMateria?.id
+                }
+            );
+
+            if (error) {
+                console.error('Error actualizando reseña:', error);
+                return;
+            }
+
+            setShowEditModal(false);
+            setEditingRating(null);
+
+            // Esperar antes de reabrir "Mis Reseñas" si quieres
+            // setTimeout(() => setShowReseniasModal(true), 300);
+        } catch (error) {
+            console.error('Error inesperado:', error);
+        }
+    };
+
 
     function getAppAvatarSrc(raw) {
         const url = (raw || "").trim();
@@ -645,15 +680,19 @@ export default function Profile() {
                         </div>
                     </div>
 
-                    {/* Reseñas Escritas */}
-                    <div style={{
-                        background: '#fff',
-                        borderRadius: '16px',
-                        padding: '24px',
-                        border: '2px solid #f1f5f9',
-                        boxShadow: '0 2px 8px rgba(0,0,0,0.04)',
-                        transition: 'all 0.3s ease',
-                    }}
+                    {/* Reseñas Escritas - CLICKEABLE */}
+                    <div
+                        onClick={() => setShowReseniasModal(true)}
+                        style={{
+                            background: '#fff',
+                            borderRadius: '16px',
+                            padding: '24px',
+                            border: '2px solid #f1f5f9',
+                            boxShadow: '0 2px 8px rgba(0,0,0,0.04)',
+                            transition: 'all 0.3s ease',
+                            cursor: 'pointer',
+                        }}
+
                          onMouseEnter={(e) => {
                              e.currentTarget.style.transform = 'translateY(-4px)';
                              e.currentTarget.style.boxShadow = '0 12px 32px rgba(0,0,0,0.08)';
@@ -706,6 +745,29 @@ export default function Profile() {
                     </div>
                 </div>
             </div>
+
+            {/* Modal de Mis Reseñas */}
+            <MisReseniasModal
+                open={showReseniasModal}
+                onClose={() => setShowReseniasModal(false)}
+                onEdit={handleEditReview}
+            />
+
+            {/* Modal de Edición */}
+            {showEditModal && editingRating && (
+                <AuthModal_HacerResenia
+                    open={showEditModal}
+                    onClose={() => {
+                        setShowEditModal(false);
+                        setEditingRating(null);
+                    }}
+                    onSave={handleSaveEdit}
+                    preSelectedEntity={editingRating.selectedEntity}
+                    initialData={editingRating}
+                    isEditing={true}
+                />
+            )}
+
 
             {/* Modal Avatar Imagen Grande */}
             {showFullImage && avatarSrc && (

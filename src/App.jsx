@@ -1,3 +1,5 @@
+import { BrowserRouter, Routes, Route, Navigate, useLocation, useNavigate, useParams } from "react-router-dom";
+import { lazy, Suspense, useEffect } from "react";
 // src/App.jsx
 import { BrowserRouter, Routes, Route, Navigate, useLocation, useNavigate } from "react-router-dom";
 import { lazy, Suspense, useEffect } from "react";
@@ -92,6 +94,12 @@ function RouteDebugger() {
     return null;
 }
 
+// Componente helper para redirigir /cursos/:id → /materias/:id
+function RedirectToMaterias() {
+    const { id } = useParams();
+    return <Navigate to={`/materias/${id}`} replace />;
+}
+
 function AppRoutes() {
     const location = useLocation();
     const navigate = useNavigate();
@@ -166,7 +174,7 @@ function AppRoutes() {
                     <Route path="/profesores/:id" element={<ProfessorDetail />} />
                     <Route path="/materias/:id" element={<SubjectDetail />} />
                     {/* Redirigir /cursos/:id a /materias/:id si es necesario */}
-                    <Route path="/cursos/:id" element={<Navigate to="/materias/:id" replace />} />
+                    <Route path="/cursos/:id" element={<RedirectToMaterias />} />
                     <Route path="/mentor/:username" element={<PublicProfileMentor />} />
 
                     {/* Usuario - PROTEGIDAS */}

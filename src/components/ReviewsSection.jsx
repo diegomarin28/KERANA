@@ -28,7 +28,8 @@ export default function ReviewsSection({
                                            onFilterChange,
                                            onMateriaChange,
                                            onAddReview,
-                                           onReviewDeleted
+                                           onReviewDeleted,
+                                           onEditReview
                                        }) {
     const [materiasNames, setMateriasNames] = useState({});
     const [currentUserId, setCurrentUserId] = useState(null);
@@ -76,13 +77,17 @@ export default function ReviewsSection({
     };
 
     const canDeleteReview = (review) => {
-        if (!currentUserId || review.user_id !== currentUserId) return false;
+        return currentUserId && review.user_id === currentUserId;
+    };
 
-        const createdAt = new Date(review.created_at);
-        const now = new Date();
-        const hoursDiff = (now - createdAt) / (1000 * 60 * 60);
+    const canEditReview = (review) => {
+        return currentUserId && review.user_id === currentUserId;
+    };
 
-        return hoursDiff <= 24;
+    const handleEditClick = (review) => {
+        if (onEditReview) {
+            onEditReview(review);
+        }
     };
 
     const handleDeleteClick = (review) => {
@@ -286,38 +291,77 @@ export default function ReviewsSection({
                                 e.currentTarget.style.transform = 'translateY(0)';
                             }}
                         >
-                            {/* Botón de borrar (solo si puede borrar) */}
-                            {canDeleteReview(review) && (
-                                <button
-                                    onClick={() => handleDeleteClick(review)}
-                                    style={{
-                                        position: 'absolute',
-                                        top: 12,
-                                        right: 12,
-                                        background: '#fee',
-                                        border: '1px solid #fcc',
-                                        borderRadius: 6,
-                                        padding: '6px 10px',
-                                        cursor: 'pointer',
-                                        fontSize: 18,
-                                        color: '#dc2626',
-                                        transition: 'all 0.2s ease',
-                                        display: 'flex',
-                                        alignItems: 'center',
-                                        justifyContent: 'center'
-                                    }}
-                                    onMouseEnter={(e) => {
-                                        e.target.style.background = '#dc2626';
-                                        e.target.style.color = '#fff';
-                                    }}
-                                    onMouseLeave={(e) => {
-                                        e.target.style.background = '#fee';
-                                        e.target.style.color = '#dc2626';
-                                    }}
-                                    title="Borrar reseña"
-                                >
-                                    🗑️
-                                </button>
+                            {/* Botones de acción (editar y borrar) */}
+                            {(canEditReview(review) || canDeleteReview(review)) && (
+                                <div style={{
+                                    position: 'absolute',
+                                    top: 12,
+                                    right: 12,
+                                    display: 'flex',
+                                    gap: 8
+                                }}>
+                                    {/* Botón de editar */}
+                                    {canEditReview(review) && (
+                                        <button
+                                            onClick={() => handleEditClick(review)}
+                                            style={{
+                                                background: '#eff6ff',
+                                                border: '1px solid #bfdbfe',
+                                                borderRadius: 6,
+                                                padding: '6px 10px',
+                                                cursor: 'pointer',
+                                                fontSize: 18,
+                                                color: '#2563eb',
+                                                transition: 'all 0.2s ease',
+                                                display: 'flex',
+                                                alignItems: 'center',
+                                                justifyContent: 'center'
+                                            }}
+                                            onMouseEnter={(e) => {
+                                                e.target.style.background = '#2563eb';
+                                                e.target.style.color = '#fff';
+                                            }}
+                                            onMouseLeave={(e) => {
+                                                e.target.style.background = '#eff6ff';
+                                                e.target.style.color = '#2563eb';
+                                            }}
+                                            title="Editar reseña"
+                                        >
+                                            ✏️
+                                        </button>
+                                    )}
+
+                                    {/* Botón de borrar */}
+                                    {canDeleteReview(review) && (
+                                        <button
+                                            onClick={() => handleDeleteClick(review)}
+                                            style={{
+                                                background: '#fee',
+                                                border: '1px solid #fcc',
+                                                borderRadius: 6,
+                                                padding: '6px 10px',
+                                                cursor: 'pointer',
+                                                fontSize: 18,
+                                                color: '#dc2626',
+                                                transition: 'all 0.2s ease',
+                                                display: 'flex',
+                                                alignItems: 'center',
+                                                justifyContent: 'center'
+                                            }}
+                                            onMouseEnter={(e) => {
+                                                e.target.style.background = '#dc2626';
+                                                e.target.style.color = '#fff';
+                                            }}
+                                            onMouseLeave={(e) => {
+                                                e.target.style.background = '#fee';
+                                                e.target.style.color = '#dc2626';
+                                            }}
+                                            title="Borrar reseña"
+                                        >
+                                            🗑️
+                                        </button>
+                                    )}
+                                </div>
                             )}
 
                             {/* Materia (primero) */}
