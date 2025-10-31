@@ -99,11 +99,12 @@ export const slotsAPI = {
                 .delete()
                 .eq('id_mentor', mentorId)
                 .eq('fecha', fecha)
-                .eq('origen', 'manual');
+                .eq('origen', 'manual')
+                .eq('disponible', true); // ✅ SOLO eliminar slots disponibles
 
             if (error) throw error;
 
-            console.log('🗑️ Slots eliminados para fecha:', fecha);
+            console.log('🗑️ Slots disponibles eliminados para fecha:', fecha);
             return { data: { success: true }, error: null };
         } catch (error) {
             console.error('❌ Error eliminando slots:', error);

@@ -115,27 +115,136 @@ export default function IAmMentor() {
         try {
             setLoadingSesiones(true);
 
-            const { data: sesiones, error } = await supabase
+            const ahora = new Date();
+            console.log('🔍 Fecha/hora actual:', ahora.toISOString());
+            console.log('🔍 Buscando sesiones para mentor ID:', mentorData.id_mentor);
+            console.log('🔍 Verificando sesión 40 específicamente...');
+            const { data: sesion40, error: error40 } = await supabase
+                .from('mentor_sesion')
+                .select('*')
+                .eq('id_sesion', 40)
+                .maybeSingle();
+
+            console.log('📊 Sesión 40:', sesion40);
+            console.log('   Estado:', sesion40?.estado);
+            console.log('   Alumno:', sesion40?.id_alumno);
+            console.log('   Fecha:', sesion40?.fecha_hora);
+
+            // Ver TODAS las sesiones confirmadas
+            const { data: todasSesiones } = await supabase
+                .from('mentor_sesion')
+                .select('id_sesion, fecha_hora, id_alumno, estado')
+                .eq('id_mentor', mentorData.id_mentor)
+                .eq('estado', 'confirmada')
+                .order('fecha_hora', { ascending: true });
+
+            console.log('📊 TODAS las sesiones confirmadas:', todasSesiones);
+
+            // ✅ Mostrar cuáles son futuras y cuáles pasadas
+            todasSesiones?.forEach(s => {
+                const esFutura = new Date(s.fecha_hora) >= ahora;
+                console.log(`   ${esFutura ? '✅' : '❌'} Sesión ${s.id_sesion}: ${s.fecha_hora} | Alumno: ${s.id_alumno} | ${esFutura ? 'FUTURA' : 'PASADA'}`);
+            });
+
+            // Obtener SOLO sesiones futuras
+            const { data: sesiones, error: sesionesError } = await supabase
                 .from('mentor_sesion')
                 .select(`
-                    id_sesion,
-                    fecha_hora,
-                    duracion_minutos,
-                    estado,
-                    precio,
-                    notas_alumno,
-                    alumno:id_alumno(nombre, foto),
-                    materia:id_materia(nombre_materia)
-                `)
+                id_sesion,
+                fecha_hora,
+                duracion_minutos,
+                estado,
+                precio,
+                notas_alumno,
+                id_alumno,
+                id_materia
+            `)
                 .eq('id_mentor', mentorData.id_mentor)
-                .in('estado', ['pendiente', 'confirmada'])
-                .gte('fecha_hora', new Date().toISOString())
-                .order('fecha_hora', { ascending: true })
-                .limit(10);
+                .eq('estado', 'confirmada')
+                .gte('fecha_hora', ahora.toISOString())
+                .order('fecha_hora', { ascending: true });
 
-            if (error) throw error;
+            console.log('📊 Sesiones FUTURAS filtradas:', sesiones);
 
-            setProximasSesiones(sesiones || []);
+            if (sesionesError) throw sesionesError;
+
+            if (!sesiones || sesiones.length === 0) {
+                setProximasSesiones([]);
+                return;
+            }
+
+            // Resto del código igual...
+            const alumnoIds = [...new Set(sesiones.map(s => s.id_alumno).filter(Boolean))];
+            console.log('🔍 IDs de alumnos únicos:', alumnoIds);
+
+            const { data: alumnos, error: alumnosError } = await supabase
+                .from('usuario')
+                .select('id_usuario, nombre, foto')
+                .in('id_usuario', alumnoIds);
+
+            console.log('👥 Alumnos cargados:', alumnos);
+
+            if (alumnosError) {
+                console.error('Error cargando alumnos:', alumnosError);
+            }
+
+            const materiaIds = [...new Set(sesiones.map(s => s.id_materia).filter(Boolean))];
+            const { data: materias } = await supabase
+                .from('materia')
+                .select('id_materia, nombre_materia')
+                .in('id_materia', materiaIds);
+
+            const { data: slots } = await supabase
+                .from('slots_disponibles')
+                .select('id_slot, fecha, hora, max_alumnos, modalidad, locacion, duracion')
+                .eq('id_mentor', mentorData.id_mentor);
+
+            // Contar reservas totales por fecha/hora
+            const reservasPorFechaHora = {};
+            sesiones.forEach(sesion => {
+                const fechaHora = new Date(sesion.fecha_hora);
+                const fecha = fechaHora.toISOString().split('T')[0];
+                const hora = fechaHora.toTimeString().slice(0, 5);
+                const key = `${fecha}-${hora}`;
+                reservasPorFechaHora[key] = (reservasPorFechaHora[key] || 0) + 1;
+            });
+
+// Combinar toda la información
+            const sesionesCompletas = sesiones.map(sesion => {
+                const fechaHora = new Date(sesion.fecha_hora);
+                const fecha = fechaHora.toISOString().split('T')[0];
+                const hora = fechaHora.toTimeString().slice(0, 5);
+
+                const slot = slots?.find(s =>
+                    s.fecha === fecha &&
+                    s.hora.slice(0, 5) === hora
+                );
+
+                const key = `${fecha}-${hora}`;
+                const maxAlumnos = slot?.max_alumnos || 1;
+
+                const reservasActuales = maxAlumnos === 1 ? 1 : (reservasPorFechaHora[key] || 1);
+
+                const alumnoEncontrado = alumnos?.find(a => a.id_usuario === sesion.id_alumno);
+
+                return {
+                    ...sesion,
+                    alumno: alumnoEncontrado,
+                    materia: materias?.find(m => m.id_materia === sesion.id_materia),
+                    slot_info: {
+                        max_alumnos: maxAlumnos,
+                        reservas_actuales: reservasActuales,
+                        modalidad: slot?.modalidad || 'virtual',
+                        locacion: slot?.locacion,
+                        duracion: slot?.duracion || 60
+                    },
+                    modalidad: slot?.modalidad || 'virtual',
+                    locacion: slot?.locacion
+                };
+            });
+
+            console.log('✅ Sesiones completas FINAL:', sesionesCompletas);
+            setProximasSesiones(sesionesCompletas);
         } catch (err) {
             console.error('Error cargando sesiones:', err);
         } finally {
@@ -438,79 +547,174 @@ export default function IAmMentor() {
                                 </Card>
                             ) : (
                                 <div style={{ display: 'grid', gap: 16, marginTop: 20 }}>
-                                    {proximasSesiones.map(sesion => (
-                                        <Card key={sesion.id_sesion} style={{ padding: 20 }}>
-                                            <div style={{ display: 'flex', gap: 16, alignItems: 'flex-start' }}>
-                                                {sesion.alumno?.foto ? (
-                                                    <img
-                                                        src={sesion.alumno.foto}
-                                                        alt={sesion.alumno.nombre}
-                                                        style={{
-                                                            width: 48,
-                                                            height: 48,
-                                                            borderRadius: '50%',
-                                                            objectFit: 'cover'
-                                                        }}
-                                                    />
-                                                ) : (
+                                    {proximasSesiones.map(sesion => {
+                                        const alumnosActuales = sesion.slot_info?.reservas_actuales || 1;
+                                        const maxAlumnos = sesion.slot_info?.max_alumnos || 1;
+                                        const nombreAlumno = sesion.alumno?.nombre || 'Sin nombre';
+
+                                        // ✅ Calcular hora de fin usando la duración del SLOT
+                                        const fechaInicio = new Date(sesion.fecha_hora);
+                                        const duracionMinutos = sesion.slot_info?.duracion || sesion.duracion_minutos || 60;
+                                        const fechaFin = new Date(fechaInicio.getTime() + duracionMinutos * 60000);
+                                        const horaInicio = fechaInicio.toLocaleTimeString('es-UY', { hour: '2-digit', minute: '2-digit' });
+                                        const horaFin = fechaFin.toLocaleTimeString('es-UY', { hour: '2-digit', minute: '2-digit' });
+
+                                        return (
+                                            <Card key={sesion.id_sesion} style={{
+                                                padding: 20,
+                                                maxWidth: 700
+                                            }}>
+                                                {/* Header: Fecha y Estado */}
+                                                <div style={{
+                                                    display: 'flex',
+                                                    justifyContent: 'space-between',
+                                                    alignItems: 'center',
+                                                    marginBottom: 16
+                                                }}>
                                                     <div style={{
-                                                        width: 48,
-                                                        height: 48,
-                                                        borderRadius: '50%',
-                                                        background: '#10B981',
+                                                        fontSize: 16,
+                                                        fontWeight: 700,
+                                                        color: '#374151',
                                                         display: 'flex',
                                                         alignItems: 'center',
-                                                        justifyContent: 'center',
-                                                        color: 'white',
-                                                        fontWeight: 700,
-                                                        fontSize: 18
+                                                        gap: 8
                                                     }}>
-                                                        {sesion.alumno?.nombre?.[0] || '?'}
+                                                        📅 {fechaInicio.toLocaleDateString('es-UY', {
+                                                        weekday: 'long',
+                                                        day: 'numeric',
+                                                        month: 'long'
+                                                    })}
                                                     </div>
-                                                )}
-                                                <div style={{ flex: 1 }}>
-                                                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 8 }}>
-                                                        <div>
-                                                            <h3 style={{ margin: '0 0 4px 0', fontSize: 16, fontWeight: 600 }}>
-                                                                {sesion.alumno?.nombre || 'Alumno'}
-                                                            </h3>
-                                                            <p style={{ margin: '0 0 4px 0', color: '#10B981', fontSize: 14, fontWeight: 600 }}>
-                                                                {sesion.materia?.nombre_materia || 'Materia'}
-                                                            </p>
-                                                        </div>
-                                                        <span style={{
-                                                            padding: '4px 12px',
-                                                            background: sesion.estado === 'confirmada' ? '#D1FAE5' : '#FEF3C7',
-                                                            color: sesion.estado === 'confirmada' ? '#065F46' : '#92400E',
-                                                            borderRadius: 12,
-                                                            fontSize: 12,
-                                                            fontWeight: 600
-                                                        }}>
-                                                            {sesion.estado === 'confirmada' ? '✓ Confirmada' : '⏳ Pendiente'}
-                                                        </span>
-                                                    </div>
-                                                    <div style={{ fontSize: 14, color: '#6b7280', marginBottom: 8 }}>
-                                                        📅 {formatFecha(sesion.fecha_hora)}
-                                                    </div>
-                                                    <div style={{ fontSize: 14, color: '#6b7280' }}>
-                                                        ⏱️ Duración: {sesion.duracion_minutos} minutos · 💰 ${sesion.precio}
-                                                    </div>
-                                                    {sesion.notas_alumno && (
-                                                        <div style={{
-                                                            marginTop: 12,
-                                                            padding: 12,
-                                                            background: '#F9FAFB',
+
+                                                    <span style={{
+                                                        padding: '4px 12px',
+                                                        background: sesion.estado === 'confirmada' ? '#D1FAE5' : '#FEF3C7',
+                                                        color: sesion.estado === 'confirmada' ? '#065F46' : '#92400E',
+                                                        borderRadius: 8,
+                                                        fontSize: 12,
+                                                        fontWeight: 700
+                                                    }}>
+                    {sesion.estado === 'confirmada' ? '✓ Confirmada' : '⏳ Pendiente'}
+                </span>
+                                                </div>
+
+                                                {/* Hora destacada */}
+                                                <div style={{
+                                                    fontSize: 24,
+                                                    fontWeight: 700,
+                                                    color: '#1F2937',
+                                                    marginBottom: 16,
+                                                    letterSpacing: '-0.5px'
+                                                }}>
+                                                    🕐 {horaInicio} - {horaFin}
+                                                </div>
+
+                                                {/* Modalidad y Botón de cancelar en la misma línea */}
+                                                <div style={{
+                                                    display: 'flex',
+                                                    justifyContent: 'space-between',
+                                                    alignItems: 'center',  // ✅ Esto centra verticalmente
+                                                    marginBottom: 16
+                                                }}>
+    <span style={{
+        display: 'inline-flex',
+        alignItems: 'center',
+        gap: 8,
+        padding: '8px 14px',
+        background: sesion.modalidad === 'virtual'
+            ? '#EFF6FF'
+            : '#ECFDF5',
+        border: `2px solid ${sesion.modalidad === 'virtual' ? '#BFDBFE' : '#A7F3D0'}`,
+        borderRadius: 8,
+        fontWeight: 700,
+        fontSize: 14,
+        color: sesion.modalidad === 'virtual' ? '#1E40AF' : '#065F46'
+    }}>
+        {sesion.modalidad === 'virtual' ? '💻' : '🏢'}
+        {sesion.modalidad === 'virtual' ? 'Virtual' :
+            sesion.locacion === 'casa' ? 'Presencial - Casa' : 'Presencial - Facultad'}
+    </span>
+
+                                                    {/* Botón de cancelar - Centrado verticalmente */}
+                                                    <button
+                                                        onClick={() => {
+                                                            if (window.confirm('¿Estás seguro que querés cancelar esta sesión?')) {
+                                                                // TODO: Implementar cancelación
+                                                                console.log('Cancelar sesión:', sesion.id_sesion);
+                                                            }
+                                                        }}
+                                                        style={{
+                                                            padding: '8px 16px',
+                                                            background: '#FEF2F2',
+                                                            color: '#DC2626',
+                                                            border: '2px solid #FECACA',
                                                             borderRadius: 8,
                                                             fontSize: 13,
-                                                            color: '#374151'
-                                                        }}>
-                                                            <strong>Nota del alumno:</strong> {sesion.notas_alumno}
-                                                        </div>
-                                                    )}
+                                                            fontWeight: 700,
+                                                            cursor: 'pointer',
+                                                            transition: 'all 0.2s ease',
+                                                            whiteSpace: 'nowrap',
+                                                            display: 'flex',
+                                                            alignItems: 'center',
+                                                            gap: 6
+                                                        }}
+                                                        onMouseEnter={e => {
+                                                            e.target.style.background = '#FEE2E2';
+                                                            e.target.style.transform = 'translateY(-1px)';
+                                                        }}
+                                                        onMouseLeave={e => {
+                                                            e.target.style.background = '#FEF2F2';
+                                                            e.target.style.transform = 'translateY(0)';
+                                                        }}
+                                                    >
+                                                        ❌ Cancelar
+                                                    </button>
                                                 </div>
-                                            </div>
-                                        </Card>
-                                    ))}
+
+                                                {/* Info secundaria */}
+                                                <div style={{
+                                                    display: 'flex',
+                                                    alignItems: 'center',
+                                                    gap: 16,
+                                                    flexWrap: 'wrap',
+                                                    paddingTop: 12,
+                                                    borderTop: '2px solid #F3F4F6',
+                                                    fontSize: 14
+                                                }}>
+                <span style={{ fontWeight: 600, color: '#6B7280' }}>
+                    👤 {nombreAlumno}
+                </span>
+
+                                                    <span style={{ color: '#D1D5DB' }}>•</span>
+
+                                                    <span style={{ fontWeight: 600, color: '#6B7280' }}>
+                    📚 {sesion.materia?.nombre_materia || 'Materia'}
+                </span>
+
+                                                    <span style={{ color: '#D1D5DB' }}>•</span>
+
+                                                    <span style={{ fontWeight: 600, color: '#6B7280' }}>
+                    👥 {alumnosActuales}/{maxAlumnos}
+                </span>
+                                                </div>
+
+                                                {/* Notas */}
+                                                {sesion.notas_alumno && (
+                                                    <div style={{
+                                                        marginTop: 12,
+                                                        padding: 12,
+                                                        background: '#F9FAFB',
+                                                        borderLeft: '3px solid #6366F1',
+                                                        borderRadius: 6,
+                                                        fontSize: 13,
+                                                        color: '#374151'
+                                                    }}>
+                                                        <strong>💬 Nota:</strong> {sesion.notas_alumno}
+                                                    </div>
+                                                )}
+                                            </Card>
+                                        );
+                                    })}
                                 </div>
                             )}
                         </div>

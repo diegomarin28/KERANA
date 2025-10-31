@@ -17,6 +17,7 @@ export default function MyCalendar() {
     const [misSesiones, setMisSesiones] = useState([]);
     const [confirmDelete, setConfirmDelete] = useState(null);
     const [isDeleting, setIsDeleting] = useState(false);
+    const [showReservedWarning, setShowReservedWarning] = useState(false);
 
     const [currentDate, setCurrentDate] = useState(new Date());
     const [selectedDate, setSelectedDate] = useState(null);
@@ -328,6 +329,14 @@ export default function MyCalendar() {
             const dateSlots = prev[dateKey] || [];
 
             if (dateSlots.includes(hour)) {
+                // ✅ VERIFICAR si el slot está reservado antes de permitir deselección
+                const estaReservado = slotDisponibilidad[slotKey] === false;
+
+                if (estaReservado) {
+                    setShowReservedWarning(true);
+                    return prev; // No permite deseleccionar
+                }
+
                 const newSlots = dateSlots.filter(h => h !== hour).sort();
                 setSlotDurations(prevDur => {
                     const newDur = { ...prevDur };
@@ -484,9 +493,20 @@ export default function MyCalendar() {
     };
 
     const deleteManualSlots = async (dateKey) => {
+        // Verificar si hay slots reservados en esa fecha
+        const slotsEnFecha = savedSlots[dateKey] || [];
+        const hayReservados = slotsEnFecha.some(hora => {
+            const slotKey = `${dateKey}-${hora}`;
+            return slotDisponibilidad[slotKey] === false;
+        });
+
+        if (hayReservados) {
+            setShowReservedWarning(true);
+            return;
+        }
+
         setConfirmDelete(dateKey);
     };
-
     const confirmDeleteSlots = async (dateKey) => {
         setIsDeleting(true);
         const { error } = await slotsAPI.eliminarSlotsFecha(currentMentorId, dateKey);
@@ -538,6 +558,103 @@ export default function MyCalendar() {
             fontFamily: 'Inter, sans-serif',
             position: 'relative'
         }}>
+            {/* Modal de advertencia de slots reservados */}
+            {showReservedWarning && (
+                <div style={{
+                    position: 'fixed',
+                    top: '50%',
+                    left: '50%',
+                    transform: 'translate(-50%, -50%)',
+                    zIndex: 10000,
+                    animation: 'slideIn 0.3s ease-out'
+                }}>
+                    <style>
+                        {`
+                @keyframes slideIn {
+                    from {
+                        opacity: 0;
+                        transform: translate(-50%, -45%);
+                    }
+                    to {
+                        opacity: 1;
+                        transform: translate(-50%, -50%);
+                    }
+                }
+            `}
+                    </style>
+                    <div style={{
+                        background: 'linear-gradient(135deg, #fff 0%, #fefce8 100%)',
+                        padding: 24,
+                        borderRadius: 16,
+                        boxShadow: '0 20px 60px rgba(0,0,0,0.3)',
+                        border: '3px solid #fbbf24',
+                        maxWidth: 400,
+                        textAlign: 'center'
+                    }}>
+                        <div style={{
+                            width: 64,
+                            height: 64,
+                            borderRadius: '50%',
+                            background: 'linear-gradient(135deg, #fef3c7 0%, #fde68a 100%)',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            margin: '0 auto 16px',
+                            boxShadow: '0 4px 12px rgba(251, 191, 36, 0.3)'
+                        }}>
+                            <FontAwesomeIcon icon={faExclamationCircle} style={{ fontSize: 32, color: '#f59e0b' }} />
+                        </div>
+                        <h3 style={{
+                            margin: '0 0 12px 0',
+                            fontSize: 20,
+                            fontWeight: 700,
+                            color: '#92400e'
+                        }}>
+                            ⚠️ Hay horarios reservados
+                        </h3>
+                        <p style={{
+                            color: '#78350f',
+                            marginBottom: 20,
+                            fontSize: 14,
+                            lineHeight: 1.6,
+                            fontWeight: 500
+                        }}>
+                            Esta fecha tiene sesiones confirmadas. Para cancelarlas, ve a la sección
+                            <strong style={{ display: 'block', marginTop: 8, color: '#92400e' }}>
+                                📅 "Próximas Mentorías"
+                            </strong>
+                            en Soy Mentor.
+                        </p>
+                        <button
+                            onClick={() => setShowReservedWarning(false)}
+                            style={{
+                                width: '100%',
+                                background: 'linear-gradient(135deg, #fbbf24 0%, #f59e0b 100%)',
+                                color: '#fff',
+                                border: 'none',
+                                borderRadius: 10,
+                                padding: '12px 24px',
+                                cursor: 'pointer',
+                                fontWeight: 700,
+                                fontSize: 14,
+                                transition: 'all 0.2s ease',
+                                fontFamily: 'Inter, sans-serif',
+                                boxShadow: '0 4px 12px rgba(251, 191, 36, 0.3)'
+                            }}
+                            onMouseEnter={e => {
+                                e.target.style.transform = 'translateY(-2px)';
+                                e.target.style.boxShadow = '0 6px 20px rgba(251, 191, 36, 0.4)';
+                            }}
+                            onMouseLeave={e => {
+                                e.target.style.transform = 'translateY(0)';
+                                e.target.style.boxShadow = '0 4px 12px rgba(251, 191, 36, 0.3)';
+                            }}
+                        >
+                            Entendido
+                        </button>
+                    </div>
+                </div>
+            )}
             {/* Modal de confirmación */}
             {confirmDelete && (
                 <div style={{
