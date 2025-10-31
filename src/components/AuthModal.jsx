@@ -1,13 +1,12 @@
-
 import { useState } from "react";
 import { supabase } from "../supabase";
-import { Card } from "../components/UI/Card";
 import { Button } from "../components/UI/Button";
 
 export default function AuthModal({ open, onClose, onSuccess }) {
     const [mode, setMode] = useState("login");
     const [email, setEmail] = useState("");
     const [name, setName] = useState("");
+    const [username, setUsername] = useState("");
     const [password, setPassword] = useState("");
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState("");
@@ -18,6 +17,7 @@ export default function AuthModal({ open, onClose, onSuccess }) {
     const clearForm = () => {
         setEmail("");
         setName("");
+        setUsername("");
         setPassword("");
         setError("");
         setSuccess("");
@@ -70,13 +70,20 @@ export default function AuthModal({ open, onClose, onSuccess }) {
         setError("");
         setSuccess("");
 
-        if (!name.trim() || !email.trim() || !password) {
+        if (!name.trim() || !username.trim() || !email.trim() || !password) {
             setError("Todos los campos son obligatorios");
             return;
         }
 
         if (password.length < 6) {
             setError("La contraseña debe tener al menos 6 caracteres");
+            return;
+        }
+
+        // Validación de contraseña: minúscula, mayúscula y número
+        const passwordRegex = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d).+$/;
+        if (!passwordRegex.test(password)) {
+            setError("La contraseña debe contener al menos: una minúscula (a-z), una mayúscula (A-Z) y un número (0-9)");
             return;
         }
 
@@ -89,16 +96,25 @@ export default function AuthModal({ open, onClose, onSuccess }) {
                 options: {
                     data: {
                         name: name.trim(),
+                        username: username.trim(),
                     },
-                    emailRedirectTo: `${window.location.origin}/auth/confirm`
+                    emailRedirectTo: `${window.location.origin}/auth/callback`
                 }
             });
 
             if (authError) {
-                if (authError.message.includes('User already registered')) {
-                    setError("Ya existe una cuenta con este email");
-                } else {
-                    setError("Error creando la cuenta: " + authError.message);
+                // Error: Email duplicado
+                if (authError.message.includes('User already registered') ||
+                    authError.message.includes('already been registered')) {
+                    setError("Ya tienes una cuenta de Kerana");
+                }
+                // Error: Contraseña débil
+                else if (authError.message.includes('Password should contain') ||
+                    authError.message.includes('abcdefghijklmnopqrstuvwxyz')) {
+                    setError("La contraseña debe contener al menos: una minúscula (a-z), una mayúscula (A-Z) y un número (0-9)");
+                }
+                else {
+                    setError(authError.message);
                 }
                 return;
             }
@@ -108,9 +124,10 @@ export default function AuthModal({ open, onClose, onSuccess }) {
                 const { error: profileError } = await supabase
                     .from('usuario')
                     .insert([{
+                        auth_id: authData.user.id,
                         correo: email.trim(),
                         nombre: name.trim(),
-                        username: email.split('@')[0],
+                        username: username.trim(),
                         fecha_creado: new Date().toISOString(),
                         creditos: 0
                     }]);
@@ -119,7 +136,7 @@ export default function AuthModal({ open, onClose, onSuccess }) {
                     console.error('Error creando perfil:', profileError);
                 }
 
-                setSuccess("¡Cuenta creada exitosamente! Revisá tu email para verificar.");
+                setSuccess("¡Cuenta creada! Revisá tu email para verificarla.");
                 setTimeout(() => {
                     setMode('login');
                     clearForm();
@@ -142,7 +159,7 @@ export default function AuthModal({ open, onClose, onSuccess }) {
             const { error } = await supabase.auth.signInWithOAuth({
                 provider: 'google',
                 options: {
-                    redirectTo: `${window.location.origin}/auth/confirm`
+                    redirectTo: `${window.location.origin}/auth/callback`
                 }
             });
 
@@ -158,6 +175,7 @@ export default function AuthModal({ open, onClose, onSuccess }) {
 
     return (
         <>
+            {/* Overlay fijo - sin scroll */}
             <div
                 onClick={handleClose}
                 style={{
@@ -165,11 +183,13 @@ export default function AuthModal({ open, onClose, onSuccess }) {
                     inset: 0,
                     background: "rgba(0,0,0,0.6)",
                     zIndex: 4000,
-                    backdropFilter: "blur(4px)"
+                    backdropFilter: "blur(4px)",
+                    overflow: "hidden"
                 }}
                 aria-hidden="true"
             />
 
+            {/* Modal fijo - sin scroll */}
             <div
                 role="dialog"
                 aria-modal="true"
@@ -179,19 +199,23 @@ export default function AuthModal({ open, onClose, onSuccess }) {
                     left: "50%",
                     transform: "translate(-50%, -50%)",
                     width: "min(90vw, 420px)",
+                    maxHeight: "90vh",
                     background: "#fff",
                     borderRadius: "16px",
                     boxShadow: "0 25px 50px -12px rgba(0, 0, 0, 0.25)",
                     zIndex: 4010,
-                    overflow: "hidden"
+                    overflow: "hidden",
+                    display: "flex",
+                    flexDirection: "column"
                 }}
             >
                 {/* Header */}
                 <div style={{
                     padding: "24px 24px 20px",
-                    background: "linear-gradient(135deg, #0b1e3a 0%, #1e3a8a 100%)",
+                    background: "linear-gradient(135deg, #13346b 0%, #2563eb 100%)",
                     color: "white",
-                    textAlign: "center"
+                    textAlign: "center",
+                    flexShrink: 0
                 }}>
                     <h3 style={{
                         margin: 0,
@@ -214,7 +238,12 @@ export default function AuthModal({ open, onClose, onSuccess }) {
                     </p>
                 </div>
 
-                <div style={{ padding: "24px" }}>
+                {/* Contenido con scroll */}
+                <div style={{
+                    padding: "24px",
+                    overflowY: "auto",
+                    flexGrow: 1
+                }}>
                     {/* Botón Google */}
                     <button
                         onClick={handleGoogleLogin}
@@ -237,7 +266,7 @@ export default function AuthModal({ open, onClose, onSuccess }) {
                             opacity: loading ? 0.6 : 1,
                             marginBottom: "20px"
                         }}
-                        onMouseEnter={(e) => e.target.style.background = "#f8fafc"}
+                        onMouseEnter={(e) => !loading && (e.target.style.background = "#f8fafc")}
                         onMouseLeave={(e) => e.target.style.background = "#fff"}
                     >
                         <svg width="18" height="18" viewBox="0 0 18 18">
@@ -279,18 +308,40 @@ export default function AuthModal({ open, onClose, onSuccess }) {
                     <form onSubmit={mode === "login" ? handleLogin : handleSignup} style={{ display: "grid", gap: "16px" }}>
 
                         {mode === "signup" && (
-                            <div>
-                                <label style={labelStyle}>Nombre completo</label>
-                                <input
-                                    type="text"
-                                    value={name}
-                                    onChange={(e) => setName(e.target.value)}
-                                    style={inputStyle}
-                                    disabled={loading}
-                                    placeholder="Tu nombre"
-                                    required
-                                />
-                            </div>
+                            <>
+                                <div>
+                                    <label style={labelStyle}>Nombre completo</label>
+                                    <input
+                                        type="text"
+                                        value={name}
+                                        onChange={(e) => setName(e.target.value)}
+                                        style={inputStyle}
+                                        disabled={loading}
+                                        placeholder="Tu nombre"
+                                        required
+                                    />
+                                </div>
+
+                                <div>
+                                    <label style={labelStyle}>Nombre de usuario</label>
+                                    <input
+                                        type="text"
+                                        value={username}
+                                        onChange={(e) => setUsername(e.target.value.toLowerCase().replace(/\s/g, ''))}
+                                        style={inputStyle}
+                                        disabled={loading}
+                                        placeholder="usuario123"
+                                        required
+                                    />
+                                    <p style={{
+                                        margin: "6px 0 0 0",
+                                        fontSize: "12px",
+                                        color: "#64748b"
+                                    }}>
+                                        Tu username único en Kerana
+                                    </p>
+                                </div>
+                            </>
                         )}
 
                         <div>
@@ -318,6 +369,15 @@ export default function AuthModal({ open, onClose, onSuccess }) {
                                 minLength={mode === "signup" ? 6 : undefined}
                                 required
                             />
+                            {mode === "signup" && (
+                                <p style={{
+                                    margin: "6px 0 0 0",
+                                    fontSize: "12px",
+                                    color: "#64748b"
+                                }}>
+                                    Debe incluir: minúsculas, mayúsculas y números
+                                </p>
+                            )}
                         </div>
 
                         {/* Mensajes */}
@@ -388,12 +448,6 @@ const inputStyle = {
     background: "#fff",
     transition: "all 0.2s ease",
     boxSizing: "border-box"
-};
-
-inputStyle[':focus'] = {
-    outline: "none",
-    borderColor: "#3b82f6",
-    boxShadow: "0 0 0 3px rgba(59, 130, 246, 0.1)"
 };
 
 const switchButtonStyle = {

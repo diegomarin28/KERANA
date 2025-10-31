@@ -219,13 +219,67 @@ async function searchSubjects(term) {
 
         if (error) return { data: [], error };
 
+        // Obtener IDs de materias encontradas
+        const materiaIds = (materias || []).map(m => m.id_materia);
+
+        if (materiaIds.length === 0) {
+            return { data: [], error: null };
+        }
+
+        // Contar apuntes, profesores y mentores por materia
+        const [apuntesCount, profesoresCount, mentoresCount] = await Promise.all([
+            // Contar apuntes
+            supabase
+                .from('apunte')
+                .select('id_materia')
+                .in('id_materia', materiaIds),
+
+            // Contar profesores
+            supabase
+                .from('imparte')
+                .select('id_materia, id_profesor')
+                .in('id_materia', materiaIds),
+
+            // Contar mentores
+            supabase
+                .from('mentor_materia')
+                .select('id_materia, id_mentor')
+                .in('id_materia', materiaIds)
+        ]);
+
+        // Crear mapas de conteo
+        const apuntesMap = {};
+        const profesoresMap = {};
+        const mentoresMap = {};
+
+        (apuntesCount.data || []).forEach(item => {
+            apuntesMap[item.id_materia] = (apuntesMap[item.id_materia] || 0) + 1;
+        });
+
+        (profesoresCount.data || []).forEach(item => {
+            if (!profesoresMap[item.id_materia]) {
+                profesoresMap[item.id_materia] = new Set();
+            }
+            profesoresMap[item.id_materia].add(item.id_profesor);
+        });
+
+        (mentoresCount.data || []).forEach(item => {
+            if (!mentoresMap[item.id_materia]) {
+                mentoresMap[item.id_materia] = new Set();
+            }
+            mentoresMap[item.id_materia].add(item.id_mentor);
+        });
+
         const transformed = (materias || []).map(materia => ({
             id: materia.id_materia,
             id_materia: materia.id_materia,
             nombre_materia: materia.nombre_materia,
             semestre: materia.semestre || '',
             label: materia.nombre_materia,
-            source: 'materia'
+            source: 'materia',
+            total_apuntes: apuntesMap[materia.id_materia] || 0,
+            total_profesores: profesoresMap[materia.id_materia]?.size || 0,
+            total_mentores: mentoresMap[materia.id_materia]?.size || 0
         }));
 
         return { data: transformed, error: null };
@@ -234,7 +288,6 @@ async function searchSubjects(term) {
         return { data: [], error };
     }
 }
-
 async function searchNotes(term) {
     const q = (term || "").trim();
     if (!q) return { data: [], error: null };
@@ -2210,57 +2263,5 @@ export const foldersAPI = {
             console.error('❌ Error en organización automática:', error)
             return { data: null, error }
         }
-    }
-}
-// ==========================================
-// 📅 CALENDLY INTEGRATION
-// ==========================================
-export const calendlyAPI = {
-    // Guardar URL de Calendly del mentor
-    async saveCalendlyUrl(url) {
-        const { data: { user } } = await supabase.auth.getUser()
-        if (!user) return { data: null, error: 'No hay usuario logueado' }
-
-        // Actualizar directamente usando auth_id
-        const { data, error } = await supabase
-            .from('usuario')
-            .update({ calendly_url: url })
-            .eq('auth_id', user.id)  // ⬅️ Usar auth_id directamente
-            .select()
-            .single()
-
-        return { data, error }
-    },
-
-    // Obtener mi URL de Calendly
-    async getMyCalendlyUrl() {
-        const { data: { user } } = await supabase.auth.getUser()
-        if (!user) return { data: null, error: 'No hay usuario logueado' }
-
-        const { data: usuarioData } = await supabase
-            .from('usuario')
-            .select('calendly_url')
-            .eq('auth_id', user.id)
-            .single()
-
-        if (!usuarioData) return { data: null, error: 'Usuario no encontrado' }
-
-        return { data: usuarioData.calendly_url, error: null }
-    },
-
-    // Obtener URL de Calendly de un mentor específico (para estudiantes)
-    async getMentorCalendlyUrl(mentorId) {
-        const { data, error } = await supabase
-            .from('mentor')
-            .select(`
-                id_mentor,
-                usuario!inner(calendly_url)
-            `)
-            .eq('id_mentor', mentorId)
-            .single()
-
-        if (error) return { data: null, error }
-
-        return { data: data?.usuario?.calendly_url, error: null }
     }
 }

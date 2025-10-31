@@ -2,7 +2,7 @@ import { useLocation } from "react-router-dom";
 import { useMemo, useState, useEffect } from "react";
 import SearchBar from "../components/SearchBar";
 import { searchAPI } from "../api/database";
-import SubjectCard from "../components/SubjectCard";
+import CourseCard from "../components/CourseCard.jsx";
 import ProfessorCard from "../components/ProfessorCard";
 
 import ApunteCard from "../components/ApunteCard.jsx";
@@ -293,7 +293,20 @@ export default function SearchResults() {
                         {/* Materias */}
                         {show("materias") &&
                             filtered.subjects.map((m) => (
-                                <SubjectCard key={`materia-${m.id_materia}`} subject={m} />
+                                <CourseCard
+                                    key={`materia-${m.id_materia}`}
+                                    course={{
+                                        tipo: 'materia',
+                                        id: m.id_materia,
+                                        titulo: m.nombre_materia,
+                                        subtitulo: m.semestre ? `Semestre: ${m.semestre}` : '',
+                                        conteo: {
+                                            apuntes: m.total_apuntes ?? 0,
+                                            profesores: m.total_profesores ?? 0,
+                                            mentores: m.total_mentores ?? 0
+                                        }
+                                    }}
+                                />
                             ))}
 
                         {/* Profesores */}

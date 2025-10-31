@@ -64,9 +64,9 @@ serve(async (req) => {
         name: usuario.nombre || 'Usuario Kerana',
       },
       back_urls: {
-        success: 'http://localhost:5173/credits/success',
-        failure: 'http://localhost:5173/credits/failure',
-        pending: 'http://localhost:5173/credits/failure',
+        success: 'https://kerana.vercel.app/credits/success',
+        failure: 'https://kerana.vercel.app/credits/failure',
+        pending: 'https://kerana.vercel.app/credits/failure',
       },
       notification_url: `${Deno.env.get('SUPABASE_URL')}/functions/v1/webhook_mercadopago`,
       metadata: {
