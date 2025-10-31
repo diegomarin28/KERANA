@@ -1180,6 +1180,176 @@ export const ratingsAPI = {
             .select();
 
         return { data, error };
+    },
+    async updateRating(ratingId, estrellas, comentario, extra = {}) {
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user) return { data: null, error: 'No hay usuario logueado' };
+
+        const { data: usuarioData } = await supabase
+            .from('usuario')
+            .select('id_usuario')
+            .eq('auth_id', user.id)
+            .single();
+
+        if (!usuarioData) return { data: null, error: 'Usuario no encontrado' };
+
+        // Verificar que la reseña pertenece al usuario
+        const { data: rating } = await supabase
+            .from('rating')
+            .select('user_id')
+            .eq('id', ratingId)
+            .single();
+
+        if (!rating || rating.user_id !== usuarioData.id_usuario) {
+            return { data: null, error: 'No tienes permiso para editar esta reseña' };
+        }
+
+        // Validar palabras prohibidas
+        const validacion = validarComentario(comentario);
+        if (!validacion.valido) {
+            return { data: null, error: { message: validacion.error } };
+        }
+
+        const payload = {
+            estrellas,
+            comentario: comentario?.trim() || null,
+            workload: extra.workload || null,
+            tags: extra.tags || []
+        };
+
+        // ✅ AGREGAR ESTA LÍNEA: Permitir actualizar materia_id si viene en extra
+        if (extra.materia_id) {
+            payload.materia_id = extra.materia_id;
+        }
+
+        const { data, error } = await supabase
+            .from('rating')
+            .update(payload)
+            .eq('id', ratingId)
+            .select()
+            .single();
+
+        return { data, error };
+    },
+
+    async getMyRatings() {
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user) return { data: null, error: 'No hay usuario logueado' };
+
+        const { data: usuarioData } = await supabase
+            .from('usuario')
+            .select('id_usuario')
+            .eq('auth_id', user.id)
+            .single();
+
+        if (!usuarioData) return { data: null, error: 'Usuario no encontrado' };
+
+        const { data, error } = await supabase
+            .from('rating')
+            .select(`
+            id,
+            tipo,
+            ref_id,
+            estrellas,
+            comentario,
+            workload,
+            materia_id,
+            created_at,
+            tags,
+            materia:materia_id(id_materia, nombre_materia)
+        `)
+            .eq('user_id', usuarioData.id_usuario)
+            .order('created_at', { ascending: false });
+
+        if (error) {
+            console.error('❌ Error obteniendo ratings:', error);
+            return { data: null, error };
+        }
+
+        // Separar IDs por tipo
+        const profesorIds = data.filter(r => r.tipo === 'profesor').map(r => r.ref_id);
+        const mentorIds = data.filter(r => r.tipo === 'mentor').map(r => r.ref_id);
+
+        let profesoresMap = new Map();
+        let mentoresMap = new Map();
+
+        // Obtener nombres de PROFESORES
+        if (profesorIds.length > 0) {
+            const { data: profData, error: profError } = await supabase
+                .from('profesor_curso')
+                .select('id_profesor, profesor_nombre')
+                .in('id_profesor', profesorIds);
+
+            if (profError) {
+                console.error('❌ Error obteniendo profesores:', profError);
+            } else {
+                console.log('✅ Profesores obtenidos:', profData);
+                profData?.forEach(p => {
+                    profesoresMap.set(p.id_profesor, p.profesor_nombre);
+                });
+            }
+        }
+
+        // ✅ AQUÍ ESTÁ EL CAMBIO PRINCIPAL - Obtener nombres de MENTORES
+        if (mentorIds.length > 0) {
+            const { data: mentorData, error: mentorError } = await supabase
+                .from('mentor')
+                .select('id_mentor, id_usuario')
+                .in('id_mentor', mentorIds);
+
+            if (mentorError) {
+                console.error('❌ Error obteniendo mentores:', mentorError);
+            } else {
+                console.log('✅ Mentores obtenidos (con id_usuario):', mentorData);
+
+                // Ahora obtener los nombres de usuario usando id_usuario
+                if (mentorData && mentorData.length > 0) {
+                    const userIds = mentorData.map(m => m.id_usuario);
+
+                    const { data: usuariosData, error: usuariosError } = await supabase
+                        .from('usuario')
+                        .select('id_usuario, nombre')
+                        .in('id_usuario', userIds);
+
+                    if (usuariosError) {
+                        console.error('❌ Error obteniendo nombres de usuarios:', usuariosError);
+                    } else {
+                        console.log('✅ Nombres de usuarios obtenidos:', usuariosData);
+
+                        // Crear un mapa de id_usuario -> nombre
+                        const usuariosNombresMap = new Map(
+                            usuariosData?.map(u => [u.id_usuario, u.nombre]) || []
+                        );
+
+                        // Mapear id_mentor -> nombre usando ambos mapas
+                        mentorData.forEach(m => {
+                            const nombre = usuariosNombresMap.get(m.id_usuario) || 'Mentor desconocido';
+                            mentoresMap.set(m.id_mentor, nombre);
+                        });
+                    }
+                }
+            }
+        }
+
+        // Combinar datos con nombres
+        const ratingsConNombres = data.map(rating => {
+            let nombre = 'Desconocido';
+
+            if (rating.tipo === 'profesor') {
+                nombre = profesoresMap.get(rating.ref_id) || 'Profesor desconocido';
+            } else if (rating.tipo === 'mentor') {
+                nombre = mentoresMap.get(rating.ref_id) || 'Mentor desconocido';
+            }
+
+            return {
+                ...rating,
+                nombre_entidad: nombre
+            };
+        });
+
+        console.log('✅ Ratings finales con nombres:', ratingsConNombres);
+
+        return { data: ratingsConNombres, error: null };
     }
 }
 // ==========================================
