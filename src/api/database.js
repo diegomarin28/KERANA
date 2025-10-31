@@ -1164,6 +1164,11 @@ export const ratingsAPI = {
             tags: extra.tags || []
         };
 
+        // ✅ AGREGAR ESTA LÍNEA: Permitir actualizar materia_id si viene en extra
+        if (extra.materia_id) {
+            payload.materia_id = extra.materia_id;
+        }
+
         const { data, error } = await supabase
             .from('rating')
             .update(payload)
@@ -1219,7 +1224,7 @@ export const ratingsAPI = {
         if (profesorIds.length > 0) {
             const { data: profData, error: profError } = await supabase
                 .from('profesor_curso')
-                .select('id_profesor, profesor_nombre')  // ✅ CORRECTO
+                .select('id_profesor, profesor_nombre')
                 .in('id_profesor', profesorIds);
 
             if (profError) {
@@ -1227,28 +1232,49 @@ export const ratingsAPI = {
             } else {
                 console.log('✅ Profesores obtenidos:', profData);
                 profData?.forEach(p => {
-                    profesoresMap.set(p.id_profesor, p.profesor_nombre);  // ✅ CORRECTO
+                    profesoresMap.set(p.id_profesor, p.profesor_nombre);
                 });
             }
         }
 
-        // Obtener nombres de MENTORES
+        // ✅ AQUÍ ESTÁ EL CAMBIO PRINCIPAL - Obtener nombres de MENTORES
         if (mentorIds.length > 0) {
             const { data: mentorData, error: mentorError } = await supabase
                 .from('mentor')
-                .select(`
-                id_mentor,
-                usuario!inner(nombre)
-            `)
+                .select('id_mentor, id_usuario')
                 .in('id_mentor', mentorIds);
 
             if (mentorError) {
                 console.error('❌ Error obteniendo mentores:', mentorError);
             } else {
-                console.log('✅ Mentores obtenidos:', mentorData);
-                mentorData?.forEach(m => {
-                    mentoresMap.set(m.id_mentor, m.usuario.nombre);
-                });
+                console.log('✅ Mentores obtenidos (con id_usuario):', mentorData);
+
+                // Ahora obtener los nombres de usuario usando id_usuario
+                if (mentorData && mentorData.length > 0) {
+                    const userIds = mentorData.map(m => m.id_usuario);
+
+                    const { data: usuariosData, error: usuariosError } = await supabase
+                        .from('usuario')
+                        .select('id_usuario, nombre')
+                        .in('id_usuario', userIds);
+
+                    if (usuariosError) {
+                        console.error('❌ Error obteniendo nombres de usuarios:', usuariosError);
+                    } else {
+                        console.log('✅ Nombres de usuarios obtenidos:', usuariosData);
+
+                        // Crear un mapa de id_usuario -> nombre
+                        const usuariosNombresMap = new Map(
+                            usuariosData?.map(u => [u.id_usuario, u.nombre]) || []
+                        );
+
+                        // Mapear id_mentor -> nombre usando ambos mapas
+                        mentorData.forEach(m => {
+                            const nombre = usuariosNombresMap.get(m.id_usuario) || 'Mentor desconocido';
+                            mentoresMap.set(m.id_mentor, nombre);
+                        });
+                    }
+                }
             }
         }
 

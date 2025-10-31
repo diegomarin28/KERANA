@@ -2,9 +2,11 @@ import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '../supabase';
 import { followersAPI } from '../api/followers';
+import { ratingsAPI } from '../api/database';
 import { useMentorStatus } from '../hooks/useMentorStatus';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import MisReseniasModal from '../components/MisReseniasModal';
+import AuthModal_HacerResenia from '../components/AuthModal_HacerResenia';
 import {
     faEdit,
     faFileAlt,
@@ -32,6 +34,8 @@ export default function Profile() {
     const navigate = useNavigate();
     const { isMentor, loading: mentorLoading } = useMentorStatus(true);
     const [showReseniasModal, setShowReseniasModal] = useState(false);
+    const [showEditModal, setShowEditModal] = useState(false);
+    const [editingRating, setEditingRating] = useState(null);
 
     useEffect(() => {
         fetchProfile();
@@ -154,6 +158,45 @@ export default function Profile() {
             siguiendo
         }));
     };
+
+    const handleEditReview = (ratingData) => {
+        setEditingRating(ratingData);
+        setShowReseniasModal(false);
+
+        // Esperar a que se cierre completamente antes de abrir el de edición
+        setTimeout(() => {
+            setShowEditModal(true);
+        }, 400);
+    };
+
+    const handleSaveEdit = async (updatedData) => {
+        try {
+            const { error } = await ratingsAPI.updateRating(
+                editingRating.ratingId,
+                updatedData.rating,
+                updatedData.texto,
+                {
+                    workload: updatedData.workload,
+                    tags: updatedData.selectedTags,
+                    materia_id: updatedData.selectedMateria?.id
+                }
+            );
+
+            if (error) {
+                console.error('Error actualizando reseña:', error);
+                return;
+            }
+
+            setShowEditModal(false);
+            setEditingRating(null);
+
+            // Esperar antes de reabrir "Mis Reseñas" si quieres
+            // setTimeout(() => setShowReseniasModal(true), 300);
+        } catch (error) {
+            console.error('Error inesperado:', error);
+        }
+    };
+
 
     function getAppAvatarSrc(raw) {
         const url = (raw || "").trim();
@@ -707,7 +750,23 @@ export default function Profile() {
             <MisReseniasModal
                 open={showReseniasModal}
                 onClose={() => setShowReseniasModal(false)}
+                onEdit={handleEditReview}
             />
+
+            {/* Modal de Edición */}
+            {showEditModal && editingRating && (
+                <AuthModal_HacerResenia
+                    open={showEditModal}
+                    onClose={() => {
+                        setShowEditModal(false);
+                        setEditingRating(null);
+                    }}
+                    onSave={handleSaveEdit}
+                    preSelectedEntity={editingRating.selectedEntity}
+                    initialData={editingRating}
+                    isEditing={true}
+                />
+            )}
 
 
             {/* Modal Avatar Imagen Grande */}

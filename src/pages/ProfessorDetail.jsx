@@ -40,6 +40,9 @@ export default function ProfessorDetail() {
     const [materiasByRating, setMateriasByRating] = useState({});
     const [selectedFilter, setSelectedFilter] = useState('todos');
     const [selectedMateria, setSelectedMateria] = useState(null);
+    const [showEditModal, setShowEditModal] = useState(false);
+    const [editingReview, setEditingReview] = useState(null);
+    const [materiasNames, setMateriasNames] = useState({});
 
     useEffect(() => {
         loadProfessorData();
@@ -181,6 +184,71 @@ export default function ProfessorDetail() {
     const handleReviewDeleted = () => {
         // Recargar todos los datos del profesor
         loadProfessorData();
+    };
+    const handleEditReview = (review) => {
+        // Cargar nombres de materias si no están disponibles
+        if (!materiasNames[review.materia_id]) {
+            loadMateriaName(review.materia_id);
+        }
+
+        const ratingData = {
+            ratingId: review.id,
+            tipo: 'profesor',
+            selectedEntity: {
+                id: professor.id_profesor,
+                nombre: professor.profesor_nombre,
+                tipo: 'profesor'
+            },
+            selectedMateria: review.materia_id ? {
+                id: review.materia_id,
+                nombre: materiasNames[review.materia_id] || ''
+            } : null,
+            rating: review.estrellas,
+            selectedTags: review.tags || [],
+            texto: review.comentario || '',
+            workload: review.workload || 'Medio'
+        };
+
+        setEditingReview(ratingData);
+        setShowEditModal(true);
+    };
+
+    const loadMateriaName = async (materiaId) => {
+        const { data } = await supabase
+            .from('materia')
+            .select('nombre_materia')
+            .eq('id_materia', materiaId)
+            .single();
+
+        if (data) {
+            setMateriasNames(prev => ({ ...prev, [materiaId]: data.nombre_materia }));
+        }
+    };
+
+    const handleSaveEdit = async (updatedData) => {
+        try {
+            const { error } = await ratingsAPI.updateRating(
+                editingReview.ratingId,
+                updatedData.rating,
+                updatedData.texto,
+                {
+                    workload: updatedData.workload,
+                    tags: updatedData.selectedTags,
+                    materia_id: updatedData.selectedMateria?.id
+                }
+            );
+
+            if (error) {
+                console.error('Error actualizando reseña:', error);
+                return;
+            }
+
+            setShowEditModal(false);
+            setEditingReview(null);
+            loadProfessorData();
+        } catch (error) {
+            console.error('Error inesperado:', error);
+        }
     };
 
     if (loading) {
@@ -442,6 +510,7 @@ export default function ProfessorDetail() {
                 onMateriaChange={setSelectedMateria}
                 onAddReview={() => setShowReviewModal(true)}
                 onReviewDeleted={handleReviewDeleted}
+                onEditReview={handleEditReview}
             />
 
             {/* Modal de reseña con información preseleccionada */}
@@ -455,6 +524,21 @@ export default function ProfessorDetail() {
                         nombre: professor.profesor_nombre,
                         tipo: 'profesor'
                     }}
+                />
+            )}
+
+            {/* Modal de edición */}
+            {showEditModal && editingReview && (
+                <AuthModal_HacerResenia
+                    open={showEditModal}
+                    onClose={() => {
+                        setShowEditModal(false);
+                        setEditingReview(null);
+                    }}
+                    onSave={handleSaveEdit}
+                    preSelectedEntity={editingReview.selectedEntity}
+                    initialData={editingReview}
+                    isEditing={true}
                 />
             )}
         </div>

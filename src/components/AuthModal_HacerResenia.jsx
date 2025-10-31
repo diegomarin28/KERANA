@@ -48,10 +48,35 @@ const AVAILABLE_TAGS = [
     { id: 'examenes-dificiles', label: 'Exámenes difíciles', type: 'negative', icon: faClipboard }
 ];
 
-// Componente de estrellas interactivo con Font Awesome
 const StarRating = ({ rating, onRatingChange }) => {
     const [hoverRating, setHoverRating] = useState(0);
     const displayRating = hoverRating || rating;
+
+    const handleStarClick = (starIndex, event) => {
+        // Detectar si hicieron click en la mitad izquierda o derecha
+        const rect = event.currentTarget.getBoundingClientRect();
+        const clickX = event.clientX - rect.left;
+        const starWidth = rect.width;
+
+        // Si hicieron click en la mitad izquierda, dar media estrella
+        if (clickX < starWidth / 2) {
+            onRatingChange(starIndex - 0.5);
+        } else {
+            onRatingChange(starIndex);
+        }
+    };
+
+    const handleStarHover = (starIndex, event) => {
+        const rect = event.currentTarget.getBoundingClientRect();
+        const hoverX = event.clientX - rect.left;
+        const starWidth = rect.width;
+
+        if (hoverX < starWidth / 2) {
+            setHoverRating(starIndex - 0.5);
+        } else {
+            setHoverRating(starIndex);
+        }
+    };
 
     return (
         <div style={{
@@ -78,11 +103,11 @@ const StarRating = ({ rating, onRatingChange }) => {
                                 color: isFull || isHalf ? "#f59e0b" : "#e5e7eb",
                                 transition: "all 0.15s ease"
                             }}
+                            onClick={(e) => handleStarClick(starIndex, e)}
+                            onMouseMove={(e) => handleStarHover(starIndex, e)}
                         >
                             <FontAwesomeIcon
                                 icon={isHalf ? faStarHalfAlt : faStar}
-                                onMouseEnter={() => setHoverRating(starIndex)}
-                                onClick={() => onRatingChange(starIndex)}
                             />
                         </div>
                     );
@@ -582,7 +607,8 @@ export default function AuthModal_HacerResenia({
                         rating: form.rating,
                         texto: form.texto,
                         workload: form.workload,
-                        selectedTags: form.selectedTags
+                        selectedTags: form.selectedTags,
+                        selectedMateria: form.selectedMateria
                     });
                 }
 
@@ -1012,7 +1038,7 @@ export default function AuthModal_HacerResenia({
                     )}
 
                     {/* Selector de materia */}
-                    {form.selectedEntity && !isEditing &&(
+                    {form.selectedEntity &&(
                         <label style={{ display: "grid", gap: 10 }}>
                             <span style={{ fontWeight: 600, fontSize: 14, color: "#0f172a" }}>
                                 Materia <span style={{color: "#ef4444"}}>*</span>
@@ -1056,24 +1082,6 @@ export default function AuthModal_HacerResenia({
                         </label>
                     )}
 
-                    {/* En modo edición, mostrar materia como texto no editable */}
-                    {isEditing && form.selectedMateria && (
-                        <div style={{
-                            padding: '14px 16px',
-                            background: '#f8fafc',
-                            border: '2px solid #e2e8f0',
-                            borderRadius: 10,
-                            display: 'grid',
-                            gap: 6
-                        }}>
-        <span style={{ fontSize: 13, color: '#64748b', fontWeight: 600 }}>
-            Materia
-        </span>
-                            <span style={{ fontSize: 15, color: '#0f172a', fontWeight: 700 }}>
-            {form.selectedMateria.nombre}
-        </span>
-                        </div>
-                    )}
 
                     {/* Calificación y Tags */}
                     {form.selectedEntity && form.selectedMateria && (
