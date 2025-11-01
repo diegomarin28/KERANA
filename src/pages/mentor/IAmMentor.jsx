@@ -53,6 +53,9 @@ export default function IAmMentor() {
 
     const [saving, setSaving] = useState(false);
     const [successModal, setSuccessModal] = useState({ open: false, message: '' });
+    const [confirmCancelSession, setConfirmCancelSession] = useState(null);
+    const [isCanceling, setIsCanceling] = useState(false);
+    const [cancelSuccess, setCancelSuccess] = useState(false);
 
     useEffect(() => {
         if (mentorData) {
@@ -116,37 +119,7 @@ export default function IAmMentor() {
             setLoadingSesiones(true);
 
             const ahora = new Date();
-            console.log('🔍 Fecha/hora actual:', ahora.toISOString());
-            console.log('🔍 Buscando sesiones para mentor ID:', mentorData.id_mentor);
-            console.log('🔍 Verificando sesión 40 específicamente...');
-            const { data: sesion40, error: error40 } = await supabase
-                .from('mentor_sesion')
-                .select('*')
-                .eq('id_sesion', 40)
-                .maybeSingle();
 
-            console.log('📊 Sesión 40:', sesion40);
-            console.log('   Estado:', sesion40?.estado);
-            console.log('   Alumno:', sesion40?.id_alumno);
-            console.log('   Fecha:', sesion40?.fecha_hora);
-
-            // Ver TODAS las sesiones confirmadas
-            const { data: todasSesiones } = await supabase
-                .from('mentor_sesion')
-                .select('id_sesion, fecha_hora, id_alumno, estado')
-                .eq('id_mentor', mentorData.id_mentor)
-                .eq('estado', 'confirmada')
-                .order('fecha_hora', { ascending: true });
-
-            console.log('📊 TODAS las sesiones confirmadas:', todasSesiones);
-
-            // ✅ Mostrar cuáles son futuras y cuáles pasadas
-            todasSesiones?.forEach(s => {
-                const esFutura = new Date(s.fecha_hora) >= ahora;
-                console.log(`   ${esFutura ? '✅' : '❌'} Sesión ${s.id_sesion}: ${s.fecha_hora} | Alumno: ${s.id_alumno} | ${esFutura ? 'FUTURA' : 'PASADA'}`);
-            });
-
-            // Obtener SOLO sesiones futuras
             const { data: sesiones, error: sesionesError } = await supabase
                 .from('mentor_sesion')
                 .select(`
@@ -164,8 +137,6 @@ export default function IAmMentor() {
                 .gte('fecha_hora', ahora.toISOString())
                 .order('fecha_hora', { ascending: true });
 
-            console.log('📊 Sesiones FUTURAS filtradas:', sesiones);
-
             if (sesionesError) throw sesionesError;
 
             if (!sesiones || sesiones.length === 0) {
@@ -173,16 +144,12 @@ export default function IAmMentor() {
                 return;
             }
 
-            // Resto del código igual...
             const alumnoIds = [...new Set(sesiones.map(s => s.id_alumno).filter(Boolean))];
-            console.log('🔍 IDs de alumnos únicos:', alumnoIds);
 
             const { data: alumnos, error: alumnosError } = await supabase
                 .from('usuario')
                 .select('id_usuario, nombre, foto')
                 .in('id_usuario', alumnoIds);
-
-            console.log('👥 Alumnos cargados:', alumnos);
 
             if (alumnosError) {
                 console.error('Error cargando alumnos:', alumnosError);
@@ -199,7 +166,6 @@ export default function IAmMentor() {
                 .select('id_slot, fecha, hora, max_alumnos, modalidad, locacion, duracion')
                 .eq('id_mentor', mentorData.id_mentor);
 
-            // Contar reservas totales por fecha/hora
             const reservasPorFechaHora = {};
             sesiones.forEach(sesion => {
                 const fechaHora = new Date(sesion.fecha_hora);
@@ -209,7 +175,6 @@ export default function IAmMentor() {
                 reservasPorFechaHora[key] = (reservasPorFechaHora[key] || 0) + 1;
             });
 
-// Combinar toda la información
             const sesionesCompletas = sesiones.map(sesion => {
                 const fechaHora = new Date(sesion.fecha_hora);
                 const fecha = fechaHora.toISOString().split('T')[0];
@@ -243,7 +208,6 @@ export default function IAmMentor() {
                 };
             });
 
-            console.log('✅ Sesiones completas FINAL:', sesionesCompletas);
             setProximasSesiones(sesionesCompletas);
         } catch (err) {
             console.error('Error cargando sesiones:', err);
@@ -352,19 +316,6 @@ export default function IAmMentor() {
         }
     };
 
-    const formatFecha = (fechaStr) => {
-        const fecha = new Date(fechaStr);
-        const opciones = {
-            weekday: 'long',
-            year: 'numeric',
-            month: 'long',
-            day: 'numeric',
-            hour: '2-digit',
-            minute: '2-digit'
-        };
-        return fecha.toLocaleDateString('es-UY', opciones);
-    };
-
     if (mentorLoading || loading) {
         return (
             <div style={pageStyle}>
@@ -424,6 +375,25 @@ export default function IAmMentor() {
                     <Card style={errorCardStyle}>
                         {error}
                     </Card>
+                )}
+
+                {cancelSuccess && (
+                    <div style={{
+                        background: '#d1fae5',
+                        border: '2px solid #6ee7b7',
+                        color: '#065f46',
+                        padding: 16,
+                        borderRadius: 12,
+                        marginBottom: 20,
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: 12,
+                        fontWeight: 600,
+                        fontSize: 14
+                    }}>
+                        <span style={{ fontSize: 20 }}>✅</span>
+                        Sesión cancelada exitosamente
+                    </div>
                 )}
 
                 <div style={tabsContainerStyle}>
@@ -552,19 +522,17 @@ export default function IAmMentor() {
                                         const maxAlumnos = sesion.slot_info?.max_alumnos || 1;
                                         const nombreAlumno = sesion.alumno?.nombre || 'Sin nombre';
 
-                                        // ✅ Calcular hora de fin usando la duración del SLOT
                                         const fechaInicio = new Date(sesion.fecha_hora);
                                         const duracionMinutos = sesion.slot_info?.duracion || sesion.duracion_minutos || 60;
                                         const fechaFin = new Date(fechaInicio.getTime() + duracionMinutos * 60000);
-                                        const horaInicio = fechaInicio.toLocaleTimeString('es-UY', { hour: '2-digit', minute: '2-digit' });
-                                        const horaFin = fechaFin.toLocaleTimeString('es-UY', { hour: '2-digit', minute: '2-digit' });
+                                        const horaInicio = fechaInicio.toLocaleTimeString('es-UY', { hour: '2-digit', minute: '2-digit', hour12: false });
+                                        const horaFin = fechaFin.toLocaleTimeString('es-UY', { hour: '2-digit', minute: '2-digit', hour12: false });
 
                                         return (
                                             <Card key={sesion.id_sesion} style={{
                                                 padding: 20,
-                                                maxWidth: 700
+                                                position: 'relative'
                                             }}>
-                                                {/* Header: Fecha y Estado */}
                                                 <div style={{
                                                     display: 'flex',
                                                     justifyContent: 'space-between',
@@ -594,11 +562,10 @@ export default function IAmMentor() {
                                                         fontSize: 12,
                                                         fontWeight: 700
                                                     }}>
-                    {sesion.estado === 'confirmada' ? '✓ Confirmada' : '⏳ Pendiente'}
-                </span>
+                                                        {sesion.estado === 'confirmada' ? '✓ Confirmada' : '⏳ Pendiente'}
+                                                    </span>
                                                 </div>
 
-                                                {/* Hora destacada */}
                                                 <div style={{
                                                     fontSize: 24,
                                                     fontWeight: 700,
@@ -609,69 +576,73 @@ export default function IAmMentor() {
                                                     🕐 {horaInicio} - {horaFin}
                                                 </div>
 
-                                                {/* Modalidad y Botón de cancelar en la misma línea */}
                                                 <div style={{
-                                                    display: 'flex',
-                                                    justifyContent: 'space-between',
-                                                    alignItems: 'center',  // ✅ Esto centra verticalmente
                                                     marginBottom: 16
                                                 }}>
-    <span style={{
-        display: 'inline-flex',
-        alignItems: 'center',
-        gap: 8,
-        padding: '8px 14px',
-        background: sesion.modalidad === 'virtual'
-            ? '#EFF6FF'
-            : '#ECFDF5',
-        border: `2px solid ${sesion.modalidad === 'virtual' ? '#BFDBFE' : '#A7F3D0'}`,
-        borderRadius: 8,
-        fontWeight: 700,
-        fontSize: 14,
-        color: sesion.modalidad === 'virtual' ? '#1E40AF' : '#065F46'
-    }}>
-        {sesion.modalidad === 'virtual' ? '💻' : '🏢'}
-        {sesion.modalidad === 'virtual' ? 'Virtual' :
-            sesion.locacion === 'casa' ? 'Presencial - Casa' : 'Presencial - Facultad'}
-    </span>
-
-                                                    {/* Botón de cancelar - Centrado verticalmente */}
-                                                    <button
-                                                        onClick={() => {
-                                                            if (window.confirm('¿Estás seguro que querés cancelar esta sesión?')) {
-                                                                // TODO: Implementar cancelación
-                                                                console.log('Cancelar sesión:', sesion.id_sesion);
-                                                            }
-                                                        }}
-                                                        style={{
-                                                            padding: '8px 16px',
-                                                            background: '#FEF2F2',
-                                                            color: '#DC2626',
-                                                            border: '2px solid #FECACA',
-                                                            borderRadius: 8,
-                                                            fontSize: 13,
-                                                            fontWeight: 700,
-                                                            cursor: 'pointer',
-                                                            transition: 'all 0.2s ease',
-                                                            whiteSpace: 'nowrap',
-                                                            display: 'flex',
-                                                            alignItems: 'center',
-                                                            gap: 6
-                                                        }}
-                                                        onMouseEnter={e => {
-                                                            e.target.style.background = '#FEE2E2';
-                                                            e.target.style.transform = 'translateY(-1px)';
-                                                        }}
-                                                        onMouseLeave={e => {
-                                                            e.target.style.background = '#FEF2F2';
-                                                            e.target.style.transform = 'translateY(0)';
-                                                        }}
-                                                    >
-                                                        ❌ Cancelar
-                                                    </button>
+                                                    <span style={{
+                                                        display: 'inline-flex',
+                                                        alignItems: 'center',
+                                                        gap: 8,
+                                                        padding: '8px 14px',
+                                                        background: sesion.modalidad === 'virtual'
+                                                            ? '#EFF6FF'
+                                                            : '#ECFDF5',
+                                                        border: `2px solid ${sesion.modalidad === 'virtual' ? '#BFDBFE' : '#A7F3D0'}`,
+                                                        borderRadius: 8,
+                                                        fontWeight: 700,
+                                                        fontSize: 14,
+                                                        color: sesion.modalidad === 'virtual' ? '#1E40AF' : '#065F46'
+                                                    }}>
+                                                        {sesion.modalidad === 'virtual' ? '💻' : '🏢'}
+                                                        {sesion.modalidad === 'virtual' ? 'Virtual' :
+                                                            sesion.locacion === 'casa' ? 'Presencial - Casa' : 'Presencial - Facultad'}
+                                                    </span>
                                                 </div>
 
-                                                {/* Info secundaria */}
+                                                <button
+                                                    onClick={() => {
+                                                        const fechaSesion = new Date(sesion.fecha_hora);
+                                                        const ahora = new Date();
+                                                        const horasRestantes = (fechaSesion - ahora) / (1000 * 60 * 60);
+
+                                                        setConfirmCancelSession({
+                                                            id: sesion.id_sesion,
+                                                            esMasDe36Horas: horasRestantes > 36,
+                                                            fecha: fechaInicio,
+                                                            materia: sesion.materia?.nombre_materia
+                                                        });
+                                                    }}
+                                                    style={{
+                                                        position: 'absolute',
+                                                        right: 20,
+                                                        top: '50%',
+                                                        transform: 'translateY(-50%)',
+                                                        padding: '8px 16px',
+                                                        background: '#FEF2F2',
+                                                        color: '#DC2626',
+                                                        border: '2px solid #FECACA',
+                                                        borderRadius: 8,
+                                                        fontSize: 13,
+                                                        fontWeight: 700,
+                                                        cursor: 'pointer',
+                                                        transition: 'all 0.2s ease',
+                                                        whiteSpace: 'nowrap',
+                                                        display: 'flex',
+                                                        alignItems: 'center',
+                                                        gap: 6
+                                                    }}
+                                                    onMouseEnter={e => {
+                                                        e.target.style.background = '#FEE2E2';
+                                                        e.target.style.transform = 'translateY(-50%) translateY(-1px)';
+                                                    }}
+                                                    onMouseLeave={e => {
+                                                        e.target.style.background = '#FEF2F2';
+                                                        e.target.style.transform = 'translateY(-50%)';
+                                                    }}
+                                                >
+                                                    ❌ Cancelar
+                                                </button>
+
                                                 <div style={{
                                                     display: 'flex',
                                                     alignItems: 'center',
@@ -681,24 +652,23 @@ export default function IAmMentor() {
                                                     borderTop: '2px solid #F3F4F6',
                                                     fontSize: 14
                                                 }}>
-                <span style={{ fontWeight: 600, color: '#6B7280' }}>
-                    👤 {nombreAlumno}
-                </span>
+                                                    <span style={{ fontWeight: 600, color: '#6B7280' }}>
+                                                        👤 {nombreAlumno}
+                                                    </span>
 
                                                     <span style={{ color: '#D1D5DB' }}>•</span>
 
                                                     <span style={{ fontWeight: 600, color: '#6B7280' }}>
-                    📚 {sesion.materia?.nombre_materia || 'Materia'}
-                </span>
+                                                        📚 {sesion.materia?.nombre_materia || 'Materia'}
+                                                    </span>
 
                                                     <span style={{ color: '#D1D5DB' }}>•</span>
 
                                                     <span style={{ fontWeight: 600, color: '#6B7280' }}>
-                    👥 {alumnosActuales}/{maxAlumnos}
-                </span>
+                                                        👥 {alumnosActuales}/{maxAlumnos}
+                                                    </span>
                                                 </div>
 
-                                                {/* Notas */}
                                                 {sesion.notas_alumno && (
                                                     <div style={{
                                                         marginTop: 12,
@@ -956,6 +926,222 @@ export default function IAmMentor() {
                 onClose={() => setSuccessModal({ open: false, message: '' })}
                 message={successModal.message}
             />
+
+            {/* Modal de confirmación de cancelación */}
+            {confirmCancelSession && (
+                <div style={{
+                    position: 'fixed',
+                    top: 0,
+                    left: 0,
+                    right: 0,
+                    bottom: 0,
+                    background: 'rgba(0,0,0,0.7)',
+                    backdropFilter: 'blur(4px)',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    zIndex: 9999,
+                    padding: 20,
+                    animation: 'fadeIn 0.2s ease-out'
+                }}>
+                    <style>
+                        {`
+                            @keyframes fadeIn {
+                                from { opacity: 0; }
+                                to { opacity: 1; }
+                            }
+                            @keyframes slideUp {
+                                from {
+                                    opacity: 0;
+                                    transform: translateY(20px);
+                                }
+                                to {
+                                    opacity: 1;
+                                    transform: translateY(0);
+                                }
+                            }
+                        `}
+                    </style>
+                    <div style={{
+                        background: confirmCancelSession.esMasDe36Horas
+                            ? 'linear-gradient(135deg, #fff 0%, #fef2f2 100%)'
+                            : 'linear-gradient(135deg, #fff 0%, #fee2e2 100%)',
+                        padding: 28,
+                        borderRadius: 16,
+                        textAlign: 'center',
+                        width: '100%',
+                        maxWidth: 450,
+                        boxShadow: '0 20px 60px rgba(0,0,0,0.3)',
+                        border: confirmCancelSession.esMasDe36Horas
+                            ? '3px solid #fecaca'
+                            : '3px solid #dc2626',
+                        animation: 'slideUp 0.3s ease-out'
+                    }}>
+                        <div style={{
+                            width: 64,
+                            height: 64,
+                            borderRadius: '50%',
+                            background: confirmCancelSession.esMasDe36Horas
+                                ? 'linear-gradient(135deg, #fee2e2 0%, #fecaca 100%)'
+                                : 'linear-gradient(135deg, #fecaca 0%, #dc2626 100%)',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            margin: '0 auto 20px',
+                            boxShadow: '0 4px 12px rgba(220, 38, 38, 0.3)'
+                        }}>
+                            <span style={{ fontSize: 32 }}>
+                                {confirmCancelSession.esMasDe36Horas ? '⚠️' : '🚫'}
+                            </span>
+                        </div>
+                        <h3 style={{
+                            margin: '0 0 12px 0',
+                            fontSize: 22,
+                            fontWeight: 700,
+                            color: '#DC2626'
+                        }}>
+                            {confirmCancelSession.esMasDe36Horas
+                                ? '¿Estás seguro de cancelar esta clase?'
+                                : '⚠️ Estás incumpliendo la política de cancelación'}
+                        </h3>
+                        <p style={{
+                            color: '#991b1b',
+                            marginBottom: 24,
+                            fontSize: 14,
+                            lineHeight: 1.6,
+                            fontWeight: 500
+                        }}>
+                            {confirmCancelSession.esMasDe36Horas
+                                ? 'Esta acción cancelará la sesión confirmada. El alumno recibirá una notificación y un reembolso completo.'
+                                : 'Lo estás haciendo con menos de 36 horas de anticipación. Esta acción te generará 1 strike. Si acumulás 3 serás baneado por 1 año.'}
+                        </p>
+
+                        {!confirmCancelSession.esMasDe36Horas && (
+                            <div style={{
+                                background: '#fef2f2',
+                                border: '2px solid #dc2626',
+                                borderRadius: 12,
+                                padding: 16,
+                                marginBottom: 24,
+                                textAlign: 'left'
+                            }}>
+                                <p style={{
+                                    margin: '0 0 12px 0',
+                                    fontSize: 13,
+                                    color: '#7f1d1d',
+                                    fontWeight: 600
+                                }}>
+                                    <strong>Recordá:</strong>
+                                </p>
+                                <ul style={{
+                                    margin: 0,
+                                    paddingLeft: 20,
+                                    fontSize: 13,
+                                    color: '#991b1b',
+                                    lineHeight: 1.6
+                                }}>
+                                    <li>Podés cancelar sin penalización hasta 36hs antes</li>
+                                    <li>3 strikes = Baneo de 1 año como mentor</li>
+                                    <li>El alumno recibirá un reembolso completo</li>
+                                </ul>
+                            </div>
+                        )}
+
+                        <div style={{ display: 'flex', gap: 12 }}>
+                            <button
+                                onClick={() => setConfirmCancelSession(null)}
+                                disabled={isCanceling}
+                                style={{
+                                    flex: 1,
+                                    background: '#f8fafc',
+                                    border: '2px solid #e2e8f0',
+                                    borderRadius: 10,
+                                    padding: '12px 20px',
+                                    cursor: isCanceling ? 'not-allowed' : 'pointer',
+                                    fontWeight: 600,
+                                    fontSize: 14,
+                                    color: '#0f172a',
+                                    transition: 'all 0.2s ease',
+                                    fontFamily: 'Inter, sans-serif',
+                                    opacity: isCanceling ? 0.5 : 1
+                                }}
+                                onMouseEnter={e => {
+                                    if (!isCanceling) {
+                                        e.target.style.background = '#f1f5f9';
+                                        e.target.style.transform = 'translateY(-1px)';
+                                    }
+                                }}
+                                onMouseLeave={e => {
+                                    if (!isCanceling) {
+                                        e.target.style.background = '#f8fafc';
+                                        e.target.style.transform = 'translateY(0)';
+                                    }
+                                }}
+                            >
+                                {confirmCancelSession.esMasDe36Horas ? 'No, mantener clase' : 'No cancelar'}
+                            </button>
+                            <button
+                                onClick={async () => {
+                                    setIsCanceling(true);
+                                    try {
+                                        // TODO: Implementar cancelación real con API
+                                        console.log('Cancelar sesión:', confirmCancelSession);
+
+                                        // Simular llamada API
+                                        await new Promise(resolve => setTimeout(resolve, 1000));
+
+                                        // Eliminar la sesión de la lista
+                                        setProximasSesiones(prev =>
+                                            prev.filter(s => s.id_sesion !== confirmCancelSession.id)
+                                        );
+
+                                        // Mostrar mensaje de éxito
+                                        setCancelSuccess(true);
+                                        setTimeout(() => setCancelSuccess(false), 3000);
+
+                                    } catch (error) {
+                                        console.error('Error cancelando sesión:', error);
+                                        alert('Error al cancelar sesión');
+                                    } finally {
+                                        setIsCanceling(false);
+                                        setConfirmCancelSession(null);
+                                    }
+                                }}
+                                disabled={isCanceling}
+                                style={{
+                                    flex: 1,
+                                    background: 'linear-gradient(135deg, #ef4444 0%, #dc2626 100%)',
+                                    color: '#fff',
+                                    border: 'none',
+                                    borderRadius: 10,
+                                    padding: '12px 20px',
+                                    cursor: isCanceling ? 'not-allowed' : 'pointer',
+                                    fontWeight: 700,
+                                    fontSize: 14,
+                                    opacity: isCanceling ? 0.7 : 1,
+                                    transition: 'all 0.2s ease',
+                                    fontFamily: 'Inter, sans-serif',
+                                    boxShadow: '0 4px 12px rgba(220, 38, 38, 0.3)'
+                                }}
+                                onMouseEnter={e => {
+                                    if (!isCanceling) {
+                                        e.target.style.transform = 'translateY(-2px)';
+                                        e.target.style.boxShadow = '0 6px 20px rgba(220, 38, 38, 0.4)';
+                                    }
+                                }}
+                                onMouseLeave={e => {
+                                    if (!isCanceling) {
+                                        e.target.style.transform = 'translateY(0)';
+                                        e.target.style.boxShadow = '0 4px 12px rgba(220, 38, 38, 0.3)';
+                                    }
+                                }}
+                            >
+                                {isCanceling ? 'Cancelando...' : (confirmCancelSession.esMasDe36Horas ? 'Sí, cancelar' : 'Entiendo, cancelar igual')}
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
     );
 }
