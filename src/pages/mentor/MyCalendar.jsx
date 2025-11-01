@@ -1,5 +1,4 @@
 import { supabase } from "../../supabase.js";
-import { sesionesAPI } from "../../api/sesiones.js";
 import { slotsAPI } from "../../api/slots.js";
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import {
@@ -14,7 +13,6 @@ export default function MyCalendar() {
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState('');
     const [success, setSuccess] = useState('');
-    const [misSesiones, setMisSesiones] = useState([]);
     const [confirmDelete, setConfirmDelete] = useState(null);
     const [isDeleting, setIsDeleting] = useState(false);
     const [showReservedWarning, setShowReservedWarning] = useState(false);
@@ -74,7 +72,6 @@ export default function MyCalendar() {
     useEffect(() => {
         if (currentMentorId) {
             loadSavedSlots();
-            loadMisSesiones();
         }
     }, [currentMentorId]);
 
@@ -162,12 +159,6 @@ export default function MyCalendar() {
         }
     };
 
-    const loadMisSesiones = async () => {
-        if (!currentMentorId) return;
-        const { data: sesiones } = await sesionesAPI.obtenerSesionesMentor(currentMentorId);
-        setMisSesiones(sesiones || []);
-    };
-
     const loadSavedSlots = async () => {
         if (!currentMentorId) return;
 
@@ -191,9 +182,8 @@ export default function MyCalendar() {
             const disponibilidadBySlot = {};
 
             data.forEach(slot => {
-                // Normalizar hora al formato HH:MM (sin segundos)
                 const horaOriginal = slot.hora;
-                const horaNormalizada = horaOriginal.slice(0, 5); // "11:00:00" -> "11:00"
+                const horaNormalizada = horaOriginal.slice(0, 5);
 
                 const slotDateTime = new Date(`${slot.fecha}T${horaOriginal}`);
 
@@ -206,8 +196,6 @@ export default function MyCalendar() {
                     seFiltra: slotDateTime < now && slot.disponible !== false
                 });
 
-                // Filtrar SOLO slots disponibles que ya pasaron
-                // Los slots reservados (disponible === false) se mantienen SIEMPRE visibles
                 if (slotDateTime < now && slot.disponible !== false) {
                     console.log('❌ Slot filtrado (pasado y disponible)');
                     return;
@@ -329,12 +317,11 @@ export default function MyCalendar() {
             const dateSlots = prev[dateKey] || [];
 
             if (dateSlots.includes(hour)) {
-                // ✅ VERIFICAR si el slot está reservado antes de permitir deselección
                 const estaReservado = slotDisponibilidad[slotKey] === false;
 
                 if (estaReservado) {
                     setShowReservedWarning(true);
-                    return prev; // No permite deseleccionar
+                    return prev;
                 }
 
                 const newSlots = dateSlots.filter(h => h !== hour).sort();
@@ -493,7 +480,6 @@ export default function MyCalendar() {
     };
 
     const deleteManualSlots = async (dateKey) => {
-        // Verificar si hay slots reservados en esa fecha
         const slotsEnFecha = savedSlots[dateKey] || [];
         const hayReservados = slotsEnFecha.some(hora => {
             const slotKey = `${dateKey}-${hora}`;
@@ -507,6 +493,7 @@ export default function MyCalendar() {
 
         setConfirmDelete(dateKey);
     };
+
     const confirmDeleteSlots = async (dateKey) => {
         setIsDeleting(true);
         const { error } = await slotsAPI.eliminarSlotsFecha(currentMentorId, dateKey);
@@ -558,7 +545,6 @@ export default function MyCalendar() {
             fontFamily: 'Inter, sans-serif',
             position: 'relative'
         }}>
-            {/* Modal de advertencia de slots reservados */}
             {showReservedWarning && (
                 <div style={{
                     position: 'fixed',
@@ -655,7 +641,7 @@ export default function MyCalendar() {
                     </div>
                 </div>
             )}
-            {/* Modal de confirmación */}
+
             {confirmDelete && (
                 <div style={{
                     position: 'fixed',
@@ -766,7 +752,6 @@ export default function MyCalendar() {
                 </div>
             )}
 
-            {/* Header */}
             <div style={{ marginBottom: 32 }}>
                 <h1 style={{
                     margin: '0 0 8px 0',
@@ -788,7 +773,6 @@ export default function MyCalendar() {
                 </p>
             </div>
 
-            {/* Alertas */}
             {error && (
                 <div style={{
                     background: '#fef2f2',
@@ -833,7 +817,6 @@ export default function MyCalendar() {
                 gap: 32,
                 marginBottom: 32
             }}>
-                {/* Calendario */}
                 <div style={{
                     background: '#fff',
                     borderRadius: 16,
@@ -1001,7 +984,6 @@ export default function MyCalendar() {
                     </div>
                 </div>
 
-                {/* Panel de horarios */}
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
                     {showTimeSelector && selectedDate ? (
                         <div style={{
@@ -1106,7 +1088,6 @@ export default function MyCalendar() {
                                 })}
                             </div>
 
-                            {/* Duraciones personalizadas */}
                             {selectedDate && (selectedSlots[formatDateKey(selectedDate)] || []).length > 0 && (
                                 <div style={{
                                     background: '#f8fafc',
@@ -1134,7 +1115,6 @@ export default function MyCalendar() {
                                         </h4>
                                     </div>
 
-                                    {/* Info de capacidad */}
                                     <div style={{
                                         background: '#fff',
                                         padding: '10px 12px',
@@ -1210,7 +1190,6 @@ export default function MyCalendar() {
                                                         </select>
                                                     </div>
 
-                                                    {/* Selector de modalidad */}
                                                     <div style={{
                                                         display: 'flex',
                                                         gap: 6,
@@ -1262,7 +1241,6 @@ export default function MyCalendar() {
                                                         )}
                                                     </div>
 
-                                                    {/* Selector de localización (solo si es presencial) */}
                                                     {currentModalidad === 'presencial' && (
                                                         <div style={{
                                                             display: 'flex',
@@ -1428,7 +1406,6 @@ export default function MyCalendar() {
                         </div>
                     )}
 
-                    {/* Resumen de horarios del mes */}
                     {Object.keys(savedSlots).length > 0 && (
                         <div style={{
                             background: '#fff',
@@ -1629,91 +1606,6 @@ export default function MyCalendar() {
                     )}
                 </div>
             </div>
-
-            {/* Lista de sesiones agendadas */}
-            {misSesiones.length > 0 && (
-                <div>
-                    <h2 style={{
-                        fontSize: 22,
-                        fontWeight: 700,
-                        marginBottom: 16,
-                        color: '#0f172a'
-                    }}>
-                        <FontAwesomeIcon icon={faCheckCircle} style={{ marginRight: 8, color: '#10b981' }} />
-                        Mis Sesiones Agendadas
-                    </h2>
-                    <div style={{ display: 'grid', gap: 12 }}>
-                        {misSesiones.filter(s => s.estado === 'confirmada').map(sesion => (
-                            <div key={sesion.id_sesion} style={{
-                                background: '#fff',
-                                border: '2px solid #f1f5f9',
-                                borderRadius: 12,
-                                padding: 16,
-                                display: 'flex',
-                                justifyContent: 'space-between',
-                                alignItems: 'center',
-                                transition: 'all 0.2s ease'
-                            }}>
-                                <div>
-                                    <div style={{
-                                        fontWeight: 600,
-                                        marginBottom: 4,
-                                        color: '#0f172a',
-                                        fontSize: 15
-                                    }}>
-                                        {sesion.estudiante?.nombre || 'Estudiante'}
-                                    </div>
-                                    <div style={{
-                                        fontSize: 13,
-                                        color: '#64748b',
-                                        fontWeight: 500,
-                                        display: 'flex',
-                                        alignItems: 'center',
-                                        gap: 6
-                                    }}>
-                                        <FontAwesomeIcon icon={faClock} style={{ fontSize: 11 }} />
-                                        {new Date(sesion.fecha_hora).toLocaleString('es-ES', {
-                                            day: 'numeric',
-                                            month: 'long',
-                                            hour: '2-digit',
-                                            minute: '2-digit'
-                                        })}
-                                    </div>
-                                </div>
-                                <button
-                                    onClick={async () => {
-                                        await sesionesAPI.cancelarSesion(sesion.id_sesion);
-                                        loadMisSesiones();
-                                    }}
-                                    style={{
-                                        padding: '8px 16px',
-                                        background: '#fef2f2',
-                                        color: '#dc2626',
-                                        border: '2px solid #fecaca',
-                                        borderRadius: 8,
-                                        fontSize: 13,
-                                        fontWeight: 600,
-                                        cursor: 'pointer',
-                                        transition: 'all 0.2s ease',
-                                        fontFamily: 'Inter, sans-serif'
-                                    }}
-                                    onMouseEnter={e => {
-                                        e.target.style.background = '#fee2e2';
-                                        e.target.style.transform = 'translateY(-1px)';
-                                    }}
-                                    onMouseLeave={e => {
-                                        e.target.style.background = '#fef2f2';
-                                        e.target.style.transform = 'translateY(0)';
-                                    }}
-                                >
-                                    <FontAwesomeIcon icon={faTimes} style={{ marginRight: 6 }} />
-                                    Cancelar
-                                </button>
-                            </div>
-                        ))}
-                    </div>
-                </div>
-            )}
         </div>
     );
 }
