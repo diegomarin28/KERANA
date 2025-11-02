@@ -42,7 +42,7 @@ export default function Mentors() {
             // Obtener mentores con calendly_disponible
             const { data: mentorsData, error: mentorsError } = await supabase
                 .from('mentor')
-                .select('id_mentor, estrellas_mentor, descripcion, id_usuario, calendly_disponible')
+                .select('id_mentor, estrellas_mentor, descripcion, id_usuario, acepta_virtual')
                 .neq('id_usuario', currentUserData || 0)
                 .limit(50);
 
