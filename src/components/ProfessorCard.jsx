@@ -1,92 +1,201 @@
 import { Link } from "react-router-dom";
 import StarDisplay from "./StarDisplay";
+import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
+import { faChalkboardTeacher } from '@fortawesome/free-solid-svg-icons';
 
 export default function ProfessorCard({ professor }) {
-    const rating = professor.rating_promedio || professor.estrellas || 0;
+    const rating = professor.rating_promedio || 0;
+    const totalResenas = professor.total_resenas || 0;
+    const materias = professor.materias || [];
 
     return (
-        <div style={{
-            background: "white",
-            borderRadius: 12,
-            padding: 20,
-            border: "1px solid #E5E7EB",
-            boxShadow: "0 2px 8px rgba(0,0,0,0.04)",
-            transition: "all 0.3s ease",
-            cursor: "pointer"
-        }}
-             onMouseEnter={(e) => {
-                 e.currentTarget.style.transform = "translateY(-2px)";
-                 e.currentTarget.style.boxShadow = "0 8px 25px rgba(0,0,0,0.1)";
-                 e.currentTarget.style.borderColor = "#2563EB";
-             }}
-             onMouseLeave={(e) => {
-                 e.currentTarget.style.transform = "translateY(0)";
-                 e.currentTarget.style.boxShadow = "0 2px 8px rgba(0,0,0,0.04)";
-                 e.currentTarget.style.borderColor = "#E5E7EB";
-             }}
+        <Link
+            to={`/profesores/${professor.id_profesor}`}
+            style={{ textDecoration: "none" }}
         >
-            <Link
-                to={`/profesores/${professor.id_profesor}`}
-                style={{ textDecoration: "none", color: "inherit" }}
+            <div style={{
+                background: "#fff",
+                borderRadius: 14,
+                padding: 14,
+                border: "1px solid #e5e7eb",
+                boxShadow: "0 1px 3px rgba(0,0,0,0.05)",
+                transition: "all 0.2s ease",
+                cursor: "pointer",
+                fontFamily: 'Inter, sans-serif',
+                minHeight: 100,
+                display: 'flex',
+                flexDirection: 'column',
+                justifyContent: 'space-between'
+            }}
+                 onMouseEnter={(e) => {
+                     e.currentTarget.style.transform = "translateY(-4px)";
+                     e.currentTarget.style.boxShadow = "0 8px 24px rgba(0,0,0,0.1)";
+                     e.currentTarget.style.borderColor = "#2563eb";
+                 }}
+                 onMouseLeave={(e) => {
+                     e.currentTarget.style.transform = "translateY(0)";
+                     e.currentTarget.style.boxShadow = "0 1px 3px rgba(0,0,0,0.05)";
+                     e.currentTarget.style.borderColor = "#e5e7eb";
+                 }}
             >
-                <div style={{ display: "flex", alignItems: "flex-start", gap: 16 }}>
-                    <div style={{
-                        width: 48,
-                        height: 48,
-                        background: "#2563EB",
-                        borderRadius: 8,
-                        display: "flex",
-                        alignItems: "center",
-                        justifyContent: "center",
-                        fontSize: 20,
-                        color: "white",
-                        flexShrink: 0
-                    }}>
-                        👨‍🏫
-                    </div>
+                {/* Header con avatar, info y badge */}
+                <div style={{ display: "flex", alignItems: "flex-start", gap: 10, marginBottom: 10 }}>
+                    {/* Avatar */}
+                    {professor.foto ? (
+                        <img
+                            src={professor.foto}
+                            alt={professor.profesor_nombre}
+                            style={{
+                                width: 40,
+                                height: 40,
+                                borderRadius: 10,
+                                objectFit: 'cover',
+                                flexShrink: 0,
+                                border: '1px solid #e5e7eb'
+                            }}
+                        />
+                    ) : (
+                        <div style={{
+                            width: 40,
+                            height: 40,
+                            background: "#2563eb",
+                            borderRadius: 10,
+                            display: "flex",
+                            alignItems: "center",
+                            justifyContent: "center",
+                            flexShrink: 0
+                        }}>
+                            <FontAwesomeIcon
+                                icon={faChalkboardTeacher}
+                                style={{ fontSize: 17, color: '#fff' }}
+                            />
+                        </div>
+                    )}
 
-                    <div style={{ flex: 1 }}>
+                    {/* Info principal */}
+                    <div style={{ flex: 1, minWidth: 0 }}>
                         <h3 style={{
-                            margin: "0 0 4px 0",
-                            fontSize: 18,
-                            fontWeight: 600,
-                            color: "#111827"
+                            margin: "0 0 3px 0",
+                            fontSize: 15,
+                            fontWeight: 700,
+                            color: "#13346b",
+                            lineHeight: 1.3,
+                            overflow: 'hidden',
+                            textOverflow: 'ellipsis',
+                            whiteSpace: 'nowrap'
                         }}>
                             {professor.profesor_nombre}
                         </h3>
 
-                        <p style={{
-                            margin: "0 0 8px 0",
-                            fontSize: 14,
-                            color: "#6B7280"
-                        }}>
-                            {professor.materia_nombre || "Profesor universitario"}
-                        </p>
-
-                        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                            <StarDisplay rating={rating} size={16} />
-                            <span style={{
-                                fontSize: 14,
-                                color: "#6B7280",
+                        {/* Rating + Contador de reseñas */}
+                        {rating > 0 ? (
+                            <>
+                                <div style={{
+                                    display: "flex",
+                                    alignItems: "center",
+                                    gap: 5,
+                                    marginBottom: 2
+                                }}>
+                                    <StarDisplay rating={rating} size={12} />
+                                    <span style={{
+                                        fontSize: 12,
+                                        color: "#64748b",
+                                        fontWeight: 600
+                                    }}>
+                                        {rating.toFixed(1)}
+                                    </span>
+                                </div>
+                                {/* Contador de reseñas - SOLO si > 0 */}
+                                {totalResenas > 0 && (
+                                    <p style={{
+                                        margin: 0,
+                                        fontSize: 10,
+                                        color: "#94a3b8",
+                                        fontWeight: 500
+                                    }}>
+                                        {totalResenas} {totalResenas === 1 ? 'reseña' : 'reseñas'}
+                                    </p>
+                                )}
+                            </>
+                        ) : (
+                            <p style={{
+                                margin: 0,
+                                fontSize: 11,
+                                color: "#94a3b8",
                                 fontWeight: 500
                             }}>
-                                {rating.toFixed(1)}
-                            </span>
-                        </div>
+                                Sin calificaciones
+                            </p>
+                        )}
                     </div>
 
+                    {/* Badge "PROFESOR" */}
                     <div style={{
-                        background: "#2563EB",
-                        color: "white",
-                        padding: "6px 12px",
-                        borderRadius: 6,
-                        fontSize: 12,
-                        fontWeight: 600
+                        background: "#2563eb",
+                        color: "#fff",
+                        padding: "4px 9px",
+                        borderRadius: 14,
+                        fontSize: 9,
+                        fontWeight: 700,
+                        letterSpacing: '0.5px',
+                        textTransform: 'uppercase',
+                        flexShrink: 0
                     }}>
                         Profesor
                     </div>
                 </div>
-            </Link>
-        </div>
+
+                {/* Materias - siempre en la parte inferior */}
+                {materias.length > 0 ? (
+                    <div style={{
+                        display: "flex",
+                        flexWrap: "wrap",
+                        gap: 5
+                    }}>
+                        {materias.slice(0, 3).map((materia, idx) => (
+                            <span
+                                key={idx}
+                                style={{
+                                    padding: "4px 9px",
+                                    background: "#eff6ff",
+                                    color: "#2563eb",
+                                    border: '1px solid #dbeafe',
+                                    borderRadius: 7,
+                                    fontSize: 10,
+                                    fontWeight: 600,
+                                    lineHeight: 1
+                                }}
+                            >
+                                {materia}
+                            </span>
+                        ))}
+                        {materias.length > 3 && (
+                            <span style={{
+                                padding: "4px 9px",
+                                background: "#f8fafc",
+                                color: "#64748b",
+                                border: '1px solid #e5e7eb',
+                                borderRadius: 7,
+                                fontSize: 10,
+                                fontWeight: 600,
+                                lineHeight: 1
+                            }}>
+                                +{materias.length - 3}
+                            </span>
+                        )}
+                    </div>
+                ) : (
+                    <p style={{
+                        margin: 0,
+                        fontSize: 11,
+                        color: "#cbd5e1",
+                        fontWeight: 500,
+                        fontStyle: 'italic'
+                    }}>
+                        Sin materias asignadas
+                    </p>
+                )}
+            </div>
+        </Link>
     );
 }

@@ -1,9 +1,12 @@
 import { useEffect, useState, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import {calendlyAPI, publicProfileAPI} from '../api/database';
+import {publicProfileAPI} from '../api/database';
 import { useSeguidores } from '../hooks/useSeguidores';
 import ApunteCard from '../components/ApunteCard';
 import {supabase} from "../supabase.js";
+import { ratingsAPI } from '../api/database';
+import AuthModal_HacerResenia from '../components/AuthModal_HacerResenia';
+import ReviewsSection from '../components/ReviewsSection';
 
 export default function PublicProfileMentor() {
     const { username } = useParams();
@@ -32,16 +35,27 @@ export default function PublicProfileMentor() {
     const [isFavoriteMentor, setIsFavoriteMentor] = useState(false);
     const [loadingFavorite, setLoadingFavorite] = useState(false);
 
-
-
     const [showCalendlyModal, setShowCalendlyModal] = useState(false);
     const [calendlyUrl, setCalendlyUrl] = useState(null);
 
     const carouselRef = useRef(null);
 
+    const [reviews, setReviews] = useState([]);
+    const [filteredReviews, setFilteredReviews] = useState([]);
+    const [selectedFilter, setSelectedFilter] = useState('todos');
+    const [selectedMateriaReview, setSelectedMateriaReview] = useState(null);
+    const [showReviewModal, setShowReviewModal] = useState(false);
+    const [showEditModal, setShowEditModal] = useState(false);
+    const [editingReview, setEditingReview] = useState(null);
+    const [materiasNamesForReviews, setMateriasNamesForReviews] = useState({});
+
     useEffect(() => {
         fetchProfileData();
     }, [username]);
+
+    useEffect(() => {
+        filterReviews();
+    }, [reviews, selectedFilter, selectedMateriaReview]);
 
     const fetchProfileData = async () => {
         try {
@@ -58,6 +72,27 @@ export default function PublicProfileMentor() {
             setStats(statsData);
             const { data: mentorData } = await publicProfileAPI.checkIfMentor(userId);
             setMentorInfo(mentorData);
+
+            // Cargar reseñas del mentor
+            if (mentorData?.id_mentor) {
+                const { data: reviewsData } = await ratingsAPI.listByMentor(mentorData.id_mentor);
+                if (reviewsData) {
+                    setReviews(reviewsData);
+
+                    // Cargar nombres de materias para las reseñas
+                    const materiaIds = [...new Set(reviewsData.map(r => r.materia_id).filter(Boolean))];
+                    const names = {};
+                    for (const id of materiaIds) {
+                        const { data } = await supabase
+                            .from('materia')
+                            .select('nombre_materia')
+                            .eq('id_materia', id)
+                            .single();
+                        if (data) names[id] = data.nombre_materia;
+                    }
+                    setMateriasNamesForReviews(names);
+                }
+            }
 
             // Obtener URL de Calendly del mentor (si tiene id_mentor)
             if (mentorData?.id_mentor) {
@@ -157,6 +192,24 @@ export default function PublicProfileMentor() {
             setLoading(false);
         }
 
+    };
+
+    const filterReviews = () => {
+        let filtered = [...reviews];
+
+        if (selectedMateriaReview) {
+            filtered = filtered.filter(r => r.materia_id === selectedMateriaReview);
+        }
+
+        if (selectedFilter === 'positivas') {
+            filtered = filtered.filter(r => r.estrellas >= 3);
+        } else if (selectedFilter === 'negativas') {
+            filtered = filtered.filter(r => r.estrellas < 3);
+        }
+
+        filtered.sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+
+        setFilteredReviews(filtered);
     };
 
     const generateSignedUrls = async (notes) => {
@@ -331,6 +384,80 @@ export default function PublicProfileMentor() {
             alert('Error al guardar favorito: ' + (error.message || ''));
         } finally {
             setLoadingFavorite(false);
+        }
+    };
+
+    const handleReviewAdded = () => {
+        setShowReviewModal(false);
+        fetchProfileData(); // Recargar todo
+    };
+
+    const handleReviewDeleted = () => {
+        fetchProfileData(); // Recargar todo
+    };
+
+    const handleEditReview = (review) => {
+        if (!materiasNamesForReviews[review.materia_id]) {
+            loadMateriaNameForReview(review.materia_id);
+        }
+
+        const ratingData = {
+            ratingId: review.id,
+            tipo: 'mentor',
+            selectedEntity: {
+                id: mentorInfo.id_mentor,
+                nombre: profile.nombre,
+                tipo: 'mentor'
+            },
+            selectedMateria: review.materia_id ? {
+                id: review.materia_id,
+                nombre: materiasNamesForReviews[review.materia_id] || ''
+            } : null,
+            rating: review.estrellas,
+            selectedTags: review.tags || [],
+            texto: review.comentario || '',
+            workload: review.workload || 'Medio'
+        };
+
+        setEditingReview(ratingData);
+        setShowEditModal(true);
+    };
+
+    const loadMateriaNameForReview = async (materiaId) => {
+        const { data } = await supabase
+            .from('materia')
+            .select('nombre_materia')
+            .eq('id_materia', materiaId)
+            .single();
+
+        if (data) {
+            setMateriasNamesForReviews(prev => ({ ...prev, [materiaId]: data.nombre_materia }));
+        }
+    };
+
+    const handleSaveEdit = async (updatedData) => {
+        try {
+            const { error } = await ratingsAPI.updateRating(
+                editingReview.ratingId,
+                updatedData.rating,
+                updatedData.texto,
+                {
+                    workload: updatedData.workload,
+                    tags: updatedData.selectedTags,
+                    materia_id: updatedData.selectedMateria?.id
+                }
+            );
+
+            if (error) {
+                console.error('Error actualizando reseña:', error);
+                return;
+            }
+
+            setShowEditModal(false);
+            setEditingReview(null);
+            fetchProfileData();
+        } catch (error) {
+            console.error('Error inesperado:', error);
         }
     };
 
@@ -523,9 +650,19 @@ export default function PublicProfileMentor() {
                 </div>
 
                 <div style={tabsContainerStyle}>
-                    {['mentorias', 'apuntes'].map(t => (
-                        <button key={t} onClick={() => setTab(t)} style={{ ...tabButtonStyle, background: tab === t ? '#10B981' : 'transparent', color: tab === t ? 'white' : '#666', borderBottom: tab === t ? '3px solid #10B981' : '3px solid transparent' }}>
+                    {['mentorias', 'resenas', 'apuntes'].map(t => (
+                        <button
+                            key={t}
+                            onClick={() => setTab(t)}
+                            style={{
+                                ...tabButtonStyle,
+                                background: tab === t ? '#10B981' : 'transparent',
+                                color: tab === t ? 'white' : '#666',
+                                borderBottom: tab === t ? '3px solid #10B981' : '3px solid transparent'
+                            }}
+                        >
                             {t === 'mentorias' && `🎓 Mentorías`}
+                            {t === 'resenas' && `⭐ Reseñas`}
                             {t === 'apuntes' && `📚 Apuntes`}
                         </button>
                     ))}
@@ -794,6 +931,24 @@ export default function PublicProfileMentor() {
                         </div>
                     </div>
                 )}
+                {tab === 'resenas' && (
+                    <div style={{ marginTop: 24 }}>
+                        <ReviewsSection
+                            reviews={filteredReviews}
+                            materias={mentorInfo?.materias?.map(m => ({
+                                id: m.materia.id_materia,
+                                nombre: m.materia.nombre_materia
+                            })) || []}
+                            selectedFilter={selectedFilter}
+                            selectedMateria={selectedMateriaReview}
+                            onFilterChange={setSelectedFilter}
+                            onMateriaChange={setSelectedMateriaReview}
+                            onAddReview={() => setShowReviewModal(true)}
+                            onReviewDeleted={handleReviewDeleted}
+                            onEditReview={handleEditReview}
+                        />
+                    </div>
+                )}
 
                 {showUnfollowModal && (
                     <div style={modalOverlayStyle} onClick={() => setShowUnfollowModal(false)}>
@@ -827,6 +982,35 @@ export default function PublicProfileMentor() {
                         </div>
                     </div>
                 )}
+                {/* Modal de nueva reseña */}
+                {showReviewModal && mentorInfo && (
+                    <AuthModal_HacerResenia
+                        open={showReviewModal}
+                        onClose={() => setShowReviewModal(false)}
+                        onSave={handleReviewAdded}
+                        preSelectedEntity={{
+                            id: mentorInfo.id_mentor,
+                            nombre: profile.nombre,
+                            tipo: 'mentor'
+                        }}
+                    />
+                )}
+
+                {/* Modal de edición */}
+                {showEditModal && editingReview && (
+                    <AuthModal_HacerResenia
+                        open={showEditModal}
+                        onClose={() => {
+                            setShowEditModal(false);
+                            setEditingReview(null);
+                        }}
+                        onSave={handleSaveEdit}
+                        preSelectedEntity={editingReview.selectedEntity}
+                        initialData={editingReview}
+                        isEditing={true}
+                    />
+                )}
+
             </div>
         </div>
     );

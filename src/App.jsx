@@ -1,14 +1,12 @@
-// src/App.jsx
-import { BrowserRouter, Routes, Route, Navigate, useLocation, useNavigate } from "react-router-dom";
+import { BrowserRouter, Routes, Route, Navigate, useLocation, useNavigate, useParams } from "react-router-dom";
 import { lazy, Suspense, useEffect } from "react";
+// src/App.jsx
 import Header from "./components/Header.jsx";
 import Home from "./pages/Home.jsx";
 import AuthGuard from "./components/AuthGuard";
 import Equipo from "./pages/Equipo";
 import { AvatarProvider } from './contexts/AvatarContext';
 import { ConnectionMonitor } from './components/ConnectionMonitor';
-import ErrorBoundary from './components/ErrorBoundary';
-import AuthSessionManager from './components/AuthSessionManager';
 import GlobalCalendar from './pages/GlobalCalendar';
 
 // Componentes lazy
@@ -94,6 +92,12 @@ function RouteDebugger() {
     return null;
 }
 
+// Componente helper para redirigir /cursos/:id → /materias/:id
+function RedirectToMaterias() {
+    const { id } = useParams();
+    return <Navigate to={`/materias/${id}`} replace />;
+}
+
 function AppRoutes() {
     const location = useLocation();
     const navigate = useNavigate();
@@ -168,7 +172,7 @@ function AppRoutes() {
                     <Route path="/profesores/:id" element={<ProfessorDetail />} />
                     <Route path="/materias/:id" element={<SubjectDetail />} />
                     {/* Redirigir /cursos/:id a /materias/:id si es necesario */}
-                    <Route path="/cursos/:id" element={<Navigate to="/materias/:id" replace />} />
+                    <Route path="/cursos/:id" element={<RedirectToMaterias />} />
                     <Route path="/mentor/:username" element={<PublicProfileMentor />} />
 
                     {/* Usuario - PROTEGIDAS */}
@@ -240,7 +244,11 @@ function AppRoutes() {
     );
 }
 
+import ErrorBoundary from './components/ErrorBoundary';
+import AuthSessionManager from './components/AuthSessionManager';
+
 export default function App() {
+
     const { credits, seguidores, siguiendo, apuntes, loading: loadingStats } = useSidebarStats();
     const { showModal, loading: loadingOnboarding, completeOnboarding } = useMentorOnboarding();
 

@@ -1,6 +1,6 @@
 # Kerana
 
-Somos un grupo diseñando un proyecto para estudiantes de la facultad.
+Somos un grupo que está diseñando un proyecto para estudiantes de la facultad.
 
 Queremos ayudarlos para que puedan avanzar de forma más amena en sus carreras y que utilizen Kerana para aprender y estudiar.
 
