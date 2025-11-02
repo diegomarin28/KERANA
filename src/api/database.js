@@ -1187,13 +1187,47 @@ export const ratingsAPI = {
 // ==========================================
 export const professorAPI = {
     async getAllProfessors() {
-        const {data, error} = await supabase
+        // 1. Traer profesores con materias
+        const {data: profesores, error} = await supabase
             .from('profesor_curso')
             .select(`
-                *,
-                imparte(materia(id_materia, nombre_materia))
-            `)
-        return {data, error}
+            *,
+            imparte(materia(id_materia, nombre_materia))
+        `)
+
+        if (error) return {data: null, error}
+
+        // 2. Traer ratings de todos los profesores
+        const profesorIds = profesores.map(p => p.id_profesor)
+        const {data: ratings} = await supabase
+            .from('rating')
+            .select('ref_id, estrellas')
+            .eq('tipo', 'profesor')
+            .in('ref_id', profesorIds)
+
+        // 3. Calcular promedio y agregar a cada profesor
+        const ratingsMap = {}
+        ratings?.forEach(r => {
+            if (!ratingsMap[r.ref_id]) ratingsMap[r.ref_id] = {sum: 0, count: 0}
+            ratingsMap[r.ref_id].sum += r.estrellas
+            ratingsMap[r.ref_id].count += 1
+        })
+
+        const profesoresConRating = profesores.map(prof => {
+            const ratingData = ratingsMap[prof.id_profesor]
+            const avgRating = ratingData
+                ? Number((ratingData.sum / ratingData.count).toFixed(1))
+                : 0
+
+            return {
+                ...prof,
+                rating_promedio: avgRating,
+                total_resenas: ratingData?.count || 0,
+                materias: prof.imparte?.map(i => i.materia?.nombre_materia).filter(Boolean) || []
+            }
+        })
+
+        return {data: profesoresConRating, error: null}
     },
 
     async getProfessorsBySubject(materiaId) {

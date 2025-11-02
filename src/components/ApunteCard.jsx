@@ -15,8 +15,9 @@ export default function ApunteCard({ note, currentUserId }) {
         const { data: { session } } = await supabase.auth.getSession();
 
         if (!session) {
-            // No hay sesión → abrir modal de login con returnUrl
-            navigate(`/?auth=signin&return=/apuntes/${note.id_apunte}`);
+            // No hay sesión → abrir modal de login MANTENIENDO la ruta actual
+            const currentPath = window.location.pathname;
+            navigate(`${currentPath}?auth=signin&return=/apuntes/${note.id_apunte}`);
         } else {
             // Hay sesión → ir directo al apunte
             navigate(`/apuntes/${note.id_apunte}`);

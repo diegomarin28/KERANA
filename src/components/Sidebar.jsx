@@ -222,7 +222,7 @@ export default function Sidebar({
                     )}
 
                     <Group title="Explorar" />
-                    <MenuLink icon="📖" label="Asignaturas" onClick={() => go("/subjects")} />
+                    <MenuLink icon="📖" label="Materias" onClick={() => go("/subjects")} />
                     <MenuLink icon="👨‍🏫" label="Profesores" onClick={() => go("/professors")} />
                     <MenuLink icon="💡" label="Mentores" onClick={() => go("/mentors")} />
                     <MenuLink icon="📄" label="Apuntes" onClick={() => go("/notes")} />
