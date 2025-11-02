@@ -9,6 +9,7 @@ import { AvatarProvider } from './contexts/AvatarContext';
 import { ConnectionMonitor } from './components/ConnectionMonitor';
 import GlobalCalendar from './pages/GlobalCalendar';
 
+
 // Componentes lazy
 const HelpCenter = lazy(() => import("./pages/HelpCenter"));
 const Terms = lazy(() => import("./pages/Terms"));
@@ -48,7 +49,6 @@ const FollowersPage = lazy(() => import('./pages/FollowersPage.jsx'));
 const FolderView = lazy(() => import("./pages/FolderView"));
 const PublicProfileMentor = lazy(() => import("./pages/PublicProfileMentor"));
 const Credits = lazy(() => import("./pages/Credits"));
-const CreateProfile = lazy(() => import("./pages/CreateProfile"));
 
 
 // Componentes cargados inmediatamente
@@ -160,7 +160,6 @@ function AppRoutes() {
                     {/* Búsqueda y exploración */}
                     <Route path="/search" element={<SearchResults />} />
                     <Route path="/cursos/buscar" element={<CourseSearch />} />
-                    <Route path="/test/followers" element={<FollowersPage />} />
 
                     {/* Mentoría */}
                     <Route path="/mentor/calendar" element={<MyCalendar />} />
@@ -177,7 +176,6 @@ function AppRoutes() {
 
                     {/* Usuario - PROTEGIDAS */}
                     <Route path="/profile" element={<AuthGuard requireAuth={true}><Profile /></AuthGuard>} />
-                    <Route path="/profile/setup" element={<AuthGuard requireAuth={true}><CreateProfile /></AuthGuard>} />
                     <Route path="/edit-profile" element={<EditProfile />} />
                     <Route path="/panel" element={<AuthGuard requireAuth={true}><UserDashboard /></AuthGuard>} />
                     <Route path="/user-card" element={<UserCard />} />
@@ -221,9 +219,6 @@ function AppRoutes() {
                     <Route path="/contact" element={<Contact />} />
                     <Route path="/mentores/postular" element={<AuthGuard requireAuth={true}><MentorApply /></AuthGuard>} />
 
-                    {/* Nueva ruta para el calendario global */}
-                    <Route path="/calendario-global" element={<GlobalCalendar />} />
-
                     {/* 404 */}
                     <Route path="*" element={
                         <div style={{ padding: "40px", textAlign: "center" }}>
@@ -244,11 +239,7 @@ function AppRoutes() {
     );
 }
 
-import ErrorBoundary from './components/ErrorBoundary';
-import AuthSessionManager from './components/AuthSessionManager';
-
 export default function App() {
-
     const { credits, seguidores, siguiendo, apuntes, loading: loadingStats } = useSidebarStats();
     const { showModal, loading: loadingOnboarding, completeOnboarding } = useMentorOnboarding();
 
@@ -257,7 +248,10 @@ export default function App() {
             <AvatarProvider sidebarStats={{ credits, seguidores, siguiendo, apuntes }}>
                 <NotificationProvider>
                     <NotificationsProvider>
-                        <NotificationsRealtimeSubscriber />
+                        <AuthSessionManager />
+                        <ErrorBoundary>
+                            <NotificationsRealtimeSubscriber />
+                        </ErrorBoundary>
                         <PrivacyBanner />
                         <ConnectionMonitor />
                         <MentorOnboardingModal
