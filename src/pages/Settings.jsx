@@ -227,6 +227,7 @@ function DataManagementSection() {
     const [summary, setSummary] = useState(null);
     const [downloading, setDownloading] = useState(false);
     const [message, setMessage] = useState('');
+    const [deleteModalOpen, setDeleteModalOpen] = useState(false);
 
     useEffect(() => {
         loadSummary();
@@ -282,14 +283,403 @@ function DataManagementSection() {
             />
 
             <ActionButton
-                onClick={() => window.open('mailto:soporte@kerana.com?subject=Solicitud de eliminación de cuenta')}
+                onClick={() => setDeleteModalOpen(true)}
                 label="Eliminar cuenta"
                 danger
+            />
+
+            <DeleteAccountModal
+                isOpen={deleteModalOpen}
+                onClose={() => setDeleteModalOpen(false)}
             />
         </>
     );
 }
 
+// ============================================
+// MODAL DE ELIMINACIÓN DE CUENTA
+// ============================================
+function DeleteAccountModal({ isOpen, onClose }) {
+    const [step, setStep] = useState(1);
+    const [password, setPassword] = useState('');
+    const [verificationCode, setVerificationCode] = useState('');
+    const [error, setError] = useState('');
+    const [loading, setLoading] = useState(false);
+    const [codeSent, setCodeSent] = useState(false);
+    const [deletionReason, setDeletionReason] = useState('');
+    const [userEmail, setUserEmail] = useState('');
+    const [isOAuthUser, setIsOAuthUser] = useState(false);
+    const navigate = useNavigate();
+
+    // Detectar tipo de autenticación al abrir el modal
+    useEffect(() => {
+        if (isOpen) {
+            detectAuthMethod();
+        }
+    }, [isOpen]);
+
+    // Reset al cerrar
+    useEffect(() => {
+        if (!isOpen) {
+            setStep(1);
+            setPassword('');
+            setDeletionReason('');
+            setVerificationCode('');
+            setError('');
+            setLoading(false);
+            setCodeSent(false);
+            setUserEmail('');
+            setIsOAuthUser(false);
+        }
+    }, [isOpen]);
+
+    const detectAuthMethod = async () => {
+        try {
+            const { data: { user }, error } = await supabase.auth.getUser();
+            if (error || !user) throw new Error('Usuario no autenticado');
+
+            const provider = user.app_metadata?.provider || 'email';
+            setIsOAuthUser(provider === 'google' || provider === 'github');
+            setUserEmail(user.email);
+        } catch (err) {
+            console.error('Error al detectar método de autenticación:', err);
+            setError('Error al verificar usuario');
+        }
+    };
+
+    const handleSendCode = async () => {
+        setLoading(true);
+        setError('');
+
+        try {
+            // Obtener usuario de auth
+            const { data: { user }, error: userError } = await supabase.auth.getUser();
+            if (userError || !user) throw new Error('Usuario no autenticado');
+
+            // Usar directamente el user.id (es el mismo que id_usuario)
+            const userId = user.id;
+
+            // Generar código en Supabase
+            const { data, error } = await supabase.rpc('generate_verification_code', {
+                target_user_id: userId,
+                code_purpose: 'delete_account'
+            });
+
+            if (error) throw error;
+            if (!data?.success) throw new Error(data?.error || 'Error al generar código');
+
+            // Enviar email con el código usando Edge Function
+            const response = await fetch(
+                `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/send-verification-email`,
+                {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}`,
+                    },
+                    body: JSON.stringify({
+                        email: data.email,
+                        name: data.name,
+                        code: data.code,
+                    }),
+                }
+            );
+
+            const result = await response.json();
+
+            if (!result.success) {
+                throw new Error(result.error || 'Error al enviar email');
+            }
+
+            setCodeSent(true);
+            setError('');
+        } catch (err) {
+            console.error('Error al enviar código:', err);
+            setError(err.message || 'Error al enviar código de verificación');
+        } finally {
+            setLoading(false);
+        }
+    };
+    const handleDelete = async () => {
+        setLoading(true);
+        setError('');
+        setStep(3);
+
+        try {
+            // Obtener usuario de auth
+            const { data: { user }, error: userError } = await supabase.auth.getUser();
+            if (userError || !user) throw new Error('Usuario no autenticado');
+
+            // Usar directamente el user.id
+            const userId = user.id;
+
+            // CASO 1: Usuario OAuth - Verificar código
+            if (isOAuthUser) {
+                if (!verificationCode || verificationCode.length !== 6) {
+                    setError('Ingresá el código de 6 dígitos');
+                    setStep(2);
+                    setLoading(false);
+                    return;
+                }
+
+                // Verificar código
+                const { data: verifyData, error: verifyError } = await supabase.rpc('verify_code', {
+                    target_user_id: userId,
+                    input_code: verificationCode,
+                    code_purpose: 'delete_account'
+                });
+
+                console.log('✅ Resultado de verificación:', verifyData); // ← AGREGAR ESTO
+
+
+                if (verifyError) throw verifyError;
+                if (!verifyData?.success) {
+                    setError(verifyData?.error || 'Código inválido o expirado');
+                    setStep(2);
+                    setLoading(false);
+                    return;
+                }
+            }
+            // CASO 2: Usuario Email/Password - Verificar contraseña
+            else {
+                if (!password) {
+                    setError('Ingresá tu contraseña');
+                    setStep(2);
+                    setLoading(false);
+                    return;
+                }
+
+                const { error: signInError } = await supabase.auth.signInWithPassword({
+                    email: user.email,
+                    password: password,
+                });
+
+                if (signInError) {
+                    setError('Contraseña incorrecta');
+                    setStep(2);
+                    setLoading(false);
+                    return;
+                }
+            }
+
+
+            // Eliminar cuenta
+            const { data, error: deleteError } = await supabase.rpc(
+                'delete_user_account_with_reason',
+                {
+                    target_user_id: userId,
+                    reason: deletionReason.trim() || 'No especificado'
+                }
+            );
+            if (deleteError) throw deleteError;
+            if (!data?.success) throw new Error(data?.error || 'Error al eliminar cuenta');
+
+            console.log('Datos eliminados:', data.deleted_counts);
+
+            // Cerrar sesión
+            await supabase.auth.signOut();
+
+            // Redirigir
+            localStorage.setItem('account_deleted', 'true');
+            window.location.href = '/';
+
+        } catch (err) {
+            console.error('Error al eliminar cuenta:', err);
+            setError(err.message || 'Error al eliminar la cuenta');
+            setStep(2);
+        } finally {
+            setLoading(false);
+        }
+    };
+    if (!isOpen) return null;
+
+    return (
+        <div style={overlayStyle} onClick={onClose}>
+            <div style={modalStyle} onClick={(e) => e.stopPropagation()}>
+                {/* Step 1: Advertencia */}
+                {step === 1 && (
+                    <>
+                        <div style={iconContainerStyle}>
+                            <div style={dangerIconStyle}>⚠️</div>
+                        </div>
+                        <h2 style={modalTitleStyle}>¿Eliminar tu cuenta?</h2>
+                        <div style={warningBoxStyle}>
+                            <p style={warningTextStyle}>
+                                <strong>Esta acción es permanente e irreversible.</strong>
+                            </p>
+                            <p style={warningTextStyle}>Se eliminarán:</p>
+                            <ul style={listStyle}>
+                                <li> Todos tus apuntes subidos</li>
+                                <li> Tus favoritos y guardados</li>
+                                <li> Notificaciones e historial</li>
+                                <li> Reseñas y comentarios</li>
+                                <li> Solicitudes de mentoría</li>
+                                <li> Información de perfil</li>
+                                <li> Créditos y transacciones</li>
+                            </ul>
+                        </div>
+                        <div style={buttonsContainerStyle}>
+                            <button onClick={onClose} style={cancelButtonStyle}>
+                                Cancelar
+                            </button>
+                            <button onClick={() => setStep(2)} style={dangerButtonStyle}>
+                                Continuar
+                            </button>
+                        </div>
+                    </>
+                )}
+
+                {/* Step 2: Confirmación */}
+                {step === 2 && (
+                    <>
+                        <div style={iconContainerStyle}>
+                            <div style={dangerIconStyle}>🔒</div>
+                        </div>
+                        <h2 style={modalTitleStyle}>Confirmación final</h2>
+
+                        {isOAuthUser ? (
+                            // OAuth: Código por email
+                            <>
+                                <p style={modalDescriptionStyle}>
+                                    Para confirmar la eliminación, te enviamos un código de verificación a:
+                                </p>
+                                <div style={{
+                                    background: '#f0f9ff',
+                                    padding: '12px',
+                                    borderRadius: '8px',
+                                    marginBottom: '16px',
+                                    textAlign: 'center',
+                                    border: '2px solid #bae6fd'
+                                }}>
+                                    <strong style={{ color: '#0369a1' }}>{userEmail}</strong>
+                                </div>
+
+                                {!codeSent ? (
+                                    <button
+                                        onClick={handleSendCode}
+                                        disabled={loading}
+                                        style={{
+                                            ...primaryButtonStyle,
+                                            width: '100%',
+                                            marginBottom: '16px',
+                                            opacity: loading ? 0.5 : 1
+                                        }}
+                                    >
+                                        {loading ? 'Enviando código...' : '📧 Enviar código'}
+                                    </button>
+                                ) : (
+                                    <>
+                                        <p style={{ ...modalDescriptionStyle, color: '#10b981', fontWeight: 600 }}>
+                                            ✅ Código enviado! Revisá tu email.
+                                        </p>
+                                        <input
+                                            type="text"
+                                            placeholder="Código de 6 dígitos"
+                                            value={verificationCode}
+                                            onChange={(e) => setVerificationCode(e.target.value.replace(/\D/g, '').slice(0, 6))}
+                                            style={modalInputStyle}
+                                            maxLength={6}
+                                            autoFocus
+                                        />
+                                    </>
+                                )}
+                            </>
+                        ) : (
+                            // Email/Password: Contraseña
+                            <>
+                                <p style={modalDescriptionStyle}>
+                                    Para confirmar, ingresá tu contraseña:
+                                </p>
+                                <input
+                                    type="password"
+                                    placeholder="Tu contraseña"
+                                    value={password}
+                                    onChange={(e) => setPassword(e.target.value)}
+                                    style={modalInputStyle}
+                                    autoFocus
+                                />
+                            </>
+                        )}
+                        <div style={{ marginTop: 16, marginBottom: 12 }}>
+                            <label style={{
+                                display: 'block',
+                                fontSize: 13,
+                                color: '#64748b',
+                                fontWeight: 600,
+                                marginBottom: 8
+                            }}>
+                                ¿Por qué eliminás tu cuenta? (opcional)
+                            </label>
+                            <textarea
+                                placeholder="Ej: No uso la plataforma, encontré otra alternativa, problemas técnicos..."
+                                value={deletionReason}
+                                onChange={(e) => setDeletionReason(e.target.value)}
+                                style={{
+                                    ...modalInputStyle,
+                                    minHeight: 80,
+                                    resize: 'vertical',
+                                    fontFamily: 'Inter, sans-serif',
+                                    lineHeight: 1.5
+                                }}
+                                maxLength={500}
+                            />
+                            <div style={{
+                                fontSize: 11,
+                                color: '#94a3b8',
+                                textAlign: 'right',
+                                marginTop: 4
+                            }}>
+                                {deletionReason.length}/500
+                            </div>
+                        </div>
+
+                        {error && <div style={errorStyle}>{error}</div>}
+
+                        <div style={buttonsContainerStyle}>
+                            <button
+                                onClick={() => {
+                                    setStep(1);
+                                    setError('');
+                                    setPassword('');
+                                    setVerificationCode('');
+                                    setCodeSent(false);
+                                }}
+                                style={cancelButtonStyle}
+                            >
+                                Volver
+                            </button>
+                            <button
+                                onClick={handleDelete}
+                                disabled={loading || (isOAuthUser ? !codeSent || verificationCode.length !== 6 : !password)}
+                                style={{
+                                    ...dangerButtonStyle,
+                                    opacity: (isOAuthUser ? !codeSent || verificationCode.length !== 6 : !password) ? 0.5 : 1,
+                                    cursor: (isOAuthUser ? !codeSent || verificationCode.length !== 6 : !password) ? 'not-allowed' : 'pointer',
+                                }}
+                            >
+                                {loading ? 'Eliminando...' : 'Eliminar cuenta'}
+                            </button>
+                        </div>
+                    </>
+                )}
+
+                {/* Step 3: Procesando */}
+                {step === 3 && (
+                    <>
+                        <div style={iconContainerStyle}>
+                            <div style={loadingIconStyle}>⏳</div>
+                        </div>
+                        <h2 style={modalTitleStyle}>Eliminando tu cuenta...</h2>
+                        <p style={modalDescriptionStyle}>
+                            Por favor esperá, estamos procesando tu solicitud.
+                        </p>
+                        <div style={spinnerStyle} />
+                    </>
+                )}
+            </div>
+        </div>
+    );
+}
 function DataStat({ label, value, color }) {
     return (
         <div style={{
@@ -885,6 +1275,158 @@ const statsGridStyle = {
     border: '2px solid #f1f5f9',
 };
 
+// ============================================
+// ESTILOS DEL MODAL
+// ============================================
+const overlayStyle = {
+    position: 'fixed',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    background: 'rgba(0, 0, 0, 0.75)',
+    backdropFilter: 'blur(4px)',
+    display: 'grid',
+    placeItems: 'center',
+    zIndex: 9999,
+    padding: 16,
+    animation: 'fadeIn 0.2s ease',
+};
+
+const modalStyle = {
+    background: '#fff',
+    borderRadius: 16,
+    padding: 32,
+    maxWidth: 480,
+    width: '100%',
+    boxShadow: '0 20px 60px rgba(0,0,0,0.3)',
+    animation: 'slideUp 0.3s cubic-bezier(0.16, 1, 0.3, 1)',
+};
+
+const iconContainerStyle = {
+    textAlign: 'center',
+    marginBottom: 20,
+};
+
+const dangerIconStyle = {
+    fontSize: 48,
+    display: 'inline-block',
+    animation: 'pulse 2s ease-in-out infinite',
+};
+
+const loadingIconStyle = {
+    fontSize: 48,
+    display: 'inline-block',
+    animation: 'spin 2s linear infinite',
+};
+
+const modalTitleStyle = {
+    fontSize: 24,
+    fontWeight: 800,
+    color: '#0f172a',
+    textAlign: 'center',
+    marginBottom: 16,
+};
+
+const modalDescriptionStyle = {
+    fontSize: 14,
+    color: '#64748b',
+    textAlign: 'center',
+    marginBottom: 20,
+    lineHeight: 1.5,
+};
+
+const warningBoxStyle = {
+    background: '#fef2f2',
+    border: '2px solid #fecaca',
+    borderRadius: 12,
+    padding: 16,
+    marginBottom: 24,
+};
+
+const warningTextStyle = {
+    fontSize: 13,
+    color: '#991b1b',
+    marginBottom: 8,
+    lineHeight: 1.5,
+};
+
+const listStyle = {
+    fontSize: 13,
+    color: '#991b1b',
+    paddingLeft: 20,
+    margin: '8px 0 0 0',
+};
+
+const modalInputStyle = {
+    width: '100%',
+    padding: '12px 14px',
+    fontSize: 14,
+    fontWeight: 500,
+    color: '#0f172a',
+    background: '#fff',
+    border: '2px solid #e5e7eb',
+    borderRadius: 10,
+    marginBottom: 12,
+    boxSizing: 'border-box',
+    outline: 'none',
+    transition: 'all 0.2s ease',
+};
+
+const errorStyle = {
+    background: '#fee2e2',
+    color: '#991b1b',
+    padding: '10px 14px',
+    borderRadius: 10,
+    fontSize: 13,
+    fontWeight: 600,
+    marginBottom: 12,
+    textAlign: 'center',
+    border: '2px solid #fca5a5',
+};
+
+const buttonsContainerStyle = {
+    display: 'grid',
+    gridTemplateColumns: '1fr 1fr',
+    gap: 12,
+    marginTop: 24,
+};
+
+const cancelButtonStyle = {
+    padding: '12px 24px',
+    fontSize: 14,
+    fontWeight: 600,
+    color: '#64748b',
+    background: '#fff',
+    border: '2px solid #e5e7eb',
+    borderRadius: 10,
+    cursor: 'pointer',
+    transition: 'all 0.2s ease',
+};
+
+const dangerButtonStyle = {
+    padding: '12px 24px',
+    fontSize: 14,
+    fontWeight: 600,
+    color: '#fff',
+    background: 'linear-gradient(135deg, #ef4444 0%, #dc2626 100%)',
+    border: 'none',
+    borderRadius: 10,
+    cursor: 'pointer',
+    transition: 'all 0.2s ease',
+    boxShadow: '0 4px 12px rgba(239, 68, 68, 0.3)',
+};
+
+const spinnerStyle = {
+    width: 40,
+    height: 40,
+    border: '4px solid #f1f5f9',
+    borderTop: '4px solid #ef4444',
+    borderRadius: '50%',
+    margin: '20px auto',
+    animation: 'spin 1s linear infinite',
+};
+
 // Animaciones
 if (typeof document !== 'undefined' && !document.getElementById('settings-animations')) {
     const style = document.createElement('style');
@@ -899,6 +1441,27 @@ if (typeof document !== 'undefined' && !document.getElementById('settings-animat
                 opacity: 1;
                 transform: translateY(0);
             }
+        }
+        
+        @keyframes slideUp {
+            from {
+                opacity: 0;
+                transform: translateY(20px) scale(0.95);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0) scale(1);
+            }
+        }
+        
+        @keyframes pulse {
+            0%, 100% { transform: scale(1); }
+            50% { transform: scale(1.1); }
+        }
+        
+        @keyframes spin {
+            from { transform: rotate(0deg); }
+            to { transform: rotate(360deg); }
         }
         
         input:focus, select:focus {

@@ -48,19 +48,8 @@ export default function Favorites() {
                 const apIds = notesFav.map(r => r.id_apunte);
 
                 const { data: apuntes, error: apuntesError } = await supabase
-                    .from('apunte')
-                    .select(`
-                        id_apunte,
-                        titulo,
-                        descripcion,
-                        creditos,
-                        estrellas,
-                        id_materia,
-                        id_usuario,
-                        file_path,
-                        materia:id_materia(nombre_materia),
-                        thumbnail_path
-                    `)
+                    .from('apuntes_completos')
+                    .select('*')
                     .in('id_apunte', apIds);
 
                 if (apuntesError) {
@@ -83,19 +72,6 @@ export default function Favorites() {
                 likesData?.forEach(like => {
                     likesCountMap[like.id_apunte] = (likesCountMap[like.id_apunte] || 0) + 1;
                 });
-
-                let userMap = {};
-                const uIds = [...new Set((apuntes || []).map(a => a.id_usuario).filter(Boolean))];
-                if (uIds.length) {
-                    const { data: users } = await supabase
-                        .from('usuario')
-                        .select('id_usuario, nombre')
-                        .in('id_usuario', uIds);
-                    userMap = (users || []).reduce((acc, u) => {
-                        acc[u.id_usuario] = u.nombre;
-                        return acc;
-                    }, {});
-                }
 
                 const apuntesWithSignedUrls = await Promise.all((apuntes || []).map(async (apunte) => {
                     if (apunte.file_path) {
@@ -120,8 +96,8 @@ export default function Favorites() {
                                 creditos: a.creditos,
                                 signedUrl: a.signedUrl,
                                 thumbnail_path: a.thumbnail_path,
-                                materia: a.materia,
-                                usuario: { nombre: userMap[a.id_usuario] || 'Anónimo' },
+                                materia: { nombre_materia: a.materia_nombre },
+                                usuario: { nombre: a.autor_nombre || 'Anónimo' },
                                 id_usuario: a.id_usuario,
                                 likes_count: likesCountMap[a.id_apunte] || 0
                             }
