@@ -22,7 +22,12 @@ export default function Credits() {
 
     const cargarPaquetes = async () => {
         try {
-            const { data, error } = await supabase.rpc('obtener_paquetes_creditos');
+            const { data, error } = await supabase
+                .from('paquete_creditos')
+                .select('*')
+                .eq('activo', true)
+                .order('cantidad_creditos', { ascending: true });
+
             if (error) throw error;
             setPaquetes(data || []);
         } catch (error) {
