@@ -7,7 +7,8 @@ import AuthGuard from "./components/AuthGuard";
 import Equipo from "./pages/Equipo";
 import { AvatarProvider } from './contexts/AvatarContext';
 import { ConnectionMonitor } from './components/ConnectionMonitor';
-import GlobalCalendar from './pages/GlobalCalendar';
+import ErrorBoundary from './components/ErrorBoundary';
+import AuthSessionManager from './components/AuthSessionManager';
 
 
 // Componentes lazy
