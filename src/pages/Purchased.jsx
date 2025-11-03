@@ -137,22 +137,8 @@ export default function Purchased() {
 
             // Traer apuntes de las compras
             const { data: apData, error: apErr } = await supabase
-                .from("apunte")
-                .select(
-                    `
-          id_apunte,
-          titulo,
-          descripcion,
-          creditos,
-          estrellas,
-          file_path,
-          file_name,
-          thumbnail_path,
-          created_at,
-          materia:id_materia(id_materia, nombre_materia),
-          usuario:id_usuario(nombre)
-        `
-                )
+                .from("apuntes_completos")
+                .select("*")
                 .in("id_apunte", apIds)
                 .order("created_at", { ascending: false });
 
@@ -171,7 +157,13 @@ export default function Purchased() {
             );
             const urls = Object.fromEntries(urlsArray);
 
-            const mapApunte = new Map(apuntes.map((a) => [a.id_apunte, a]));
+            const mapApunte = new Map(
+                apuntes.map((a) => ({
+                    ...a,
+                    usuario: { nombre: a.autor_nombre },
+                    materia: { id_materia: a.id_materia, nombre_materia: a.materia_nombre }
+                })).map(a => [a.id_apunte, a])
+            );
             const enriched = compras.map((c) => {
                 const apunte = mapApunte.get(c.apunte_id);
                 return {

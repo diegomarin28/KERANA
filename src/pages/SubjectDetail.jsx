@@ -101,21 +101,8 @@ export default function SubjectDetail() {
 
             // Cargar apuntes de esta materia (solo los primeros 12 para preview)
             const { data: apuntesData, error: apuntesError } = await supabase
-                .from('apunte')
-                .select(`
-                    id_apunte,
-                    id_usuario,
-                    titulo,
-                    descripcion,
-                    creditos,
-                    estrellas,
-                    file_path,
-                    thumbnail_path,
-                    created_at,
-                    id_materia,
-                    usuario:id_usuario(nombre),
-                    materia:id_materia(nombre_materia)
-                `)
+                .from('apuntes_completos')
+                .select('*')
                 .eq('id_materia', id)
                 .order('created_at', { ascending: false })
                 .limit(12);
@@ -144,9 +131,10 @@ export default function SubjectDetail() {
                 // Agregar likes_count a cada apunte
                 const apuntesConData = apuntesData.map(apunte => ({
                     ...apunte,
+                    usuario: { nombre: apunte.autor_nombre },
+                    materia: { nombre_materia: apunte.materia_nombre },
                     likes_count: likesCountMap[apunte.id_apunte] || 0
                 }));
-
                 setApuntes(apuntesConData);
             }
 

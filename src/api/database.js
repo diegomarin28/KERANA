@@ -322,19 +322,8 @@ async function searchNotes(term) {
 
         // 4️⃣ Traer toda la info de esos apuntes
         const { data: apuntesCompletos, error: errorCompleto } = await supabase
-            .from('apunte')
-            .select(`
-                id_apunte,
-                titulo,
-                descripcion,
-                file_path,
-                estrellas,
-                creditos,
-                id_usuario,
-                id_materia,
-                materia(nombre_materia),
-                thumbnail_path
-            `)
+            .from('apuntes_completos')
+            .select('*')
             .in('id_apunte', ids);
 
         if (errorCompleto) {
@@ -393,8 +382,8 @@ async function searchNotes(term) {
                 creditos: a.creditos || 0,
                 file_path: a.file_path,
                 signedUrl: signedUrl,
-                materia: a.materia,
-                usuario: { nombre: userMap.get(a.id_usuario) || 'Anónimo' },
+                materia: { nombre_materia: a.materia_nombre },
+                usuario: { nombre: a.autor_nombre || 'Anónimo' },
                 likes_count: likesCountMap[a.id_apunte] || 0,
                 thumbnail_path: a.thumbnail_path || null
             });
@@ -2014,25 +2003,11 @@ export const publicProfileAPI = {
 
     async getRecentNotes(userId, limit = 4) {
         const { data, error } = await supabase
-            .from('apunte')
-            .select(`
-            id_apunte,
-            id_usuario,
-            titulo,
-            descripcion,
-            creditos,
-            estrellas,
-            created_at,
-            file_path,
-            thumbnail_path,
-            id_materia,
-            usuario:id_usuario(nombre),
-            materia:id_materia(nombre_materia)
-        `)
+            .from('apuntes_completos')
+            .select('*')
             .eq('id_usuario', userId)
             .order('created_at', { ascending: false })
             .limit(limit);
-
         if (error) return { data: null, error };
 
         // Contar likes para cada apunte
@@ -2058,6 +2033,8 @@ export const publicProfileAPI = {
         // Agregar likes_count a cada apunte
         const notesWithLikes = (data || []).map(note => ({
             ...note,
+            usuario: { nombre: note.autor_nombre },
+            materia: { nombre_materia: note.materia_nombre },
             likes_count: likesCountMap[note.id_apunte] || 0
         }));
 
@@ -2066,24 +2043,10 @@ export const publicProfileAPI = {
 
     async getAllNotes(userId, materiaId = null) {
         let query = supabase
-            .from('apunte')
-            .select(`
-            id_apunte,
-            id_usuario,
-            titulo,
-            descripcion,
-            creditos,
-            estrellas,
-            created_at,
-            file_path,
-            thumbnail_path,
-            id_materia,
-            usuario:id_usuario(nombre),
-            materia:id_materia(nombre_materia)
-        `)
+            .from('apuntes_completos')
+            .select('*')
             .eq('id_usuario', userId)
             .order('created_at', { ascending: false });
-
         if (materiaId) {
             query = query.eq('id_materia', materiaId);
         }
@@ -2115,6 +2078,8 @@ export const publicProfileAPI = {
         // Agregar likes_count a cada apunte
         const notesWithLikes = (data || []).map(note => ({
             ...note,
+            usuario: { nombre: note.autor_nombre },
+            materia: { nombre_materia: note.materia_nombre },
             likes_count: likesCountMap[note.id_apunte] || 0
         }));
 

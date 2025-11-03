@@ -48,30 +48,14 @@ export default function MyPapers() {
             setCurrentUserId(usuarioData.id_usuario);
 
             const { data, error: notesError } = await supabase
-                .from("apunte")
-                .select(`
-                    id_apunte,
-                    id_usuario,
-                    titulo,
-                    descripcion,
-                    creditos,
-                    estrellas,
-                    created_at,
-                    id_materia,
-                    file_path,
-                    file_name,
-                    mime_type,
-                    file_size,
-                    thumbnail_path,
-                    usuario:id_usuario(nombre),
-                    materia:id_materia(nombre_materia)
-                `)
+                .from("apuntes_completos")
+                .select('*')
                 .eq("id_usuario", usuarioData.id_usuario)
                 .order("created_at", { ascending: false });
 
             if (notesError) throw notesError;
 
-            // Obtener likes count
+// Obtener likes count
             const apIds = (data || []).map(n => n.id_apunte);
             let likesCountMap = {};
             let totalLikesCount = 0;
@@ -89,7 +73,7 @@ export default function MyPapers() {
             }
             setTotalLikes(totalLikesCount);
 
-            // Obtener signed URLs
+// Obtener signed URLs
             const notesWithData = await Promise.all((data || []).map(async (note) => {
                 let signedUrl = null;
                 if (note.file_path) {
@@ -99,8 +83,6 @@ export default function MyPapers() {
                             .createSignedUrl(note.file_path, 3600);
                         if (!signedError && signedData) {
                             signedUrl = signedData.signedUrl;
-                        } else if (signedError) {
-                            console.warn(`⚠️ Archivo no encontrado para apunte ${note.id_apunte}:`, note.file_path);
                         }
                     } catch (err) {
                         console.warn(`⚠️ Error obteniendo URL para apunte ${note.id_apunte}:`, err);
@@ -108,12 +90,21 @@ export default function MyPapers() {
                 }
 
                 return {
-                    ...note,
+                    id_apunte: note.id_apunte,
+                    id_usuario: note.id_usuario,
+                    titulo: note.titulo,
+                    descripcion: note.descripcion,
+                    creditos: note.creditos,
+                    estrellas: note.estrellas,
+                    created_at: note.created_at,
+                    file_path: note.file_path,
+                    thumbnail_path: note.thumbnail_path,
+                    usuario: { nombre: note.autor_nombre },
+                    materia: { nombre_materia: note.materia_nombre },
                     likes_count: likesCountMap[note.id_apunte] || 0,
                     signedUrl
                 };
             }));
-
             setNotes(notesWithData);
         } catch (err) {
             setError(err.message || "Error cargando tus apuntes");

@@ -385,19 +385,8 @@ export default function FolderView() {
             const apIds = compras.map(c => c.apunte_id).filter(Boolean);
 
             const { data: apuntes } = await supabase
-                .from("apunte")
-                .select(`
-                    id_apunte,
-                    titulo,
-                    descripcion,
-                    creditos,
-                    estrellas,
-                    file_path,
-                    file_name,
-                    thumbnail_path, 
-                    materia:id_materia(id_materia, nombre_materia),
-                    usuario:id_usuario(nombre)
-                `)
+                .from("apuntes_completos")
+                .select("*")
                 .in("id_apunte", apIds);
 
             const urls = {};
@@ -418,7 +407,13 @@ export default function FolderView() {
 
             }
 
-            const mapApunte = new Map(apuntes?.map(a => [a.id_apunte, a]) || []);
+            const mapApunte = new Map(
+                apuntes?.map(a => ({
+                    ...a,
+                    usuario: { nombre: a.autor_nombre },
+                    materia: { id_materia: a.id_materia, nombre_materia: a.materia_nombre }
+                })).map(a => [a.id_apunte, a]) || []
+            );
             const mapCompra = new Map(compras.map(c => [c.id, c]));
 
             const enriched = notesInFolder.map(nif => {

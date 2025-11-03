@@ -48,20 +48,8 @@ export default function Notes() {
     const loadNotes = async () => {
         try {
             const { data, error } = await supabase
-                .from('apunte')
-                .select(`
-                    id_apunte,
-                    id_usuario,
-                    titulo,
-                    descripcion,
-                    creditos,
-                    estrellas,
-                    created_at,
-                    file_path,
-                    usuario:id_usuario(nombre),
-                    materia:id_materia(nombre_materia),
-                    thumbnail_path
-                `)
+                .from('apuntes_completos')
+                .select('*')
                 .order('created_at', { ascending: false })
                 .limit(50);
 
@@ -84,7 +72,17 @@ export default function Notes() {
             }
 
             const notesWithLikes = (data || []).map(note => ({
-                ...note,
+                id_apunte: note.id_apunte,
+                id_usuario: note.id_usuario,
+                titulo: note.titulo,
+                descripcion: note.descripcion,
+                creditos: note.creditos,
+                estrellas: note.estrellas,
+                created_at: note.created_at,
+                file_path: note.file_path,
+                thumbnail_path: note.thumbnail_path,
+                usuario: { nombre: note.autor_nombre },
+                materia: { nombre_materia: note.materia_nombre },
                 likes_count: likesCountMap[note.id_apunte] || 0,
             }));
 
