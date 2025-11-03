@@ -5,6 +5,10 @@ import {
     faChalkboardTeacher,
     faGraduationCap,
     faBookOpen,
+    faFileAlt,
+    faUserTie,
+    faUsers,
+    faHeart
 } from '@fortawesome/free-solid-svg-icons';
 
 export default function CourseCard({ course, onFav = null }) {
@@ -86,18 +90,19 @@ export default function CourseCard({ course, onFav = null }) {
                     style={{
                         display: 'inline-flex',
                         alignItems: 'center',
-                        gap: '6px',
-                        padding: '6px 12px',
-                        borderRadius: '16px',
+                        gap: '5px',
+                        padding: '5px 10px',
+                        borderRadius: '12px',
                         background: tipoConfig.bgColor,
                         color: tipoConfig.color,
-                        fontSize: '11px',
+                        fontSize: '10px',
                         fontWeight: 700,
                         letterSpacing: '0.5px',
-                        textTransform: 'uppercase'
+                        textTransform: 'uppercase',
+                        fontFamily: 'Inter, sans-serif'
                     }}
                 >
-                    <FontAwesomeIcon icon={tipoConfig.icon} style={{ fontSize: '10px' }} />
+                    <FontAwesomeIcon icon={tipoConfig.icon} style={{ fontSize: '9px' }} />
                     {tipoConfig.label}
                 </div>
 
@@ -113,18 +118,27 @@ export default function CourseCard({ course, onFav = null }) {
                             all: 'unset',
                             cursor: 'pointer',
                             fontSize: '18px',
-                            transition: 'transform 0.2s ease',
-                            padding: '4px'
+                            transition: 'all 0.2s ease',
+                            padding: '4px',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center'
                         }}
                         onMouseEnter={(e) => {
-                            e.currentTarget.style.transform = 'scale(1.2)';
+                            e.currentTarget.style.transform = 'scale(1.15)';
                         }}
                         onMouseLeave={(e) => {
                             e.currentTarget.style.transform = 'scale(1)';
                         }}
                         title="Agregar a favoritos"
                     >
-                        🤍
+                        <FontAwesomeIcon
+                            icon={faHeart}
+                            style={{
+                                fontSize: 16,
+                                color: '#cbd5e1'
+                            }}
+                        />
                     </button>
                 )}
             </div>
@@ -132,14 +146,15 @@ export default function CourseCard({ course, onFav = null }) {
             {/* Título */}
             <div style={{ flex: 1, minWidth: 0 }}>
                 <h3 style={{
-                    margin: '0 0 6px 0',
-                    fontSize: '18px',
+                    margin: '0 0 4px 0',
+                    fontSize: '17px',
                     fontWeight: 600,
                     color: '#0f172a',
                     lineHeight: 1.3,
                     overflow: 'hidden',
                     textOverflow: 'ellipsis',
-                    whiteSpace: 'nowrap'
+                    whiteSpace: 'nowrap',
+                    fontFamily: 'Inter, sans-serif'
                 }}>
                     {course.titulo}
                 </h3>
@@ -147,59 +162,91 @@ export default function CourseCard({ course, onFav = null }) {
                 {/* Subtítulo */}
                 {course.subtitulo && (
                     <p style={{
-                        margin: '0 0 12px 0',
-                        fontSize: '13px',
+                        margin: '0 0 14px 0',
+                        fontSize: '12px',
+                        fontWeight: 500,
                         color: '#64748b',
-                        lineHeight: 1.5,
+                        lineHeight: 1.4,
                         overflow: 'hidden',
                         textOverflow: 'ellipsis',
-                        whiteSpace: 'nowrap'
+                        whiteSpace: 'nowrap',
+                        fontFamily: 'Inter, sans-serif'
                     }}>
                         {course.subtitulo}
                     </p>
                 )}
 
-                {/* Stats con bullets */}
+                {/* Stats con iconos Font Awesome */}
                 {hasStats && (
                     <div style={{
                         display: 'flex',
-                        gap: '12px',
-                        fontSize: '13px',
+                        gap: '14px',
+                        fontSize: '12px',
                         color: '#374151',
                         flexWrap: 'wrap',
                         alignItems: 'center'
                     }}>
                         {course.conteo.apuntes !== undefined && (
-                            <span style={{ display: 'flex', alignItems: 'center', gap: '5px', fontWeight: 500 }}>
-                                <span style={{
-                                    width: '8px',
-                                    height: '8px',
-                                    borderRadius: '50%',
-                                    background: '#2563eb'
-                                }} />
-                                Apuntes: {course.conteo.apuntes}
+                            <span style={{
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: '5px',
+                                fontWeight: 500,
+                                fontFamily: 'Inter, sans-serif'
+                            }}>
+                                <FontAwesomeIcon
+                                    icon={faFileAlt}
+                                    style={{
+                                        fontSize: '11px',
+                                        color: '#2563eb'
+                                    }}
+                                />
+                                <span style={{ color: '#64748b' }}>Apuntes:</span>
+                                <span style={{ color: '#0f172a', fontWeight: 600 }}>
+                                    {course.conteo.apuntes}
+                                </span>
                             </span>
                         )}
                         {course.conteo.profesores !== undefined && (
-                            <span style={{ display: 'flex', alignItems: 'center', gap: '5px', fontWeight: 500 }}>
-                                <span style={{
-                                    width: '8px',
-                                    height: '8px',
-                                    borderRadius: '50%',
-                                    background: '#ef4444'
-                                }} />
-                                Profes: {course.conteo.profesores}
+                            <span style={{
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: '5px',
+                                fontWeight: 500,
+                                fontFamily: 'Inter, sans-serif'
+                            }}>
+                                <FontAwesomeIcon
+                                    icon={faChalkboardTeacher}
+                                    style={{
+                                        fontSize: '11px',
+                                        color: '#ef4444'
+                                    }}
+                                />
+                                <span style={{ color: '#64748b' }}>Profesores:</span>
+                                <span style={{ color: '#0f172a', fontWeight: 600 }}>
+                                    {course.conteo.profesores}
+                                </span>
                             </span>
                         )}
                         {course.conteo.mentores !== undefined && (
-                            <span style={{ display: 'flex', alignItems: 'center', gap: '5px', fontWeight: 500 }}>
-                                <span style={{
-                                    width: '8px',
-                                    height: '8px',
-                                    borderRadius: '50%',
-                                    background: '#10b981'
-                                }} />
-                                Mentores: {course.conteo.mentores}
+                            <span style={{
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: '5px',
+                                fontWeight: 500,
+                                fontFamily: 'Inter, sans-serif'
+                            }}>
+                                <FontAwesomeIcon
+                                    icon={faGraduationCap}
+                                    style={{
+                                        fontSize: '11px',
+                                        color: '#10b981'
+                                    }}
+                                />
+                                <span style={{ color: '#64748b' }}>Mentores:</span>
+                                <span style={{ color: '#0f172a', fontWeight: 600 }}>
+                                    {course.conteo.mentores}
+                                </span>
                             </span>
                         )}
                     </div>
@@ -212,24 +259,26 @@ export default function CourseCard({ course, onFav = null }) {
     // Estilos de la card
     const cardStyles = {
         background: '#ffffff',
-        border: '2px solid #e5e7eb',
-        borderRadius: '16px',
-        padding: '20px',
+        border: '2px solid #f1f5f9',
+        borderRadius: '14px',
+        padding: '18px',
         cursor: route ? 'pointer' : 'default',
-        transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
+        transition: 'all 0.25s cubic-bezier(0.4, 0, 0.2, 1)',
         display: 'flex',
         flexDirection: 'column',
-        gap: '14px',
-        minHeight: '170px',
+        gap: '12px',
+        minHeight: '115px',
         position: 'relative',
         textDecoration: 'none',
-        color: 'inherit'
+        color: 'inherit',
+        fontFamily: 'Inter, sans-serif',
+        boxShadow: '0 1px 3px rgba(0,0,0,0.04)'
     };
 
     const handleMouseEnter = (e) => {
         if (route) {
-            e.currentTarget.style.transform = 'translateY(-4px)';
-            e.currentTarget.style.boxShadow = '0 12px 32px rgba(0, 0, 0, 0.1)';
+            e.currentTarget.style.transform = 'translateY(-3px)';
+            e.currentTarget.style.boxShadow = '0 8px 24px rgba(0, 0, 0, 0.08)';
             e.currentTarget.style.borderColor = tipoConfig.color;
         }
     };
@@ -237,8 +286,8 @@ export default function CourseCard({ course, onFav = null }) {
     const handleMouseLeave = (e) => {
         if (route) {
             e.currentTarget.style.transform = 'translateY(0)';
-            e.currentTarget.style.boxShadow = 'none';
-            e.currentTarget.style.borderColor = '#e5e7eb';
+            e.currentTarget.style.boxShadow = '0 1px 3px rgba(0,0,0,0.04)';
+            e.currentTarget.style.borderColor = '#f1f5f9';
         }
     };
 

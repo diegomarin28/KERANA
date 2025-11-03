@@ -1,17 +1,27 @@
 import { useState, useEffect } from 'react';
-import { useParams, useNavigate, useLocation } from 'react-router-dom';
+import { useParams, useNavigate } from 'react-router-dom';
+import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
+import {
+    faHeart,
+    faCoins,
+    faFlag,
+    faBookmark,
+    faExclamationTriangle,
+    faCheckCircle,
+    faTrash,
+    faDownload,
+    faHandHoldingHeart
+} from '@fortawesome/free-solid-svg-icons';
 import { supabase } from '../supabase';
+import { notesAPI } from '../api/database';
 import { Card } from '../components/UI/Card';
 import { Button } from '../components/UI/Button';
 import PDFThumbnail from '../components/PDFThumbnail';
 import emailjs from '@emailjs/browser';
 
-
-
 export const ApunteView = () => {
     const { id } = useParams();
     const navigate = useNavigate();
-    const location = useLocation();
 
     const [apunte, setApunte] = useState(null);
     const [loading, setLoading] = useState(true);
@@ -22,7 +32,8 @@ export const ApunteView = () => {
     const [hasPurchased, setHasPurchased] = useState(false);
     const [purchasing, setPurchasing] = useState(false);
     const [likesCount, setLikesCount] = useState(0);
-    const [dislikesCount, setDislikesCount] = useState(0);
+    const [liked, setLiked] = useState(false);
+    const [likingInProgress, setLikingInProgress] = useState(false);
     const [showSuccessModal, setShowSuccessModal] = useState(false);
     const [showErrorModal, setShowErrorModal] = useState(false);
     const [errorMessage, setErrorMessage] = useState("");
@@ -31,13 +42,11 @@ export const ApunteView = () => {
     const [showDeleteSuccessModal, setShowDeleteSuccessModal] = useState(false);
     const [isFavorite, setIsFavorite] = useState(false);
     const [showToast, setShowToast] = useState(false);
-    const [userLike, setUserLike] = useState(null);
     const [showReportModal, setShowReportModal] = useState(false);
     const [reportMotivo, setReportMotivo] = useState('');
     const [reportDescripcion, setReportDescripcion] = useState('');
     const [submittingReport, setSubmittingReport] = useState(false);
     const [showReportSuccessModal, setShowReportSuccessModal] = useState(false);
-
 
     useEffect(() => {
         loadApunteData();
@@ -121,7 +130,7 @@ export const ApunteView = () => {
                 }
             }
 
-            // Verificar si el apunte está en favoritos
+            // Verificar si está en favoritos
             const { data: favoriteData, error: favoriteError } = await supabase
                 .from('apunte_fav')
                 .select('id_apunte')
@@ -130,19 +139,14 @@ export const ApunteView = () => {
             if (favoriteError) throw favoriteError;
             setIsFavorite(favoriteData.length > 0);
 
-            const { data: likeData, error: likeError } = await supabase
-                .from('likes')
-                .select('tipo')
-                .eq('id_usuario', usuarioData.id_usuario)
-                .eq('id_apunte', id)
-                .maybeSingle();
-            if (likeError) throw likeError;
-            if (likeData) {
-                setUserLike(likeData.tipo);
-            }
+            // Verificar si ya dio like
+            const { data: likeCheck } = await notesAPI.checkIfLiked(id);
+            setLiked(likeCheck);
 
+            // Cargar conteo de likes
+            const { data: likeCount } = await notesAPI.getLikesCount(id);
+            setLikesCount(likeCount);
 
-            await loadLikesCount(id);
         } catch (err) {
             console.error('Error cargando apunte:', err);
             setError(err.message || "Error cargando el apunte");
@@ -150,26 +154,6 @@ export const ApunteView = () => {
             setLoading(false);
         }
     };
-
-    const loadLikesCount = async (apunteId) => {
-        try {
-            const { data: likesData, error } = await supabase
-                .from('likes')
-                .select('tipo')
-                .eq('id_apunte', apunteId);
-
-            if (error) throw error;
-
-            const likes = likesData?.filter(l => l.tipo === 'like').length || 0;
-            const dislikes = likesData?.filter(l => l.tipo === 'dislike').length || 0;
-
-            setLikesCount(likes);
-            setDislikesCount(dislikes);
-        } catch (err) {
-            console.error('Error cargando likes/dislikes:', err);
-        }
-    };
-
 
     const handlePurchase = async () => {
         if (!apunte || !currentUserId) return;
@@ -213,7 +197,6 @@ export const ApunteView = () => {
             if (agregarError) {
                 console.error('Error agregando créditos al vendedor:', agregarError);
             }
-
 
             setHasPurchased(true);
             setUserCredits(prev => prev - apunte.creditos);
@@ -318,73 +301,26 @@ export const ApunteView = () => {
         }
     };
 
-    const handleLike = async (tipo) => {
-        if (!apunte || !currentUserId) return;
+    const handleLike = async () => {
+        if (!apunte || !currentUserId || likingInProgress) return;
 
-        // Guardar estado anterior para posible rollback
-        const previousUserLike = userLike;
-        const previousLikesCount = likesCount;
-        const previousDislikesCount = dislikesCount;
+        setLikingInProgress(true);
 
         try {
-            // Update optimista del frontend
-            if (userLike === tipo) {
-                // Toggle: quitar el voto
-                setUserLike(null);
-                if (tipo === 'like') {
-                    setLikesCount(prev => prev - 1);
-                } else {
-                    setDislikesCount(prev => prev - 1);
-                }
-            } else {
-                // Cambiar voto o agregar nuevo
-                if (userLike === 'like') {
-                    // Tenía like, cambio a dislike
-                    setLikesCount(prev => prev - 1);
-                    setDislikesCount(prev => prev + 1);
-                } else if (userLike === 'dislike') {
-                    // Tenía dislike, cambio a like
-                    setDislikesCount(prev => prev - 1);
-                    setLikesCount(prev => prev + 1);
-                } else {
-                    // No tenía voto, agregar nuevo
-                    if (tipo === 'like') {
-                        setLikesCount(prev => prev + 1);
-                    } else {
-                        setDislikesCount(prev => prev + 1);
-                    }
-                }
-                setUserLike(tipo);
+            const { data, error } = await notesAPI.toggleLike(apunte.id_apunte);
+
+            if (error) {
+                console.error('Error al dar like:', error);
+                return;
             }
 
-            // Actualizar en Supabase
-            if (previousUserLike === tipo) {
-                // Eliminar voto
-                const { error } = await supabase
-                    .from('likes')
-                    .delete()
-                    .match({ id_usuario: currentUserId, id_apunte: apunte.id_apunte });
-                if (error) throw error;
-            } else {
-                // Insertar o actualizar voto
-                const { error } = await supabase
-                    .from('likes')
-                    .upsert({
-                        id_usuario: currentUserId,
-                        id_apunte: apunte.id_apunte,
-                        tipo: tipo
-                    }, {
-                        onConflict: 'id_usuario,id_apunte'
-                    });
-                if (error) throw error;
-            }
+            setLiked(data.liked);
+            setLikesCount(data.count);
+
         } catch (error) {
-            console.error('Error al dar like/dislike:', error);
-            // Rollback en caso de error
-            setUserLike(previousUserLike);
-            setLikesCount(previousLikesCount);
-            setDislikesCount(previousDislikesCount);
-            alert("Error al registrar tu reacción: " + (error.message || ""));
+            console.error('Error en handleLike:', error);
+        } finally {
+            setLikingInProgress(false);
         }
     };
 
@@ -402,7 +338,6 @@ export const ApunteView = () => {
         try {
             setSubmittingReport(true);
 
-            // 1. Guardar en la base de datos
             const { error } = await supabase
                 .from('reportes')
                 .insert({
@@ -419,14 +354,12 @@ export const ApunteView = () => {
                     throw error;
                 }
             } else {
-                // 2. Obtener datos del usuario actual
                 const { data: usuarioData } = await supabase
                     .from('usuario')
                     .select('nombre, correo')
                     .eq('id_usuario', currentUserId)
                     .single();
 
-                // 3. Mapear motivos a texto legible
                 const motivosMap = {
                     'contenido_inapropiado': 'Contenido inapropiado',
                     'spam': 'Spam o publicidad',
@@ -435,11 +368,10 @@ export const ApunteView = () => {
                     'otro': 'Otro motivo'
                 };
 
-                // 4. Enviar email con EmailJS
                 try {
                     await emailjs.send(
                         "service_fbf675u",
-                        "template_sn2a1ih", // ⚠️ REEMPLAZÁ con el template ID que creaste
+                        "template_sn2a1ih",
                         {
                             titulo_apunte: apunte.titulo,
                             id_apunte: apunte.id_apunte,
@@ -453,15 +385,13 @@ export const ApunteView = () => {
                             link_apunte: `${window.location.origin}/apuntes/${apunte.id_apunte}`,
                             to_email: "kerana.soporte@gmail.com"
                         },
-                        "JA_sGzk8UJMPOtSmE"// Tu public key
+                        "JA_sGzk8UJMPOtSmE"
                     );
                     console.log('✅ Email de reporte enviado');
                 } catch (emailError) {
                     console.error('❌ Error enviando email:', emailError);
-
                 }
 
-                // 5. Mostrar modal de agradecimiento
                 setShowReportModal(false);
                 setReportMotivo('');
                 setReportDescripcion('');
@@ -477,7 +407,13 @@ export const ApunteView = () => {
 
     if (loading) {
         return (
-            <div style={{ minHeight: '60vh', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            <div style={{
+                minHeight: '60vh',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                fontFamily: 'Inter, sans-serif'
+            }}>
                 <div style={{ textAlign: 'center' }}>
                     <div style={{
                         width: 40,
@@ -488,7 +424,12 @@ export const ApunteView = () => {
                         animation: 'spin 1s linear infinite',
                         margin: '0 auto 16px'
                     }} />
-                    <p style={{ color: '#6b7280', margin: 0 }}>Cargando apunte...</p>
+                    <p style={{
+                        color: '#6b7280',
+                        margin: 0,
+                        fontFamily: 'Inter, sans-serif',
+                        fontWeight: 500
+                    }}>Cargando apunte...</p>
                 </div>
             </div>
         );
@@ -497,10 +438,34 @@ export const ApunteView = () => {
     if (error) {
         return (
             <div style={{ maxWidth: 800, margin: '40px auto', padding: '0 20px' }}>
-                <Card style={{ padding: 40, textAlign: 'center', background: '#fef2f2', border: '1px solid #fecaca' }}>
-                    <div style={{ fontSize: 48, marginBottom: 16 }}>⚠️</div>
-                    <h3 style={{ margin: '0 0 12px 0', color: '#991b1b' }}>Error</h3>
-                    <p style={{ color: '#991b1b', margin: '0 0 24px 0' }}>{error}</p>
+                <Card style={{
+                    padding: 40,
+                    textAlign: 'center',
+                    background: '#fef2f2',
+                    border: '1px solid #fecaca',
+                    fontFamily: 'Inter, sans-serif'
+                }}>
+                    <div style={{ fontSize: 48, marginBottom: 16 }}>
+                        <FontAwesomeIcon
+                            icon={faExclamationTriangle}
+                            style={{
+                                fontSize: 48,
+                                color: '#991b1b'
+                            }}
+                        />
+                    </div>
+                    <h3 style={{
+                        margin: '0 0 12px 0',
+                        color: '#991b1b',
+                        fontFamily: 'Inter, sans-serif',
+                        fontWeight: 700
+                    }}>Error</h3>
+                    <p style={{
+                        color: '#991b1b',
+                        margin: '0 0 24px 0',
+                        fontFamily: 'Inter, sans-serif',
+                        fontWeight: 500
+                    }}>{error}</p>
                     <Button onClick={() => navigate('/apuntes')}>Volver a Apuntes</Button>
                 </Card>
             </div>
@@ -510,9 +475,15 @@ export const ApunteView = () => {
     if (!apunte) return null;
 
     const isOwner = apunte.id_usuario === currentUserId;
+    const canLike = hasPurchased && !isOwner;
 
     return (
-        <div style={{ maxWidth: 900, margin: '40px auto', padding: '0 20px' }}>
+        <div style={{
+            maxWidth: 900,
+            margin: '40px auto',
+            padding: '0 20px',
+            fontFamily: 'Inter, sans-serif'
+        }}>
             {/* Modal de confirmación - Eliminar */}
             {deleteConfirm && (
                 <div style={{
@@ -526,7 +497,8 @@ export const ApunteView = () => {
                     alignItems: 'center',
                     justifyContent: 'center',
                     zIndex: 1000,
-                    backdropFilter: 'blur(4px)'
+                    backdropFilter: 'blur(4px)',
+                    fontFamily: 'Inter, sans-serif'
                 }}>
                     <Card style={{
                         maxWidth: 450,
@@ -541,19 +513,25 @@ export const ApunteView = () => {
                             background: '#fee2e2',
                             borderRadius: '50%',
                             margin: '0 auto 20px',
-                            fontSize: 32,
                             display: 'flex',
                             alignItems: 'center',
                             justifyContent: 'center',
                         }}>
-                            ⚠️
+                            <FontAwesomeIcon
+                                icon={faExclamationTriangle}
+                                style={{
+                                    fontSize: 28,
+                                    color: '#dc2626'
+                                }}
+                            />
                         </div>
                         <h3 style={{
                             margin: '0 0 12px 0',
                             fontSize: 22,
                             fontWeight: 700,
                             color: '#991b1b',
-                            textAlign: 'center'
+                            textAlign: 'center',
+                            fontFamily: 'Inter, sans-serif'
                         }}>
                             ¿Eliminar apunte?
                         </h3>
@@ -562,7 +540,9 @@ export const ApunteView = () => {
                             fontSize: 15,
                             lineHeight: 1.6,
                             marginBottom: 24,
-                            textAlign: 'center'
+                            textAlign: 'center',
+                            fontFamily: 'Inter, sans-serif',
+                            fontWeight: 500
                         }}>
                             Esta acción no se puede deshacer. El archivo se eliminará permanentemente del sistema.
                         </p>
@@ -577,7 +557,8 @@ export const ApunteView = () => {
                                     border: '1px solid #d1d5db',
                                     borderRadius: 8,
                                     fontWeight: 600,
-                                    cursor: 'pointer'
+                                    cursor: 'pointer',
+                                    fontFamily: 'Inter, sans-serif'
                                 }}
                             >
                                 Cancelar
@@ -594,7 +575,8 @@ export const ApunteView = () => {
                                     borderRadius: 8,
                                     fontWeight: 600,
                                     cursor: deleting ? 'not-allowed' : 'pointer',
-                                    opacity: deleting ? 0.6 : 1
+                                    opacity: deleting ? 0.6 : 1,
+                                    fontFamily: 'Inter, sans-serif'
                                 }}
                             >
                                 {deleting ? 'Eliminando...' : 'Eliminar'}
@@ -617,7 +599,8 @@ export const ApunteView = () => {
                     alignItems: 'center',
                     justifyContent: 'center',
                     zIndex: 1000,
-                    backdropFilter: 'blur(4px)'
+                    backdropFilter: 'blur(4px)',
+                    fontFamily: 'Inter, sans-serif'
                 }}>
                     <Card style={{
                         maxWidth: 450,
@@ -635,10 +618,15 @@ export const ApunteView = () => {
                             display: 'flex',
                             alignItems: 'center',
                             justifyContent: 'center',
-                            margin: '0 auto 24px',
-                            fontSize: 40
+                            margin: '0 auto 24px'
                         }}>
-                            ✅
+                            <FontAwesomeIcon
+                                icon={faCheckCircle}
+                                style={{
+                                    fontSize: 36,
+                                    color: '#fff'
+                                }}
+                            />
                         </div>
                         <h2 style={{
                             margin: '0 0 12px 0',
@@ -647,7 +635,8 @@ export const ApunteView = () => {
                             background: 'linear-gradient(135deg, #ef4444 0%, #991b1b 100%)',
                             WebkitBackgroundClip: 'text',
                             WebkitTextFillColor: 'transparent',
-                            backgroundClip: 'text'
+                            backgroundClip: 'text',
+                            fontFamily: 'Inter, sans-serif'
                         }}>
                             Apunte eliminado
                         </h2>
@@ -655,7 +644,9 @@ export const ApunteView = () => {
                             color: '#6b7280',
                             fontSize: 16,
                             lineHeight: 1.6,
-                            marginBottom: 32
+                            marginBottom: 32,
+                            fontFamily: 'Inter, sans-serif',
+                            fontWeight: 500
                         }}>
                             El apunte se ha eliminado permanentemente.
                         </p>
@@ -671,7 +662,8 @@ export const ApunteView = () => {
                                 cursor: 'pointer',
                                 fontSize: 16,
                                 width: '100%',
-                                transition: 'transform 0.2s'
+                                transition: 'transform 0.2s',
+                                fontFamily: 'Inter, sans-serif'
                             }}
                             onMouseEnter={(e) => e.currentTarget.style.transform = 'scale(1.02)'}
                             onMouseLeave={(e) => e.currentTarget.style.transform = 'scale(1)'}
@@ -682,15 +674,20 @@ export const ApunteView = () => {
                 </div>
             )}
 
-            {/* Modal de éxito - Favorito */}
-
-            <h1 style={{ textAlign: 'center', margin: '0 0 32px 0', fontSize: 32, fontWeight: 700 }}>
+            <h1 style={{
+                textAlign: 'center',
+                margin: '0 0 32px 0',
+                fontSize: 32,
+                fontWeight: 700,
+                fontFamily: 'Inter, sans-serif',
+                color: '#0f172a'
+            }}>
                 {apunte.titulo}
             </h1>
 
             <Card style={{ padding: 32, position: 'relative' }}>
-                {/* Bookmark - Solo visible si NO es owner y NO ha comprado */}
-                {!isOwner  && (
+                {/* Bookmark - Solo visible si NO es owner */}
+                {!isOwner && (
                     <button
                         onClick={handleFavoriteToggle}
                         style={{
@@ -707,36 +704,35 @@ export const ApunteView = () => {
                         onMouseEnter={(e) => e.currentTarget.style.transform = 'scale(1.1)'}
                         onMouseLeave={(e) => e.currentTarget.style.transform = 'scale(1)'}
                     >
-                        <svg
-                            width="32"
-                            height="32"
-                            viewBox="0 0 24 24"
-                            fill={isFavorite ? '#1e293b' : 'none'}
-                            stroke="#1e293b"
-                            strokeWidth="2"
-                            strokeLinecap="round"
-                            strokeLinejoin="round"
+                        <FontAwesomeIcon
+                            icon={faBookmark}
                             style={{
-                                transition: 'all 0.3s ease',
-                                animation: isFavorite ? 'bookmarkBounce 0.5s ease' : 'none'
+                                fontSize: 24,
+                                color: isFavorite ? '#1e293b' : '#cbd5e1',
+                                transition: 'all 0.3s ease'
                             }}
-                        >
-                            <path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z" />
-                        </svg>
+                        />
                     </button>
                 )}
+
                 <div style={{ display: 'flex', gap: 32, marginBottom: 24 }}>
                     <div style={{ flexShrink: 0 }}>
                         <PDFThumbnail
                             url={signedUrl}
-                            thumbnailPath={apunte?.thumbnail_path} // ← Agregar esto
+                            thumbnailPath={apunte?.thumbnail_path}
                             width={250}
                             height={350}
                         />
                     </div>
 
                     <div style={{ flex: 1 }}>
-                        <div style={{ display: 'flex', gap: 12, alignItems: 'center', marginBottom: 16, flexWrap: 'wrap' }}>
+                        <div style={{
+                            display: 'flex',
+                            gap: 12,
+                            alignItems: 'center',
+                            marginBottom: 16,
+                            flexWrap: 'wrap'
+                        }}>
                             {apunte.materia?.nombre_materia && (
                                 <span style={{
                                     padding: '6px 14px',
@@ -744,42 +740,66 @@ export const ApunteView = () => {
                                     color: '#1e40af',
                                     borderRadius: 20,
                                     fontSize: 14,
-                                    fontWeight: 600
+                                    fontWeight: 600,
+                                    fontFamily: 'Inter, sans-serif'
                                 }}>
                                     {apunte.materia.nombre_materia}
                                 </span>
                             )}
-                            <span style={{ fontSize: 14, color: '#6b7280' }}>
+                            <span style={{
+                                fontSize: 14,
+                                color: '#6b7280',
+                                fontFamily: 'Inter, sans-serif',
+                                fontWeight: 500
+                            }}>
                                 {isOwner ? (
-                                    <strong>Por Ti</strong>
+                                    <strong style={{ fontWeight: 600 }}>Por Ti</strong>
                                 ) : (
-                                    <>Por <strong>{apunte.usuario?.nombre || 'Anónimo'}</strong></>
+                                    <>Por <strong style={{ fontWeight: 600 }}>{apunte.usuario?.nombre || 'Anónimo'}</strong></>
                                 )}
                             </span>
                         </div>
 
                         {apunte.descripcion && (
                             <div style={{ marginBottom: 24 }}>
-                                <h3 style={{ margin: '0 0 8px 0', fontSize: 16, fontWeight: 600 }}>Descripción</h3>
-                                <p style={{ color: '#374151', lineHeight: 1.6, margin: 0, fontSize: 15 }}>
+                                <h3 style={{
+                                    margin: '0 0 8px 0',
+                                    fontSize: 16,
+                                    fontWeight: 600,
+                                    fontFamily: 'Inter, sans-serif',
+                                    color: '#0f172a'
+                                }}>Descripción</h3>
+                                <p style={{
+                                    color: '#374151',
+                                    lineHeight: 1.6,
+                                    margin: 0,
+                                    fontSize: 15,
+                                    fontFamily: 'Inter, sans-serif',
+                                    fontWeight: 500
+                                }}>
                                     {apunte.descripcion}
                                 </p>
                             </div>
                         )}
 
-                        {/* Botones de votación con contadores */}
-                        <div style={{ marginBottom: 16, display: 'flex', gap: 16, justifyContent: 'center', alignItems: 'center' }}>
+                        {/* Botón de like con contador */}
+                        <div style={{
+                            marginBottom: 24,
+                            display: 'flex',
+                            justifyContent: 'center',
+                            alignItems: 'center'
+                        }}>
                             <div style={{ position: 'relative' }}>
                                 <button
-                                    onClick={() => hasPurchased && !isOwner && handleLike('like')}
+                                    onClick={() => canLike && handleLike()}
+                                    disabled={likingInProgress}
                                     onMouseEnter={(e) => {
-                                        const cannotVote = isOwner || !hasPurchased;
-                                        const button = e.currentTarget; // Guardar referencia
-                                        if (cannotVote) {
+                                        if (!canLike) {
+                                            const button = e.currentTarget;
                                             button.dataset.hovering = 'true';
                                             setTimeout(() => {
-                                                if (button.dataset.hovering === 'true') {
-                                                    const tooltip = button.parentElement.children[1];
+                                                if (button && button.dataset && button.dataset.hovering === 'true') {
+                                                    const tooltip = button.parentElement?.children[1];
                                                     if (tooltip) {
                                                         tooltip.style.opacity = '1';
                                                         tooltip.style.visibility = 'visible';
@@ -787,44 +807,47 @@ export const ApunteView = () => {
                                                 }
                                             }, 500);
                                         } else {
-                                            button.style.transform = 'scale(1.1)';
-                                            if (userLike !== 'like') {
-                                                button.style.borderColor = '#2563eb';
-                                            }
+                                            e.currentTarget.style.transform = 'scale(1.1)';
                                         }
                                     }}
                                     onMouseLeave={(e) => {
-                                        e.currentTarget.dataset.hovering = 'false';
-                                        const tooltip = e.currentTarget.parentElement.children[1];
+                                        const button = e.currentTarget;
+                                        if (button && button.dataset) {
+                                            button.dataset.hovering = 'false';
+                                        }
+                                        const tooltip = button.parentElement?.children[1];
                                         if (tooltip) {
                                             tooltip.style.opacity = '0';
                                             tooltip.style.visibility = 'hidden';
                                         }
-                                        if (hasPurchased && !isOwner) {
+                                        if (canLike) {
                                             e.currentTarget.style.transform = 'scale(1)';
-                                            if (userLike !== 'like') {
-                                                e.currentTarget.style.borderColor = '#d1d5db';
-                                            }
                                         }
                                     }}
                                     style={{
-                                        width: 56,
-                                        height: 56,
+                                        width: 48,
+                                        height: 48,
                                         borderRadius: '50%',
-                                        border: `2px solid ${userLike === 'like' ? '#2563eb' : '#d1d5db'}`,
-                                        background: userLike === 'like' ? '#dbeafe' : '#fff',
-                                        cursor: (hasPurchased && !isOwner) ? 'pointer' : 'not-allowed',
-                                        fontSize: 24,
+                                        border: 'none',
+                                        background: liked ? '#fef3c7' : '#fff',
+                                        cursor: canLike ? 'pointer' : 'not-allowed',
                                         display: 'flex',
                                         alignItems: 'center',
                                         justifyContent: 'center',
                                         transition: 'all 0.2s ease',
-                                        boxShadow: '0 2px 4px rgba(0,0,0,0.1)',
-                                        opacity:  1,
+                                        boxShadow: '0 2px 8px rgba(0,0,0,0.08)',
+                                        opacity: likingInProgress ? 0.6 : 1,
                                         position: 'relative'
                                     }}
                                 >
-                                    👍
+                                    <FontAwesomeIcon
+                                        icon={faHeart}
+                                        style={{
+                                            fontSize: 20,
+                                            color: liked ? '#f59e0b' : '#cbd5e1',
+                                            transition: 'all 0.2s ease'
+                                        }}
+                                    />
                                 </button>
                                 <div style={{
                                     position: 'absolute',
@@ -842,9 +865,12 @@ export const ApunteView = () => {
                                     transition: 'opacity 0.2s ease',
                                     zIndex: 10,
                                     pointerEvents: 'none',
-                                    boxShadow: '0 2px 8px rgba(0,0,0,0.15)'
+                                    boxShadow: '0 2px 8px rgba(0,0,0,0.15)',
+                                    fontFamily: 'Inter, sans-serif',
+                                    fontWeight: 500
                                 }}>
-                                    {isOwner ? 'No podés votar tu propio apunte' : 'Para votar tenés que comprar el apunte'}                                    <div style={{
+                                    {isOwner ? 'No podés votar tu propio apunte' : 'Para dar like tenés que comprar el apunte'}
+                                    <div style={{
                                         position: 'absolute',
                                         top: '-4px',
                                         left: '50%',
@@ -858,139 +884,45 @@ export const ApunteView = () => {
                                 </div>
                                 <div style={{
                                     position: 'absolute',
-                                    bottom: '-20px',
+                                    bottom: '-24px',
                                     left: '50%',
                                     transform: 'translateX(-50%)',
-                                    fontSize: 14,
-                                    fontWeight: 700,
-                                    color: '#2563eb'
+                                    fontSize: 13,
+                                    fontWeight: 600,
+                                    color: '#64748b',
+                                    fontFamily: 'Inter, sans-serif'
                                 }}>
                                     {likesCount}
-                                </div>
-                            </div>
-
-                            <div style={{ width: 2, height: 40, background: '#d1d5db' }} />
-
-                            <div style={{ position: 'relative' }}>
-                                <button
-                                    onClick={() => hasPurchased && !isOwner && handleLike('dislike')}
-                                    onMouseEnter={(e) => {
-                                        const cannotVote = isOwner || !hasPurchased;
-                                        const button = e.currentTarget; // Guardar referencia
-                                        if (cannotVote) {
-                                            button.dataset.hovering = 'true';
-                                            setTimeout(() => {
-                                                if (button.dataset.hovering === 'true') {
-                                                    const tooltip = button.parentElement.children[1];
-                                                    if (tooltip) {
-                                                        tooltip.style.opacity = '1';
-                                                        tooltip.style.visibility = 'visible';
-                                                    }
-                                                }
-                                            }, 500);
-                                        } else {
-                                            button.style.transform = 'scale(1.1)';
-                                            if (userLike !== 'dislike') {
-                                                button.style.borderColor = '#ef4444';
-                                            }
-                                        }
-                                    }}
-                                    onMouseLeave={(e) => {
-                                        e.currentTarget.dataset.hovering = 'false';
-                                        const tooltip = e.currentTarget.parentElement.children[1];
-                                        if (tooltip) {
-                                            tooltip.style.opacity = '0';
-                                            tooltip.style.visibility = 'hidden';
-                                        }
-                                        if (hasPurchased && !isOwner) {
-                                            e.currentTarget.style.transform = 'scale(1)';
-                                            if (userLike !== 'dislike') {
-                                                e.currentTarget.style.borderColor = '#d1d5db';
-                                            }
-                                        }
-                                    }}
-                                    style={{
-                                        width: 56,
-                                        height: 56,
-                                        borderRadius: '50%',
-                                        border: `2px solid ${userLike === 'dislike' ? '#ef4444' : '#d1d5db'}`,
-                                        background: userLike === 'dislike' ? '#fee2e2' : '#fff',
-                                        cursor: (hasPurchased && !isOwner) ? 'pointer' : 'not-allowed',
-                                        fontSize: 24,
-                                        display: 'flex',
-                                        alignItems: 'center',
-                                        justifyContent: 'center',
-                                        transition: 'all 0.2s ease',
-                                        boxShadow: '0 2px 4px rgba(0,0,0,0.1)',
-                                        opacity: 1,
-                                        position: 'relative'
-                                    }}
-                                >
-                                    👎
-                                </button>
-                                <div style={{
-                                    position: 'absolute',
-                                    bottom: '-45px',
-                                    left: '50%',
-                                    transform: 'translateX(-50%)',
-                                    background: '#374151',
-                                    color: '#fff',
-                                    padding: '8px 12px',
-                                    borderRadius: 6,
-                                    fontSize: 12,
-                                    whiteSpace: 'nowrap',
-                                    opacity: 0,
-                                    visibility: 'hidden',
-                                    transition: 'opacity 0.2s ease',
-                                    zIndex: 10,
-                                    pointerEvents: 'none',
-                                    boxShadow: '0 2px 8px rgba(0,0,0,0.15)'
-                                }}>
-                                    {isOwner ? 'No podés votar tu propio apunte' : 'Para votar tenés que comprar el apunte'}                                    <div style={{
-                                        position: 'absolute',
-                                        top: '-4px',
-                                        left: '50%',
-                                        transform: 'translateX(-50%)',
-                                        width: 0,
-                                        height: 0,
-                                        borderLeft: '4px solid transparent',
-                                        borderRight: '4px solid transparent',
-                                        borderBottom: '4px solid #374151'
-                                    }} />
-                                </div>
-                                <div style={{
-                                    position: 'absolute',
-                                    bottom: '-20px',
-                                    left: '50%',
-                                    transform: 'translateX(-50%)',
-                                    fontSize: 14,
-                                    fontWeight: 700,
-                                    color: '#ef4444'
-                                }}>
-                                    {dislikesCount}
                                 </div>
                             </div>
                         </div>
 
                         <div style={{
-                            padding: '10px 16px',
-                            background: '#eff6ff',
-                            borderRadius: 12,
-                            marginTop:32,
-                            marginBottom: 24,
-                            border: '2px solid #bfdbfe',
+                            padding: '8px 14px',
+                            background: '#f8fafc',
+                            borderRadius: 8,
+                            marginTop: 28,
+                            marginBottom: 20,
+                            border: '1px solid #e2e8f0',
                             display: 'flex',
                             alignItems: 'center',
-                            gap: 120
+                            gap: 8
                         }}>
-                            <div>
-                                <div style={{ fontSize: 12, color: '#1e40af', fontWeight: 600 }}>
-                                    Precio
-                                </div>
-                                <div style={{ fontSize: 20, fontWeight: 700, color: '#1e40af' }}>
-                                    {apunte.creditos} 💰
-                                </div>
-                            </div>
+                            <FontAwesomeIcon
+                                icon={faCoins}
+                                style={{
+                                    fontSize: 16,
+                                    color: '#f59e0b'
+                                }}
+                            />
+                            <span style={{
+                                fontSize: 16,
+                                fontWeight: 700,
+                                color: '#0f172a',
+                                fontFamily: 'Inter, sans-serif'
+                            }}>
+                                {apunte.creditos}
+                            </span>
                         </div>
 
                         <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
@@ -1003,60 +935,77 @@ export const ApunteView = () => {
                                         padding: '14px 28px',
                                         fontSize: 16,
                                         fontWeight: 600,
-                                        width: '100%'
+                                        width: '100%',
+                                        fontFamily: 'Inter, sans-serif'
                                     }}
                                 >
                                     {purchasing ? 'Procesando compra...' :
                                         isOwner ? 'Es tu apunte' :
-                                            `Comprar por ${apunte.creditos} 💰`}
+                                            `Comprar por ${apunte.creditos} créditos`}
                                 </Button>
                             ) : (
                                 <>
-                                <Button
-                                variant="primary"
-                                onClick={handleDownload}
-                            style={{
-                                padding: '14px 28px',
-                                fontSize: 16,
-                                fontWeight: 600,
-                                width: '100%'
-                            }}
-                        >
-                            📥 Descargar apunte
-                        </Button>
-                        {!isOwner && (
-                            <div style={{ display: 'flex', justifyContent: 'center', marginTop: 12 }}>
-                                <button
-                                    onClick={() => setShowReportModal(true)}
-                                    style={{
-                                        width: 56,
-                                        height: 56,
-                                        borderRadius: '50%',
-                                        border: '2px solid #f59e0b',
-                                        background: '#fff',
-                                        cursor: 'pointer',
-                                        fontSize: 24,
-                                        display: 'flex',
-                                        alignItems: 'center',
-                                        justifyContent: 'center',
-                                        transition: 'all 0.2s ease',
-                                        boxShadow: '0 2px 4px rgba(0,0,0,0.1)'
-                                    }}
-                                    onMouseEnter={(e) => {
-                                        e.currentTarget.style.transform = 'scale(1.1)';
-                                        e.currentTarget.style.background = '#fef3c7';
-                                    }}
-                                    onMouseLeave={(e) => {
-                                        e.currentTarget.style.transform = 'scale(1)';
-                                        e.currentTarget.style.background = '#fff';
-                                    }}
-                                >
-                                    🚩
-                                </button>
-                            </div>
-                        )}
-                    </>
-                    )}
+                                    <Button
+                                        variant="primary"
+                                        onClick={handleDownload}
+                                        style={{
+                                            padding: '14px 28px',
+                                            fontSize: 16,
+                                            fontWeight: 600,
+                                            width: '100%',
+                                            fontFamily: 'Inter, sans-serif',
+                                            display: 'flex',
+                                            alignItems: 'center',
+                                            justifyContent: 'center',
+                                            gap: 8
+                                        }}
+                                    >
+                                        <FontAwesomeIcon
+                                            icon={faDownload}
+                                            style={{
+                                                fontSize: 16
+                                            }}
+                                        />
+                                        Descargar apunte
+                                    </Button>
+                                    {!isOwner && (
+                                        <div style={{ display: 'flex', justifyContent: 'center', marginTop: 12 }}>
+                                            <button
+                                                onClick={() => setShowReportModal(true)}
+                                                style={{
+                                                    width: 56,
+                                                    height: 56,
+                                                    borderRadius: '50%',
+                                                    border: '2px solid #f59e0b',
+                                                    background: '#fff',
+                                                    cursor: 'pointer',
+                                                    display: 'flex',
+                                                    alignItems: 'center',
+                                                    justifyContent: 'center',
+                                                    transition: 'all 0.2s ease',
+                                                    boxShadow: '0 2px 4px rgba(0,0,0,0.1)'
+                                                }}
+                                                onMouseEnter={(e) => {
+                                                    e.currentTarget.style.transform = 'scale(1.1)';
+                                                    e.currentTarget.style.background = '#fef3c7';
+                                                }}
+                                                onMouseLeave={(e) => {
+                                                    e.currentTarget.style.transform = 'scale(1)';
+                                                    e.currentTarget.style.background = '#fff';
+                                                }}
+                                            >
+                                                <FontAwesomeIcon
+                                                    icon={faFlag}
+                                                    style={{
+                                                        fontSize: 20,
+                                                        color: '#f59e0b'
+                                                    }}
+                                                />
+                                            </button>
+                                        </div>
+                                    )}
+                                </>
+                            )}
                         </div>
 
                         {isOwner && (
@@ -1081,13 +1030,20 @@ export const ApunteView = () => {
                                     cursor: 'pointer',
                                     fontSize: 14,
                                     width: '100%',
-                                    transition: 'all 0.2s ease'
+                                    transition: 'all 0.2s ease',
+                                    fontFamily: 'Inter, sans-serif'
                                 }}
                             >
-                                🗑️ Eliminar apunte
+                                <FontAwesomeIcon
+                                    icon={faTrash}
+                                    style={{
+                                        fontSize: 14,
+                                        marginRight: 6
+                                    }}
+                                />
+                                Eliminar apunte
                             </button>
                         )}
-
 
                         <div style={{
                             marginTop: 16,
@@ -1096,9 +1052,19 @@ export const ApunteView = () => {
                             borderRadius: 8,
                             fontSize: 14,
                             color: '#6b7280',
-                            textAlign: 'center'
+                            textAlign: 'center',
+                            fontFamily: 'Inter, sans-serif',
+                            fontWeight: 500
                         }}>
-                            Tenés <strong style={{ color: '#374151' }}>{userCredits} 💰</strong> disponibles
+                            Tenés <strong style={{ color: '#374151', fontWeight: 700 }}>{userCredits}</strong>
+                            <FontAwesomeIcon
+                                icon={faCoins}
+                                style={{
+                                    fontSize: 14,
+                                    color: '#f59e0b',
+                                    marginLeft: 4
+                                }}
+                            /> disponibles
                         </div>
                     </div>
                 </div>
@@ -1108,6 +1074,7 @@ export const ApunteView = () => {
                 <Button
                     variant="ghost"
                     onClick={() => navigate(-1)}
+                    style={{ fontFamily: 'Inter, sans-serif' }}
                 >
                     ← Volver
                 </Button>
@@ -1126,7 +1093,8 @@ export const ApunteView = () => {
                     alignItems: 'center',
                     justifyContent: 'center',
                     zIndex: 1000,
-                    backdropFilter: 'blur(4px)'
+                    backdropFilter: 'blur(4px)',
+                    fontFamily: 'Inter, sans-serif'
                 }}>
                     <Card style={{
                         maxWidth: 450,
@@ -1144,10 +1112,15 @@ export const ApunteView = () => {
                             display: 'flex',
                             alignItems: 'center',
                             justifyContent: 'center',
-                            margin: '0 auto 24px',
-                            fontSize: 40
+                            margin: '0 auto 24px'
                         }}>
-                            ✅
+                            <FontAwesomeIcon
+                                icon={faCheckCircle}
+                                style={{
+                                    fontSize: 36,
+                                    color: '#fff'
+                                }}
+                            />
                         </div>
                         <h2 style={{
                             margin: '0 0 12px 0',
@@ -1156,7 +1129,8 @@ export const ApunteView = () => {
                             background: 'linear-gradient(135deg, #2563eb 0%, #1e40af 100%)',
                             WebkitBackgroundClip: 'text',
                             WebkitTextFillColor: 'transparent',
-                            backgroundClip: 'text'
+                            backgroundClip: 'text',
+                            fontFamily: 'Inter, sans-serif'
                         }}>
                             ¡Compra exitosa!
                         </h2>
@@ -1164,7 +1138,9 @@ export const ApunteView = () => {
                             color: '#6b7280',
                             fontSize: 16,
                             lineHeight: 1.6,
-                            marginBottom: 32
+                            marginBottom: 32,
+                            fontFamily: 'Inter, sans-serif',
+                            fontWeight: 500
                         }}>
                             Ya podés descargar el apunte. También aparece en tu sección de <strong style={{ color: '#374151' }}>Mis compras</strong>. 📥
                         </p>
@@ -1180,7 +1156,8 @@ export const ApunteView = () => {
                                 cursor: 'pointer',
                                 fontSize: 16,
                                 width: '100%',
-                                transition: 'transform 0.2s'
+                                transition: 'transform 0.2s',
+                                fontFamily: 'Inter, sans-serif'
                             }}
                             onMouseEnter={(e) => e.currentTarget.style.transform = 'scale(1.02)'}
                             onMouseLeave={(e) => e.currentTarget.style.transform = 'scale(1)'}
@@ -1204,7 +1181,8 @@ export const ApunteView = () => {
                     alignItems: 'center',
                     justifyContent: 'center',
                     zIndex: 1000,
-                    backdropFilter: 'blur(4px)'
+                    backdropFilter: 'blur(4px)',
+                    fontFamily: 'Inter, sans-serif'
                 }}>
                     <Card style={{
                         maxWidth: 450,
@@ -1222,10 +1200,15 @@ export const ApunteView = () => {
                             display: 'flex',
                             alignItems: 'center',
                             justifyContent: 'center',
-                            margin: '0 auto 24px',
-                            fontSize: 40
+                            margin: '0 auto 24px'
                         }}>
-                            ⚠️
+                            <FontAwesomeIcon
+                                icon={faExclamationTriangle}
+                                style={{
+                                    fontSize: 36,
+                                    color: '#fff'
+                                }}
+                            />
                         </div>
                         <h2 style={{
                             margin: '0 0 12px 0',
@@ -1234,7 +1217,8 @@ export const ApunteView = () => {
                             background: 'linear-gradient(135deg, #dc2626 0%, #991b1b 100%)',
                             WebkitBackgroundClip: 'text',
                             WebkitTextFillColor: 'transparent',
-                            backgroundClip: 'text'
+                            backgroundClip: 'text',
+                            fontFamily: 'Inter, sans-serif'
                         }}>
                             Créditos insuficientes
                         </h2>
@@ -1242,7 +1226,9 @@ export const ApunteView = () => {
                             color: '#6b7280',
                             fontSize: 16,
                             lineHeight: 1.6,
-                            marginBottom: 32
+                            marginBottom: 32,
+                            fontFamily: 'Inter, sans-serif',
+                            fontWeight: 500
                         }}>
                             {errorMessage}
                         </p>
@@ -1258,7 +1244,8 @@ export const ApunteView = () => {
                                 cursor: 'pointer',
                                 fontSize: 16,
                                 width: '100%',
-                                transition: 'transform 0.2s'
+                                transition: 'transform 0.2s',
+                                fontFamily: 'Inter, sans-serif'
                             }}
                             onMouseEnter={(e) => e.currentTarget.style.transform = 'scale(1.02)'}
                             onMouseLeave={(e) => e.currentTarget.style.transform = 'scale(1)'}
@@ -1285,13 +1272,20 @@ export const ApunteView = () => {
                     alignItems: 'center',
                     gap: 12,
                     animation: 'slideInUp 0.3s ease-out',
-                    maxWidth: 400
+                    maxWidth: 400,
+                    fontFamily: 'Inter, sans-serif'
                 }}>
                     <div style={{
                         fontSize: 24,
                         flexShrink: 0
                     }}>
-                        ✓
+                        <FontAwesomeIcon
+                            icon={faCheckCircle}
+                            style={{
+                                fontSize: 24,
+                                color: '#10b981'
+                            }}
+                        />
                     </div>
                     <div>
                         <div style={{ fontWeight: 600, marginBottom: 4, fontSize: 15 }}>
@@ -1303,6 +1297,7 @@ export const ApunteView = () => {
                     </div>
                 </div>
             )}
+
             {/* Modal de reporte */}
             {showReportModal && (
                 <div style={{
@@ -1316,7 +1311,8 @@ export const ApunteView = () => {
                     alignItems: 'center',
                     justifyContent: 'center',
                     zIndex: 1000,
-                    backdropFilter: 'blur(4px)'
+                    backdropFilter: 'blur(4px)',
+                    fontFamily: 'Inter, sans-serif'
                 }}>
                     <Card style={{
                         maxWidth: 500,
@@ -1333,19 +1329,25 @@ export const ApunteView = () => {
                             background: '#fef3c7',
                             borderRadius: '50%',
                             margin: '0 auto 20px',
-                            fontSize: 32,
                             display: 'flex',
                             alignItems: 'center',
                             justifyContent: 'center',
                         }}>
-                            🚩
+                            <FontAwesomeIcon
+                                icon={faFlag}
+                                style={{
+                                    fontSize: 28,
+                                    color: '#f59e0b'
+                                }}
+                            />
                         </div>
                         <h3 style={{
                             margin: '0 0 12px 0',
                             fontSize: 22,
                             fontWeight: 700,
                             color: '#1f2937',
-                            textAlign: 'center'
+                            textAlign: 'center',
+                            fontFamily: 'Inter, sans-serif'
                         }}>
                             Reportar apunte
                         </h3>
@@ -1354,22 +1356,31 @@ export const ApunteView = () => {
                             fontSize: 14,
                             lineHeight: 1.6,
                             marginBottom: 24,
-                            textAlign: 'center'
+                            textAlign: 'center',
+                            fontFamily: 'Inter, sans-serif',
+                            fontWeight: 500
                         }}>
                             Ayudanos a mantener la calidad del contenido. Seleccioná el motivo del reporte:
                         </p>
 
                         <div style={{ marginBottom: 20 }}>
-                            <label style={{ display: 'block', marginBottom: 12, fontSize: 14, fontWeight: 600, color: '#374151' }}>
+                            <label style={{
+                                display: 'block',
+                                marginBottom: 12,
+                                fontSize: 14,
+                                fontWeight: 600,
+                                color: '#374151',
+                                fontFamily: 'Inter, sans-serif'
+                            }}>
                                 Motivo del reporte *
                             </label>
                             <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
                                 {[
-                                    { value: 'contenido_inapropiado', label: '🚫 Contenido inapropiado', icon: '🚫' },
-                                    { value: 'spam', label: '📧 Spam o publicidad', icon: '📧' },
-                                    { value: 'plagio', label: '©️ Plagio o violación de derechos', icon: '©️' },
-                                    { value: 'informacion_incorrecta', label: '❌ Información incorrecta', icon: '❌' },
-                                    { value: 'otro', label: '💬 Otro motivo', icon: '💬' }
+                                    { value: 'contenido_inapropiado', label: 'Contenido inapropiado' },
+                                    { value: 'spam', label: 'Spam o publicidad' },
+                                    { value: 'plagio', label: 'Plagio o violación de derechos' },
+                                    { value: 'informacion_incorrecta', label: 'Información incorrecta' },
+                                    { value: 'otro', label: 'Otro motivo' }
                                 ].map((opcion) => (
                                     <button
                                         key={opcion.value}
@@ -1386,9 +1397,7 @@ export const ApunteView = () => {
                                             cursor: 'pointer',
                                             textAlign: 'left',
                                             transition: 'all 0.2s ease',
-                                            display: 'flex',
-                                            alignItems: 'center',
-                                            gap: 12
+                                            fontFamily: 'Inter, sans-serif'
                                         }}
                                         onMouseEnter={(e) => {
                                             if (reportMotivo !== opcion.value) {
@@ -1403,8 +1412,7 @@ export const ApunteView = () => {
                                             }
                                         }}
                                     >
-                                        <span style={{ fontSize: 20 }}>{opcion.icon}</span>
-                                        <span>{opcion.label.substring(opcion.label.indexOf(' ') + 1)}</span>
+                                        {opcion.label}
                                     </button>
                                 ))}
                             </div>
@@ -1412,7 +1420,14 @@ export const ApunteView = () => {
 
                         {reportMotivo && (
                             <div style={{ marginBottom: 24 }}>
-                                <label style={{ display: 'block', marginBottom: 8, fontSize: 14, fontWeight: 600, color: '#374151' }}>
+                                <label style={{
+                                    display: 'block',
+                                    marginBottom: 8,
+                                    fontSize: 14,
+                                    fontWeight: 600,
+                                    color: '#374151',
+                                    fontFamily: 'Inter, sans-serif'
+                                }}>
                                     Descripción {reportMotivo === 'otro' && <span style={{ color: '#ef4444' }}>*</span>}
                                 </label>
                                 <textarea
@@ -1429,7 +1444,7 @@ export const ApunteView = () => {
                                         color: '#1f2937',
                                         outline: 'none',
                                         resize: 'vertical',
-                                        fontFamily: 'inherit'
+                                        fontFamily: 'Inter, sans-serif'
                                     }}
                                 />
                             </div>
@@ -1452,7 +1467,8 @@ export const ApunteView = () => {
                                     borderRadius: 8,
                                     fontWeight: 600,
                                     cursor: submittingReport ? 'not-allowed' : 'pointer',
-                                    opacity: submittingReport ? 0.5 : 1
+                                    opacity: submittingReport ? 0.5 : 1,
+                                    fontFamily: 'Inter, sans-serif'
                                 }}
                             >
                                 Cancelar
@@ -1469,7 +1485,8 @@ export const ApunteView = () => {
                                     borderRadius: 8,
                                     fontWeight: 600,
                                     cursor: (submittingReport || !reportMotivo) ? 'not-allowed' : 'pointer',
-                                    opacity: (submittingReport || !reportMotivo) ? 0.6 : 1
+                                    opacity: (submittingReport || !reportMotivo) ? 0.6 : 1,
+                                    fontFamily: 'Inter, sans-serif'
                                 }}
                             >
                                 {submittingReport ? 'Enviando...' : 'Enviar reporte'}
@@ -1478,6 +1495,7 @@ export const ApunteView = () => {
                     </Card>
                 </div>
             )}
+
             {/* Modal de éxito - Reporte enviado */}
             {showReportSuccessModal && (
                 <div style={{
@@ -1491,7 +1509,8 @@ export const ApunteView = () => {
                     alignItems: 'center',
                     justifyContent: 'center',
                     zIndex: 1001,
-                    backdropFilter: 'blur(4px)'
+                    backdropFilter: 'blur(4px)',
+                    fontFamily: 'Inter, sans-serif'
                 }}>
                     <Card style={{
                         maxWidth: 500,
@@ -1510,10 +1529,15 @@ export const ApunteView = () => {
                             alignItems: 'center',
                             justifyContent: 'center',
                             margin: '0 auto 24px',
-                            fontSize: 50,
                             boxShadow: '0 10px 30px rgba(245, 158, 11, 0.3)'
                         }}>
-                            🙏
+                            <FontAwesomeIcon
+                                icon={faHandHoldingHeart}
+                                style={{
+                                    fontSize: 44,
+                                    color: '#fff'
+                                }}
+                            />
                         </div>
                         <h2 style={{
                             margin: '0 0 16px 0',
@@ -1522,7 +1546,8 @@ export const ApunteView = () => {
                             background: 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)',
                             WebkitBackgroundClip: 'text',
                             WebkitTextFillColor: 'transparent',
-                            backgroundClip: 'text'
+                            backgroundClip: 'text',
+                            fontFamily: 'Inter, sans-serif'
                         }}>
                             Kerana te agradece
                         </h2>
@@ -1531,7 +1556,9 @@ export const ApunteView = () => {
                             fontSize: 17,
                             lineHeight: 1.7,
                             marginBottom: 36,
-                            padding: '0 20px'
+                            padding: '0 20px',
+                            fontFamily: 'Inter, sans-serif',
+                            fontWeight: 500
                         }}>
                             Tu reporte nos ayuda a mantener la calidad del contenido. Lo revisaremos a la brevedad.
                         </p>
@@ -1547,7 +1574,8 @@ export const ApunteView = () => {
                                 cursor: 'pointer',
                                 fontSize: 16,
                                 boxShadow: '0 4px 14px rgba(245, 158, 11, 0.4)',
-                                transition: 'all 0.2s'
+                                transition: 'all 0.2s',
+                                fontFamily: 'Inter, sans-serif'
                             }}
                             onMouseEnter={(e) => {
                                 e.currentTarget.style.transform = 'scale(1.05)';
@@ -1565,24 +1593,33 @@ export const ApunteView = () => {
             )}
 
             <style>{`
-    @keyframes bookmarkBounce {
-        0%, 100% { transform: scale(1); }
-        25% { transform: scale(1.2); }
-        50% { transform: scale(0.9); }
-        75% { transform: scale(1.1); }
-    }
-    
-    @keyframes slideInUp {
-        from {
-            transform: translateY(100px);
-            opacity: 0;
-        }
-        to {
-            transform: translateY(0);
-            opacity: 1;
-        }
-    }
-`}</style>
+                @keyframes spin {
+                    from { transform: rotate(0deg); }
+                    to { transform: rotate(360deg); }
+                }
+                
+                @keyframes fadeIn {
+                    from {
+                        opacity: 0;
+                        transform: translateY(10px);
+                    }
+                    to {
+                        opacity: 1;
+                        transform: translateY(0);
+                    }
+                }
+                
+                @keyframes slideInUp {
+                    from {
+                        transform: translateY(100px);
+                        opacity: 0;
+                    }
+                    to {
+                        transform: translateY(0);
+                        opacity: 1;
+                    }
+                }
+            `}</style>
         </div>
     );
 };

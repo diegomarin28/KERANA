@@ -322,19 +322,8 @@ async function searchNotes(term) {
 
         // 4️⃣ Traer toda la info de esos apuntes
         const { data: apuntesCompletos, error: errorCompleto } = await supabase
-            .from('apunte')
-            .select(`
-                id_apunte,
-                titulo,
-                descripcion,
-                file_path,
-                estrellas,
-                creditos,
-                id_usuario,
-                id_materia,
-                materia(nombre_materia),
-                thumbnail_path
-            `)
+            .from('apuntes_completos')
+            .select('*')
             .in('id_apunte', ids);
 
         if (errorCompleto) {
@@ -393,8 +382,8 @@ async function searchNotes(term) {
                 creditos: a.creditos || 0,
                 file_path: a.file_path,
                 signedUrl: signedUrl,
-                materia: a.materia,
-                usuario: { nombre: userMap.get(a.id_usuario) || 'Anónimo' },
+                materia: { nombre_materia: a.materia_nombre },
+                usuario: { nombre: a.autor_nombre || 'Anónimo' },
                 likes_count: likesCountMap[a.id_apunte] || 0,
                 thumbnail_path: a.thumbnail_path || null
             });
@@ -817,6 +806,173 @@ export const notesAPI = {
             .eq('id_materia', materiaId)
 
         return { data, error }
+    },
+
+    // ==========================================
+    // ❤️ SISTEMA DE LIKES
+    // ==========================================
+
+    /**
+     * Toggle like/unlike en un apunte
+     * @param {number} apunteId - ID del apunte
+     * @returns {Object} { data: { liked: boolean, count: number }, error }
+     */
+    async toggleLike(apunteId) {
+        try {
+            // 1. Obtener usuario actual
+            const { data: { user } } = await supabase.auth.getUser();
+            if (!user) {
+                return {
+                    data: null,
+                    error: { message: 'Debes iniciar sesión para dar like' }
+                };
+            }
+
+            const { data: usuarioData, error: userError } = await supabase
+                .from('usuario')
+                .select('id_usuario')
+                .eq('auth_id', user.id)
+                .single();
+
+            if (userError || !usuarioData) {
+                return {
+                    data: null,
+                    error: { message: 'Usuario no encontrado' }
+                };
+            }
+
+            const userId = usuarioData.id_usuario;
+
+            // 2. Verificar si ya dio like
+            const { data: existingLike, error: checkError } = await supabase
+                .from('likes')
+                .select('*')
+                .eq('id_usuario', userId)
+                .eq('id_apunte', apunteId)
+                .eq('tipo', 'like')
+                .maybeSingle();
+
+            if (checkError) {
+                console.error('Error verificando like:', checkError);
+                return { data: null, error: checkError };
+            }
+
+            let liked = false;
+
+            if (existingLike) {
+                // 3A. Ya dio like → eliminar (unlike)
+                const { error: deleteError } = await supabase
+                    .from('likes')
+                    .delete()
+                    .eq('id_usuario', userId)
+                    .eq('id_apunte', apunteId);
+
+                if (deleteError) {
+                    console.error('Error eliminando like:', deleteError);
+                    return { data: null, error: deleteError };
+                }
+
+                liked = false;
+            } else {
+                // 3B. No dio like → insertar (like)
+                const { error: insertError } = await supabase
+                    .from('likes')
+                    .insert([{
+                        id_usuario: userId,
+                        id_apunte: apunteId,
+                        tipo: 'like'
+                    }]);
+
+                if (insertError) {
+                    console.error('Error insertando like:', insertError);
+                    return { data: null, error: insertError };
+                }
+
+                liked = true;
+            }
+
+            // 4. Obtener nuevo conteo
+            const { count, error: countError } = await supabase
+                .from('likes')
+                .select('*', { count: 'exact', head: true })
+                .eq('id_apunte', apunteId)
+                .eq('tipo', 'like');
+
+            if (countError) {
+                console.error('Error contando likes:', countError);
+            }
+
+            return {
+                data: {
+                    liked,
+                    count: count || 0
+                },
+                error: null
+            };
+
+        } catch (error) {
+            console.error('Error en toggleLike:', error);
+            return { data: null, error };
+        }
+    },
+
+    /**
+     * Verificar si el usuario actual dio like a un apunte
+     * @param {number} apunteId - ID del apunte
+     * @returns {Object} { data: boolean, error }
+     */
+    async checkIfLiked(apunteId) {
+        try {
+            const { data: { user } } = await supabase.auth.getUser();
+            if (!user) {
+                return { data: false, error: null };
+            }
+
+            const { data: usuarioData, error: userError } = await supabase
+                .from('usuario')
+                .select('id_usuario')
+                .eq('auth_id', user.id)
+                .single();
+
+            if (userError || !usuarioData) {
+                return { data: false, error: null };
+            }
+
+            const { data, error } = await supabase
+                .from('likes')
+                .select('*')
+                .eq('id_usuario', usuarioData.id_usuario)
+                .eq('id_apunte', apunteId)
+                .eq('tipo', 'like')
+                .maybeSingle();
+
+            return { data: !!data, error };
+
+        } catch (error) {
+            console.error('Error en checkIfLiked:', error);
+            return { data: false, error };
+        }
+    },
+
+    /**
+     * Obtener conteo de likes de un apunte
+     * @param {number} apunteId - ID del apunte
+     * @returns {Object} { data: number, error }
+     */
+    async getLikesCount(apunteId) {
+        try {
+            const { count, error } = await supabase
+                .from('likes')
+                .select('*', { count: 'exact', head: true })
+                .eq('id_apunte', apunteId)
+                .eq('tipo', 'like');
+
+            return { data: count || 0, error };
+
+        } catch (error) {
+            console.error('Error en getLikesCount:', error);
+            return { data: 0, error };
+        }
     }
 }
 
@@ -1357,13 +1513,47 @@ export const ratingsAPI = {
 // ==========================================
 export const professorAPI = {
     async getAllProfessors() {
-        const {data, error} = await supabase
+        // 1. Traer profesores con materias
+        const {data: profesores, error} = await supabase
             .from('profesor_curso')
             .select(`
-                *,
-                imparte(materia(id_materia, nombre_materia))
-            `)
-        return {data, error}
+            *,
+            imparte(materia(id_materia, nombre_materia))
+        `)
+
+        if (error) return {data: null, error}
+
+        // 2. Traer ratings de todos los profesores
+        const profesorIds = profesores.map(p => p.id_profesor)
+        const {data: ratings} = await supabase
+            .from('rating')
+            .select('ref_id, estrellas')
+            .eq('tipo', 'profesor')
+            .in('ref_id', profesorIds)
+
+        // 3. Calcular promedio y agregar a cada profesor
+        const ratingsMap = {}
+        ratings?.forEach(r => {
+            if (!ratingsMap[r.ref_id]) ratingsMap[r.ref_id] = {sum: 0, count: 0}
+            ratingsMap[r.ref_id].sum += r.estrellas
+            ratingsMap[r.ref_id].count += 1
+        })
+
+        const profesoresConRating = profesores.map(prof => {
+            const ratingData = ratingsMap[prof.id_profesor]
+            const avgRating = ratingData
+                ? Number((ratingData.sum / ratingData.count).toFixed(1))
+                : 0
+
+            return {
+                ...prof,
+                rating_promedio: avgRating,
+                total_resenas: ratingData?.count || 0,
+                materias: prof.imparte?.map(i => i.materia?.nombre_materia).filter(Boolean) || []
+            }
+        })
+
+        return {data: profesoresConRating, error: null}
     },
 
     async getProfessorsBySubject(materiaId) {
@@ -1813,25 +2003,11 @@ export const publicProfileAPI = {
 
     async getRecentNotes(userId, limit = 4) {
         const { data, error } = await supabase
-            .from('apunte')
-            .select(`
-            id_apunte,
-            id_usuario,
-            titulo,
-            descripcion,
-            creditos,
-            estrellas,
-            created_at,
-            file_path,
-            thumbnail_path,
-            id_materia,
-            usuario:id_usuario(nombre),
-            materia:id_materia(nombre_materia)
-        `)
+            .from('apuntes_completos')
+            .select('*')
             .eq('id_usuario', userId)
             .order('created_at', { ascending: false })
             .limit(limit);
-
         if (error) return { data: null, error };
 
         // Contar likes para cada apunte
@@ -1857,6 +2033,8 @@ export const publicProfileAPI = {
         // Agregar likes_count a cada apunte
         const notesWithLikes = (data || []).map(note => ({
             ...note,
+            usuario: { nombre: note.autor_nombre },
+            materia: { nombre_materia: note.materia_nombre },
             likes_count: likesCountMap[note.id_apunte] || 0
         }));
 
@@ -1865,24 +2043,10 @@ export const publicProfileAPI = {
 
     async getAllNotes(userId, materiaId = null) {
         let query = supabase
-            .from('apunte')
-            .select(`
-            id_apunte,
-            id_usuario,
-            titulo,
-            descripcion,
-            creditos,
-            estrellas,
-            created_at,
-            file_path,
-            thumbnail_path,
-            id_materia,
-            usuario:id_usuario(nombre),
-            materia:id_materia(nombre_materia)
-        `)
+            .from('apuntes_completos')
+            .select('*')
             .eq('id_usuario', userId)
             .order('created_at', { ascending: false });
-
         if (materiaId) {
             query = query.eq('id_materia', materiaId);
         }
@@ -1914,6 +2078,8 @@ export const publicProfileAPI = {
         // Agregar likes_count a cada apunte
         const notesWithLikes = (data || []).map(note => ({
             ...note,
+            usuario: { nombre: note.autor_nombre },
+            materia: { nombre_materia: note.materia_nombre },
             likes_count: likesCountMap[note.id_apunte] || 0
         }));
 
@@ -2261,6 +2427,335 @@ export const foldersAPI = {
 
         } catch (error) {
             console.error('❌ Error en organización automática:', error)
+            return { data: null, error }
+        }
+    }
+}
+
+// ==========================================
+// 💰 CRÉDITOS Y BONIFICACIONES
+// ==========================================
+export const creditsAPI = {
+    // Obtener créditos actuales del usuario
+    async getUserCredits() {
+        const { data: { user } } = await supabase.auth.getUser()
+        if (!user) return { data: null, error: 'No hay usuario logueado' }
+
+        const { data, error } = await supabase
+            .from('usuario')
+            .select('creditos')
+            .eq('auth_id', user.id)
+            .single()
+
+        return { data: data?.creditos || 0, error }
+    },
+
+    // Agregar créditos al usuario
+    async addCredits(amount, reason = 'manual', referenciaId = null) {
+        const { data: { user } } = await supabase.auth.getUser()
+        if (!user) return { data: null, error: 'No hay usuario logueado' }
+
+        // Primero obtenemos los créditos actuales
+        const { data: userData, error: getUserError } = await supabase
+            .from('usuario')
+            .select('creditos, id_usuario')
+            .eq('auth_id', user.id)
+            .single()
+
+        if (getUserError) return { data: null, error: getUserError }
+
+        const newCredits = (userData.creditos || 0) + amount
+
+        // Actualizamos los créditos
+        const { data, error } = await supabase
+            .from('usuario')
+            .update({ creditos: newCredits })
+            .eq('auth_id', user.id)
+            .select()
+
+        if (error) return { data: null, error }
+
+        // Registrar en historial de transacciones
+        await supabase.from('historial_creditos').insert({
+            id_usuario: userData.id_usuario,
+            cantidad_creditos: amount,
+            tipo_transaccion: reason,
+            descripcion: reason,
+            referencia_id: referenciaId
+        })
+
+        return { data, error: null }
+    },
+
+    // Restar créditos al usuario
+    async deductCredits(amount, reason = 'purchase') {
+        return this.addCredits(-amount, reason)
+    },
+
+    // Calcular créditos por subir apunte
+    async calculateNoteCredits(numPaginas, materiaId) {
+        try {
+            // Valor base: 10 créditos por página
+            let creditos = numPaginas * 10
+
+            // Obtener cantidad de apuntes en esa materia para aplicar multiplicador
+            const { count, error } = await supabase
+                .from('apunte')
+                .select('id_apunte', { count: 'exact', head: true })
+                .eq('id_materia', materiaId)
+
+            if (!error) {
+                if (count === 0) {
+                    // Primera contribución: multiplicador x2
+                    creditos *= 2
+                } else if (count < 5) {
+                    // Menos de 5 apuntes: multiplicador x1.5
+                    creditos *= 1.5
+                }
+            }
+
+            // El usuario recibe el 80% inmediato
+            const creditosInmediatos = Math.floor(creditos * 0.8)
+            const creditosBonos = creditos - creditosInmediatos
+
+            return {
+                data: {
+                    creditosInmediatos,
+                    creditosBonos,
+                    creditosTotales: creditos,
+                    multiplicador: creditos / (numPaginas * 10)
+                },
+                error: null
+            }
+        } catch (error) {
+            return { data: null, error }
+        }
+    },
+
+    // Otorgar créditos por subir apunte
+    async grantNoteUploadCredits(apunteId, numPaginas, materiaId) {
+        try {
+            const { data: { user } } = await supabase.auth.getUser()
+            if (!user) return { data: null, error: 'No hay usuario logueado' }
+
+            // Obtener id_usuario
+            const { data: userData, error: userError } = await supabase
+                .from('usuario')
+                .select('id_usuario')
+                .eq('auth_id', user.id)
+                .single()
+
+            if (userError) throw userError
+
+            // Verificar si es el primer apunte
+            const { count: apuntesCount } = await supabase
+                .from('apunte')
+                .select('id_apunte', { count: 'exact', head: true })
+                .eq('id_usuario', userData.id_usuario)
+
+            const esPrimerApunte = apuntesCount === 1
+
+            // Calcular créditos
+            const { data: calculados, error: calcError } = await this.calculateNoteCredits(numPaginas, materiaId)
+            if (calcError) throw calcError
+
+            // Otorgar créditos inmediatos
+            const { error: creditError } = await this.addCredits(
+                calculados.creditosInmediatos,
+                'apunte_subido',
+                apunteId
+            )
+
+            if (creditError) throw creditError
+
+            // Si es el primer apunte, dar bono de 50 créditos
+            let bonoPrimerApunte = 0
+            if (esPrimerApunte) {
+                // Verificar que no se haya dado antes
+                const { data: bonoExistente } = await supabase
+                    .from('bonos_otorgados')
+                    .select('id_bono')
+                    .eq('id_usuario', userData.id_usuario)
+                    .eq('tipo_bono', 'primer_apunte')
+                    .single()
+
+                if (!bonoExistente) {
+                    await this.addCredits(50, 'bono_primer_apunte', apunteId)
+                    await supabase.from('bonos_otorgados').insert({
+                        id_usuario: userData.id_usuario,
+                        tipo_bono: 'primer_apunte',
+                        cantidad_creditos: 50
+                    })
+                    bonoPrimerApunte = 50
+                }
+            }
+
+            return {
+                data: {
+                    creditosOtorgados: calculados.creditosInmediatos,
+                    bonoPrimerApunte,
+                    creditosPendientes: calculados.creditosBonos,
+                    multiplicador: calculados.multiplicador
+                },
+                error: null
+            }
+        } catch (error) {
+            return { data: null, error }
+        }
+    },
+
+    // Otorgar créditos por reseña
+    async grantReviewCredits(ratingId) {
+        try {
+            const { data: { user } } = await supabase.auth.getUser()
+            if (!user) return { data: null, error: 'No hay usuario logueado' }
+
+            // Obtener id_usuario
+            const { data: userData, error: userError } = await supabase
+                .from('usuario')
+                .select('id_usuario')
+                .eq('auth_id', user.id)
+                .single()
+
+            if (userError) throw userError
+
+            // Verificar que la reseña no haya dado créditos antes
+            const { data: rating, error: ratingError } = await supabase
+                .from('rating')
+                .select('creditos_otorgados')
+                .eq('id', ratingId)
+                .single()
+
+            if (ratingError) throw ratingError
+
+            if (rating.creditos_otorgados) {
+                return { data: null, error: 'Esta reseña ya otorgó créditos' }
+            }
+
+            // Otorgar 10 créditos por reseña válida
+            const { error: creditError } = await this.addCredits(10, 'resena_profesor', ratingId)
+            if (creditError) throw creditError
+
+            // Marcar que esta reseña ya dio créditos
+            await supabase
+                .from('rating')
+                .update({ creditos_otorgados: true })
+                .eq('id', ratingId)
+
+            return { data: { creditosOtorgados: 10 }, error: null }
+        } catch (error) {
+            return { data: null, error }
+        }
+    },
+
+    // Verificar y otorgar bonos por hitos
+    async checkAndGrantMilestoneBonus() {
+        try {
+            const { data: { user } } = await supabase.auth.getUser()
+            if (!user) return { data: null, error: 'No hay usuario logueado' }
+
+            // Obtener cantidad de apuntes subidos por el usuario
+            const { data: userData, error: userError } = await supabase
+                .from('usuario')
+                .select('id_usuario')
+                .eq('auth_id', user.id)
+                .single()
+
+            if (userError) throw userError
+
+            const { count: apuntesCount } = await supabase
+                .from('apunte')
+                .select('id_apunte', { count: 'exact', head: true })
+                .eq('id_usuario_subio', userData.id_usuario)
+
+            // Definir hitos y sus bonos
+            const milestones = {
+                10: 100,
+                25: 250,
+                50: 500,
+                100: 1000,
+                250: 2500,
+                500: 5000,
+                1000: 10000
+            }
+
+            // TODO: Verificar qué bonos ya fueron otorgados
+            // Por ahora solo retornamos info
+            const nextMilestone = Object.keys(milestones)
+                .map(Number)
+                .find(m => m > apuntesCount)
+
+            return {
+                data: {
+                    apuntesSubidos: apuntesCount,
+                    proximoHito: nextMilestone,
+                    bonoProximo: nextMilestone ? milestones[nextMilestone] : null
+                },
+                error: null
+            }
+        } catch (error) {
+            return { data: null, error }
+        }
+    },
+
+    // Obtener paquetes de créditos disponibles
+    async getCreditPackages() {
+        const { data, error } = await supabase
+            .from('paquete_creditos')
+            .select('*')
+            .eq('activo', true)
+            .order('cantidad_creditos', { ascending: true })
+
+        return { data, error }
+    },
+
+    // Otorgar bono de bienvenida (llamar al registrar usuario)
+    async grantWelcomeBonus(userId) {
+        try {
+            // Verificar que no se haya dado antes
+            const { data: bonoExistente } = await supabase
+                .from('bonos_otorgados')
+                .select('id_bono')
+                .eq('id_usuario', userId)
+                .eq('tipo_bono', 'bienvenida')
+                .single()
+
+            if (bonoExistente) {
+                return { data: null, error: 'Bono de bienvenida ya otorgado' }
+            }
+
+            // Otorgar 50 créditos
+            const { data: userData } = await supabase
+                .from('usuario')
+                .select('auth_id')
+                .eq('id_usuario', userId)
+                .single()
+
+            if (!userData) throw new Error('Usuario no encontrado')
+
+            // Actualizar créditos directamente
+            await supabase
+                .from('usuario')
+                .update({ creditos: 50 })
+                .eq('id_usuario', userId)
+
+            // Registrar en historial
+            await supabase.from('historial_creditos').insert({
+                id_usuario: userId,
+                cantidad_creditos: 50,
+                tipo_transaccion: 'bono_bienvenida',
+                descripcion: 'Bono de bienvenida'
+            })
+
+            // Registrar en bonos otorgados
+            await supabase.from('bonos_otorgados').insert({
+                id_usuario: userId,
+                tipo_bono: 'bienvenida',
+                cantidad_creditos: 50
+            })
+
+            return { data: { creditosOtorgados: 50 }, error: null }
+        } catch (error) {
             return { data: null, error }
         }
     }

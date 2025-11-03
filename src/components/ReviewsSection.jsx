@@ -2,22 +2,46 @@ import { useState, useEffect } from 'react';
 import { supabase } from '../supabase';
 import { ratingsAPI } from '../api/database';
 import StarDisplay from './StarDisplay';
+import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
+import {
+    faHeart,
+    faBook,
+    faLightbulb,
+    faComments,
+    faFire,
+    faClipboardList,
+    faBolt,
+    faHandshake,
+    faChartLine,
+    faMicrophone,
+    faQuestionCircle,
+    faDoorOpen,
+    faClipboard,
+    faPenToSquare,
+    faTrash,
+    faPlus,
+    faFilter,
+    faSmile,
+    faFrown,
+    faExclamationTriangle,
+    faClipboardCheck
+} from '@fortawesome/free-solid-svg-icons';
 
-// Tags disponibles (mismo array que en AuthModal)
+// Tags disponibles
 const AVAILABLE_TAGS = [
-    { id: 'muy-claro', label: '✨ Muy claro', type: 'positive' },
-    { id: 'querido', label: '🎓 Querido por los estudiantes', type: 'positive' },
-    { id: 'apasionado', label: '🔥 Apasionado', type: 'positive' },
-    { id: 'disponible', label: '💬 Siempre disponible', type: 'positive' },
-    { id: 'ordenado', label: '📋 Muy ordenado', type: 'positive' },
-    { id: 'dinamico', label: '⚡ Clases dinámicas', type: 'positive' },
-    { id: 'cercano', label: '🤝 Cercano a los alumnos', type: 'positive' },
-    { id: 'califica-duro', label: '📊 Califica duro', type: 'negative' },
-    { id: 'mucha-tarea', label: '📖 Mucha tarea', type: 'negative' },
-    { id: 'participacion', label: '🎤 La participación importa', type: 'negative' },
-    { id: 'confuso', label: '🤔 Confuso', type: 'negative' },
-    { id: 'lejano', label: '🚪 Lejano a los alumnos', type: 'negative' },
-    { id: 'examenes-dificiles', label: '📝 Exámenes difíciles', type: 'negative' }
+    { id: 'muy-claro', label: 'Muy claro', type: 'positive', icon: faLightbulb },
+    { id: 'querido', label: 'Querido', type: 'positive', icon: faHeart },
+    { id: 'apasionado', label: 'Apasionado', type: 'positive', icon: faFire },
+    { id: 'disponible', label: 'Disponible', type: 'positive', icon: faComments },
+    { id: 'ordenado', label: 'Ordenado', type: 'positive', icon: faClipboardList },
+    { id: 'dinamico', label: 'Dinámico', type: 'positive', icon: faBolt },
+    { id: 'cercano', label: 'Cercano', type: 'positive', icon: faHandshake },
+    { id: 'califica-duro', label: 'Califica duro', type: 'negative', icon: faChartLine },
+    { id: 'mucha-tarea', label: 'Mucha tarea', type: 'negative', icon: faBook },
+    { id: 'participacion', label: 'Participación', type: 'negative', icon: faMicrophone },
+    { id: 'confuso', label: 'Confuso', type: 'negative', icon: faQuestionCircle },
+    { id: 'lejano', label: 'Lejano', type: 'negative', icon: faDoorOpen },
+    { id: 'examenes-dificiles', label: 'Exámenes difíciles', type: 'negative', icon: faClipboard }
 ];
 
 export default function ReviewsSection({
@@ -104,11 +128,9 @@ export default function ReviewsSection({
         if (error) {
             alert('Error al borrar la reseña: ' + error.message);
         } else {
-            // Cerrar modal
             setDeleteModalOpen(false);
             setReviewToDelete(null);
 
-            // Notificar al componente padre para que recargue los datos
             if (onReviewDeleted) {
                 onReviewDeleted();
             }
@@ -116,13 +138,12 @@ export default function ReviewsSection({
         setDeleting(false);
     };
 
-    const getTagLabel = (tagId) => {
-        const tag = AVAILABLE_TAGS.find(t => t.id === tagId);
-        return tag ? tag.label : tagId;
+    const getTagData = (tagId) => {
+        return AVAILABLE_TAGS.find(t => t.id === tagId);
     };
 
     const getReviewBorderColor = (rating) => {
-        return rating >= 3 ? '#86efac' : '#fca5a5';
+        return rating >= 3 ? '#10b981' : '#ef4444';
     };
 
     const getReviewBackgroundColor = (rating) => {
@@ -149,7 +170,7 @@ export default function ReviewsSection({
     };
 
     return (
-        <div>
+        <div style={{ fontFamily: 'Inter, sans-serif' }}>
             {/* Header con título y botón */}
             <div style={{
                 display: 'flex',
@@ -157,35 +178,51 @@ export default function ReviewsSection({
                 alignItems: 'center',
                 marginBottom: 24,
                 flexWrap: 'wrap',
-                gap: 12
+                gap: 16
             }}>
-                <h2 style={{ fontSize: 20, fontWeight: 700, margin: 0 }}>
+                <h2 style={{
+                    fontSize: 24,
+                    fontWeight: 800,
+                    margin: 0,
+                    color: '#13346b',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 12
+                }}>
+                    <FontAwesomeIcon icon={faClipboardCheck} style={{ fontSize: 22 }} />
                     Reseñas ({reviews.length})
                 </h2>
                 <button
                     onClick={onAddReview}
                     style={{
-                        padding: '10px 16px',
-                        background: 'linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%)',
+                        padding: '12px 24px',
+                        background: '#2563eb',
                         color: '#fff',
                         border: 'none',
-                        borderRadius: 8,
-                        fontWeight: 600,
+                        borderRadius: 12,
+                        fontWeight: 700,
                         cursor: 'pointer',
-                        fontSize: 14,
+                        fontSize: 15,
+                        fontFamily: 'Inter, sans-serif',
                         transition: 'all 0.2s ease',
-                        boxShadow: '0 4px 12px rgba(59, 130, 246, 0.3)'
+                        boxShadow: '0 4px 12px rgba(37, 99, 235, 0.3)',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: 8
                     }}
                     onMouseEnter={(e) => {
+                        e.target.style.background = '#1e40af';
                         e.target.style.transform = 'translateY(-2px)';
-                        e.target.style.boxShadow = '0 6px 16px rgba(59, 130, 246, 0.4)';
+                        e.target.style.boxShadow = '0 8px 20px rgba(37, 99, 235, 0.4)';
                     }}
                     onMouseLeave={(e) => {
+                        e.target.style.background = '#2563eb';
                         e.target.style.transform = 'translateY(0)';
-                        e.target.style.boxShadow = '0 4px 12px rgba(59, 130, 246, 0.3)';
+                        e.target.style.boxShadow = '0 4px 12px rgba(37, 99, 235, 0.3)';
                     }}
                 >
-                    + ¡Dejá tu reseña!
+                    <FontAwesomeIcon icon={faPlus} style={{ fontSize: 14 }} />
+                    Dejá tu reseña
                 </button>
             </div>
 
@@ -194,38 +231,49 @@ export default function ReviewsSection({
                 display: 'flex',
                 gap: 12,
                 marginBottom: 24,
-                flexWrap: 'wrap'
+                flexWrap: 'wrap',
+                alignItems: 'center'
             }}>
                 {/* Filtro de tipo */}
                 <div style={{ display: 'flex', gap: 8 }}>
-                    {['todos', 'positivas', 'negativas'].map(filter => (
+                    {[
+                        { key: 'todos', label: 'Todas', icon: faClipboardCheck },
+                        { key: 'positivas', label: 'Positivas', icon: faSmile },
+                        { key: 'negativas', label: 'Negativas', icon: faFrown }
+                    ].map(filter => (
                         <button
-                            key={filter}
-                            onClick={() => onFilterChange(filter)}
+                            key={filter.key}
+                            onClick={() => onFilterChange(filter.key)}
                             style={{
-                                padding: '8px 16px',
-                                background: selectedFilter === filter ? '#2563eb' : '#f3f4f6',
-                                color: selectedFilter === filter ? '#fff' : '#6b7280',
-                                border: 'none',
-                                borderRadius: 8,
-                                fontWeight: 500,
+                                padding: '10px 18px',
+                                background: selectedFilter === filter.key ? '#2563eb' : '#fff',
+                                color: selectedFilter === filter.key ? '#fff' : '#64748b',
+                                border: `2px solid ${selectedFilter === filter.key ? '#2563eb' : '#e5e7eb'}`,
+                                borderRadius: 10,
+                                fontWeight: 600,
                                 cursor: 'pointer',
-                                fontSize: 13,
+                                fontSize: 14,
+                                fontFamily: 'Inter, sans-serif',
                                 transition: 'all 0.2s ease',
-                                textTransform: 'capitalize'
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: 8
                             }}
                             onMouseEnter={(e) => {
-                                if (selectedFilter !== filter) {
-                                    e.target.style.background = '#e5e7eb';
+                                if (selectedFilter !== filter.key) {
+                                    e.target.style.background = '#f8fafc';
+                                    e.target.style.borderColor = '#cbd5e1';
                                 }
                             }}
                             onMouseLeave={(e) => {
-                                if (selectedFilter !== filter) {
-                                    e.target.style.background = '#f3f4f6';
+                                if (selectedFilter !== filter.key) {
+                                    e.target.style.background = '#fff';
+                                    e.target.style.borderColor = '#e5e7eb';
                                 }
                             }}
                         >
-                            {filter === 'todos' ? 'Todas' : filter === 'positivas' ? '😊 Positivas' : '😞 Negativas'}
+                            <FontAwesomeIcon icon={filter.icon} style={{ fontSize: 14 }} />
+                            {filter.label}
                         </button>
                     ))}
                 </div>
@@ -236,13 +284,25 @@ export default function ReviewsSection({
                         value={selectedMateria || ''}
                         onChange={(e) => onMateriaChange(e.target.value ? parseInt(e.target.value) : null)}
                         style={{
-                            padding: '8px 12px',
-                            background: '#f3f4f6',
-                            border: '1px solid #d1d5db',
-                            borderRadius: 8,
-                            fontWeight: 500,
+                            padding: '10px 14px',
+                            background: '#fff',
+                            border: '2px solid #e5e7eb',
+                            borderRadius: 10,
+                            fontWeight: 600,
                             cursor: 'pointer',
-                            fontSize: 13
+                            fontSize: 14,
+                            fontFamily: 'Inter, sans-serif',
+                            color: '#64748b',
+                            outline: 'none',
+                            transition: 'all 0.2s ease'
+                        }}
+                        onFocus={(e) => {
+                            e.target.style.borderColor = '#2563eb';
+                            e.target.style.boxShadow = '0 0 0 3px rgba(37, 99, 235, 0.1)';
+                        }}
+                        onBlur={(e) => {
+                            e.target.style.borderColor = '#e5e7eb';
+                            e.target.style.boxShadow = 'none';
                         }}
                     >
                         <option value="">Todas las materias</option>
@@ -259,58 +319,115 @@ export default function ReviewsSection({
             <div style={{ display: 'grid', gap: 16 }}>
                 {reviews.length === 0 ? (
                     <div style={{
-                        padding: 40,
+                        padding: 60,
                         textAlign: 'center',
-                        background: '#f9fafb',
-                        borderRadius: 12,
-                        border: '1px solid #e5e7eb'
+                        background: '#fff',
+                        borderRadius: 16,
+                        border: '2px dashed #cbd5e1'
                     }}>
-                        <div style={{ fontSize: 40, marginBottom: 12 }}>📝</div>
-                        <p style={{ color: '#6b7280', margin: 0 }}>
-                            No hay reseñas todavía. ¡Sé el primero en dejar una!
+                        <div style={{
+                            width: 80,
+                            height: 80,
+                            margin: '0 auto 20px',
+                            background: '#f1f5f9',
+                            borderRadius: '50%',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center'
+                        }}>
+                            <FontAwesomeIcon
+                                icon={faClipboardCheck}
+                                style={{ fontSize: 32, color: '#94a3b8' }}
+                            />
+                        </div>
+                        <h3 style={{
+                            margin: '0 0 8px 0',
+                            fontSize: 18,
+                            fontWeight: 700,
+                            color: '#0f172a'
+                        }}>
+                            No hay reseñas todavía
+                        </h3>
+                        <p style={{
+                            color: '#64748b',
+                            margin: '0 0 24px 0',
+                            fontSize: 15,
+                            fontWeight: 500
+                        }}>
+                            ¡Sé el primero en dejar una reseña!
                         </p>
+                        <button
+                            onClick={onAddReview}
+                            style={{
+                                padding: '12px 24px',
+                                background: '#2563eb',
+                                color: '#fff',
+                                border: 'none',
+                                borderRadius: 12,
+                                fontWeight: 700,
+                                cursor: 'pointer',
+                                fontSize: 15,
+                                fontFamily: 'Inter, sans-serif',
+                                transition: 'all 0.2s ease',
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                gap: 8
+                            }}
+                            onMouseEnter={(e) => {
+                                e.target.style.background = '#1e40af';
+                                e.target.style.transform = 'translateY(-2px)';
+                                e.target.style.boxShadow = '0 8px 20px rgba(37, 99, 235, 0.3)';
+                            }}
+                            onMouseLeave={(e) => {
+                                e.target.style.background = '#2563eb';
+                                e.target.style.transform = 'translateY(0)';
+                                e.target.style.boxShadow = 'none';
+                            }}
+                        >
+                            <FontAwesomeIcon icon={faPlus} />
+                            Escribir primera reseña
+                        </button>
                     </div>
                 ) : (
                     reviews.map(review => (
                         <div
                             key={review.id}
                             style={{
-                                padding: 20,
+                                padding: 24,
                                 background: getReviewBackgroundColor(review.estrellas),
                                 border: `2px solid ${getReviewBorderColor(review.estrellas)}`,
-                                borderRadius: 12,
+                                borderRadius: 16,
                                 transition: 'all 0.2s ease',
                                 position: 'relative'
                             }}
                             onMouseEnter={(e) => {
-                                e.currentTarget.style.boxShadow = '0 4px 12px rgba(0,0,0,0.08)';
-                                e.currentTarget.style.transform = 'translateY(-1px)';
+                                e.currentTarget.style.boxShadow = '0 8px 24px rgba(0,0,0,0.1)';
+                                e.currentTarget.style.transform = 'translateY(-2px)';
                             }}
                             onMouseLeave={(e) => {
                                 e.currentTarget.style.boxShadow = 'none';
                                 e.currentTarget.style.transform = 'translateY(0)';
                             }}
                         >
-                            {/* Botones de acción (editar y borrar) */}
+                            {/* Botones de acción */}
                             {(canEditReview(review) || canDeleteReview(review)) && (
                                 <div style={{
                                     position: 'absolute',
-                                    top: 12,
-                                    right: 12,
+                                    top: 16,
+                                    right: 16,
                                     display: 'flex',
                                     gap: 8
                                 }}>
-                                    {/* Botón de editar */}
                                     {canEditReview(review) && (
                                         <button
                                             onClick={() => handleEditClick(review)}
                                             style={{
+                                                width: 36,
+                                                height: 36,
                                                 background: '#eff6ff',
-                                                border: '1px solid #bfdbfe',
-                                                borderRadius: 6,
-                                                padding: '6px 10px',
+                                                border: '2px solid #bfdbfe',
+                                                borderRadius: 10,
                                                 cursor: 'pointer',
-                                                fontSize: 18,
                                                 color: '#2563eb',
                                                 transition: 'all 0.2s ease',
                                                 display: 'flex',
@@ -320,28 +437,29 @@ export default function ReviewsSection({
                                             onMouseEnter={(e) => {
                                                 e.target.style.background = '#2563eb';
                                                 e.target.style.color = '#fff';
+                                                e.target.style.transform = 'scale(1.1)';
                                             }}
                                             onMouseLeave={(e) => {
                                                 e.target.style.background = '#eff6ff';
                                                 e.target.style.color = '#2563eb';
+                                                e.target.style.transform = 'scale(1)';
                                             }}
                                             title="Editar reseña"
                                         >
-                                            ✏️
+                                            <FontAwesomeIcon icon={faPenToSquare} style={{ fontSize: 14 }} />
                                         </button>
                                     )}
 
-                                    {/* Botón de borrar */}
                                     {canDeleteReview(review) && (
                                         <button
                                             onClick={() => handleDeleteClick(review)}
                                             style={{
-                                                background: '#fee',
-                                                border: '1px solid #fcc',
-                                                borderRadius: 6,
-                                                padding: '6px 10px',
+                                                width: 36,
+                                                height: 36,
+                                                background: '#fee2e2',
+                                                border: '2px solid #fecaca',
+                                                borderRadius: 10,
                                                 cursor: 'pointer',
-                                                fontSize: 18,
                                                 color: '#dc2626',
                                                 transition: 'all 0.2s ease',
                                                 display: 'flex',
@@ -351,102 +469,138 @@ export default function ReviewsSection({
                                             onMouseEnter={(e) => {
                                                 e.target.style.background = '#dc2626';
                                                 e.target.style.color = '#fff';
+                                                e.target.style.transform = 'scale(1.1)';
                                             }}
                                             onMouseLeave={(e) => {
-                                                e.target.style.background = '#fee';
+                                                e.target.style.background = '#fee2e2';
                                                 e.target.style.color = '#dc2626';
+                                                e.target.style.transform = 'scale(1)';
                                             }}
                                             title="Borrar reseña"
                                         >
-                                            🗑️
+                                            <FontAwesomeIcon icon={faTrash} style={{ fontSize: 14 }} />
                                         </button>
                                     )}
                                 </div>
                             )}
 
-                            {/* Materia (primero) */}
+                            {/* Materia */}
                             {review.materia_id && (
                                 <div style={{
-                                    display: 'inline-block',
+                                    display: 'inline-flex',
+                                    alignItems: 'center',
+                                    gap: 6,
                                     padding: '6px 12px',
                                     background: '#dbeafe',
                                     color: '#1e40af',
-                                    borderRadius: 8,
+                                    borderRadius: 10,
                                     fontSize: 13,
-                                    fontWeight: 600,
-                                    marginBottom: 12
+                                    fontWeight: 700,
+                                    marginBottom: 14,
+                                    border: '1px solid #bfdbfe'
                                 }}>
+                                    <FontAwesomeIcon icon={faBook} style={{ fontSize: 12 }} />
                                     {materiasNames[review.materia_id] || 'Materia'}
                                 </div>
                             )}
 
-                            {/* Header de la reseña con estrellas */}
+                            {/* Header con estrellas y fecha */}
                             <div style={{
                                 display: 'flex',
                                 justifyContent: 'space-between',
                                 alignItems: 'flex-start',
-                                marginBottom: 12
+                                marginBottom: 14
                             }}>
                                 <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-                                    <StarDisplay rating={review.estrellas} size={26} />
+                                    <StarDisplay rating={review.estrellas} size={24} />
+                                    <span style={{
+                                        fontSize: 20,
+                                        fontWeight: 800,
+                                        color: '#0f172a'
+                                    }}>
+                                        {review.estrellas.toFixed(1)}
+                                    </span>
                                 </div>
                                 <div style={{
-                                    fontSize: 12,
-                                    color: '#6b7280'
+                                    fontSize: 13,
+                                    color: '#64748b',
+                                    fontWeight: 600
                                 }}>
                                     {formatDate(review.created_at)}
                                 </div>
                             </div>
 
-                            {/* Tags (debajo de las estrellas) */}
+                            {/* Tags */}
                             {review.tags && review.tags.length > 0 && (
                                 <div style={{
                                     display: 'flex',
                                     flexWrap: 'wrap',
-                                    gap: 6,
-                                    marginBottom: 12
+                                    gap: 8,
+                                    marginBottom: 14
                                 }}>
-                                    {review.tags.map((tagId, idx) => (
-                                        <span
-                                            key={idx}
-                                            style={{
-                                                padding: '4px 10px',
-                                                background: '#f3f4f6',
-                                                color: '#374151',
-                                                borderRadius: 16,
-                                                fontSize: 12,
-                                                fontWeight: 500,
-                                                border: '1px solid #e5e7eb'
-                                            }}
-                                        >
-                                            {getTagLabel(tagId)}
-                                        </span>
-                                    ))}
+                                    {review.tags.map((tagId, idx) => {
+                                        const tagData = getTagData(tagId);
+                                        return (
+                                            <span
+                                                key={idx}
+                                                style={{
+                                                    padding: '6px 12px',
+                                                    background: '#fff',
+                                                    color: '#374151',
+                                                    borderRadius: 10,
+                                                    fontSize: 13,
+                                                    fontWeight: 600,
+                                                    border: '2px solid #e5e7eb',
+                                                    display: 'flex',
+                                                    alignItems: 'center',
+                                                    gap: 6
+                                                }}
+                                            >
+                                                {tagData && (
+                                                    <FontAwesomeIcon
+                                                        icon={tagData.icon}
+                                                        style={{ fontSize: 12, color: '#64748b' }}
+                                                    />
+                                                )}
+                                                {tagData?.label || tagId}
+                                            </span>
+                                        );
+                                    })}
                                 </div>
                             )}
 
                             {/* Comentario */}
                             {review.comentario && (
                                 <p style={{
-                                    margin: '0 0 12px 0',
-                                    fontSize: 14,
+                                    margin: '0 0 14px 0',
+                                    fontSize: 15,
                                     lineHeight: 1.6,
-                                    color: '#374151'
+                                    color: '#374151',
+                                    fontWeight: 500
                                 }}>
-                                    {review.comentario}
+                                    "{review.comentario}"
                                 </p>
                             )}
 
-                            {/* Información adicional - SOLO WORKLOAD */}
+                            {/* Workload */}
                             {review.workload && (
                                 <div style={{
-                                    fontSize: 12,
-                                    color: '#6b7280',
-                                    borderTop: '1px solid rgba(0,0,0,0.05)',
-                                    paddingTop: 12,
-                                    marginTop: 12
+                                    fontSize: 14,
+                                    color: '#64748b',
+                                    borderTop: '2px solid rgba(0,0,0,0.06)',
+                                    paddingTop: 14,
+                                    marginTop: 14,
+                                    fontWeight: 600,
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    gap: 8
                                 }}>
-                                    <strong>Carga:</strong> {review.workload}
+                                    <FontAwesomeIcon
+                                        icon={faClipboardList}
+                                        style={{ fontSize: 14, color: '#94a3b8' }}
+                                    />
+                                    <span style={{ color: '#94a3b8' }}>Carga de trabajo:</span>
+                                    <span style={{ color: '#0f172a' }}>{review.workload}</span>
                                 </div>
                             )}
                         </div>
@@ -462,41 +616,53 @@ export default function ReviewsSection({
                     left: 0,
                     right: 0,
                     bottom: 0,
-                    background: 'rgba(0,0,0,0.5)',
+                    background: 'rgba(0,0,0,0.6)',
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'center',
-                    zIndex: 1000
+                    zIndex: 1000,
+                    backdropFilter: 'blur(4px)'
                 }}>
                     <div style={{
                         background: '#fff',
                         borderRadius: 16,
-                        padding: 24,
-                        maxWidth: 400,
+                        padding: 28,
+                        maxWidth: 440,
                         width: '90%',
-                        boxShadow: '0 20px 60px rgba(0,0,0,0.3)'
+                        boxShadow: '0 24px 60px rgba(0,0,0,0.3)',
+                        border: '2px solid #e5e7eb'
                     }}>
                         <div style={{
-                            fontSize: 48,
-                            textAlign: 'center',
-                            marginBottom: 16
+                            width: 64,
+                            height: 64,
+                            margin: '0 auto 20px',
+                            background: '#fee2e2',
+                            borderRadius: '50%',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center'
                         }}>
-                            ⚠️
+                            <FontAwesomeIcon
+                                icon={faExclamationTriangle}
+                                style={{ fontSize: 28, color: '#dc2626' }}
+                            />
                         </div>
                         <h3 style={{
                             margin: '0 0 12px 0',
-                            fontSize: 20,
-                            fontWeight: 700,
-                            textAlign: 'center'
+                            fontSize: 22,
+                            fontWeight: 800,
+                            textAlign: 'center',
+                            color: '#0f172a'
                         }}>
                             ¿Borrar reseña?
                         </h3>
                         <p style={{
-                            margin: '0 0 24px 0',
-                            fontSize: 14,
-                            color: '#6b7280',
+                            margin: '0 0 28px 0',
+                            fontSize: 15,
+                            color: '#64748b',
                             textAlign: 'center',
-                            lineHeight: 1.5
+                            lineHeight: 1.6,
+                            fontWeight: 500
                         }}>
                             Esta acción no se puede deshacer. La reseña será eliminada permanentemente.
                         </p>
@@ -512,15 +678,29 @@ export default function ReviewsSection({
                                 }}
                                 disabled={deleting}
                                 style={{
-                                    padding: '10px 20px',
-                                    background: '#f3f4f6',
-                                    color: '#374151',
-                                    border: 'none',
-                                    borderRadius: 8,
-                                    fontWeight: 600,
+                                    padding: '12px 24px',
+                                    background: '#f8fafc',
+                                    color: '#64748b',
+                                    border: '2px solid #e5e7eb',
+                                    borderRadius: 12,
+                                    fontWeight: 700,
                                     cursor: deleting ? 'not-allowed' : 'pointer',
-                                    fontSize: 14,
-                                    opacity: deleting ? 0.5 : 1
+                                    fontSize: 15,
+                                    fontFamily: 'Inter, sans-serif',
+                                    opacity: deleting ? 0.5 : 1,
+                                    transition: 'all 0.2s ease'
+                                }}
+                                onMouseEnter={(e) => {
+                                    if (!deleting) {
+                                        e.target.style.background = '#e5e7eb';
+                                        e.target.style.color = '#0f172a';
+                                    }
+                                }}
+                                onMouseLeave={(e) => {
+                                    if (!deleting) {
+                                        e.target.style.background = '#f8fafc';
+                                        e.target.style.color = '#64748b';
+                                    }
                                 }}
                             >
                                 Cancelar
@@ -529,15 +709,27 @@ export default function ReviewsSection({
                                 onClick={handleConfirmDelete}
                                 disabled={deleting}
                                 style={{
-                                    padding: '10px 20px',
+                                    padding: '12px 24px',
                                     background: '#dc2626',
                                     color: '#fff',
                                     border: 'none',
-                                    borderRadius: 8,
-                                    fontWeight: 600,
+                                    borderRadius: 12,
+                                    fontWeight: 700,
                                     cursor: deleting ? 'not-allowed' : 'pointer',
-                                    fontSize: 14,
-                                    opacity: deleting ? 0.5 : 1
+                                    fontSize: 15,
+                                    fontFamily: 'Inter, sans-serif',
+                                    opacity: deleting ? 0.5 : 1,
+                                    transition: 'all 0.2s ease'
+                                }}
+                                onMouseEnter={(e) => {
+                                    if (!deleting) {
+                                        e.target.style.background = '#b91c1c';
+                                    }
+                                }}
+                                onMouseLeave={(e) => {
+                                    if (!deleting) {
+                                        e.target.style.background = '#dc2626';
+                                    }
                                 }}
                             >
                                 {deleting ? 'Borrando...' : 'Sí, borrar'}

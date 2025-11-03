@@ -1,5 +1,15 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
+import {
+    faBell,
+    faArrowLeft,
+    faCog,
+    faCheck,
+    faTrash,
+    faTimes,
+    faSpinner
+} from '@fortawesome/free-solid-svg-icons';
 import { useNotificationsContext } from '../contexts/NotificationsContext';
 import { getNotificationIcon } from '../utils/notificationRouter';
 import { useSeguidores } from '../hooks/useSeguidores';
@@ -96,22 +106,37 @@ export default function Notifications() {
         <div style={pageStyle}>
             <div style={containerStyle}>
                 {/* Header */}
-                <div style={headerStyle}>
-                    <button
-                        onClick={() => navigate(-1)}
-                        style={backButtonStyle}
-                        onMouseEnter={(e) => e.target.style.background = '#f1f5f9'}
-                        onMouseLeave={(e) => e.target.style.background = '#fff'}
-                    >
-                        ← Volver
-                    </button>
-                    <h1 style={titleStyle}>Notificaciones</h1>
-                    {unreadCount > 0 && (
-                        <p style={subtitleStyle}>
-                            Tenés {unreadCount} notificación{unreadCount !== 1 ? 'es' : ''} sin leer
-                        </p>
-                    )}
-                </div>
+                <header style={headerWrapperStyle}>
+                    <div style={headerStyle}>
+                        <div style={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: 12,
+                            marginBottom: 6
+                        }}>
+                            <div style={{
+                                width: 44,
+                                height: 44,
+                                borderRadius: 12,
+                                background: '#2563eb',
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center'
+                            }}>
+                                <FontAwesomeIcon
+                                    icon={faBell}
+                                    style={{ fontSize: 18, color: '#fff' }}
+                                />
+                            </div>
+                            <h1 style={titleStyle}>Notificaciones</h1>
+                        </div>
+                        {unreadCount > 0 && (
+                            <p style={subtitleStyle}>
+                                Tenés {unreadCount} notificación{unreadCount !== 1 ? 'es' : ''} sin leer
+                            </p>
+                        )}
+                    </div>
+                </header>
 
                 {/* Acciones rápidas */}
                 {notificaciones.length > 0 && (
@@ -119,8 +144,21 @@ export default function Notifications() {
                         {/* Banner de nuevas notificaciones */}
                         {newSinceLastVisit > 0 && (
                             <div style={newNotifsBannerStyle}>
-                                <span style={{ fontSize: 18 }}>✨</span>
-                                <span style={{ fontWeight: 600, fontSize: 14 }}>
+                                <div style={{
+                                    width: 32,
+                                    height: 32,
+                                    borderRadius: '50%',
+                                    background: '#2563eb',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    justifyContent: 'center'
+                                }}>
+                                    <FontAwesomeIcon
+                                        icon={faBell}
+                                        style={{ fontSize: 14, color: '#fff' }}
+                                    />
+                                </div>
+                                <span style={{ fontWeight: 600, fontSize: 14, fontFamily: 'Inter, sans-serif' }}>
                                     {newSinceLastVisitMessage}
                                 </span>
                             </div>
@@ -130,19 +168,33 @@ export default function Notifications() {
                             <button
                                 onClick={() => navigate('/settings')}
                                 style={actionButtonStyle}
-                                onMouseEnter={(e) => e.target.style.background = '#f0f9ff'}
-                                onMouseLeave={(e) => e.target.style.background = '#fff'}
+                                onMouseEnter={(e) => {
+                                    e.target.style.background = '#f8fafc';
+                                    e.target.style.borderColor = '#2563eb';
+                                }}
+                                onMouseLeave={(e) => {
+                                    e.target.style.background = '#fff';
+                                    e.target.style.borderColor = '#e5e7eb';
+                                }}
                             >
-                                ⚙️ Configurar
+                                <FontAwesomeIcon icon={faCog} style={{ fontSize: 13 }} />
+                                Configurar
                             </button>
                             {unreadCount > 0 && (
                                 <button
                                     onClick={marcarTodasLeidas}
                                     style={{...actionButtonStyle, color: '#2563eb'}}
-                                    onMouseEnter={(e) => e.target.style.background = '#eff6ff'}
-                                    onMouseLeave={(e) => e.target.style.background = '#fff'}
+                                    onMouseEnter={(e) => {
+                                        e.target.style.background = '#eff6ff';
+                                        e.target.style.borderColor = '#2563eb';
+                                    }}
+                                    onMouseLeave={(e) => {
+                                        e.target.style.background = '#fff';
+                                        e.target.style.borderColor = '#e5e7eb';
+                                    }}
                                 >
-                                    ✓ Marcar todas como leídas
+                                    <FontAwesomeIcon icon={faCheck} style={{ fontSize: 13 }} />
+                                    Marcar todas como leídas
                                 </button>
                             )}
                             {notificaciones.length > 0 && (
@@ -156,10 +208,17 @@ export default function Notifications() {
                                         }
                                     }}
                                     style={{...actionButtonStyle, color: '#ef4444'}}
-                                    onMouseEnter={(e) => e.target.style.background = '#fef2f2'}
-                                    onMouseLeave={(e) => e.target.style.background = '#fff'}
+                                    onMouseEnter={(e) => {
+                                        e.target.style.background = '#fef2f2';
+                                        e.target.style.borderColor = '#ef4444';
+                                    }}
+                                    onMouseLeave={(e) => {
+                                        e.target.style.background = '#fff';
+                                        e.target.style.borderColor = '#e5e7eb';
+                                    }}
                                 >
-                                    🗑️ Eliminar todas
+                                    <FontAwesomeIcon icon={faTrash} style={{ fontSize: 13 }} />
+                                    Eliminar todas
                                 </button>
                             )}
                         </div>
@@ -170,16 +229,36 @@ export default function Notifications() {
                 <div style={listContainerStyle}>
                     {loading ? (
                         <div style={emptyStateStyle}>
-                            <div style={spinnerStyle} />
-                            <p>Cargando notificaciones...</p>
+                            <FontAwesomeIcon
+                                icon={faSpinner}
+                                spin
+                                style={{ fontSize: 40, color: '#2563eb', marginBottom: 16 }}
+                            />
+                            <p style={{ margin: 0, fontFamily: 'Inter, sans-serif', fontSize: 15, fontWeight: 500, color: '#64748b' }}>
+                                Cargando notificaciones...
+                            </p>
                         </div>
                     ) : notificaciones.length === 0 ? (
                         <div style={emptyStateStyle}>
-                            <div style={{ fontSize: 60, marginBottom: 16 }}>🔔</div>
-                            <h3 style={{ margin: 0, fontSize: 18, color: '#0f172a' }}>
+                            <div style={{
+                                width: 100,
+                                height: 100,
+                                borderRadius: '24px',
+                                background: '#2563eb',
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                margin: '0 auto 24px'
+                            }}>
+                                <FontAwesomeIcon
+                                    icon={faBell}
+                                    style={{ fontSize: 48, color: '#fff' }}
+                                />
+                            </div>
+                            <h3 style={{ margin: '0 0 8px 0', fontSize: 28, color: '#13346b', fontWeight: 700, fontFamily: 'Inter, sans-serif' }}>
                                 No tenés notificaciones
                             </h3>
-                            <p style={{ margin: '8px 0 0', fontSize: 14, color: '#64748b' }}>
+                            <p style={{ margin: 0, fontSize: 16, color: '#64748b', fontWeight: 500, fontFamily: 'Inter, sans-serif' }}>
                                 Cuando alguien interactúe contigo, te avisaremos aquí
                             </p>
                         </div>
@@ -231,7 +310,8 @@ export default function Notifications() {
                                                 fontSize: 14,
                                                 color: '#0f172a',
                                                 lineHeight: 1.5,
-                                                fontWeight: notif.leida ? 400 : 600,
+                                                fontWeight: notif.leida ? 500 : 600,
+                                                fontFamily: 'Inter, sans-serif'
                                             }}>
                                                 <strong>{notif.emisor?.nombre || 'Alguien'}</strong>{' '}
                                                 {notif.tipo === 'nuevo_seguidor' ? 'comenzó a seguirte' : notif.mensaje}.{' '}
@@ -306,7 +386,7 @@ export default function Notifications() {
                                         }}
                                         aria-label="Eliminar notificación"
                                     >
-                                        ×
+                                        <FontAwesomeIcon icon={faTimes} style={{ fontSize: 18 }} />
                                     </button>
 
                                     {/* Puntito azul (no leída) - al lado de la cruz */}
@@ -402,8 +482,9 @@ function formatTimeAgo(dateString) {
 
 const pageStyle = {
     minHeight: '100vh',
-    background: 'linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%)',
+    background: '#f8fafc',
     padding: '30px 16px',
+    fontFamily: 'Inter, sans-serif'
 };
 
 const containerStyle = {
@@ -411,9 +492,17 @@ const containerStyle = {
     margin: '0 auto',
 };
 
-const headerStyle = {
-    textAlign: 'center',
+const headerWrapperStyle = {
     marginBottom: 24,
+    background: '#ffffff',
+    padding: '20px',
+    borderRadius: 16,
+    border: '2px solid #f1f5f9',
+    boxShadow: '0 2px 8px rgba(0,0,0,0.04)'
+};
+
+const headerStyle = {
+    textAlign: 'left',
 };
 
 const backButtonStyle = {
@@ -427,19 +516,27 @@ const backButtonStyle = {
     cursor: 'pointer',
     transition: 'all 0.2s ease',
     marginBottom: 12,
+    fontFamily: 'Inter, sans-serif',
+    display: 'flex',
+    alignItems: 'center',
+    gap: 6
 };
 
 const titleStyle = {
-    fontSize: 28,
-    fontWeight: 800,
-    color: '#0b1e3a',
-    margin: '0 0 6px 0',
+    fontSize: 26,
+    fontWeight: 700,
+    color: '#13346b',
+    margin: 0,
+    fontFamily: 'Inter, sans-serif'
 };
 
 const subtitleStyle = {
     fontSize: 14,
     color: '#64748b',
     margin: 0,
+    paddingLeft: 56,
+    fontWeight: 500,
+    fontFamily: 'Inter, sans-serif'
 };
 
 const actionsStyle = {
@@ -451,15 +548,19 @@ const actionsStyle = {
 };
 
 const actionButtonStyle = {
+    display: 'flex',
+    alignItems: 'center',
+    gap: 8,
     padding: '8px 16px',
     fontSize: 13,
     fontWeight: 600,
     color: '#64748b',
     background: '#fff',
-    border: '1px solid #e5e7eb',
-    borderRadius: 8,
+    border: '2px solid #e5e7eb',
+    borderRadius: 10,
     cursor: 'pointer',
     transition: 'all 0.2s ease',
+    fontFamily: 'Inter, sans-serif'
 };
 
 const listContainerStyle = {
@@ -475,10 +576,11 @@ const notificationCardStyle = {
     gap: 12,
     padding: 16,
     background: '#fff',
-    border: '1px solid',
+    border: '2px solid',
     borderRadius: 12,
     boxShadow: '0 1px 3px rgba(0,0,0,0.06)',
     transition: 'all 0.2s ease',
+    fontFamily: 'Inter, sans-serif'
 };
 
 const avatarStyle = {
@@ -494,7 +596,7 @@ const avatarPlaceholderStyle = {
     width: 44,
     height: 44,
     borderRadius: '50%',
-    background: 'linear-gradient(135deg, #3b82f6 0%, #1e40af 100%)',
+    background: '#2563eb',
     color: '#fff',
     display: 'grid',
     placeItems: 'center',
@@ -516,6 +618,7 @@ const buttonSeguirStyle = {
     transition: 'all 0.15s cubic-bezier(0.4, 0, 0.2, 1)',
     whiteSpace: 'nowrap',
     flexShrink: 0,
+    fontFamily: 'Inter, sans-serif'
 };
 
 const buttonSiguiendoStyle = {
@@ -530,6 +633,7 @@ const buttonSiguiendoStyle = {
     transition: 'all 0.15s cubic-bezier(0.4, 0, 0.2, 1)',
     whiteSpace: 'nowrap',
     flexShrink: 0,
+    fontFamily: 'Inter, sans-serif'
 };
 
 const deleteButtonStyle = {
@@ -537,8 +641,8 @@ const deleteButtonStyle = {
     top: '50%',
     transform: 'translateY(-50%)',
     right: 12,
-    width: 24,
-    height: 24,
+    width: 28,
+    height: 28,
     display: 'grid',
     placeItems: 'center',
     background: 'transparent',
@@ -555,7 +659,7 @@ const unreadDotStyle = {
     position: 'absolute',
     top: '50%',
     transform: 'translateY(-50%)',
-    right: 42,
+    right: 46,
     width: 8,
     height: 8,
     borderRadius: '50%',
@@ -567,21 +671,24 @@ const emptyStateStyle = {
     flexDirection: 'column',
     alignItems: 'center',
     justifyContent: 'center',
-    padding: 60,
+    padding: '80px 40px',
     textAlign: 'center',
     color: '#64748b',
+    background: '#fff',
+    borderRadius: 16,
+    border: '2px solid #f1f5f9'
 };
 
 const newNotifsBannerStyle = {
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 10,
-    padding: '12px 20px',
+    gap: 12,
+    padding: '14px 20px',
     marginBottom: 16,
-    background: 'linear-gradient(135deg, #dbeafe 0%, #bfdbfe 100%)',
-    border: '1px solid #93c5fd',
-    borderRadius: 10,
+    background: '#eff6ff',
+    border: '2px solid #bfdbfe',
+    borderRadius: 12,
     color: '#1e40af',
     animation: 'slideDown 0.3s ease-out',
 };
@@ -617,6 +724,7 @@ const modalContentStyle = {
     width: '90%',
     boxShadow: '0 20px 60px rgba(0, 0, 0, 0.3)',
     animation: 'scaleIn 0.2s cubic-bezier(0.16, 1, 0.3, 1)',
+    fontFamily: 'Inter, sans-serif'
 };
 
 const modalTitleStyle = {
@@ -624,6 +732,7 @@ const modalTitleStyle = {
     fontSize: 18,
     fontWeight: 700,
     color: '#0f172a',
+    fontFamily: 'Inter, sans-serif'
 };
 
 const modalMessageStyle = {
@@ -631,6 +740,7 @@ const modalMessageStyle = {
     fontSize: 14,
     lineHeight: 1.5,
     color: '#64748b',
+    fontFamily: 'Inter, sans-serif'
 };
 
 const modalButtonCancelStyle = {
@@ -643,6 +753,7 @@ const modalButtonCancelStyle = {
     fontSize: 14,
     cursor: 'pointer',
     transition: 'all 0.15s cubic-bezier(0.4, 0, 0.2, 1)',
+    fontFamily: 'Inter, sans-serif'
 };
 
 const modalButtonConfirmStyle = {
@@ -655,6 +766,7 @@ const modalButtonConfirmStyle = {
     fontSize: 14,
     cursor: 'pointer',
     transition: 'all 0.15s cubic-bezier(0.4, 0, 0.2, 1)',
+    fontFamily: 'Inter, sans-serif'
 };
 
 // Animaciones

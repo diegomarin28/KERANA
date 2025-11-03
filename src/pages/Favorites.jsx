@@ -6,7 +6,8 @@ import {
     faGraduationCap,
     faFilter,
     faRotateRight,
-    faSpinner
+    faSpinner,
+    faFileAlt
 } from '@fortawesome/free-solid-svg-icons';
 import { Card } from '../components/UI/Card';
 import { Button } from '../components/UI/Button';
@@ -48,19 +49,8 @@ export default function Favorites() {
                 const apIds = notesFav.map(r => r.id_apunte);
 
                 const { data: apuntes, error: apuntesError } = await supabase
-                    .from('apunte')
-                    .select(`
-                        id_apunte,
-                        titulo,
-                        descripcion,
-                        creditos,
-                        estrellas,
-                        id_materia,
-                        id_usuario,
-                        file_path,
-                        materia:id_materia(nombre_materia),
-                        thumbnail_path
-                    `)
+                    .from('apuntes_completos')
+                    .select('*')
                     .in('id_apunte', apIds);
 
                 if (apuntesError) {
@@ -83,19 +73,6 @@ export default function Favorites() {
                 likesData?.forEach(like => {
                     likesCountMap[like.id_apunte] = (likesCountMap[like.id_apunte] || 0) + 1;
                 });
-
-                let userMap = {};
-                const uIds = [...new Set((apuntes || []).map(a => a.id_usuario).filter(Boolean))];
-                if (uIds.length) {
-                    const { data: users } = await supabase
-                        .from('usuario')
-                        .select('id_usuario, nombre')
-                        .in('id_usuario', uIds);
-                    userMap = (users || []).reduce((acc, u) => {
-                        acc[u.id_usuario] = u.nombre;
-                        return acc;
-                    }, {});
-                }
 
                 const apuntesWithSignedUrls = await Promise.all((apuntes || []).map(async (apunte) => {
                     if (apunte.file_path) {
@@ -120,8 +97,8 @@ export default function Favorites() {
                                 creditos: a.creditos,
                                 signedUrl: a.signedUrl,
                                 thumbnail_path: a.thumbnail_path,
-                                materia: a.materia,
-                                usuario: { nombre: userMap[a.id_usuario] || 'Anónimo' },
+                                materia: { nombre_materia: a.materia_nombre },
+                                usuario: { nombre: a.autor_nombre || 'Anónimo' },
                                 id_usuario: a.id_usuario,
                                 likes_count: likesCountMap[a.id_apunte] || 0
                             }
@@ -285,7 +262,8 @@ export default function Favorites() {
                     color: "#64748b",
                     margin: 0,
                     fontSize: 15,
-                    fontWeight: 500
+                    fontWeight: 500,
+                    fontFamily: 'Inter, sans-serif'
                 }}>
                     Cargando favoritos...
                 </p>
@@ -299,28 +277,29 @@ export default function Favorites() {
             maxWidth: 1200,
             margin: '0 auto',
             background: '#f8fafc',
-            minHeight: '100vh'
+            minHeight: '100vh',
+            fontFamily: 'Inter, sans-serif'
         }}>
             {/* Header */}
             <header style={{
-                marginBottom: 12,
+                marginBottom: 20,
                 background: '#ffffff',
-                padding: '16px 20px',
-                borderRadius: '12px',
+                padding: '20px',
+                borderRadius: 16,
                 border: '2px solid #f1f5f9',
                 boxShadow: '0 2px 8px rgba(0,0,0,0.04)'
             }}>
                 <div style={{
                     display: 'flex',
                     alignItems: 'center',
-                    gap: 10,
+                    gap: 12,
                     marginBottom: 6
                 }}>
                     <div style={{
-                        width: 32,
-                        height: 32,
-                        borderRadius: '8px',
-                        background: 'linear-gradient(135deg, #2563eb 0%, #1e40af 100%)',
+                        width: 44,
+                        height: 44,
+                        borderRadius: 12,
+                        background: '#2563eb',
                         display: 'flex',
                         alignItems: 'center',
                         justifyContent: 'center'
@@ -328,17 +307,16 @@ export default function Favorites() {
                         <FontAwesomeIcon
                             icon={faHeart}
                             style={{
-                                fontSize: 16,
+                                fontSize: 18,
                                 color: '#ffffff'
                             }}
                         />
                     </div>
                     <h1 style={{
-                        fontSize: '22px',
+                        fontSize: 26,
                         fontWeight: 700,
                         margin: 0,
-                        color: '#13346b',
-                        fontFamily: 'Inter, sans-serif'
+                        color: '#13346b'
                     }}>
                         Mis Favoritos
                     </h1>
@@ -346,9 +324,9 @@ export default function Favorites() {
                 <p style={{
                     color: '#64748b',
                     margin: 0,
-                    fontSize: 13,
+                    fontSize: 14,
                     fontWeight: 500,
-                    lineHeight: 1.4
+                    paddingLeft: 56
                 }}>
                     Todos tus apuntes y mentores favoritos en un solo lugar
                 </p>
@@ -358,17 +336,17 @@ export default function Favorites() {
             <div style={{
                 display: 'flex',
                 gap: 10,
-                marginBottom: 12,
+                marginBottom: 20,
                 flexWrap: 'wrap',
                 background: '#ffffff',
                 padding: '16px',
-                borderRadius: '12px',
+                borderRadius: 12,
                 border: '2px solid #f1f5f9'
             }}>
                 {[
                     { key: 'all', label: 'Todos', icon: faFilter, count: items.length },
-                    { key: 'course', label: 'Cursos', icon: faBook, count: items.filter(i => i.type === 'course').length },
-                    { key: 'note', label: 'Apuntes', icon: faBook, count: items.filter(i => i.type === 'note').length },
+                    { key: 'course', label: 'Materias', icon: faBook, count: items.filter(i => i.type === 'course').length },
+                    { key: 'note', label: 'Apuntes', icon: faFileAlt, count: items.filter(i => i.type === 'note').length },
                     { key: 'mentor', label: 'Mentores', icon: faGraduationCap, count: items.filter(i => i.type === 'mentor').length }
                 ].map(filter => (
                     <button
@@ -474,10 +452,10 @@ export default function Favorites() {
                     border: '2px solid #f1f5f9'
                 }}>
                     <div style={{
-                        width: 80,
-                        height: 80,
-                        borderRadius: '20px',
-                        background: 'linear-gradient(135deg, #f1f5f9 0%, #e2e8f0 100%)',
+                        width: 100,
+                        height: 100,
+                        borderRadius: '24px',
+                        background: '#2563eb',
                         display: 'flex',
                         alignItems: 'center',
                         justifyContent: 'center',
@@ -486,27 +464,26 @@ export default function Favorites() {
                         <FontAwesomeIcon
                             icon={faHeart}
                             style={{
-                                fontSize: 40,
-                                color: '#cbd5e1'
+                                fontSize: 48,
+                                color: '#fff'
                             }}
                         />
                     </div>
                     <h3 style={{
                         margin: '0 0 12px 0',
                         color: '#13346b',
-                        fontSize: 24,
-                        fontWeight: 700,
-                        fontFamily: 'Inter, sans-serif'
+                        fontSize: 28,
+                        fontWeight: 700
                     }}>
                         {activeFilter === 'all' ? 'No tenés favoritos' : `No tenés ${getTypeLabel(activeFilter).toLowerCase()}s favoritos`}
                     </h3>
                     <p style={{
                         color: '#64748b',
                         margin: '0 0 28px 0',
-                        maxWidth: 400,
+                        maxWidth: 420,
                         marginLeft: 'auto',
                         marginRight: 'auto',
-                        fontSize: 15,
+                        fontSize: 16,
                         lineHeight: 1.6,
                         fontWeight: 500
                     }}>

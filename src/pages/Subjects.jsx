@@ -1,6 +1,8 @@
 import { useEffect, useState, useMemo } from "react";
 import { subjectsAPI } from "../api/database";
 import CourseCard from "../components/CourseCard";
+import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
+import { faBookOpen, faSearch, faSpinner, faFilter } from '@fortawesome/free-solid-svg-icons';
 
 export default function Subjects() {
     const [subjects, setSubjects] = useState([]);
@@ -44,13 +46,26 @@ export default function Subjects() {
     // Get unique semesters for filter (ordenado numéricamente)
     const semesters = useMemo(() => {
         const uniqueSemesters = [...new Set(subjects.map(s => s.semestre).filter(Boolean))];
-        return uniqueSemesters.sort((a, b) => parseInt(a) - parseInt(b));
+        return uniqueSemesters
+            .map(s => String(s).trim())
+            .sort((a, b) => Number(a) - Number(b));
     }, [subjects]);
+
+    // Normalizar texto para búsqueda sin tildes
+    const normalizeText = (text) => {
+        if (!text) return '';
+        return text
+            .toLowerCase()
+            .normalize('NFD')
+            .replace(/[\u0300-\u036f]/g, '');
+    };
 
     // Filter subjects based on search and semester
     const filteredSubjects = useMemo(() => {
         return subjects.filter(subject => {
-            const matchesSearch = subject.nombre.toLowerCase().includes(searchTerm.toLowerCase());
+            const searchNormalized = normalizeText(searchTerm);
+            const nombreNormalized = normalizeText(subject.nombre);
+            const matchesSearch = nombreNormalized.includes(searchNormalized);
             const matchesSemester = selectedSemester === "all" || subject.semestre == selectedSemester;
             return matchesSearch && matchesSemester;
         });
@@ -94,6 +109,12 @@ export default function Subjects() {
         return `Semestre ${selectedSemester}`;
     };
 
+    // Reset filters
+    const resetFilters = () => {
+        setSearchTerm('');
+        setSelectedSemester('all');
+    };
+
     // Close dropdown when clicking outside
     useEffect(() => {
         const handleClickOutside = (e) => {
@@ -109,207 +130,218 @@ export default function Subjects() {
 
     if (loading) {
         return (
-            <>
-                <style>
-                    {`
-                        @keyframes spin {
-                            from { transform: rotate(0deg); }
-                            to { transform: rotate(360deg); }
-                        }
-                        @keyframes slideDown {
-                            from {
-                                opacity: 0;
-                                transform: translateY(-8px);
-                            }
-                            to {
-                                opacity: 1;
-                                transform: translateY(0);
-                            }
-                        }
-                    `}
-                </style>
-                <div style={{ minHeight: "50vh", display: "grid", placeItems: "center" }}>
-                    <div style={{
-                        display: "flex",
-                        flexDirection: "column",
-                        alignItems: "center",
-                        gap: 12
-                    }}>
-                        <div style={{
-                            width: 40,
-                            height: 40,
-                            border: "3px solid #f3f4f6",
-                            borderTop: "3px solid #2563eb",
-                            borderRadius: "50%",
-                            animation: "spin 1s linear infinite"
-                        }} />
-                        <div>Cargando asignaturas…</div>
-                    </div>
-                </div>
-            </>
+            <div style={{
+                minHeight: '60vh',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                flexDirection: 'column',
+                gap: 16
+            }}>
+                <FontAwesomeIcon
+                    icon={faSpinner}
+                    spin
+                    style={{ fontSize: 40, color: '#2563eb' }}
+                />
+                <p style={{
+                    fontSize: 15,
+                    fontWeight: 500,
+                    color: '#64748b',
+                    fontFamily: 'Inter, sans-serif'
+                }}>
+                    Cargando materias...
+                </p>
+            </div>
         );
     }
 
     return (
-        <>
-            <style>
-                {`
-                    @keyframes spin {
-                        from { transform: rotate(0deg); }
-                        to { transform: rotate(360deg); }
-                    }
-                    @keyframes slideDown {
-                        from {
-                            opacity: 0;
-                            transform: translateY(-8px);
-                        }
-                        to {
-                            opacity: 1;
-                            transform: translateY(0);
-                        }
-                    }
-                `}
-            </style>
-            <div style={{ width: "min(1080px, 92vw)", margin: "0 auto", padding: "24px 0" }}>
-                <div style={{ marginBottom: 32 }}>
-                    <h1 style={{ margin: "0 0 8px 0" }}>Asignaturas</h1>
-                    <p style={{ color: "#6b7280", margin: 0 }}>
-                        {subjects.length} materia{subjects.length !== 1 ? 's' : ''} disponible{subjects.length !== 1 ? 's' : ''}
-                    </p>
-                </div>
-
-                {err && (
+        <div style={{
+            maxWidth: 1200,
+            margin: '0 auto',
+            padding: 20,
+            fontFamily: 'Inter, sans-serif'
+        }}>
+            {/* Header */}
+            <header style={{
+                marginBottom: 20,
+                background: '#ffffff',
+                padding: '20px',
+                borderRadius: 16,
+                border: '1px solid #e5e7eb'
+            }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 6 }}>
                     <div style={{
-                        background: "#fef2f2",
-                        color: "#991b1b",
-                        border: "1px solid #fecaca",
-                        borderRadius: 8,
-                        padding: "12px 16px",
-                        marginBottom: 24
+                        width: 44,
+                        height: 44,
+                        background: '#2563eb',
+                        borderRadius: 12,
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center'
                     }}>
-                        {err} — mostrando vista simple si hay datos.
+                        <FontAwesomeIcon
+                            icon={faBookOpen}
+                            style={{ fontSize: 18, color: '#fff' }}
+                        />
                     </div>
-                )}
-
-                {/* Search and Filter Bar */}
-                <div style={{
-                    display: "grid",
-                    gridTemplateColumns: "1fr auto",
-                    gap: 16,
-                    marginBottom: 24
+                    <h1 style={{
+                        margin: 0,
+                        fontSize: '26px',
+                        fontWeight: 700,
+                        color: '#13346b'
+                    }}>
+                        Materias
+                    </h1>
+                </div>
+                <p style={{
+                    margin: 0,
+                    fontSize: 14,
+                    fontWeight: 500,
+                    color: '#64748b'
                 }}>
-                    <div style={{ position: "relative" }}>
+                    Explorá todas las asignaturas de la universidad
+                </p>
+            </header>
+
+            {/* Buscador + Filtros en misma fila */}
+            <div style={{
+                background: '#fff',
+                padding: 14,
+                borderRadius: 12,
+                border: '1px solid #e5e7eb',
+                marginBottom: 16
+            }}>
+                <div style={{
+                    display: 'flex',
+                    gap: 10,
+                    alignItems: 'center',
+                    flexWrap: 'wrap'
+                }}>
+                    {/* Buscador */}
+                    <div style={{
+                        position: 'relative',
+                        flexShrink: 0
+                    }}>
+                        <FontAwesomeIcon
+                            icon={faSearch}
+                            style={{
+                                position: 'absolute',
+                                left: 14,
+                                top: '50%',
+                                transform: 'translateY(-50%)',
+                                color: '#94a3b8',
+                                fontSize: 14,
+                                pointerEvents: 'none'
+                            }}
+                        />
                         <input
                             type="text"
                             placeholder="Buscar materias..."
                             value={searchTerm}
                             onChange={(e) => setSearchTerm(e.target.value)}
                             style={{
-                                width: "94%",
-                                padding: "12px 16px 12px 40px",
-                                border: "1px solid #e5e7eb",
-                                borderRadius: 8,
-                                fontSize: 14,
-                                outline: "none",
-                                transition: "all 0.2s ease"
+                                width: 910,
+                                padding: '10px 14px 10px 38px',
+                                border: '1px solid #e5e7eb',
+                                borderRadius: 10,
+                                fontSize: 13,
+                                fontWeight: 500,
+                                fontFamily: 'Inter, sans-serif',
+                                color: '#0f172a',
+                                outline: 'none',
+                                transition: 'all 0.2s ease',
+                                background: '#fff'
                             }}
                             onFocus={(e) => {
-                                e.target.style.borderColor = "#2563eb";
-                                e.target.style.boxShadow = "0 0 0 3px rgba(37, 99, 235, 0.1)";
+                                e.target.style.borderColor = '#2563eb';
+                                e.target.style.boxShadow = '0 0 0 3px rgba(37, 99, 235, 0.1)';
                             }}
                             onBlur={(e) => {
-                                e.target.style.borderColor = "#e5e7eb";
-                                e.target.style.boxShadow = "none";
+                                e.target.style.borderColor = '#e5e7eb';
+                                e.target.style.boxShadow = 'none';
                             }}
                         />
-                        <svg
-                            style={{
-                                position: "absolute",
-                                left: 12,
-                                top: "50%",
-                                transform: "translateY(-50%)",
-                                width: 18,
-                                height: 18,
-                                color: "#9ca3af"
-                            }}
-                            fill="none"
-                            stroke="currentColor"
-                            viewBox="0 0 24 24"
-                        >
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-                        </svg>
                     </div>
 
-                    {/* Custom Dropdown */}
-                    <div className="semester-dropdown" style={{ position: "relative" }}>
+                    {/* Espaciador para empujar filtros a la derecha */}
+                    <div style={{ flex: 1 }}></div>
+
+                    {/* Filtro de Semestre */}
+                    <div
+                        className="semester-dropdown"
+                        style={{
+                            position: 'relative',
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: 6,
+                            flexShrink: 0
+                        }}
+                    >
+                        <FontAwesomeIcon icon={faFilter} style={{ color: '#64748b', fontSize: 12 }} />
                         <button
                             type="button"
                             onClick={() => setDropdownOpen(!dropdownOpen)}
                             style={{
-                                padding: "12px 40px 12px 16px",
-                                border: "2px solid #e5e7eb",
-                                borderRadius: 12,
-                                fontSize: 14,
+                                padding: '9px 12px',
+                                border: '1px solid #e5e7eb',
+                                borderRadius: 10,
+                                fontSize: 12,
                                 fontWeight: 500,
-                                background: "#fff",
-                                minWidth: 180,
-                                outline: "none",
-                                cursor: "pointer",
-                                boxShadow: dropdownOpen ? "0 0 0 3px rgba(37, 99, 235, 0.1)" : "0 2px 8px rgba(0, 0, 0, 0.06)",
-                                transition: "all 0.2s ease",
-                                color: "#0f172a",
-                                textAlign: "left",
-                                width: "100%",
-                                display: "flex",
-                                alignItems: "center",
-                                justifyContent: "space-between",
-                                borderColor: dropdownOpen ? "#2563eb" : "#e5e7eb"
+                                fontFamily: 'Inter, sans-serif',
+                                color: '#0f172a',
+                                cursor: 'pointer',
+                                outline: 'none',
+                                background: '#fff',
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: 6,
+                                transition: 'all 0.2s ease',
+                                minWidth: 160
                             }}
                             onMouseEnter={(e) => {
-                                if (!dropdownOpen) {
-                                    e.target.style.borderColor = "#2563eb";
-                                    e.target.style.boxShadow = "0 4px 12px rgba(37, 99, 235, 0.15)";
-                                }
+                                e.target.style.borderColor = '#cbd5e1';
+                                e.target.style.background = '#f8fafc';
                             }}
                             onMouseLeave={(e) => {
-                                if (!dropdownOpen) {
-                                    e.target.style.borderColor = "#e5e7eb";
-                                    e.target.style.boxShadow = "0 2px 8px rgba(0, 0, 0, 0.06)";
-                                }
+                                e.target.style.borderColor = '#e5e7eb';
+                                e.target.style.background = '#fff';
                             }}
                         >
-                            {getSelectedLabel()}
+                            <span style={{ flex: 1, textAlign: 'left' }}>
+                                {getSelectedLabel()}
+                            </span>
                             <svg
                                 style={{
-                                    width: 12,
-                                    height: 12,
-                                    color: "#64748b",
-                                    transition: "transform 0.2s ease",
-                                    transform: dropdownOpen ? "rotate(180deg)" : "rotate(0deg)"
+                                    width: 14,
+                                    height: 14,
+                                    color: '#64748b',
+                                    transition: 'transform 0.2s ease',
+                                    transform: dropdownOpen ? 'rotate(180deg)' : 'rotate(0deg)'
                                 }}
-                                fill="currentColor"
-                                viewBox="0 0 20 20"
+                                fill="none"
+                                stroke="currentColor"
+                                viewBox="0 0 24 24"
                             >
-                                <path fillRule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clipRule="evenodd" />
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
                             </svg>
                         </button>
 
+                        {/* Dropdown */}
                         {dropdownOpen && (
-                            <div
-                                style={{
-                                    position: "absolute",
-                                    top: "calc(100% + 8px)",
-                                    left: 0,
-                                    right: 0,
-                                    background: "#fff",
-                                    border: "2px solid #e5e7eb",
-                                    borderRadius: 12,
-                                    boxShadow: "0 12px 32px rgba(0, 0, 0, 0.12)",
-                                    zIndex: 1000,
-                                    overflow: "hidden",
-                                    animation: "slideDown 0.2s ease"
-                                }}
-                            >
+                            <div style={{
+                                position: 'absolute',
+                                top: 'calc(100% + 6px)',
+                                left: 0,
+                                background: '#fff',
+                                border: '1px solid #e5e7eb',
+                                borderRadius: 12,
+                                boxShadow: '0 8px 24px rgba(0,0,0,0.12)',
+                                minWidth: 200,
+                                zIndex: 1000,
+                                overflow: 'hidden',
+                                animation: 'slideDown 0.2s ease'
+                            }}>
                                 <button
                                     type="button"
                                     onClick={() => {
@@ -324,6 +356,7 @@ export default function Subjects() {
                                         color: selectedSemester === "all" ? "#2563eb" : "#0f172a",
                                         fontWeight: selectedSemester === "all" ? 600 : 500,
                                         fontSize: 14,
+                                        fontFamily: 'Inter, sans-serif',
                                         textAlign: "left",
                                         cursor: "pointer",
                                         transition: "all 0.15s ease",
@@ -369,6 +402,7 @@ export default function Subjects() {
                                                 color: selectedSemester == semester ? "#2563eb" : "#0f172a",
                                                 fontWeight: selectedSemester == semester ? 600 : 500,
                                                 fontSize: 14,
+                                                fontFamily: 'Inter, sans-serif',
                                                 textAlign: "left",
                                                 cursor: "pointer",
                                                 transition: "all 0.15s ease",
@@ -399,61 +433,173 @@ export default function Subjects() {
                             </div>
                         )}
                     </div>
-                </div>
 
-                {filteredSubjects.length === 0 ? (
+                    {/* Botón limpiar filtros */}
+                    {(searchTerm || selectedSemester !== 'all') && (
+                        <button
+                            onClick={resetFilters}
+                            style={{
+                                padding: '9px 14px',
+                                background: '#fff',
+                                border: '1px solid #e5e7eb',
+                                borderRadius: 10,
+                                fontSize: 12,
+                                fontWeight: 600,
+                                color: '#64748b',
+                                cursor: 'pointer',
+                                transition: 'all 0.2s ease',
+                                fontFamily: 'Inter, sans-serif',
+                                flexShrink: 0
+                            }}
+                            onMouseEnter={(e) => {
+                                e.target.style.borderColor = '#ef4444';
+                                e.target.style.color = '#ef4444';
+                                e.target.style.background = '#fef2f2';
+                            }}
+                            onMouseLeave={(e) => {
+                                e.target.style.borderColor = '#e5e7eb';
+                                e.target.style.color = '#64748b';
+                                e.target.style.background = '#fff';
+                            }}
+                        >
+                            Limpiar filtros
+                        </button>
+                    )}
+                </div>
+            </div>
+
+            {/* Contador de resultados */}
+            <p style={{
+                fontSize: 13,
+                fontWeight: 600,
+                color: '#64748b',
+                marginBottom: 16
+            }}>
+                Mostrando {filteredSubjects.length} materias
+            </p>
+
+            {/* Empty state */}
+            {filteredSubjects.length === 0 ? (
+                <div style={{
+                    background: '#fff',
+                    borderRadius: 16,
+                    padding: 60,
+                    textAlign: 'center',
+                    border: '1px solid #e5e7eb'
+                }}>
                     <div style={{
-                        textAlign: "center",
-                        padding: "48px 24px",
-                        color: "#6b7280"
+                        width: 80,
+                        height: 80,
+                        background: '#f1f5f9',
+                        borderRadius: '50%',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        margin: '0 auto 20px'
                     }}>
-                        <div style={{ fontSize: 48, marginBottom: 16 }}>🔍</div>
-                        <h3 style={{ margin: "0 0 8px 0", color: "#374151" }}>
-                            No se encontraron materias
-                        </h3>
-                        <p>Probá con otros términos de búsqueda o otro semestre</p>
+                        <FontAwesomeIcon
+                            icon={faBookOpen}
+                            style={{ fontSize: 32, color: '#94a3b8' }}
+                        />
                     </div>
-                ) : (
-                    <div style={{ display: "flex", flexDirection: "column", gap: 32 }}>
-                        {groupedSubjects.map(([semester, semesterSubjects]) => (
-                            <div key={semester}>
-                                <h2 style={{
-                                    margin: "0 0 16px 0",
-                                    fontSize: 20,
-                                    fontWeight: 600,
-                                    color: "#0f172a",
-                                    paddingBottom: 8,
-                                    borderBottom: "2px solid #e5e7eb"
+                    <h3 style={{
+                        fontSize: 20,
+                        fontWeight: 700,
+                        color: '#0f172a',
+                        margin: '0 0 8px 0'
+                    }}>
+                        No se encontraron materias
+                    </h3>
+                    <p style={{
+                        fontSize: 15,
+                        fontWeight: 500,
+                        color: '#64748b',
+                        margin: '0 0 20px 0'
+                    }}>
+                        Intentá con otros filtros o términos de búsqueda
+                    </p>
+                    <button
+                        onClick={resetFilters}
+                        style={{
+                            padding: '12px 24px',
+                            background: '#2563eb',
+                            border: 'none',
+                            borderRadius: 10,
+                            fontSize: 15,
+                            fontWeight: 600,
+                            color: '#fff',
+                            cursor: 'pointer',
+                            fontFamily: 'Inter, sans-serif',
+                            transition: 'all 0.2s ease'
+                        }}
+                        onMouseEnter={(e) => {
+                            e.target.style.background = '#1d4ed8';
+                            e.target.style.transform = 'translateY(-2px)';
+                            e.target.style.boxShadow = '0 4px 12px rgba(37, 99, 235, 0.3)';
+                        }}
+                        onMouseLeave={(e) => {
+                            e.target.style.background = '#2563eb';
+                            e.target.style.transform = 'translateY(0)';
+                            e.target.style.boxShadow = 'none';
+                        }}
+                    >
+                        Limpiar filtros
+                    </button>
+                </div>
+            ) : (
+                <div style={{ display: "flex", flexDirection: "column", gap: 32 }}>
+                    {groupedSubjects.map(([semester, semesterSubjects]) => (
+                        <div key={semester}>
+                            <h2 style={{
+                                margin: "0 0 16px 0",
+                                fontSize: 20,
+                                fontWeight: 600,
+                                color: "#0f172a",
+                                paddingBottom: 8,
+                                borderBottom: "2px solid #e5e7eb"
+                            }}>
+                                {semester === "Sin semestre" ? "Otras Materias" : `Semestre ${semester}`}
+                                <span style={{
+                                    marginLeft: 8,
+                                    fontSize: 14,
+                                    color: "#64748b",
+                                    fontWeight: 500
                                 }}>
-                                    {semester === "Sin semestre" ? "Otras Materias" : `Semestre ${semester}`}
-                                    <span style={{
-                                        marginLeft: 8,
-                                        fontSize: 14,
-                                        color: "#64748b",
-                                        fontWeight: 500
-                                    }}>
                                     ({semesterSubjects.length})
                                 </span>
-                                </h2>
-                                <div style={{
-                                    display: "grid",
-                                    gridTemplateColumns: "repeat(auto-fill, minmax(300px, 1fr))",
-                                    gap: 16
-                                }}>
-                                    {semesterSubjects.map(s => (
-                                        <CourseCard
-                                            key={s.id}
-                                            course={transformToCourseCard(s)}
-                                            onFav={null}
-                                        />
-                                    ))}
-                                </div>
+                            </h2>
+                            <div style={{
+                                display: "grid",
+                                gridTemplateColumns: "repeat(auto-fill, minmax(300px, 1fr))",
+                                gap: 16
+                            }}>
+                                {semesterSubjects.map(s => (
+                                    <CourseCard
+                                        key={s.id}
+                                        course={transformToCourseCard(s)}
+                                        onFav={null}
+                                    />
+                                ))}
                             </div>
-                        ))}
-                    </div>
-                )}
-            </div>
-        </>
+                        </div>
+                    ))}
+                </div>
+            )}
+
+            {/* Keyframes CSS */}
+            <style>{`
+                @keyframes slideDown {
+                    from {
+                        opacity: 0;
+                        transform: translateY(-8px);
+                    }
+                    to {
+                        opacity: 1;
+                        transform: translateY(0);
+                    }
+                }
+            `}</style>
+        </div>
     );
 }
 

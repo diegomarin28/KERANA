@@ -22,7 +22,12 @@ export default function Credits() {
 
     const cargarPaquetes = async () => {
         try {
-            const { data, error } = await supabase.rpc('obtener_paquetes_creditos');
+            const { data, error } = await supabase
+                .from('paquete_creditos')
+                .select('*')
+                .eq('activo', true)
+                .order('cantidad_creditos', { ascending: true });
+
             if (error) throw error;
             setPaquetes(data || []);
         } catch (error) {
@@ -255,7 +260,7 @@ export default function Credits() {
 
 function PaqueteCard({ paquete, onComprar, disabled }) {
     const precioOriginal = paquete.descuento_porcentaje > 0
-        ? (paquete.precio_usd / (1 - paquete.descuento_porcentaje / 100)).toFixed(2)
+        ? (paquete.precio_uyu / (1 - paquete.descuento_porcentaje / 100)).toFixed(2)
         : null;
 
     return (
@@ -380,7 +385,7 @@ function PaqueteCard({ paquete, onComprar, disabled }) {
                             fontFamily: 'Inter, sans-serif',
                             marginBottom: 4,
                         }}>
-                            ${precioOriginal} USD
+                            ${precioOriginal} UYU
                         </div>
                     )}
                     <div style={{
@@ -390,7 +395,7 @@ function PaqueteCard({ paquete, onComprar, disabled }) {
                         fontFamily: 'Inter, sans-serif',
                         letterSpacing: '-0.02em',
                     }}>
-                        ${paquete.precio_usd} <span style={{ fontSize: 18, fontWeight: 600, color: '#64748b' }}>USD</span>
+                        ${paquete.precio_uyu} <span style={{ fontSize: 18, fontWeight: 600, color: '#64748b' }}>UYU</span>
                     </div>
                 </div>
 

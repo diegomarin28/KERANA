@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { supabase } from '../supabase';
+import { creditsAPI } from '../api/database';
 import { Card } from '../components/UI/Card';
 import { Button } from '../components/UI/Button';
 import FileDrop from "../components/FileDrop";
@@ -204,9 +205,21 @@ export default function Upload() {
             const fileName = formData.file.name; // ya saneado
             const thumbnailFileName = `thumb_${fileName.replace(/\.pdf$/i, '.jpg')}`;
 
-            // 1) Generar thumbnail
-            setUploadProgress('Generando vista previa...');
+            // 1) Generar thumbnail y contar páginas del PDF
+            setUploadProgress('Generando vista previa y contando páginas...');
             const thumbnailBlob = await generateThumbnail(formData.file);
+
+            // Contar páginas del PDF
+            let numPaginas = 0;
+            try {
+                const arrayBuffer = await formData.file.arrayBuffer();
+                const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
+                numPaginas = pdf.numPages;
+                console.log(`📄 PDF tiene ${numPaginas} páginas`);
+            } catch (pdfError) {
+                console.warn('No se pudo contar páginas del PDF:', pdfError);
+                numPaginas = 0; // Default si falla
+            }
 
             // 2) Subir PDF al bucket 'apuntes'
             setUploadProgress('Subiendo PDF...');
@@ -243,7 +256,7 @@ export default function Upload() {
 
             // 4) Insertar fila en 'apunte'
             setUploadProgress('Guardando información...');
-            const { error: insertError } = await supabase
+            const { data: apunteData, error: insertError } = await supabase
                 .from('apunte')
                 .insert([{
                     titulo: formData.title.trim(),
@@ -252,11 +265,13 @@ export default function Upload() {
                     id_usuario: usuarioData.id_usuario,
                     file_path: fileName,
                     file_name: formData.file.name,
-                    thumbnail_path: thumbnailPath,   // <— tu campo nuevo
+                    thumbnail_path: thumbnailPath,
                     mime_type: 'pdf',
                     file_size: formData.file.size,
+                    num_paginas: numPaginas,
                     created_at: new Date().toISOString()
-                }]);
+                }])
+                .select();
 
             if (insertError) {
                 console.error('Error insertando en BD:', insertError);
@@ -266,6 +281,27 @@ export default function Upload() {
                     await supabase.storage.from('thumbnails').remove([thumbnailFileName]).catch(() => {});
                 }
                 throw new Error('Error al guardar en base de datos: ' + insertError.message);
+            }
+
+            // 5) 💰 Otorgar créditos por subir apunte
+            if (apunteData && apunteData[0] && numPaginas >= 3) {
+                setUploadProgress('Calculando créditos...');
+                const { data: creditosResult, error: creditosError } = await creditsAPI.grantNoteUploadCredits(
+                    apunteData[0].id_apunte,
+                    numPaginas,
+                    selectedMateria.id_materia
+                );
+
+                if (!creditosError && creditosResult) {
+                    console.log(`💰 Créditos otorgados: ${creditosResult.creditosOtorgados}`);
+                    if (creditosResult.bonoPrimerApunte > 0) {
+                        console.log(`🎁 ¡Bono de primer apunte! +${creditosResult.bonoPrimerApunte} créditos`);
+                    }
+                } else {
+                    console.warn('No se pudieron otorgar créditos:', creditosError);
+                }
+            } else if (numPaginas < 3) {
+                console.warn('⚠️ Apunte tiene menos de 3 páginas, no se otorgan créditos');
             }
 
             playSound('apunte_publicado');

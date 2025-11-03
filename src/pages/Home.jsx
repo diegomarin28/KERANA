@@ -29,13 +29,8 @@ export default function Home() {
 
                 const apIds = data.map(d => d.apunte_id);
                 const { data: apuntes, error: apError } = await supabase
-                    .from('apunte')
-                    .select(`
-                        id_apunte, 
-                        file_path,
-                        usuario:id_usuario(nombre),
-                        thumbnail_path
-                    `)
+                    .from('apuntes_completos')  // ← Vista que ya tiene todos los datos
+                    .select('*')
                     .in('id_apunte', apIds);
 
                 if (apError) throw apError;

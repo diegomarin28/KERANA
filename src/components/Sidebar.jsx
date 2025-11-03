@@ -3,6 +3,27 @@ import { supabase } from "../supabase";
 import AuthModal_SignIn from "../components/AuthModal_SignIn";
 import { useAvatar } from '../contexts/AvatarContext';
 import { useNavigate } from 'react-router-dom';
+import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
+import {
+    faShoppingCart,
+    faBookmark,
+    faFileAlt,
+    faChalkboardTeacher,
+    faUsers,
+    faCalendar,
+    faBook,
+    faGraduationCap,
+    faUser,
+    faBell,
+    faCog,
+    faPhone,
+    faQuestionCircle,
+    faFileContract,
+    faShieldAlt,
+    faTimes,
+    faCheckCircle,
+    faBookOpen
+} from '@fortawesome/free-solid-svg-icons';
 
 export default function Sidebar({
                                     open,
@@ -110,19 +131,20 @@ export default function Sidebar({
                     display: "grid",
                     gridTemplateRows: "auto auto 1fr auto",
                     overflow: "hidden",
+                    fontFamily: 'Inter, sans-serif'
                 }}
             >
                 <div style={headerStyle}>
                     <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
                         <div style={{ fontWeight: 800, letterSpacing: .5 }}>KERANA</div>
-                        <span style={{ fontSize: 12, opacity: .75 }}>beta</span>
+                        <span style={{ fontSize: 12, opacity: .75, fontWeight: 500 }}>beta</span>
                     </div>
                     <button
                         onClick={onClose}
                         aria-label="Cerrar menú"
                         style={closeButtonStyle}
                     >
-                        ✕
+                        <FontAwesomeIcon icon={faTimes} style={{ fontSize: 14 }} />
                     </button>
                 </div>
 
@@ -182,17 +204,20 @@ export default function Sidebar({
                             </div>
                             {isMentor && !mentorLoading && (
                                 <div style={{
-                                    display: 'inline-block',
-                                    padding: '2px 8px',
-                                    background: 'rgba(16, 185, 129, 0.2)',
-                                    border: '1px solid rgba(16, 185, 129, 0.4)',
+                                    display: 'inline-flex',
+                                    alignItems: 'center',
+                                    gap: '4px',
+                                    padding: '3px 8px',
+                                    background: 'rgba(13, 148, 136, 0.2)',
+                                    border: '1px solid rgba(13, 148, 136, 0.4)',
                                     borderRadius: 4,
                                     fontSize: 10,
-                                    fontWeight: 600,
-                                    color: '#6ee7b7',
+                                    fontWeight: 700,
+                                    color: '#5eead4',
                                     marginBottom: 4
                                 }}>
-                                    ✓ MENTOR
+                                    <FontAwesomeIcon icon={faCheckCircle} style={{ fontSize: 9 }} />
+                                    MENTOR
                                 </div>
                             )}
                             <div style={{ display: "flex", gap: 6, fontSize: 12, opacity: .9 }}>
@@ -207,41 +232,41 @@ export default function Sidebar({
 
                 <nav style={navStyle}>
                     <Group title="Mis Recursos" />
-                    <MenuLink icon="📚" label="Comprados" onClick={() => go("/purchased")} />
-                    <MenuLink icon="⭐" label="Favoritos" onClick={() => go("/favorites")} />
-                    <MenuLink icon="📄" label="Mis Apuntes" onClick={() => go("/my_papers")} />
+                    <MenuLink icon={faShoppingCart} label="Comprados" onClick={() => go("/purchased")} />
+                    <MenuLink icon={faBookmark} label="Favoritos" onClick={() => go("/favorites")} />
+                    <MenuLink icon={faFileAlt} label="Mis Apuntes" onClick={() => go("/my_papers")} />
 
-                    {/* SECCIÓN DE MENTOR - Sin lag porque viene del Header */}
+                    {/* SECCIÓN DE MENTOR */}
                     {isMentor && !mentorLoading && (
                         <>
                             <Group title="Panel de Mentor" />
-                            <MenuLink icon="📚" label="Soy Mentor" onClick={() => go("/mentor/courses")} />
-                            <MenuLink icon="👥" label="Mis Alumnos" onClick={() => go("/mentor/students")} />
-                            <MenuLink icon="📅" label="Mi Calendario" onClick={() => go("/mentor/calendar")} />
+                            <MenuLink icon={faBookOpen} label="Soy Mentor" onClick={() => go("/mentor/courses")} />
+                            <MenuLink icon={faUsers} label="Mis Alumnos" onClick={() => go("/mentor/students")} />
+                            <MenuLink icon={faCalendar} label="Mi Calendario" onClick={() => go("/mentor/calendar")} />
                         </>
                     )}
 
                     <Group title="Explorar" />
-                    <MenuLink icon="📖" label="Asignaturas" onClick={() => go("/subjects")} />
-                    <MenuLink icon="👨‍🏫" label="Profesores" onClick={() => go("/professors")} />
-                    <MenuLink icon="💡" label="Mentores" onClick={() => go("/mentors")} />
-                    <MenuLink icon="📄" label="Apuntes" onClick={() => go("/notes")} />
+                    <MenuLink icon={faBook} label="Materias" onClick={() => go("/subjects")} />
+                    <MenuLink icon={faChalkboardTeacher} label="Profesores" onClick={() => go("/professors")} />
+                    <MenuLink icon={faGraduationCap} label="Mentores" onClick={() => go("/mentors")} />
+                    <MenuLink icon={faFileAlt} label="Apuntes" onClick={() => go("/notes")} />
 
                     {/* CUENTA */}
                     <Group title="Cuenta" />
                     {isAuthenticated && (
                         <>
-                            <MenuLink icon="👤" label="Mi Perfil" onClick={() => go("/profile")} />
-                            <MenuLink icon="🔔" label="Notificaciones" onClick={() => go("/notifications")} />
-                            <MenuLink icon="⚙️" label="Ajustes" onClick={() => go("/settings")} />
+                            <MenuLink icon={faUser} label="Mi Perfil" onClick={() => go("/profile")} />
+                            <MenuLink icon={faBell} label="Notificaciones" onClick={() => go("/notifications")} />
+                            <MenuLink icon={faCog} label="Ajustes" onClick={() => go("/settings")} />
                         </>
                     )}
 
                     <Group title="Ayuda" />
-                    <MenuLink icon="📞" label="Contacto" onClick={() => go("/contact")} />
-                    <MenuLink icon="❓" label="Centro de ayuda" onClick={() => go("/help-center")} />
-                    <MenuLink icon="📄" label="Términos y condiciones" onClick={() => go("/terms")} />
-                    <MenuLink icon="🔒" label="Política de privacidad" onClick={() => go("/privacy")} />
+                    <MenuLink icon={faPhone} label="Contacto" onClick={() => go("/contact")} />
+                    <MenuLink icon={faQuestionCircle} label="Centro de ayuda" onClick={() => go("/help-center")} />
+                    <MenuLink icon={faFileContract} label="Términos y condiciones" onClick={() => go("/terms")} />
+                    <MenuLink icon={faShieldAlt} label="Política de privacidad" onClick={() => go("/privacy")} />
 
                     {/* SESIÓN */}
                     {!isAuthenticated ? (
@@ -259,7 +284,7 @@ export default function Sidebar({
 
                 <div style={footerStyle}>
                     <Badge>ES</Badge>
-                    <span style={{ marginLeft: "auto", opacity: .6, fontSize: 12 }}>v0.1</span>
+                    <span style={{ marginLeft: "auto", opacity: .6, fontSize: 12, fontWeight: 500 }}>v10.28.05</span>
                 </div>
             </aside>
 
@@ -291,7 +316,8 @@ const headerStyle = {
     alignItems: "center",
     justifyContent: "space-between",
     padding: 16,
-    borderBottom: "1px solid rgba(255,255,255,.12)"
+    borderBottom: "1px solid rgba(255,255,255,.12)",
+    fontFamily: 'Inter, sans-serif'
 };
 
 const closeButtonStyle = {
@@ -300,12 +326,18 @@ const closeButtonStyle = {
     cursor: "pointer",
     borderRadius: 8,
     background: "rgba(255,255,255,.08)",
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    color: '#fff',
+    transition: 'background 0.2s ease'
 };
 
 const profileSectionStyle = {
     padding: "16px",
     borderBottom: "1px solid rgba(255,255,255,.12)",
-    background: "rgba(255,255,255,.03)"
+    background: "rgba(255,255,255,.03)",
+    fontFamily: 'Inter, sans-serif'
 };
 
 const profileContainerStyle = {
@@ -344,14 +376,16 @@ const usernameStyle = {
     whiteSpace: "nowrap",
     textOverflow: "ellipsis",
     overflow: "hidden",
-    marginBottom: 4
+    marginBottom: 4,
+    fontFamily: 'Inter, sans-serif'
 };
 
 const navStyle = {
     padding: 16,
     overflowY: "auto",
     display: "grid",
-    gap: 4
+    gap: 4,
+    fontFamily: 'Inter, sans-serif'
 };
 
 const footerStyle = {
@@ -359,7 +393,8 @@ const footerStyle = {
     borderTop: "1px solid rgba(255,255,255,.08)",
     display: "flex",
     gap: 8,
-    flexWrap: "wrap"
+    flexWrap: "wrap",
+    fontFamily: 'Inter, sans-serif'
 };
 
 function Group({ title }) {
@@ -370,7 +405,8 @@ function Group({ title }) {
             letterSpacing: .5,
             textTransform: "uppercase",
             opacity: .6,
-            fontWeight: 600
+            fontWeight: 600,
+            fontFamily: 'Inter, sans-serif'
         }}>
             {title}
         </div>
@@ -386,8 +422,8 @@ function MenuLink({ icon, label, onClick }) {
             onMouseEnter={(e) => e.currentTarget.style.background = "rgba(255,255,255,.08)"}
             onMouseLeave={(e) => e.currentTarget.style.background = "transparent"}
         >
-            <span style={{ fontSize: 16, width: 20, textAlign: 'center' }}>{icon}</span>
-            <span style={{ fontWeight: 500, fontSize: 14, flex: 1, textAlign: 'left' }}>{label}</span>
+            <FontAwesomeIcon icon={icon} style={{ fontSize: 15, width: 20, textAlign: 'center', opacity: 0.85 }} />
+            <span style={{ fontWeight: 500, fontSize: 14, flex: 1, textAlign: 'left', opacity: 0.95 }}>{label}</span>
         </button>
     );
 }
@@ -403,6 +439,7 @@ const menuLinkStyle = {
     color: "#fff",
     width: "100%",
     transition: "background 0.2s ease",
+    fontFamily: 'Inter, sans-serif'
 };
 
 function PrimaryButton({ label, onClick }) {
@@ -431,6 +468,7 @@ const primaryButtonStyle = {
     cursor: "pointer",
     transition: "all 0.2s ease",
     fontSize: 14,
+    fontFamily: 'Inter, sans-serif'
 };
 
 function SecondaryButton({ label, onClick }) {
@@ -459,6 +497,7 @@ const secondaryButtonStyle = {
     cursor: "pointer",
     transition: "all 0.2s ease",
     fontSize: 14,
+    fontFamily: 'Inter, sans-serif'
 };
 
 function SmallDangerButton({ label, onClick }) {
@@ -490,6 +529,7 @@ const smallDangerButtonStyle = {
     cursor: "pointer",
     transition: "all 0.2s ease",
     fontSize: 13,
+    fontFamily: 'Inter, sans-serif'
 };
 
 function StatLink({ label, value, onClick }) {
@@ -512,7 +552,7 @@ function StatLink({ label, value, onClick }) {
             onMouseLeave={(e) => e.currentTarget.style.background = "transparent"}
         >
             <strong style={{ fontWeight: 800, fontSize: 12 }}>{value}</strong>
-            <span style={{ opacity: .85, fontSize: 11 }}>{label}</span>
+            <span style={{ opacity: .85, fontSize: 11, fontWeight: 500 }}>{label}</span>
         </div>
     );
 }
@@ -528,6 +568,7 @@ const statLinkStyle = {
     borderRadius: 6,
     transition: "background 0.2s ease",
     minWidth: 45,
+    fontFamily: 'Inter, sans-serif'
 };
 
 function Badge({ children }) {
@@ -548,4 +589,6 @@ const badgeStyle = {
     border: "1px solid rgba(255,255,255,.18)",
     fontSize: 11,
     color: "#fff",
+    fontWeight: 600,
+    fontFamily: 'Inter, sans-serif'
 };
