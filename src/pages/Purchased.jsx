@@ -1,4 +1,10 @@
 import { useEffect, useState, useRef } from "react";
+import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
+import {
+    faShoppingCart,
+    faFolder,
+    faSpinner
+} from '@fortawesome/free-solid-svg-icons';
 import { supabase } from "../supabase";
 import { getOrCreateUserProfile } from "../api/userService";
 import { foldersAPI } from "../api/database";
@@ -427,31 +433,83 @@ export default function Purchased() {
                     alignItems: "center",
                     justifyContent: "center",
                     flexDirection: "column",
-                    gap: 16
+                    gap: 16,
+                    background: '#f8fafc'
                 }}
             >
-                <div
-                    style={{
-                        width: 40,
-                        height: 40,
-                        border: "3px solid #f3f4f6",
-                        borderTop: "3px solid #2563eb",
-                        borderRadius: "50%",
-                        animation: "spin 1s linear infinite"
-                    }}
+                <FontAwesomeIcon
+                    icon={faSpinner}
+                    spin
+                    style={{ fontSize: 40, color: '#2563eb' }}
                 />
-                <p style={{ color: "#6b7280", margin: 0 }}>Cargando tus compras…</p>
+                <p style={{
+                    color: "#64748b",
+                    margin: 0,
+                    fontSize: 15,
+                    fontWeight: 500,
+                    fontFamily: 'Inter, sans-serif'
+                }}>
+                    Cargando tus compras…
+                </p>
             </div>
         );
     }
 
     return (
-        <div style={{ width: "min(1200px, 92vw)", margin: "0 auto", padding: "32px 0" }}>
-            <header style={{ marginBottom: 24 }}>
-                <h1 style={{ margin: "0 0 8px 0" }}>Mis compras</h1>
-                <p style={{ color: "#6b7280", margin: 0 }}>
-                    {purchases.length} compra{purchases.length !== 1 ? "s" : ""} realizada
-                    {purchases.length !== 1 ? "s" : ""}
+        <div style={{
+            width: "min(1200px, 92vw)",
+            margin: "0 auto",
+            padding: "32px 0",
+            fontFamily: 'Inter, sans-serif',
+            background: '#f8fafc',
+            minHeight: '100vh'
+        }}>
+            {/* Header */}
+            <header style={{
+                marginBottom: 24,
+                background: '#ffffff',
+                padding: '20px',
+                borderRadius: 16,
+                border: '2px solid #f1f5f9',
+                boxShadow: '0 2px 8px rgba(0,0,0,0.04)'
+            }}>
+                <div style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 12,
+                    marginBottom: 6
+                }}>
+                    <div style={{
+                        width: 44,
+                        height: 44,
+                        borderRadius: 12,
+                        background: '#2563eb',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center'
+                    }}>
+                        <FontAwesomeIcon
+                            icon={faShoppingCart}
+                            style={{ fontSize: 18, color: '#fff' }}
+                        />
+                    </div>
+                    <h1 style={{
+                        margin: 0,
+                        fontSize: 26,
+                        fontWeight: 700,
+                        color: '#13346b'
+                    }}>
+                        Mis Compras
+                    </h1>
+                </div>
+                <p style={{
+                    color: '#64748b',
+                    margin: 0,
+                    fontSize: 14,
+                    fontWeight: 500,
+                    paddingLeft: 56
+                }}>
+                    {purchases.length} compra{purchases.length !== 1 ? "s" : ""} realizada{purchases.length !== 1 ? "s" : ""}
                 </p>
             </header>
 
@@ -460,28 +518,39 @@ export default function Purchased() {
                     display: "flex",
                     gap: 8,
                     borderBottom: "2px solid #e5e7eb",
-                    marginBottom: 24
+                    marginBottom: 24,
+                    background: '#fff',
+                    padding: '0 20px',
+                    borderRadius: '16px 16px 0 0'
                 }}
             >
-                {["purchases", "folders"].map((tab) => (
+                {[
+                    { key: "purchases", label: "Todas las compras", icon: faShoppingCart },
+                    { key: "folders", label: "Mis carpetas", icon: faFolder }
+                ].map((tab) => (
                     <button
-                        key={tab}
-                        onClick={() => setActiveTab(tab)}
+                        key={tab.key}
+                        onClick={() => setActiveTab(tab.key)}
                         style={{
-                            padding: "12px 24px",
+                            padding: "14px 24px",
                             background: "none",
                             border: "none",
                             borderBottom:
-                                activeTab === tab ? "2px solid #2563eb" : "2px solid transparent",
-                            color: activeTab === tab ? "#2563eb" : "#6b7280",
-                            fontWeight: activeTab === tab ? 600 : 400,
+                                activeTab === tab.key ? "3px solid #2563eb" : "3px solid transparent",
+                            color: activeTab === tab.key ? "#2563eb" : "#6b7280",
+                            fontWeight: activeTab === tab.key ? 700 : 500,
                             cursor: "pointer",
                             fontSize: 15,
                             marginBottom: -2,
-                            transition: "all 0.2s"
+                            transition: "all 0.2s",
+                            fontFamily: 'Inter, sans-serif',
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: 8
                         }}
                     >
-                        {tab === "purchases" ? "Todas las compras" : "Mis carpetas"}
+                        <FontAwesomeIcon icon={tab.icon} style={{ fontSize: 14 }} />
+                        {tab.label}
                     </button>
                 ))}
             </div>
@@ -490,7 +559,7 @@ export default function Purchased() {
                 <Card
                     style={{
                         background: "#fef2f2",
-                        border: "1px solid #fecaca",
+                        border: "2px solid #fecaca",
                         color: "#991b1b",
                         padding: "16px 20px",
                         marginBottom: 20
@@ -504,7 +573,7 @@ export default function Purchased() {
                             gap: 12
                         }}
                     >
-                        <span>{errorMsg}</span>
+                        <span style={{ fontWeight: 500 }}>{errorMsg}</span>
                         <Button
                             variant="ghost"
                             onClick={() => {
@@ -520,11 +589,43 @@ export default function Purchased() {
 
             {activeTab === "purchases" ? (
                 purchases.length === 0 ? (
-                    <Card style={{ textAlign: "center", padding: "48px 24px", background: "#fafafa" }}>
-                        <div style={{ fontSize: 48, marginBottom: 16 }}>🧾</div>
-                        <h3 style={{ margin: "0 0 12px 0", color: "#374151" }}>Todavía no compraste nada</h3>
-                        <p style={{ color: "#6b7280", margin: "0 0 24px 0" }}>
-                            Explorá apuntes y materiales creados por otros estudiantes.
+                    <Card style={{
+                        textAlign: "center",
+                        padding: "80px 40px",
+                        background: "#ffffff",
+                        border: '2px solid #f1f5f9'
+                    }}>
+                        <div style={{
+                            width: 100,
+                            height: 100,
+                            borderRadius: '24px',
+                            background: '#2563eb',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            margin: '0 auto 24px'
+                        }}>
+                            <FontAwesomeIcon
+                                icon={faShoppingCart}
+                                style={{ fontSize: 48, color: '#fff' }}
+                            />
+                        </div>
+                        <h3 style={{
+                            margin: "0 0 12px 0",
+                            color: "#13346b",
+                            fontSize: 28,
+                            fontWeight: 700
+                        }}>
+                            Todavía no compraste nada
+                        </h3>
+                        <p style={{
+                            color: "#64748b",
+                            margin: "0 0 28px 0",
+                            fontSize: 16,
+                            fontWeight: 500,
+                            lineHeight: 1.6
+                        }}>
+                            Explorá apuntes y materiales creados por otros estudiantes
                         </p>
                         <Button variant="primary" onClick={() => navigate("/notes")}>
                             Ir a explorar apuntes
@@ -553,29 +654,26 @@ export default function Purchased() {
                                 alignItems: 'center',
                                 gap: 8,
                                 padding: '10px 18px',
-                                borderRadius: 8,
+                                borderRadius: 10,
                                 fontWeight: 600,
                                 fontSize: 14,
                                 background: 'white',
-                                border: '1px solid #dbdbdb',
-                                color: '#262626',
+                                border: '2px solid #e2e8f0',
+                                color: '#0f172a',
                                 cursor: 'pointer',
-                                transition: 'all 0.2s'
+                                transition: 'all 0.2s',
+                                fontFamily: 'Inter, sans-serif'
                             }}
                             onMouseEnter={(e) => {
-                                e.currentTarget.style.background = '#fafafa';
-                                e.currentTarget.style.borderColor = '#b3b3b3';
+                                e.currentTarget.style.background = '#f8fafc';
+                                e.currentTarget.style.borderColor = '#2563eb';
                             }}
                             onMouseLeave={(e) => {
                                 e.currentTarget.style.background = 'white';
-                                e.currentTarget.style.borderColor = '#dbdbdb';
+                                e.currentTarget.style.borderColor = '#e2e8f0';
                             }}
                         >
-                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
-                                <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/>
-                                <line x1="12" y1="11" x2="12" y2="17"/>
-                                <line x1="9" y1="14" x2="15" y2="14"/>
-                            </svg>
+                            <FontAwesomeIcon icon={faFolder} />
                             Crear carpeta
                         </button>
 
@@ -587,35 +685,27 @@ export default function Purchased() {
                                     display: 'flex',
                                     alignItems: 'center',
                                     gap: 8,
-                                    background: organizing ? '#b3b3b3' : '#0095f6',
+                                    background: organizing ? '#94a3b8' : '#2563eb',
                                     color: 'white',
                                     border: 'none',
                                     padding: '10px 18px',
-                                    borderRadius: 8,
-                                    fontWeight: 600,
+                                    borderRadius: 10,
+                                    fontWeight: 700,
                                     fontSize: 14,
                                     cursor: organizing ? 'not-allowed' : 'pointer',
-                                    transition: 'all 0.2s'
+                                    transition: 'all 0.2s',
+                                    fontFamily: 'Inter, sans-serif'
                                 }}
                                 onMouseEnter={(e) => {
-                                    if (!organizing) e.target.style.background = '#1877f2';
+                                    if (!organizing) e.target.style.background = '#1e40af';
                                 }}
                                 onMouseLeave={(e) => {
-                                    if (!organizing) e.target.style.background = '#0095f6';
+                                    if (!organizing) e.target.style.background = '#2563eb';
                                 }}
                             >
                                 {organizing ? (
                                     <>
-                                        <div
-                                            style={{
-                                                width: 14,
-                                                height: 14,
-                                                border: '2px solid white',
-                                                borderTop: '2px solid transparent',
-                                                borderRadius: '50%',
-                                                animation: 'spin 1s linear infinite'
-                                            }}
-                                        />
+                                        <FontAwesomeIcon icon={faSpinner} spin />
                                         Organizando...
                                     </>
                                 ) : (
@@ -640,15 +730,16 @@ export default function Purchased() {
                                     alignItems: 'center',
                                     gap: 8,
                                     padding: '10px 18px',
-                                    borderRadius: 8,
+                                    borderRadius: 10,
                                     fontWeight: 600,
                                     fontSize: 14,
                                     background: 'white',
-                                    border: '1px solid #ed4956',
-                                    color: '#ed4956',
+                                    border: '2px solid #ef4444',
+                                    color: '#ef4444',
                                     cursor: organizing ? 'not-allowed' : 'pointer',
                                     opacity: organizing ? 0.6 : 1,
-                                    transition: 'all 0.2s'
+                                    transition: 'all 0.2s',
+                                    fontFamily: 'Inter, sans-serif'
                                 }}
                                 onMouseEnter={(e) => {
                                     if (!organizing) {
@@ -663,16 +754,7 @@ export default function Purchased() {
                             >
                                 {organizing ? (
                                     <>
-                                        <div
-                                            style={{
-                                                width: 14,
-                                                height: 14,
-                                                border: '2px solid #ed4956',
-                                                borderTop: '2px solid transparent',
-                                                borderRadius: '50%',
-                                                animation: 'spin 1s linear infinite'
-                                            }}
-                                        />
+                                        <FontAwesomeIcon icon={faSpinner} spin />
                                         Borrando...
                                     </>
                                 ) : (
@@ -688,11 +770,43 @@ export default function Purchased() {
                     </div>
 
                     {folders.length === 0 ? (
-                        <Card style={{ textAlign: "center", padding: "48px 24px", background: "#fafafa" }}>
-                            <div style={{ fontSize: 48, marginBottom: 16 }}>📁</div>
-                            <h3 style={{ margin: "0 0 12px 0", color: "#374151" }}>No tenés carpetas todavía</h3>
-                            <p style={{ color: "#6b7280", margin: "0 0 24px 0" }}>
-                                Organizá tus compras automáticamente o creá carpetas personalizadas.
+                        <Card style={{
+                            textAlign: "center",
+                            padding: "80px 40px",
+                            background: "#ffffff",
+                            border: '2px solid #f1f5f9'
+                        }}>
+                            <div style={{
+                                width: 100,
+                                height: 100,
+                                borderRadius: '24px',
+                                background: '#2563eb',
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                margin: '0 auto 24px'
+                            }}>
+                                <FontAwesomeIcon
+                                    icon={faFolder}
+                                    style={{ fontSize: 48, color: '#fff' }}
+                                />
+                            </div>
+                            <h3 style={{
+                                margin: "0 0 12px 0",
+                                color: "#13346b",
+                                fontSize: 28,
+                                fontWeight: 700
+                            }}>
+                                No tenés carpetas todavía
+                            </h3>
+                            <p style={{
+                                color: "#64748b",
+                                margin: "0 0 28px 0",
+                                fontSize: 16,
+                                fontWeight: 500,
+                                lineHeight: 1.6
+                            }}>
+                                Organizá tus compras automáticamente o creá carpetas personalizadas
                             </p>
                         </Card>
                     ) : (
@@ -703,8 +817,7 @@ export default function Purchased() {
                                 gap: 20
                             }}
                         >
-                            {folders.map((folder) => (
-                                <FolderCard
+                            {folders.map((folder) => (<FolderCard
                                     key={folder.id_carpeta}
                                     folder={folder}
                                     semestres={folder.semestres}
@@ -745,7 +858,7 @@ export default function Purchased() {
                                 width: 56,
                                 height: 56,
                                 borderRadius: 14,
-                                background: "#2563eb",
+                                background: '#2563eb',
                                 display: "flex",
                                 alignItems: "center",
                                 justifyContent: "center",
@@ -755,8 +868,8 @@ export default function Purchased() {
                         >
                             🤖
                         </div>
-                        <h2 style={{ margin: "0 0 12px 0", fontSize: 22, fontWeight: 700 }}>Organizar automáticamente</h2>
-                        <p style={{ color: "#6b7280", margin: "0 0 24px 0", lineHeight: 1.6, fontSize: 15 }}>
+                        <h2 style={{ margin: "0 0 12px 0", fontSize: 22, fontWeight: 700, fontFamily: 'Inter, sans-serif' }}>Organizar automáticamente</h2>
+                        <p style={{ color: "#6b7280", margin: "0 0 24px 0", lineHeight: 1.6, fontSize: 15, fontFamily: 'Inter, sans-serif' }}>
                             Voy a crear carpetas por semestre y materia automáticamente, organizando todos tus apuntes.
                         </p>
                         <div style={{ display: "flex", gap: 12 }}>
@@ -772,7 +885,8 @@ export default function Purchased() {
                                     fontSize: 15,
                                     fontWeight: 600,
                                     color: "#6b7280",
-                                    transition: "all 0.2s"
+                                    transition: "all 0.2s",
+                                    fontFamily: 'Inter, sans-serif'
                                 }}
                             >
                                 Cancelar
@@ -789,7 +903,8 @@ export default function Purchased() {
                                     cursor: "pointer",
                                     fontSize: 15,
                                     fontWeight: 600,
-                                    transition: "all 0.2s"
+                                    transition: "all 0.2s",
+                                    fontFamily: 'Inter, sans-serif'
                                 }}
                             >
                                 Organizar
@@ -843,10 +958,10 @@ export default function Purchased() {
                             >
                                 📁
                             </div>
-                            <h2 style={{ margin: 0, fontSize: 22, fontWeight: 700 }}>Nueva carpeta</h2>
+                            <h2 style={{ margin: 0, fontSize: 22, fontWeight: 700, fontFamily: 'Inter, sans-serif' }}>Nueva carpeta</h2>
                         </div>
 
-                        <p style={{ color: "#6b7280", margin: "0 0 20px 0", fontSize: 14, lineHeight: 1.5 }}>
+                        <p style={{ color: "#6b7280", margin: "0 0 20px 0", fontSize: 14, lineHeight: 1.5, fontFamily: 'Inter, sans-serif' }}>
                             Organizá tus apuntes creando carpetas personalizadas o por materia
                         </p>
 
@@ -858,7 +973,8 @@ export default function Purchased() {
                                     fontSize: 13,
                                     fontWeight: 600,
                                     color: "#374151",
-                                    marginBottom: 12
+                                    marginBottom: 12,
+                                    fontFamily: 'Inter, sans-serif'
                                 }}
                             >
                                 Tipo de carpeta
@@ -875,18 +991,19 @@ export default function Purchased() {
                                     style={{
                                         flex: 1,
                                         padding: "12px 16px",
-                                        border: newFolderType === "materia" ? "2px solid #059669" : "2px solid #e5e7eb",
+                                        border: newFolderType === "materia" ? "2px solid #10b981" : "2px solid #e5e7eb",
                                         borderRadius: 8,
                                         background: newFolderType === "materia" ? "#d1fae5" : "white",
                                         color: newFolderType === "materia" ? "#059669" : "#6b7280",
                                         cursor: "pointer",
-                                        fontWeight: newFolderType === "materia" ? 600 : 400,
+                                        fontWeight: newFolderType === "materia" ? 600 : 500,
                                         fontSize: 14,
                                         transition: "all 0.2s",
                                         display: "flex",
                                         flexDirection: "column",
                                         alignItems: "center",
-                                        gap: 4
+                                        gap: 4,
+                                        fontFamily: 'Inter, sans-serif'
                                     }}
                                 >
                                     <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
@@ -911,13 +1028,14 @@ export default function Purchased() {
                                         background: newFolderType === "personalizada" ? "#dbeafe" : "white",
                                         color: newFolderType === "personalizada" ? "#2563eb" : "#6b7280",
                                         cursor: "pointer",
-                                        fontWeight: newFolderType === "personalizada" ? 600 : 400,
+                                        fontWeight: newFolderType === "personalizada" ? 600 : 500,
                                         fontSize: 14,
                                         transition: "all 0.2s",
                                         display: "flex",
                                         flexDirection: "column",
                                         alignItems: "center",
-                                        gap: 4
+                                        gap: 4,
+                                        fontFamily: 'Inter, sans-serif'
                                     }}
                                 >
                                     <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
@@ -937,7 +1055,8 @@ export default function Purchased() {
                                         fontSize: 13,
                                         fontWeight: 600,
                                         color: "#374151",
-                                        marginBottom: 8
+                                        marginBottom: 8,
+                                        fontFamily: 'Inter, sans-serif'
                                     }}
                                 >
                                     Buscar materia
@@ -958,7 +1077,8 @@ export default function Purchased() {
                                         fontSize: 15,
                                         outline: "none",
                                         transition: "all 0.2s",
-                                        boxSizing: "border-box"
+                                        boxSizing: "border-box",
+                                        fontFamily: 'Inter, sans-serif'
                                     }}
                                     autoFocus
                                 />
@@ -991,8 +1111,8 @@ export default function Purchased() {
                                                 onMouseEnter={(e) => (e.target.style.background = "#f9fafb")}
                                                 onMouseLeave={(e) => (e.target.style.background = "#fff")}
                                             >
-                                                <div style={{ fontWeight: 500 }}>{materia.nombre_materia}</div>
-                                                <div style={{ fontSize: 12, color: "#6b7280", marginTop: 2 }}>
+                                                <div style={{ fontWeight: 500, fontFamily: 'Inter, sans-serif' }}>{materia.nombre_materia}</div>
+                                                <div style={{ fontSize: 12, color: "#6b7280", marginTop: 2, fontFamily: 'Inter, sans-serif' }}>
                                                     Semestre {materia.semestre}
                                                 </div>
                                             </div>
@@ -1008,7 +1128,8 @@ export default function Purchased() {
                                         fontSize: 13,
                                         fontWeight: 600,
                                         color: "#374151",
-                                        marginBottom: 8
+                                        marginBottom: 8,
+                                        fontFamily: 'Inter, sans-serif'
                                     }}
                                 >
                                     Nombre de la carpeta
@@ -1032,7 +1153,8 @@ export default function Purchased() {
                                         fontSize: 15,
                                         outline: "none",
                                         transition: "all 0.2s",
-                                        boxSizing: "border-box"
+                                        boxSizing: "border-box",
+                                        fontFamily: 'Inter, sans-serif'
                                     }}
                                     autoFocus
                                 />
@@ -1058,7 +1180,8 @@ export default function Purchased() {
                                     fontSize: 15,
                                     fontWeight: 600,
                                     color: "#6b7280",
-                                    transition: "all 0.2s"
+                                    transition: "all 0.2s",
+                                    fontFamily: 'Inter, sans-serif'
                                 }}
                                 onMouseEnter={(e) => (e.target.style.background = "#f9fafb")}
                                 onMouseLeave={(e) => (e.target.style.background = "white")}
@@ -1078,7 +1201,8 @@ export default function Purchased() {
                                     cursor: !newFolderName.trim() ? "not-allowed" : "pointer",
                                     fontSize: 15,
                                     fontWeight: 600,
-                                    transition: "all 0.2s"
+                                    transition: "all 0.2s",
+                                    fontFamily: 'Inter, sans-serif'
                                 }}
                                 onMouseEnter={(e) => {
                                     if (newFolderName.trim()) e.target.style.background = "#1d4ed8";
@@ -1128,7 +1252,7 @@ export default function Purchased() {
                         onClick={(e) => e.stopPropagation()}
                     >
                         <div style={{ padding: 32, borderBottom: "1px solid #e5e7eb" }}>
-                            <h2 style={{ margin: "0 0 16px 0", fontSize: 20 }}>
+                            <h2 style={{ margin: "0 0 16px 0", fontSize: 20, fontFamily: 'Inter, sans-serif', fontWeight: 700 }}>
                                 Añadir apuntes a "{targetFolder?.nombre}"
                             </h2>
 
@@ -1145,7 +1269,8 @@ export default function Purchased() {
                                     fontSize: 14,
                                     outline: "none",
                                     boxSizing: "border-box",
-                                    transition: "border 0.2s"
+                                    transition: "border 0.2s",
+                                    fontFamily: 'Inter, sans-serif'
                                 }}
                                 onFocus={(e) => (e.target.style.borderColor = "#2563eb")}
                                 onBlur={(e) => (e.target.style.borderColor = "#e5e7eb")}
@@ -1158,7 +1283,7 @@ export default function Purchased() {
                                     <div style={{ fontSize: 48, marginBottom: 12 }}>
                                         {filterText ? "🔍" : "📭"}
                                     </div>
-                                    <p style={{ margin: 0, fontWeight: 500 }}>
+                                    <p style={{ margin: 0, fontWeight: 500, fontFamily: 'Inter, sans-serif' }}>
                                         {filterText ? "No se encontraron resultados" : "No hay apuntes disponibles"}
                                     </p>
                                 </div>
@@ -1176,7 +1301,8 @@ export default function Purchased() {
                                                 marginBottom: 8,
                                                 cursor: "pointer",
                                                 background: selectedNotes.includes(note.id) ? "#eff6ff" : "white",
-                                                transition: "all 0.2s"
+                                                transition: "all 0.2s",
+                                                fontFamily: 'Inter, sans-serif'
                                             }}
                                         >
                                             <input
@@ -1205,7 +1331,7 @@ export default function Purchased() {
                                 alignItems: "center"
                             }}
                         >
-              <span style={{ fontSize: 14, color: "#6b7280" }}>
+              <span style={{ fontSize: 14, color: "#6b7280", fontFamily: 'Inter, sans-serif' }}>
                 {selectedNotes.length > 0 &&
                     `${selectedNotes.length} seleccionado${selectedNotes.length !== 1 ? "s" : ""}`}
               </span>

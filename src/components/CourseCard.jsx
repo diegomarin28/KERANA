@@ -8,6 +8,7 @@ import {
     faFileAlt,
     faUserTie,
     faUsers,
+    faHeart
 } from '@fortawesome/free-solid-svg-icons';
 
 export default function CourseCard({ course, onFav = null }) {
@@ -117,18 +118,27 @@ export default function CourseCard({ course, onFav = null }) {
                             all: 'unset',
                             cursor: 'pointer',
                             fontSize: '18px',
-                            transition: 'transform 0.2s ease',
-                            padding: '4px'
+                            transition: 'all 0.2s ease',
+                            padding: '4px',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center'
                         }}
                         onMouseEnter={(e) => {
-                            e.currentTarget.style.transform = 'scale(1.2)';
+                            e.currentTarget.style.transform = 'scale(1.15)';
                         }}
                         onMouseLeave={(e) => {
                             e.currentTarget.style.transform = 'scale(1)';
                         }}
                         title="Agregar a favoritos"
                     >
-                        🤍
+                        <FontAwesomeIcon
+                            icon={faHeart}
+                            style={{
+                                fontSize: 16,
+                                color: '#cbd5e1'
+                            }}
+                        />
                     </button>
                 )}
             </div>
@@ -206,13 +216,13 @@ export default function CourseCard({ course, onFav = null }) {
                                 fontFamily: 'Inter, sans-serif'
                             }}>
                                 <FontAwesomeIcon
-                                    icon={faUserTie}
+                                    icon={faChalkboardTeacher}
                                     style={{
                                         fontSize: '11px',
                                         color: '#ef4444'
                                     }}
                                 />
-                                <span style={{ color: '#64748b' }}>Profes:</span>
+                                <span style={{ color: '#64748b' }}>Profesores:</span>
                                 <span style={{ color: '#0f172a', fontWeight: 600 }}>
                                     {course.conteo.profesores}
                                 </span>
@@ -227,7 +237,7 @@ export default function CourseCard({ course, onFav = null }) {
                                 fontFamily: 'Inter, sans-serif'
                             }}>
                                 <FontAwesomeIcon
-                                    icon={faUsers}
+                                    icon={faGraduationCap}
                                     style={{
                                         fontSize: '11px',
                                         color: '#10b981'

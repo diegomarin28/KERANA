@@ -74,6 +74,24 @@ export default function Terms() {
                     </div>
 
                     <div style={sectionStyle}>
+                        <h2 style={sectionTitleStyle}>5.1. Sistema de Créditos y Bonificaciones</h2>
+                        <p style={textStyle}>
+                            KERANA utiliza un sistema de créditos como moneda virtual para transacciones
+                            dentro de la plataforma. Al participar en KERANA, aceptas las siguientes condiciones:
+                        </p>
+                        <ul style={listStyle}>
+                            <li>Al subir contenido educativo válido, recibirás una porción mayoritaria de créditos de forma inmediata</li>
+                            <li>Una porción menor del valor se distribuye en forma de bonificaciones por hitos de participación y calidad del contenido</li>
+                            <li>Existen bonos adicionales por bienvenida, calidad del contenido, ventas, participación activa y rankings</li>
+                            <li>Los créditos comprados con dinero real no son reembolsables bajo ninguna circunstancia</li>
+                            <li>KERANA se reserva el derecho de ajustar valores, porcentajes y condiciones del sistema de créditos con previo aviso</li>
+                            <li>Los bonos y créditos pueden ser revocados en caso de detectarse fraude, contenido inapropiado o violación de estos términos</li>
+                            <li>El contenido reportado y verificado como inapropiado resultará en la devolución de créditos a los compradores y penalización al autor</li>
+                            <li>Para detalles completos sobre el funcionamiento del sistema de créditos y bonificaciones, consulta nuestra sección de Ayuda</li>
+                        </ul>
+                    </div>
+
+                    <div style={sectionStyle}>
                         <h2 style={sectionTitleStyle}>6. Propiedad Intelectual</h2>
                         <p style={textStyle}>
                             Los usuarios mantienen los derechos de autor sobre el contenido que suben.

@@ -4,19 +4,21 @@ import StarDisplay from './StarDisplay';
 
 // Tags disponibles
 const AVAILABLE_TAGS = [
-    { id: 'muy-claro', label: '✨ Muy claro' },
-    { id: 'querido', label: '🎓 Querido por los estudiantes' },
-    { id: 'apasionado', label: '🔥 Apasionado' },
-    { id: 'disponible', label: '💬 Disponible' },
-    { id: 'ordenado', label: '📋 Ordenado' },
-    { id: 'dinamico', label: '⚡ Dinámico' },
-    { id: 'cercano', label: '🤝 Cercano' },
-    { id: 'califica-duro', label: '📊 Califica duro' },
-    { id: 'mucha-tarea', label: '📖 Mucha tarea' },
-    { id: 'participacion', label: '🎤 Participación' },
-    { id: 'confuso', label: '🤔 Confuso' },
-    { id: 'lejano', label: '🚪 Lejano' },
-    { id: 'examenes-dificiles', label: '📝 Exámenes difíciles' }
+    // Positivos
+    { id: 'muy-claro', label: 'Muy claro', type: 'positive', icon: faLightbulb },
+    { id: 'querido', label: 'Querido', type: 'positive', icon: faHeart },
+    { id: 'apasionado', label: 'Apasionado', type: 'positive', icon: faFire },
+    { id: 'disponible', label: 'Disponible', type: 'positive', icon: faComments },
+    { id: 'ordenado', label: 'Ordenado', type: 'positive', icon: faClipboardList },
+    { id: 'dinamico', label: 'Dinámico', type: 'positive', icon: faBolt },
+    { id: 'cercano', label: 'Cercano', type: 'positive', icon: faHandshake },
+    // Negativos/Desafiantes
+    { id: 'califica-duro', label: 'Califica duro', type: 'negative', icon: faChartLine },
+    { id: 'mucha-tarea', label: 'Mucha tarea', type: 'negative', icon: faBook },
+    { id: 'participacion', label: 'Participación', type: 'negative', icon: faMicrophone },
+    { id: 'confuso', label: 'Confuso', type: 'negative', icon: faQuestionCircle },
+    { id: 'lejano', label: 'Lejano', type: 'negative', icon: faDoorOpen },
+    { id: 'examenes-dificiles', label: 'Exámenes difíciles', type: 'negative', icon: faClipboard }
 ];
 
 export default function ProfessorCarousel({ profesores, profesoresByRating }) {

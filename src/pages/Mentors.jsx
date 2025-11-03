@@ -1,10 +1,10 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { supabase } from '../supabase';
 import { Card } from '../components/UI/Card';
 import { MentorCard } from '../components/MentorCard';
 import { useNavigate } from 'react-router-dom';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faSearch, faGraduationCap, faFilter } from '@fortawesome/free-solid-svg-icons';
+import { faSearch, faGraduationCap, faFilter, faCalendarAlt, faChevronDown, faList, faCalendarDay } from '@fortawesome/free-solid-svg-icons';
 
 export default function Mentors() {
     const navigate = useNavigate();
@@ -19,9 +19,25 @@ export default function Mentors() {
     const [showCalendarView, setShowCalendarView] = useState(false);
     const [selectedMentorCalendar, setSelectedMentorCalendar] = useState(null);
 
+    // Estado para dropdown
+    const [dropdownOpen, setDropdownOpen] = useState(false);
+    const dropdownRef = useRef(null);
+
     useEffect(() => {
         getCurrentUserId();
         loadMentors();
+    }, []);
+
+    // Cerrar dropdown al hacer click fuera
+    useEffect(() => {
+        const handleClickOutside = (event) => {
+            if (dropdownRef.current && !dropdownRef.current.contains(event.target)) {
+                setDropdownOpen(false);
+            }
+        };
+
+        document.addEventListener('mousedown', handleClickOutside);
+        return () => document.removeEventListener('mousedown', handleClickOutside);
     }, []);
 
     const getCurrentUserId = async () => {
@@ -115,10 +131,16 @@ export default function Mentors() {
 
     const handleOpenCalendarView = () => {
         setShowCalendarView(true);
+        setDropdownOpen(false);
     };
 
     const handleOpenMentorCalendar = (mentor) => {
         setSelectedMentorCalendar(mentor);
+    };
+
+    const handleNavigateGlobalCalendar = () => {
+        navigate('/calendario-global');
+        setDropdownOpen(false);
     };
 
     if (loading) {
@@ -135,31 +157,31 @@ export default function Mentors() {
                 }}>
                     {/* Header Skeleton */}
                     <div style={{
-                        background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
-                        borderRadius: '16px',
-                        padding: '48px 32px',
-                        marginBottom: '32px',
-                        boxShadow: '0 10px 30px rgba(16, 185, 129, 0.2)'
+                        background: '#0d9488',
+                        borderRadius: '12px',
+                        padding: '20px 24px',
+                        marginBottom: '24px',
+                        boxShadow: '0 4px 12px rgba(13, 148, 136, 0.2)'
                     }}>
                         <div style={{
                             background: 'rgba(255,255,255,0.3)',
-                            height: '40px',
-                            width: '200px',
-                            borderRadius: '8px',
-                            marginBottom: '12px'
+                            height: '28px',
+                            width: '150px',
+                            borderRadius: '6px',
+                            marginBottom: '8px'
                         }} />
                         <div style={{
                             background: 'rgba(255,255,255,0.2)',
-                            height: '20px',
-                            width: '300px',
-                            borderRadius: '6px'
+                            height: '18px',
+                            width: '200px',
+                            borderRadius: '4px'
                         }} />
                     </div>
 
                     {/* Filters Skeleton */}
                     <div style={{
                         display: 'grid',
-                        gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))',
+                        gridTemplateColumns: '2fr 1fr',
                         gap: '16px',
                         marginBottom: '32px'
                     }}>
@@ -225,13 +247,13 @@ export default function Mentors() {
                 margin: '0 auto',
                 padding: '32px 20px'
             }}>
-                {/* Header Hero Mejorado */}
+                {/* Header Mejorado */}
                 <div style={{
-                    background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
+                    background: '#0d9488',
                     borderRadius: '12px',
                     padding: '20px 24px',
                     marginBottom: '24px',
-                    boxShadow: '0 4px 12px rgba(16, 185, 129, 0.2)'
+                    boxShadow: '0 4px 12px rgba(13, 148, 136, 0.2)'
                 }}>
                     <div style={{
                         display: 'flex',
@@ -266,69 +288,27 @@ export default function Mentors() {
                                     color: 'rgba(255,255,255,0.9)',
                                     fontWeight: 500
                                 }}>
-                                    {mentors.length} mentores activos
+                                    Conectá con {mentors.length} mentores que pueden ayudarte
                                 </p>
                             </div>
                         </div>
                     </div>
                 </div>
 
-                {/* Banner de Calendarios Disponibles */}
+                {/* Dropdown para Calendarios - Debajo del Header */}
                 {mentorsWithCalendly.length > 0 && (
                     <div style={{
-                        background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
-                        borderRadius: '16px',
-                        padding: '24px',
-                        marginBottom: '32px',
-                        boxShadow: '0 10px 30px rgba(16, 185, 129, 0.3)',
+                        marginBottom: '24px',
                         display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'space-between',
-                        flexWrap: 'wrap',
-                        gap: '16px'
+                        justifyContent: 'center'
                     }}>
-                        <div style={{ flex: 1, minWidth: '250px' }}>
-                            <div style={{
-                                display: 'flex',
-                                alignItems: 'center',
-                                gap: '12px',
-                                marginBottom: '8px'
-                            }}>
-                                <span style={{ fontSize: '28px' }}>📅</span>
-                                <h3 style={{
-                                    margin: 0,
-                                    fontSize: '20px',
-                                    fontWeight: 700,
-                                    color: 'white'
-                                }}>
-                                    Ver calendarios y agendar
-                                </h3>
-                            </div>
-                            <p style={{
-                                margin: 0,
-                                fontSize: '14px',
-                                opacity: 0.95,
-                                color: 'white',
-                                lineHeight: 1.5,
-                                fontWeight: 500
-                            }}>
-                                {filterMateria === 'all'
-                                    ? `${mentorsWithCalendly.length} mentores tienen horarios disponibles`
-                                    : `${mentorsWithCalendly.length} mentores de ${filterMateria} con calendario activo`
-                                }
-                            </p>
-                        </div>
-                        <div style={{
-                            display: 'flex',
-                            gap: '12px',
-                            flexWrap: 'wrap'
-                        }}>
+                        <div style={{ position: 'relative' }} ref={dropdownRef}>
                             <button
-                                onClick={handleOpenCalendarView}
+                                onClick={() => setDropdownOpen(!dropdownOpen)}
                                 style={{
                                     padding: '14px 28px',
-                                    background: 'white',
-                                    color: '#10b981',
+                                    background: '#0d9488',
+                                    color: 'white',
                                     border: 'none',
                                     borderRadius: '12px',
                                     fontWeight: 700,
@@ -337,57 +317,148 @@ export default function Mentors() {
                                     transition: 'all 0.2s ease',
                                     display: 'flex',
                                     alignItems: 'center',
-                                    gap: '10px',
-                                    boxShadow: '0 4px 14px rgba(0,0,0,0.15)',
+                                    gap: '12px',
+                                    boxShadow: '0 4px 14px rgba(13, 148, 136, 0.3)',
                                     fontFamily: 'Inter, sans-serif'
                                 }}
                                 onMouseEnter={(e) => {
                                     e.currentTarget.style.transform = 'translateY(-2px)';
-                                    e.currentTarget.style.boxShadow = '0 6px 20px rgba(0,0,0,0.2)';
+                                    e.currentTarget.style.boxShadow = '0 6px 20px rgba(13, 148, 136, 0.4)';
+                                    e.currentTarget.style.background = '#14b8a6';
                                 }}
                                 onMouseLeave={(e) => {
                                     e.currentTarget.style.transform = 'translateY(0)';
-                                    e.currentTarget.style.boxShadow = '0 4px 14px rgba(0,0,0,0.15)';
+                                    e.currentTarget.style.boxShadow = '0 4px 14px rgba(13, 148, 136, 0.3)';
+                                    e.currentTarget.style.background = '#0d9488';
                                 }}
                             >
-                                <span style={{ fontSize: '20px' }}>🗓️</span>
-                                Ver lista de mentores
+                                <FontAwesomeIcon icon={faCalendarAlt} style={{ fontSize: '18px' }} />
+                                Agendar Mentoría
+                                <FontAwesomeIcon
+                                    icon={faChevronDown}
+                                    style={{
+                                        fontSize: '14px',
+                                        transition: 'transform 0.2s ease',
+                                        transform: dropdownOpen ? 'rotate(180deg)' : 'rotate(0deg)'
+                                    }}
+                                />
                             </button>
-                            <button
-                                onClick={() => navigate('/calendario-global')}
-                                style={{
-                                    padding: '14px 28px',
-                                    background: 'rgba(255,255,255,0.25)',
-                                    color: 'white',
-                                    border: '2px solid rgba(255,255,255,0.4)',
+
+                            {/* Dropdown Menu */}
+                            {dropdownOpen && (
+                                <div style={{
+                                    position: 'absolute',
+                                    top: 'calc(100% + 8px)',
+                                    left: '50%',
+                                    transform: 'translateX(-50%)',
+                                    background: 'white',
                                     borderRadius: '12px',
-                                    fontWeight: 700,
-                                    fontSize: '16px',
-                                    cursor: 'pointer',
-                                    transition: 'all 0.2s ease',
-                                    display: 'flex',
-                                    alignItems: 'center',
-                                    gap: '10px',
-                                    backdropFilter: 'blur(10px)',
-                                    fontFamily: 'Inter, sans-serif'
-                                }}
-                                onMouseEnter={(e) => {
-                                    e.currentTarget.style.background = 'rgba(255,255,255,0.35)';
-                                    e.currentTarget.style.transform = 'translateY(-2px)';
-                                }}
-                                onMouseLeave={(e) => {
-                                    e.currentTarget.style.background = 'rgba(255,255,255,0.25)';
-                                    e.currentTarget.style.transform = 'translateY(0)';
-                                }}
-                            >
-                                <span style={{ fontSize: '20px' }}>📅</span>
-                                Ver calendario global
-                            </button>
+                                    boxShadow: '0 12px 40px rgba(0,0,0,0.15)',
+                                    overflow: 'hidden',
+                                    minWidth: '280px',
+                                    zIndex: 100,
+                                    border: '2px solid #e2e8f0',
+                                    animation: 'slideDown 0.2s ease'
+                                }}>
+                                    <button
+                                        onClick={handleOpenCalendarView}
+                                        style={{
+                                            width: '100%',
+                                            padding: '16px 20px',
+                                            background: 'white',
+                                            border: 'none',
+                                            borderBottom: '1px solid #f1f5f9',
+                                            cursor: 'pointer',
+                                            transition: 'all 0.2s ease',
+                                            display: 'flex',
+                                            alignItems: 'center',
+                                            gap: '12px',
+                                            fontFamily: 'Inter, sans-serif',
+                                            fontSize: '15px',
+                                            fontWeight: 600,
+                                            color: '#0f172a',
+                                            textAlign: 'left'
+                                        }}
+                                        onMouseEnter={(e) => {
+                                            e.currentTarget.style.background = '#f8fafc';
+                                        }}
+                                        onMouseLeave={(e) => {
+                                            e.currentTarget.style.background = 'white';
+                                        }}
+                                    >
+                                        <FontAwesomeIcon
+                                            icon={faList}
+                                            style={{
+                                                fontSize: '16px',
+                                                color: '#0d9488',
+                                                width: '20px'
+                                            }}
+                                        />
+                                        <div>
+                                            <div>Ver lista de mentores</div>
+                                            <div style={{
+                                                fontSize: '12px',
+                                                color: '#64748b',
+                                                fontWeight: 500,
+                                                marginTop: '2px'
+                                            }}>
+                                                {mentorsWithCalendly.length} {mentorsWithCalendly.length === 1 ? 'mentor disponible' : 'mentores disponibles'}
+                                            </div>
+                                        </div>
+                                    </button>
+
+                                    <button
+                                        onClick={handleNavigateGlobalCalendar}
+                                        style={{
+                                            width: '100%',
+                                            padding: '16px 20px',
+                                            background: 'white',
+                                            border: 'none',
+                                            cursor: 'pointer',
+                                            transition: 'all 0.2s ease',
+                                            display: 'flex',
+                                            alignItems: 'center',
+                                            gap: '12px',
+                                            fontFamily: 'Inter, sans-serif',
+                                            fontSize: '15px',
+                                            fontWeight: 600,
+                                            color: '#0f172a',
+                                            textAlign: 'left'
+                                        }}
+                                        onMouseEnter={(e) => {
+                                            e.currentTarget.style.background = '#f8fafc';
+                                        }}
+                                        onMouseLeave={(e) => {
+                                            e.currentTarget.style.background = 'white';
+                                        }}
+                                    >
+                                        <FontAwesomeIcon
+                                            icon={faCalendarDay}
+                                            style={{
+                                                fontSize: '16px',
+                                                color: '#0d9488',
+                                                width: '20px'
+                                            }}
+                                        />
+                                        <div>
+                                            <div>Ver calendario global</div>
+                                            <div style={{
+                                                fontSize: '12px',
+                                                color: '#64748b',
+                                                fontWeight: 500,
+                                                marginTop: '2px'
+                                            }}>
+                                                Todos los horarios disponibles
+                                            </div>
+                                        </div>
+                                    </button>
+                                </div>
+                            )}
                         </div>
                     </div>
                 )}
 
-                {/* Barra de Búsqueda y Filtros Mejorados */}
+                {/* Barra de Búsqueda y Filtros */}
                 <div style={{
                     display: 'grid',
                     gridTemplateColumns: '2fr 1fr',
@@ -428,8 +499,8 @@ export default function Mentors() {
                                 boxSizing: 'border-box'
                             }}
                             onFocus={(e) => {
-                                e.target.style.borderColor = '#10b981';
-                                e.target.style.boxShadow = '0 0 0 3px rgba(16, 185, 129, 0.1)';
+                                e.target.style.borderColor = '#0d9488';
+                                e.target.style.boxShadow = '0 0 0 3px rgba(13, 148, 136, 0.1)';
                             }}
                             onBlur={(e) => {
                                 e.target.style.borderColor = '#e2e8f0';
@@ -476,8 +547,8 @@ export default function Mentors() {
                                 backgroundPosition: 'right 16px center'
                             }}
                             onFocus={(e) => {
-                                e.target.style.borderColor = '#10b981';
-                                e.target.style.boxShadow = '0 0 0 3px rgba(16, 185, 129, 0.1)';
+                                e.target.style.borderColor = '#0d9488';
+                                e.target.style.boxShadow = '0 0 0 3px rgba(13, 148, 136, 0.1)';
                             }}
                             onBlur={(e) => {
                                 e.target.style.borderColor = '#e2e8f0';
@@ -532,7 +603,7 @@ export default function Mentors() {
                                 }}
                                 style={{
                                     padding: '12px 28px',
-                                    background: '#10b981',
+                                    background: '#0d9488',
                                     color: 'white',
                                     border: 'none',
                                     borderRadius: '10px',
@@ -543,11 +614,11 @@ export default function Mentors() {
                                     fontFamily: 'Inter, sans-serif'
                                 }}
                                 onMouseEnter={(e) => {
-                                    e.currentTarget.style.background = '#059669';
+                                    e.currentTarget.style.background = '#14b8a6';
                                     e.currentTarget.style.transform = 'translateY(-2px)';
                                 }}
                                 onMouseLeave={(e) => {
-                                    e.currentTarget.style.background = '#10b981';
+                                    e.currentTarget.style.background = '#0d9488';
                                     e.currentTarget.style.transform = 'translateY(0)';
                                 }}
                             >
@@ -578,8 +649,8 @@ export default function Mentors() {
                                     style={{
                                         padding: '8px 16px',
                                         background: 'white',
-                                        color: '#10b981',
-                                        border: '2px solid #10b981',
+                                        color: '#0d9488',
+                                        border: '2px solid #0d9488',
                                         borderRadius: '8px',
                                         fontSize: '13px',
                                         fontWeight: 700,
@@ -588,12 +659,12 @@ export default function Mentors() {
                                         fontFamily: 'Inter, sans-serif'
                                     }}
                                     onMouseEnter={(e) => {
-                                        e.currentTarget.style.background = '#10b981';
+                                        e.currentTarget.style.background = '#0d9488';
                                         e.currentTarget.style.color = 'white';
                                     }}
                                     onMouseLeave={(e) => {
                                         e.currentTarget.style.background = 'white';
-                                        e.currentTarget.style.color = '#10b981';
+                                        e.currentTarget.style.color = '#0d9488';
                                     }}
                                 >
                                     Limpiar filtros
@@ -602,8 +673,9 @@ export default function Mentors() {
                         </div>
                         <div style={{
                             display: 'grid',
-                            gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))',
-                            gap: '24px'
+                            gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))',
+                            rowGap: '48px',
+                            columnGap: '32px'
                         }}>
                             {filteredMentors.map(mentor => (
                                 <MentorCard
@@ -653,7 +725,7 @@ export default function Mentors() {
                                 display: 'flex',
                                 justifyContent: 'space-between',
                                 alignItems: 'center',
-                                background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
+                                background: '#0d9488',
                                 color: 'white'
                             }}>
                                 <div>
@@ -704,7 +776,8 @@ export default function Mentors() {
                                 <div style={{
                                     display: 'grid',
                                     gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))',
-                                    gap: '20px'
+                                    rowGap: '30px',
+                                    columnGap: '20px'
                                 }}>
                                     {mentorsWithCalendly.map(mentor => (
                                         <div
@@ -719,9 +792,9 @@ export default function Mentors() {
                                             }}
                                             onClick={() => handleOpenMentorCalendar(mentor)}
                                             onMouseEnter={(e) => {
-                                                e.currentTarget.style.borderColor = '#10b981';
+                                                e.currentTarget.style.borderColor = '#0d9488';
                                                 e.currentTarget.style.transform = 'translateY(-4px)';
-                                                e.currentTarget.style.boxShadow = '0 12px 24px rgba(16, 185, 129, 0.2)';
+                                                e.currentTarget.style.boxShadow = '0 12px 24px rgba(13, 148, 136, 0.2)';
                                             }}
                                             onMouseLeave={(e) => {
                                                 e.currentTarget.style.borderColor = '#e5e7eb';
@@ -752,7 +825,7 @@ export default function Mentors() {
                                                         width: '56px',
                                                         height: '56px',
                                                         borderRadius: '50%',
-                                                        background: 'linear-gradient(135deg, #10b981, #059669)',
+                                                        background: '#0d9488',
                                                         display: 'flex',
                                                         alignItems: 'center',
                                                         justifyContent: 'center',
@@ -796,8 +869,8 @@ export default function Mentors() {
                                                         <span
                                                             key={idx}
                                                             style={{
-                                                                background: '#d1fae5',
-                                                                color: '#059669',
+                                                                background: '#ccfbf1',
+                                                                color: '#0d9488',
                                                                 padding: '4px 10px',
                                                                 borderRadius: '6px',
                                                                 fontSize: '12px',
@@ -834,7 +907,7 @@ export default function Mentors() {
                                             {/* Botón */}
                                             <div style={{
                                                 padding: '12px 16px',
-                                                background: 'linear-gradient(135deg, #10b981, #059669)',
+                                                background: '#0d9488',
                                                 color: 'white',
                                                 borderRadius: '10px',
                                                 textAlign: 'center',
@@ -925,7 +998,7 @@ export default function Mentors() {
                                 display: 'flex',
                                 justifyContent: 'space-between',
                                 alignItems: 'center',
-                                background: 'linear-gradient(135deg, #10b981, #059669)',
+                                background: '#0d9488',
                                 color: 'white'
                             }}>
                                 <div style={{
@@ -1013,6 +1086,20 @@ export default function Mentors() {
                     </>
                 )}
             </div>
+
+            {/* Keyframe para animación */}
+            <style>{`
+                @keyframes slideDown {
+                    from {
+                        opacity: 0;
+                        transform: translateX(-50%) translateY(-10px);
+                    }
+                    to {
+                        opacity: 1;
+                        transform: translateX(-50%) translateY(0);
+                    }
+                }
+            `}</style>
         </div>
     );
 }

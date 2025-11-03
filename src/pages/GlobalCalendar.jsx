@@ -6,7 +6,8 @@ import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import {
     faCalendar, faChevronLeft, faChevronRight, faClock,
     faUser, faBook, faCheckCircle, faTimes, faVideo,
-    faBuilding, faUsers, faFilter, faXmark
+    faBuilding, faUsers, faFilter, faXmark, faEnvelope,
+    faFileAlt, faDollarSign, faHome, faUniversity
 } from '@fortawesome/free-solid-svg-icons';
 
 export default function GlobalCalendar() {
@@ -30,6 +31,11 @@ export default function GlobalCalendar() {
     // Estados para el filtro de materias
     const [materias, setMaterias] = useState([]);
     const [selectedMateria, setSelectedMateria] = useState(null);
+    const [numPersonas, setNumPersonas] = useState(1);
+    const [emailsParticipantes, setEmailsParticipantes] = useState(['']);
+    const [descripcionSesion, setDescripcionSesion] = useState('');
+    const [erroresValidacion, setErroresValidacion] = useState({});
+
 
     const months = ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio',
         'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'];
@@ -92,6 +98,95 @@ export default function GlobalCalendar() {
             setCurrentEstudianteId(userId);
         }
     };
+
+    const calcularPrecio = (cantidad, modalidad) => {
+        const preciosBase = {
+            virtual: { 1: 430, 2: 760, 3: 990 },
+            presencial: { 1: 630, 2: 1160, 3: 1590 }
+        };
+
+        return preciosBase[modalidad]?.[cantidad] || 0;
+    };
+
+    const validarEmail = (email) => {
+        const regex = /^[a-zA-Z0-9._%+-]+@correo\.um\.edu\.uy$/;
+        return regex.test(email.trim());
+    };
+    const validarFormulario = () => {
+        const errores = {};
+
+        // Validar emails
+        emailsParticipantes.forEach((email, index) => {
+            if (!email.trim()) {
+                errores[`email_${index}`] = 'El email es obligatorio';
+            } else if (!validarEmail(email)) {
+                errores[`email_${index}`] = 'Debe ser un email @correo.um.edu.uy';
+            }
+        });
+
+        setErroresValidacion(errores);
+        return Object.keys(errores).length === 0;
+    };
+
+    const handleNumPersonasChange = (cantidad) => {
+        setNumPersonas(cantidad);
+
+        // Ajustar array de emails
+        const nuevosEmails = [...emailsParticipantes];
+        if (cantidad > emailsParticipantes.length) {
+            // Agregar emails vacíos
+            while (nuevosEmails.length < cantidad) {
+                nuevosEmails.push('');
+            }
+        } else {
+            // Recortar emails
+            nuevosEmails.length = cantidad;
+        }
+        setEmailsParticipantes(nuevosEmails);
+        setErroresValidacion({}); // Limpiar errores
+    };
+
+    const handleEmailChange = (index, value) => {
+        const nuevosEmails = [...emailsParticipantes];
+        nuevosEmails[index] = value;
+        setEmailsParticipantes(nuevosEmails);
+
+        // Limpiar error de ese campo
+        if (erroresValidacion[`email_${index}`]) {
+            const nuevosErrores = { ...erroresValidacion };
+            delete nuevosErrores[`email_${index}`];
+            setErroresValidacion(nuevosErrores);
+        }
+    };
+
+    const resetModal = () => {
+        setNumPersonas(1);
+        setEmailsParticipantes(['']);
+        setDescripcionSesion('');
+        setErroresValidacion({});
+        setShowConfirmModal(false);
+        setSelectedMentor(null);
+        setSelectedSlot(null);
+    };
+
+    useEffect(() => {
+        if (showConfirmModal && currentUserId) {
+            // Autocompletar primer email con el del usuario actual
+            const fetchUserEmail = async () => {
+                const { data } = await supabase
+                    .from('usuario')
+                    .select('correo')
+                    .eq('id_usuario', currentUserId)
+                    .single();
+
+                if (data?.correo) {
+                    setEmailsParticipantes([data.correo]);
+                }
+            };
+            fetchUserEmail();
+        }
+    }, [showConfirmModal, currentUserId]);
+
 
     const loadAvailability = async () => {
         const now = new Date();
@@ -294,6 +389,12 @@ export default function GlobalCalendar() {
     const confirmBooking = async () => {
         if (!selectedMentor || !selectedSlot || !currentEstudianteId) return;
 
+        // ✅ VALIDAR FORMULARIO
+        if (!validarFormulario()) {
+            setErrorMessage('Por favor corrige los errores en el formulario');
+            return;
+        }
+
         setIsBooking(true);
 
         try {
@@ -307,57 +408,93 @@ export default function GlobalCalendar() {
             if (checkError || !slotActual?.disponible) {
                 setErrorMessage('Lo sentimos, este slot ya no está disponible. Alguien más lo reservó.');
                 setShowErrorModal(true);
-                setShowConfirmModal(false);
-                setSelectedMentor(null);
-                setSelectedSlot(null);
+                resetModal();
                 setIsBooking(false);
                 return;
             }
 
-            // ✅ PASO 2: Registrar la sesión
+            // ✅ PASO 2: CALCULAR PRECIO
+            const precioTotal = calcularPrecio(numPersonas, selectedSlot.modalidad);
+
+            // 🟡 AQUÍ VAS A AGREGAR MERCADO PAGO DESPUÉS
+            // const pagoExitoso = await procesarPagoMercadoPago(precioTotal, selectedMentor, selectedSlot);
+            // if (!pagoExitoso) {
+            //     setErrorMessage('El pago no pudo procesarse. Intenta nuevamente.');
+            //     setShowErrorModal(true);
+            //     setIsBooking(false);
+            //     return;
+            // }
+
+            // 🟢 POR AHORA: PAGO SIMULADO (comentar esta línea cuando integres MP)
+            const pagoExitoso = true;
+
+            if (!pagoExitoso) {
+                setErrorMessage('El pago no pudo procesarse. Intenta nuevamente.');
+                setShowErrorModal(true);
+                setIsBooking(false);
+                return;
+            }
+
+            // ✅ PASO 3: REGISTRAR LA SESIÓN CON TODOS LOS DATOS
             const fechaHora = `${formatDateKey(selectedDate)}T${selectedSlot.hora}`;
 
-            const { data: sesionData, error: sesionError } = await sesionesAPI.registrarSesion(
-                selectedMentor.mentorId,
-                currentEstudianteId,
-                fechaHora,
-                selectedMentor.materiaId,
-                selectedSlot.duracion
-            );
+            const { data: sesionData, error: sesionError } = await supabase
+                .from('mentor_sesion')
+                .insert({
+                    id_mentor: selectedMentor.mentorId,
+                    id_alumno: currentEstudianteId,
+                    id_materia: selectedMentor.materiaId,
+                    fecha_hora: fechaHora,
+                    duracion_minutos: selectedSlot.duracion,
+                    estado: 'confirmada',
+                    pagado: true, // ✅ Marcar como pagado
+                    precio: precioTotal, // ✅ Guardar precio calculado
+                    cantidad_alumnos: numPersonas, // ✅ NUEVO
+                    emails_participantes: emailsParticipantes, // ✅ NUEVO (array)
+                    descripcion_alumno: descripcionSesion.trim() || null // ✅ NUEVO
+                })
+                .select()
+                .single();
 
             if (sesionError) {
-                console.error('Error creating session:', sesionError);
+                console.error('❌ Error creating session:', sesionError);
                 setErrorMessage('Error al crear la sesión. Por favor, intenta nuevamente.');
                 setShowErrorModal(true);
                 setIsBooking(false);
                 return;
             }
 
-            // ✅ PASO 3: Marcar slot como no disponible
-            // Esto disparará el evento Realtime para TODOS los clientes
+            console.log('✅ Sesión creada:', sesionData);
+
+            // ✅ PASO 4: Marcar slot como no disponible
             const { error: slotError } = await supabase
                 .rpc('marcar_slot_no_disponible', { p_id_slot: selectedSlot.id_slot });
 
             if (slotError) {
-                console.error('Error updating slot:', slotError);
-                setErrorMessage('Error al actualizar el slot. Por favor, contacta al soporte.');
-                setShowErrorModal(true);
-                setIsBooking(false);
-                return;
+                console.error('❌ Error updating slot:', slotError);
+                // No mostramos error al usuario porque la sesión YA se creó
+                // Solo logueamos para debugging
             }
 
-            // ✅ Éxito
-            setShowSuccessModal(true);
-            setShowConfirmModal(false);
-            setSelectedMentor(null);
-            setSelectedSlot(null);
+            // ✅ PASO 5: SI ES VIRTUAL → Enviar emails (después lo implementamos)
+            // if (selectedSlot.modalidad === 'virtual') {
+            //     await enviarEmailsConfirmacion({
+            //         sesionId: sesionData.id_sesion,
+            //         mentorId: selectedMentor.mentorId,
+            //         alumnoId: currentEstudianteId,
+            //         emails: emailsParticipantes,
+            //         materia: selectedMentor.materia,
+            //         fecha: formatDateKey(selectedDate),
+            //         hora: selectedSlot.hora
+            //     });
+            // }
 
-            // ❌ REMOVIDO: No necesitamos recargar manualmente
-            // Realtime se encargará de actualizar todos los clientes
-            // await loadAvailability();
+            // ✅ ÉXITO
+            setShowSuccessModal(true);
+            resetModal();
 
         } catch (error) {
-            console.error('Error:', error);
+            console.error('❌ Error:', error);
             setErrorMessage('Error inesperado al agendar la sesión. Por favor, intenta nuevamente.');
             setShowErrorModal(true);
         } finally {
@@ -932,7 +1069,6 @@ export default function GlobalCalendar() {
                 </div>
             </div>
 
-            {/* Modal de confirmación */}
             {showConfirmModal && selectedMentor && selectedSlot && (
                 <div style={{
                     position: 'fixed',
@@ -946,40 +1082,65 @@ export default function GlobalCalendar() {
                     alignItems: 'center',
                     justifyContent: 'center',
                     zIndex: 9999,
-                    padding: 20
+                    padding: 20,
+                    overflowY: 'auto',
+                    fontFamily: 'Inter, sans-serif'
                 }}>
                     <div style={{
                         background: '#fff',
                         borderRadius: 16,
                         padding: 32,
-                        maxWidth: 480,
+                        maxWidth: 600,
                         width: '100%',
                         boxShadow: '0 20px 60px rgba(0,0,0,0.3)',
-                        border: '2px solid #f1f5f9'
+                        border: '2px solid #f1f5f9',
+                        maxHeight: '90vh',
+                        overflowY: 'auto',
+                        fontFamily: 'Inter, sans-serif'
                     }}>
+                        {/* Header */}
                         <div style={{
-                            width: 56,
-                            height: 56,
-                            borderRadius: '50%',
-                            background: 'linear-gradient(135deg, #d1fae5 0%, #a7f3d0 100%)',
                             display: 'flex',
                             alignItems: 'center',
-                            justifyContent: 'center',
-                            margin: '0 auto 20px'
+                            justifyContent: 'space-between',
+                            marginBottom: 24,
+                            paddingBottom: 16,
+                            borderBottom: '2px solid #f1f5f9'
                         }}>
-                            <FontAwesomeIcon icon={faCheckCircle} style={{ fontSize: 28, color: '#059669' }} />
+                            <h3 style={{
+                                margin: 0,
+                                fontSize: 24,
+                                fontWeight: 700,
+                                color: '#0f172a',
+                                fontFamily: 'Inter, sans-serif',
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: 10
+                            }}>
+                                <FontAwesomeIcon icon={faCalendar} style={{ color: '#2563eb' }} />
+                                Agendar Mentoría
+                            </h3>
+                            <button
+                                onClick={resetModal}
+                                disabled={isBooking}
+                                style={{
+                                    background: 'none',
+                                    border: 'none',
+                                    fontSize: 24,
+                                    color: '#94a3b8',
+                                    cursor: isBooking ? 'not-allowed' : 'pointer',
+                                    padding: 4,
+                                    transition: 'color 0.2s ease',
+                                    fontFamily: 'Inter, sans-serif'
+                                }}
+                                onMouseEnter={e => !isBooking && (e.target.style.color = '#ef4444')}
+                                onMouseLeave={e => !isBooking && (e.target.style.color = '#94a3b8')}
+                            >
+                                <FontAwesomeIcon icon={faTimes} />
+                            </button>
                         </div>
 
-                        <h3 style={{
-                            margin: '0 0 24px 0',
-                            fontSize: 24,
-                            fontWeight: 700,
-                            textAlign: 'center',
-                            color: '#0f172a'
-                        }}>
-                            Confirmar sesión
-                        </h3>
-
+                        {/* Info de la sesión */}
                         <div style={{
                             background: '#f8fafc',
                             borderRadius: 12,
@@ -987,143 +1148,312 @@ export default function GlobalCalendar() {
                             marginBottom: 24,
                             border: '2px solid #f1f5f9'
                         }}>
-                            {/* Mentor */}
-                            <div style={{ marginBottom: 16 }}>
-                                <div style={{
-                                    display: 'flex',
-                                    alignItems: 'center',
-                                    gap: 8,
-                                    marginBottom: 6
-                                }}>
-                                    <FontAwesomeIcon icon={faUser} style={{ color: '#64748b', fontSize: 14 }} />
-                                    <span style={{ color: '#64748b', fontSize: 13, fontWeight: 600 }}>Mentor:</span>
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+                                <div>
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 4 }}>
+                                        <FontAwesomeIcon icon={faUser} style={{ color: '#64748b', fontSize: 12 }} />
+                                        <span style={{ color: '#64748b', fontSize: 13, fontWeight: 600, fontFamily: 'Inter, sans-serif' }}>
+                                Mentor
+                            </span>
+                                    </div>
+                                    <p style={{ margin: 0, fontWeight: 700, fontSize: 16, color: '#0f172a', fontFamily: 'Inter, sans-serif' }}>
+                                        {selectedMentor.mentorName}
+                                    </p>
                                 </div>
-                                <p style={{ margin: 0, fontWeight: 700, fontSize: 16, color: '#0f172a' }}>
-                                    {selectedMentor.mentorName}
-                                </p>
-                            </div>
-
-                            {/* Materia */}
-                            <div style={{ marginBottom: 16 }}>
-                                <div style={{
-                                    display: 'flex',
-                                    alignItems: 'center',
-                                    gap: 8,
-                                    marginBottom: 6
-                                }}>
-                                    <FontAwesomeIcon icon={faBook} style={{ color: '#64748b', fontSize: 14 }} />
-                                    <span style={{ color: '#64748b', fontSize: 13, fontWeight: 600 }}>Materia:</span>
+                                <div>
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 4 }}>
+                                        <FontAwesomeIcon icon={faBook} style={{ color: '#64748b', fontSize: 12 }} />
+                                        <span style={{ color: '#64748b', fontSize: 13, fontWeight: 600, fontFamily: 'Inter, sans-serif' }}>
+                                Materia
+                            </span>
+                                    </div>
+                                    <p style={{ margin: 0, fontWeight: 700, fontSize: 16, color: '#0f172a', fontFamily: 'Inter, sans-serif' }}>
+                                        {selectedMentor.materia}
+                                    </p>
                                 </div>
-                                <p style={{ margin: 0, fontWeight: 700, fontSize: 16, color: '#0f172a' }}>
-                                    {selectedMentor.materia}
-                                </p>
-                            </div>
-
-                            {/* Fecha */}
-                            <div style={{ marginBottom: 16 }}>
-                                <div style={{
-                                    display: 'flex',
-                                    alignItems: 'center',
-                                    gap: 8,
-                                    marginBottom: 6
-                                }}>
-                                    <FontAwesomeIcon icon={faCalendar} style={{ color: '#64748b', fontSize: 14 }} />
-                                    <span style={{ color: '#64748b', fontSize: 13, fontWeight: 600 }}>Fecha:</span>
+                                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+                                    <div>
+                                        <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 4 }}>
+                                            <FontAwesomeIcon icon={faCalendar} style={{ color: '#64748b', fontSize: 12 }} />
+                                            <span style={{ color: '#64748b', fontSize: 13, fontWeight: 600, fontFamily: 'Inter, sans-serif' }}>
+                                    Fecha
+                                </span>
+                                        </div>
+                                        <p style={{ margin: 0, fontWeight: 600, fontSize: 14, color: '#0f172a', fontFamily: 'Inter, sans-serif' }}>
+                                            {selectedDate.getDate()}/{selectedDate.getMonth() + 1}/{selectedDate.getFullYear()}
+                                        </p>
+                                    </div>
+                                    <div>
+                                        <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 4 }}>
+                                            <FontAwesomeIcon icon={faClock} style={{ color: '#64748b', fontSize: 12 }} />
+                                            <span style={{ color: '#64748b', fontSize: 13, fontWeight: 600, fontFamily: 'Inter, sans-serif' }}>
+                                    Hora
+                                </span>
+                                        </div>
+                                        <p style={{ margin: 0, fontWeight: 700, fontSize: 14, color: '#2563eb', fontFamily: 'Inter, sans-serif' }}>
+                                            {formatTimeRange(selectedSlot.hora, selectedSlot.duracion)}
+                                        </p>
+                                    </div>
                                 </div>
-                                <p style={{ margin: 0, fontWeight: 700, fontSize: 16, color: '#0f172a' }}>
-                                    {selectedDate.getDate()} de {months[selectedDate.getMonth()]} de {selectedDate.getFullYear()}
-                                </p>
-                            </div>
-
-                            {/* Horario */}
-                            <div style={{ marginBottom: 16 }}>
-                                <div style={{
-                                    display: 'flex',
-                                    alignItems: 'center',
-                                    gap: 8,
-                                    marginBottom: 6
-                                }}>
-                                    <FontAwesomeIcon icon={faClock} style={{ color: '#64748b', fontSize: 14 }} />
-                                    <span style={{ color: '#64748b', fontSize: 13, fontWeight: 600 }}>Horario:</span>
+                                <div>
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 4 }}>
+                                        <FontAwesomeIcon
+                                            icon={selectedSlot.modalidad === 'virtual' ? faVideo : faBuilding}
+                                            style={{ color: '#64748b', fontSize: 12 }}
+                                        />
+                                        <span style={{ color: '#64748b', fontSize: 13, fontWeight: 600, fontFamily: 'Inter, sans-serif' }}>
+                                Modalidad
+                            </span>
+                                    </div>
+                                    <p style={{
+                                        margin: 0,
+                                        fontWeight: 700,
+                                        fontSize: 14,
+                                        color: selectedSlot.modalidad === 'virtual' ? '#1e40af' : '#065f46',
+                                        fontFamily: 'Inter, sans-serif',
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        gap: 6
+                                    }}>
+                                        {selectedSlot.modalidad === 'virtual' ? 'Virtual' : 'Presencial'}
+                                        {selectedSlot.modalidad === 'presencial' && selectedSlot.locacion && (
+                                            <span style={{ fontSize: 12, opacity: 0.8 }}>
+                                    <FontAwesomeIcon
+                                        icon={selectedSlot.locacion === 'casa' ? faHome : faUniversity}
+                                        style={{ marginRight: 4 }}
+                                    />
+                                                {selectedSlot.locacion === 'casa' ? 'Casa del mentor' : 'Facultad'}
+                                </span>
+                                        )}
+                                    </p>
                                 </div>
-                                <p style={{ margin: 0, fontWeight: 700, fontSize: 18, color: '#2563eb' }}>
-                                    {formatTimeRange(selectedSlot.hora, selectedSlot.duracion)}
-                                </p>
-                            </div>
-
-                            {/* Modalidad */}
-                            <div style={{ marginBottom: 16 }}>
-                                <div style={{
-                                    display: 'flex',
-                                    alignItems: 'center',
-                                    gap: 8,
-                                    marginBottom: 6
-                                }}>
-                                    {selectedSlot.modalidad === 'virtual' ? (
-                                        <FontAwesomeIcon icon={faVideo} style={{ color: '#64748b', fontSize: 14 }} />
-                                    ) : (
-                                        <FontAwesomeIcon icon={faBuilding} style={{ color: '#64748b', fontSize: 14 }} />
-                                    )}
-                                    <span style={{ color: '#64748b', fontSize: 13, fontWeight: 600 }}>Modalidad:</span>
-                                </div>
-                                <div style={{
-                                    margin: 0,
-                                    fontWeight: 700,
-                                    fontSize: 16,
-                                    color: selectedSlot.modalidad === 'virtual' ? '#1e40af' : '#065f46',
-                                    display: 'flex',
-                                    flexDirection: 'column',
-                                    gap: 4
-                                }}>
-                                    <span>{selectedSlot.modalidad === 'virtual' ? '💻 Virtual' : '🏢 Presencial'}</span>
-                                    {selectedSlot.modalidad === 'presencial' && selectedSlot.locacion && (
-                                        <span style={{ fontSize: 14, opacity: 0.8 }}>
-                                            {selectedSlot.locacion === 'casa' ? '🏠 En casa del mentor' : '🎓 En la facultad'}
-                                        </span>
-                                    )}
-                                </div>
-                            </div>
-
-                            {/* Duración */}
-                            <div style={{ marginBottom: 16 }}>
-                                <div style={{
-                                    display: 'flex',
-                                    alignItems: 'center',
-                                    gap: 8,
-                                    marginBottom: 6
-                                }}>
-                                    <FontAwesomeIcon icon={faClock} style={{ color: '#64748b', fontSize: 14 }} />
-                                    <span style={{ color: '#64748b', fontSize: 13, fontWeight: 600 }}>Duración:</span>
-                                </div>
-                                <p style={{ margin: 0, fontWeight: 700, fontSize: 16, color: '#0f172a' }}>
-                                    {selectedSlot.duracion} minutos
-                                </p>
-                            </div>
-
-                            {/* Capacidad */}
-                            <div>
-                                <div style={{
-                                    display: 'flex',
-                                    alignItems: 'center',
-                                    gap: 8,
-                                    marginBottom: 6
-                                }}>
-                                    <FontAwesomeIcon icon={faUsers} style={{ color: '#64748b', fontSize: 14 }} />
-                                    <span style={{ color: '#64748b', fontSize: 13, fontWeight: 600 }}>Capacidad:</span>
-                                </div>
-                                <p style={{ margin: 0, fontWeight: 700, fontSize: 16, color: '#0f172a' }}>
-                                    👤 {selectedSlot.max_alumnos} {selectedSlot.max_alumnos === 1 ? 'alumno' : 'alumnos'}
-                                </p>
                             </div>
                         </div>
 
+                        {/* Cantidad de personas */}
+                        <div style={{ marginBottom: 24 }}>
+                            <label style={{
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: 8,
+                                marginBottom: 12,
+                                fontSize: 14,
+                                fontWeight: 700,
+                                color: '#0f172a',
+                                fontFamily: 'Inter, sans-serif'
+                            }}>
+                                <FontAwesomeIcon icon={faUsers} style={{ color: '#2563eb' }} />
+                                ¿Cuántas personas asistirán?
+                            </label>
+                            <div style={{ display: 'flex', gap: 12 }}>
+                                {[1, 2, 3].map(num => (
+                                    <button
+                                        key={num}
+                                        onClick={() => handleNumPersonasChange(num)}
+                                        disabled={isBooking || num > selectedSlot.max_alumnos}
+                                        style={{
+                                            flex: 1,
+                                            padding: '14px',
+                                            background: numPersonas === num
+                                                ? 'linear-gradient(135deg, #2563eb 0%, #1e40af 100%)'
+                                                : '#fff',
+                                            color: numPersonas === num ? '#fff' : '#0f172a',
+                                            border: numPersonas === num ? 'none' : '2px solid #e2e8f0',
+                                            borderRadius: 10,
+                                            fontWeight: 700,
+                                            fontSize: 16,
+                                            cursor: (isBooking || num > selectedSlot.max_alumnos) ? 'not-allowed' : 'pointer',
+                                            opacity: num > selectedSlot.max_alumnos ? 0.5 : 1,
+                                            transition: 'all 0.2s ease',
+                                            fontFamily: 'Inter, sans-serif'
+                                        }}
+                                        onMouseEnter={e => {
+                                            if (!isBooking && num <= selectedSlot.max_alumnos && numPersonas !== num) {
+                                                e.target.style.borderColor = '#2563eb';
+                                                e.target.style.transform = 'translateY(-2px)';
+                                            }
+                                        }}
+                                        onMouseLeave={e => {
+                                            if (!isBooking && numPersonas !== num) {
+                                                e.target.style.borderColor = '#e2e8f0';
+                                                e.target.style.transform = 'translateY(0)';
+                                            }
+                                        }}
+                                    >
+                                        {num}
+                                    </button>
+                                ))}
+                            </div>
+                        </div>
+
+                        {/* Precio calculado */}
+                        <div style={{
+                            background: 'linear-gradient(135deg, #dbeafe 0%, #bfdbfe 100%)',
+                            border: '2px solid #93c5fd',
+                            borderRadius: 12,
+                            padding: 16,
+                            marginBottom: 24,
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'space-between'
+                        }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                                <FontAwesomeIcon icon={faDollarSign} style={{ color: '#1e40af', fontSize: 18 }} />
+                                <span style={{ color: '#1e40af', fontSize: 14, fontWeight: 600, fontFamily: 'Inter, sans-serif' }}>
+                        Precio total:
+                    </span>
+                            </div>
+                            <span style={{ color: '#1e40af', fontSize: 24, fontWeight: 800, fontFamily: 'Inter, sans-serif' }}>
+                    ${calcularPrecio(numPersonas, selectedSlot.modalidad)} UYU
+                </span>
+                        </div>
+
+                        {/* Emails de participantes */}
+                        <div style={{ marginBottom: 24 }}>
+                            <label style={{
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: 8,
+                                marginBottom: 12,
+                                fontSize: 14,
+                                fontWeight: 700,
+                                color: '#0f172a',
+                                fontFamily: 'Inter, sans-serif'
+                            }}>
+                                <FontAwesomeIcon icon={faEnvelope} style={{ color: '#2563eb' }} />
+                                Email{numPersonas > 1 ? 's' : ''} institucional{numPersonas > 1 ? 'es' : ''}
+                                <span style={{ color: '#ef4444' }}>*</span>
+                            </label>
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+                                {emailsParticipantes.map((email, index) => (
+                                    <div key={index}>
+                                        <div style={{ position: 'relative' }}>
+                                            <input
+                                                type="email"
+                                                value={email}
+                                                onChange={(e) => handleEmailChange(index, e.target.value)}
+                                                placeholder={index === 0 ? 'tu@correo.um.edu.uy' : `email${index + 1}@correo.um.edu.uy`}
+                                                disabled={isBooking}
+                                                style={{
+                                                    width: '100%',
+                                                    padding: '12px 14px 12px 40px',
+                                                    border: erroresValidacion[`email_${index}`] ? '2px solid #ef4444' : '2px solid #e2e8f0',
+                                                    borderRadius: 10,
+                                                    fontSize: 14,
+                                                    fontWeight: 500,
+                                                    outline: 'none',
+                                                    transition: 'all 0.2s ease',
+                                                    fontFamily: 'Inter, sans-serif',
+                                                    background: isBooking ? '#f9fafb' : '#fff'
+                                                }}
+                                                onFocus={(e) => {
+                                                    if (!erroresValidacion[`email_${index}`]) {
+                                                        e.target.style.borderColor = '#2563eb';
+                                                        e.target.style.boxShadow = '0 0 0 3px rgba(37, 99, 235, 0.1)';
+                                                    }
+                                                }}
+                                                onBlur={(e) => {
+                                                    if (!erroresValidacion[`email_${index}`]) {
+                                                        e.target.style.borderColor = '#e2e8f0';
+                                                        e.target.style.boxShadow = 'none';
+                                                    }
+                                                }}
+                                            />
+                                            <FontAwesomeIcon
+                                                icon={faEnvelope}
+                                                style={{
+                                                    position: 'absolute',
+                                                    left: 14,
+                                                    top: '50%',
+                                                    transform: 'translateY(-50%)',
+                                                    color: erroresValidacion[`email_${index}`] ? '#ef4444' : '#94a3b8',
+                                                    fontSize: 14
+                                                }}
+                                            />
+                                        </div>
+                                        {erroresValidacion[`email_${index}`] && (
+                                            <p style={{
+                                                margin: '6px 0 0 0',
+                                                fontSize: 12,
+                                                color: '#ef4444',
+                                                fontWeight: 600,
+                                                fontFamily: 'Inter, sans-serif'
+                                            }}>
+                                                {erroresValidacion[`email_${index}`]}
+                                            </p>
+                                        )}
+                                    </div>
+                                ))}
+                            </div>
+                            <p style={{
+                                margin: '8px 0 0 0',
+                                fontSize: 12,
+                                color: '#64748b',
+                                fontWeight: 500,
+                                fontFamily: 'Inter, sans-serif'
+                            }}>
+                                Solo se aceptan emails institucionales @correo.um.edu.uy
+                            </p>
+                        </div>
+
+                        {/* Descripción */}
+                        <div style={{ marginBottom: 24 }}>
+                            <label style={{
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: 8,
+                                marginBottom: 12,
+                                fontSize: 14,
+                                fontWeight: 700,
+                                color: '#0f172a',
+                                fontFamily: 'Inter, sans-serif'
+                            }}>
+                                <FontAwesomeIcon icon={faFileAlt} style={{ color: '#2563eb' }} />
+                                Descripción (opcional)
+                            </label>
+                            <textarea
+                                value={descripcionSesion}
+                                onChange={(e) => setDescripcionSesion(e.target.value)}
+                                placeholder="Ej: Quiero repasar derivadas y límites para el parcial..."
+                                disabled={isBooking}
+                                rows={3}
+                                style={{
+                                    width: '100%',
+                                    padding: '12px 14px',
+                                    border: '2px solid #e2e8f0',
+                                    borderRadius: 10,
+                                    fontSize: 14,
+                                    fontWeight: 500,
+                                    outline: 'none',
+                                    resize: 'vertical',
+                                    transition: 'all 0.2s ease',
+                                    fontFamily: 'Inter, sans-serif',
+                                    background: isBooking ? '#f9fafb' : '#fff'
+                                }}
+                                onFocus={(e) => {
+                                    e.target.style.borderColor = '#2563eb';
+                                    e.target.style.boxShadow = '0 0 0 3px rgba(37, 99, 235, 0.1)';
+                                }}
+                                onBlur={(e) => {
+                                    e.target.style.borderColor = '#e2e8f0';
+                                    e.target.style.boxShadow = 'none';
+                                }}
+                            />
+                            <p style={{
+                                margin: '6px 0 0 0',
+                                fontSize: 12,
+                                color: '#64748b',
+                                fontWeight: 500,
+                                fontFamily: 'Inter, sans-serif'
+                            }}>
+                                Ayuda al mentor a prepararse mejor para la sesión
+                            </p>
+                        </div>
+
+                        {/* Botones */}
                         <div style={{ display: 'flex', gap: 12 }}>
                             <button
-                                onClick={() => {
-                                    setShowConfirmModal(false);
-                                    setSelectedMentor(null);
-                                    setSelectedSlot(null);
-                                }}
+                                onClick={resetModal}
                                 disabled={isBooking}
                                 style={{
                                     flex: 1,
@@ -1165,7 +1495,7 @@ export default function GlobalCalendar() {
                                     color: '#fff',
                                     border: 'none',
                                     borderRadius: 10,
-                                    fontWeight: 600,
+                                    fontWeight: 700,
                                     cursor: isBooking ? 'not-allowed' : 'pointer',
                                     fontSize: 15,
                                     opacity: isBooking ? 0.7 : 1,
@@ -1186,7 +1516,7 @@ export default function GlobalCalendar() {
                                 }}
                             >
                                 <FontAwesomeIcon icon={faCheckCircle} style={{ marginRight: 8 }} />
-                                {isBooking ? 'Agendando...' : 'Confirmar sesión'}
+                                {isBooking ? 'Procesando...' : 'Confirmar y pagar →'}
                             </button>
                         </div>
                     </div>

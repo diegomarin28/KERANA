@@ -1,13 +1,18 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faGraduationCap, faUserCheck, faUserPlus } from '@fortawesome/free-solid-svg-icons';
+import { faGraduationCap, faUserCheck, faUserPlus, faStar } from '@fortawesome/free-solid-svg-icons';
 import { supabase } from '../supabase';
 import { useSeguidores } from '../hooks/useSeguidores';
 import StarDisplay from './StarDisplay';
 
 const AVAILABLE_TAGS = [
     { id: 'muy-claro', label: 'Muy claro' },
+    { id: 'participacion', label: 'Participación' },
+    { id: 'califica-duro', label: 'Califica duro' },
+    { id: 'lejano', label: 'Lejano' },
+    { id: 'confuso', label: 'Confuso' },
+    { id: 'mucha-tarea', label: 'Mucha tarea' },
     { id: 'querido', label: 'Querido' },
     { id: 'apasionado', label: 'Apasionado' },
     { id: 'disponible', label: 'Disponible' },
@@ -128,48 +133,50 @@ export function MentorCard({ mentor }) {
     };
 
     const estrellas = mentor.estrellas_mentor || mentor.rating_promedio || rating.promedio || 0;
-    const materiasDisplay = materias.slice(0, 2);
-    const hayMasMaterias = materias.length > 2;
+    const materiasDisplay = materias.slice(0, 3);
+    const hayMasMaterias = materias.length > 3;
 
     return (
         <>
             <div
                 onClick={irAlPerfil}
                 style={{
-                    width: 240,
-                    height: 340,
-                    padding: 12,
                     background: '#fff',
-                    borderRadius: 12,
+                    borderRadius: '16px',
                     border: '2px solid #f1f5f9',
                     boxShadow: '0 2px 8px rgba(0,0,0,0.04)',
+                    padding: '20px 16px',
                     display: 'flex',
                     flexDirection: 'column',
                     transition: 'all 0.2s ease',
                     cursor: 'pointer',
-                    fontFamily: 'Inter, sans-serif'
+                    fontFamily: 'Inter, sans-serif',
+                    height: '100%'
                 }}
                 onMouseEnter={(e) => {
-                    e.currentTarget.style.boxShadow = '0 8px 20px rgba(0,0,0,0.1)';
-                    e.currentTarget.style.transform = 'translateY(-3px)';
+                    e.currentTarget.style.boxShadow = '0 8px 24px rgba(13, 148, 136, 0.15)';
+                    e.currentTarget.style.transform = 'translateY(-4px)';
+                    e.currentTarget.style.borderColor = '#0d9488';
                 }}
                 onMouseLeave={(e) => {
                     e.currentTarget.style.boxShadow = '0 2px 8px rgba(0,0,0,0.04)';
                     e.currentTarget.style.transform = 'translateY(0)';
+                    e.currentTarget.style.borderColor = '#f1f5f9';
                 }}
             >
-                {/* Avatar */}
+                {/* Avatar centrado arriba */}
                 <div style={{
-                    width: 48,
-                    height: 48,
+                    width: '56px',
+                    height: '56px',
                     borderRadius: '50%',
-                    background: mentor.foto ? 'transparent' : 'linear-gradient(135deg, #10B981 0%, #059669 100%)',
+                    background: mentor.foto ? 'transparent' : '#0d9488',
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'center',
                     overflow: 'hidden',
-                    margin: '0 auto 8px',
-                    border: '2px solid #10B981'
+                    margin: '0 auto 14px',
+                    border: '3px solid #0d9488',
+                    flexShrink: 0
                 }}>
                     {mentor.foto ? (
                         <img
@@ -183,7 +190,7 @@ export function MentorCard({ mentor }) {
                         />
                     ) : (
                         <div style={{
-                            fontSize: 18,
+                            fontSize: '20px',
                             fontWeight: 700,
                             color: '#fff'
                         }}>
@@ -192,161 +199,130 @@ export function MentorCard({ mentor }) {
                     )}
                 </div>
 
-                {/* Nombre */}
-                <h3 style={{
-                    margin: '0 0 3px 0',
-                    fontSize: 14,
-                    fontWeight: 700,
-                    textAlign: 'center',
-                    color: '#13346b',
-                    overflow: 'hidden',
-                    textOverflow: 'ellipsis',
-                    whiteSpace: 'nowrap'
-                }}>
-                    {mentor.mentor_nombre}
-                </h3>
-
-                {/* Username */}
-                <p style={{
-                    margin: '0 0 6px 0',
-                    fontSize: 11,
-                    color: '#64748b',
-                    textAlign: 'center',
-                    fontWeight: 500,
-                    height: 14
-                }}>
-                    {mentor.username ? `@${mentor.username}` : ''}
-                </p>
-
-                {/* Badge Mentor */}
+                {/* Nombre centrado */}
                 <div style={{
-                    padding: '3px 8px',
-                    background: '#d1fae5',
-                    color: '#059669',
-                    borderRadius: 6,
-                    fontSize: 10,
-                    fontWeight: 700,
                     textAlign: 'center',
-                    border: '1px solid #10B981',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    gap: 3,
-                    marginBottom: 8
+                    marginBottom: '12px'
                 }}>
-                    <FontAwesomeIcon icon={faGraduationCap} style={{ fontSize: 10 }} />
-                    <span>MENTOR</span>
-                </div>
-
-                {/* Materias - ALTURA FIJA */}
-                <div style={{
-                    height: 40,
-                    display: 'flex',
-                    flexDirection: 'column',
-                    gap: 3,
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    marginBottom: 8
-                }}>
-                    {materiasDisplay.length > 0 ? (
-                        <>
-                            {materiasDisplay.map((materia, idx) => (
-                                <span
-                                    key={idx}
-                                    style={{
-                                        background: '#dbeafe',
-                                        color: '#1e40af',
-                                        padding: '2px 8px',
-                                        borderRadius: 5,
-                                        fontSize: 10,
-                                        fontWeight: 600,
-                                        textAlign: 'center',
-                                        overflow: 'hidden',
-                                        textOverflow: 'ellipsis',
-                                        whiteSpace: 'nowrap',
-                                        maxWidth: '100%'
-                                    }}
-                                >
-                                    {materia}
-                                </span>
-                            ))}
-                            {hayMasMaterias && (
-                                <span style={{
-                                    fontSize: 9,
-                                    color: '#64748b',
-                                    fontWeight: 500
-                                }}>
-                                    +{materias.length - 2} más
-                                </span>
-                            )}
-                        </>
-                    ) : (
-                        <span style={{ fontSize: 10, color: '#cbd5e1' }}>Sin materias</span>
-                    )}
-                </div>
-
-                {/* Rating - ALTURA FIJA */}
-                <div style={{
-                    height: 50,
-                    display: 'flex',
-                    flexDirection: 'column',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    gap: 5,
-                    paddingTop: 8,
-                    paddingBottom: 8,
-                    borderTop: '1px solid #f1f5f9',
-                    borderBottom: '1px solid #f1f5f9'
-                }}>
-                    <StarDisplay rating={estrellas} size={12} />
                     <div style={{
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: 3
+                        fontSize: '16px',
+                        fontWeight: 700,
+                        color: '#0f172a',
+                        marginBottom: '4px',
+                        overflow: 'hidden',
+                        textOverflow: 'ellipsis',
+                        whiteSpace: 'nowrap'
                     }}>
-                        <span style={{
-                            fontSize: 12,
-                            fontWeight: 700,
-                            color: '#13346b'
-                        }}>
-                            {estrellas > 0 ? estrellas.toFixed(1) : '—'}
-                        </span>
-                        {rating.cantidad > 0 && (
-                            <span style={{
-                                fontSize: 10,
-                                color: '#64748b',
-                                fontWeight: 500
-                            }}>
-                                ({rating.cantidad})
-                            </span>
-                        )}
+                        {mentor.mentor_nombre}
+                    </div>
+                    <div style={{
+                        fontSize: '13px',
+                        color: '#64748b',
+                        fontWeight: 500,
+                        overflow: 'hidden',
+                        textOverflow: 'ellipsis',
+                        whiteSpace: 'nowrap'
+                    }}>
+                        @{mentor.username}
                     </div>
                 </div>
 
-                {/* Tags - ALTURA FIJA 60px para 3 badges */}
+                {/* Rating centrado - SIEMPRE mostrar */}
                 <div style={{
-                    height: 60,
                     display: 'flex',
-                    flexWrap: 'wrap',
-                    gap: 4,
-                    paddingTop: 8,
+                    alignItems: 'center',
                     justifyContent: 'center',
-                    alignContent: 'flex-start'
+                    gap: '6px',
+                    marginBottom: '14px'
                 }}>
-                    {rating.topTags.length > 0 ? (
-                        rating.topTags.map((tagId) => {
+                    <FontAwesomeIcon
+                        icon={faStar}
+                        style={{
+                            color: estrellas > 0 ? '#f59e0b' : '#e5e7eb',
+                            fontSize: '14px'
+                        }}
+                    />
+                    <span style={{
+                        fontSize: '15px',
+                        fontWeight: 700,
+                        color: estrellas > 0 ? '#0f172a' : '#94a3b8'
+                    }}>
+                        {estrellas.toFixed(1)}
+                    </span>
+                    {rating.cantidad > 0 && (
+                        <span style={{
+                            fontSize: '12px',
+                            color: '#64748b',
+                            fontWeight: 500
+                        }}>
+                            ({rating.cantidad})
+                        </span>
+                    )}
+                </div>
+
+                {/* Materias */}
+                {materiasDisplay.length > 0 && (
+                    <div style={{
+                        display: 'flex',
+                        flexWrap: 'wrap',
+                        gap: '6px',
+                        justifyContent: 'center',
+                        marginBottom: '12px'
+                    }}>
+                        {materiasDisplay.map((materia, idx) => (
+                            <div
+                                key={idx}
+                                style={{
+                                    padding: '6px 12px',
+                                    background: '#ccfbf1',
+                                    color: '#0d9488',
+                                    borderRadius: '8px',
+                                    fontSize: '12px',
+                                    fontWeight: 600,
+                                    border: '1px solid #99f6e4'
+                                }}
+                            >
+                                {materia}
+                            </div>
+                        ))}
+                        {hayMasMaterias && (
+                            <div
+                                style={{
+                                    padding: '6px 12px',
+                                    background: '#f1f5f9',
+                                    color: '#64748b',
+                                    borderRadius: '8px',
+                                    fontSize: '12px',
+                                    fontWeight: 600
+                                }}
+                            >
+                                +{materias.length - 3}
+                            </div>
+                        )}
+                    </div>
+                )}
+
+                {/* Tags (características) */}
+                {rating.topTags && rating.topTags.length > 0 && (
+                    <div style={{
+                        display: 'flex',
+                        flexWrap: 'wrap',
+                        gap: '6px',
+                        justifyContent: 'center',
+                        marginBottom: '0px'
+                    }}>
+                        {rating.topTags.map((tagId) => {
                             const tag = AVAILABLE_TAGS.find(t => t.id === tagId);
                             if (!tag) return null;
                             return (
                                 <div
                                     key={tagId}
                                     style={{
-                                        padding: '3px 8px',
+                                        padding: '4px 10px',
                                         background: '#eff6ff',
-                                        borderRadius: 5,
-                                        fontSize: 9,
+                                        borderRadius: '6px',
+                                        fontSize: '11px',
                                         color: '#1e40af',
-                                        whiteSpace: 'nowrap',
                                         fontWeight: 600,
                                         border: '1px solid #dbeafe'
                                     }}
@@ -354,27 +330,23 @@ export function MentorCard({ mentor }) {
                                     {tag.label}
                                 </div>
                             );
-                        })
-                    ) : (
-                        <span style={{ fontSize: 9, color: '#cbd5e1', marginTop: 8 }}>
-                            Sin características
-                        </span>
-                    )}
-                </div>
+                        })}
+                    </div>
+                )}
 
-                {/* Botón Seguir - al final */}
+                {/* Botón Seguir */}
                 <button
                     onClick={manejarSeguir}
                     disabled={cargando}
                     style={{
                         width: '100%',
-                        padding: '8px 12px',
-                        borderRadius: '7px',
-                        border: siguiendo ? '2px solid #10B981' : 'none',
-                        background: siguiendo ? '#ffffff' : '#10B981',
-                        color: siguiendo ? '#10B981' : '#ffffff',
+                        padding: '10px 16px',
+                        borderRadius: '10px',
+                        border: siguiendo ? '2px solid #0d9488' : 'none',
+                        background: siguiendo ? '#ffffff' : '#0d9488',
+                        color: siguiendo ? '#0d9488' : '#ffffff',
                         fontWeight: 700,
-                        fontSize: 12,
+                        fontSize: '14px',
                         cursor: cargando ? 'not-allowed' : 'pointer',
                         opacity: cargando ? 0.6 : 1,
                         transition: 'all 0.2s ease',
@@ -382,21 +354,21 @@ export function MentorCard({ mentor }) {
                         display: 'flex',
                         alignItems: 'center',
                         justifyContent: 'center',
-                        gap: 5,
+                        gap: '8px',
                         fontFamily: 'Inter, sans-serif'
                     }}
                     onMouseEnter={(e) => {
                         if (!cargando) {
-                            e.currentTarget.style.background = siguiendo ? '#f8fafc' : '#059669';
+                            e.currentTarget.style.background = siguiendo ? '#f8fafc' : '#14b8a6';
                         }
                     }}
                     onMouseLeave={(e) => {
                         if (!cargando) {
-                            e.currentTarget.style.background = siguiendo ? '#ffffff' : '#10B981';
+                            e.currentTarget.style.background = siguiendo ? '#ffffff' : '#0d9488';
                         }
                     }}
                 >
-                    <FontAwesomeIcon icon={siguiendo ? faUserCheck : faUserPlus} style={{ fontSize: 11 }} />
+                    <FontAwesomeIcon icon={siguiendo ? faUserCheck : faUserPlus} style={{ fontSize: '14px' }} />
                     {cargando ? 'Procesando...' : siguiendo ? 'Siguiendo' : 'Seguir'}
                 </button>
             </div>
@@ -410,35 +382,35 @@ export function MentorCard({ mentor }) {
                         left: 0,
                         right: 0,
                         bottom: 0,
-                        background: 'rgba(0, 0, 0, 0.6)',
+                        background: 'rgba(0, 0, 0, 0.7)',
                         display: 'flex',
                         alignItems: 'center',
                         justifyContent: 'center',
                         zIndex: 9999,
-                        backdropFilter: 'blur(4px)'
+                        backdropFilter: 'blur(8px)'
                     }}
                     onClick={() => setShowUnfollowModal(false)}
                 >
                     <div
                         style={{
                             background: 'white',
-                            borderRadius: 16,
-                            padding: '28px 24px 24px 24px',
-                            maxWidth: 380,
+                            borderRadius: '20px',
+                            padding: '32px 28px',
+                            maxWidth: '400px',
                             width: '90%',
-                            boxShadow: '0 20px 60px rgba(0,0,0,0.3)',
+                            boxShadow: '0 25px 80px rgba(0,0,0,0.3)',
                             textAlign: 'center',
                             fontFamily: 'Inter, sans-serif'
                         }}
                         onClick={(e) => e.stopPropagation()}
                     >
                         <div style={{
-                            width: 72,
-                            height: 72,
-                            margin: '0 auto 16px auto',
+                            width: '80px',
+                            height: '80px',
+                            margin: '0 auto 20px auto',
                             borderRadius: '50%',
                             overflow: 'hidden',
-                            border: '3px solid #10B981'
+                            border: '3px solid #0d9488'
                         }}>
                             {mentor.foto ? (
                                 <img
@@ -454,11 +426,11 @@ export function MentorCard({ mentor }) {
                                 <div style={{
                                     width: '100%',
                                     height: '100%',
-                                    background: 'linear-gradient(135deg, #10B981 0%, #059669 100%)',
+                                    background: '#0d9488',
                                     display: 'flex',
                                     alignItems: 'center',
                                     justifyContent: 'center',
-                                    fontSize: 28,
+                                    fontSize: '32px',
                                     fontWeight: 'bold',
                                     color: 'white'
                                 }}>
@@ -468,10 +440,10 @@ export function MentorCard({ mentor }) {
                         </div>
 
                         <h3 style={{
-                            margin: '0 0 20px 0',
-                            fontSize: 17,
+                            margin: '0 0 24px 0',
+                            fontSize: '20px',
                             fontWeight: 700,
-                            color: '#13346b'
+                            color: '#0f172a'
                         }}>
                             ¿Dejar de seguir a @{mentor.username}?
                         </h3>
@@ -479,28 +451,29 @@ export function MentorCard({ mentor }) {
                         <div style={{
                             display: 'flex',
                             flexDirection: 'column',
-                            gap: 10
+                            gap: '12px'
                         }}>
                             <button
                                 onClick={confirmarDejarDeSeguir}
                                 disabled={cargando}
                                 style={{
-                                    padding: '12px 24px',
-                                    background: '#EF4444',
+                                    padding: '14px 24px',
+                                    background: '#ef4444',
                                     color: 'white',
                                     border: 'none',
-                                    borderRadius: 8,
+                                    borderRadius: '10px',
                                     fontWeight: 700,
-                                    fontSize: 14,
+                                    fontSize: '15px',
                                     cursor: cargando ? 'not-allowed' : 'pointer',
                                     transition: 'all 0.2s ease',
-                                    opacity: cargando ? 0.6 : 1
+                                    opacity: cargando ? 0.6 : 1,
+                                    fontFamily: 'Inter, sans-serif'
                                 }}
                                 onMouseEnter={(e) => {
-                                    if (!cargando) e.currentTarget.style.background = '#DC2626';
+                                    if (!cargando) e.currentTarget.style.background = '#dc2626';
                                 }}
                                 onMouseLeave={(e) => {
-                                    if (!cargando) e.currentTarget.style.background = '#EF4444';
+                                    if (!cargando) e.currentTarget.style.background = '#ef4444';
                                 }}
                             >
                                 {cargando ? 'Procesando...' : 'Dejar de seguir'}
@@ -509,15 +482,16 @@ export function MentorCard({ mentor }) {
                                 onClick={() => setShowUnfollowModal(false)}
                                 disabled={cargando}
                                 style={{
-                                    padding: '12px 24px',
+                                    padding: '14px 24px',
                                     background: 'transparent',
                                     color: '#64748b',
                                     border: 'none',
-                                    borderRadius: 8,
+                                    borderRadius: '10px',
                                     fontWeight: 600,
-                                    fontSize: 14,
+                                    fontSize: '15px',
                                     cursor: cargando ? 'not-allowed' : 'pointer',
-                                    transition: 'all 0.2s ease'
+                                    transition: 'all 0.2s ease',
+                                    fontFamily: 'Inter, sans-serif'
                                 }}
                                 onMouseEnter={(e) => {
                                     if (!cargando) e.currentTarget.style.background = '#f8fafc';

@@ -817,6 +817,173 @@ export const notesAPI = {
             .eq('id_materia', materiaId)
 
         return { data, error }
+    },
+
+    // ==========================================
+    // ❤️ SISTEMA DE LIKES
+    // ==========================================
+
+    /**
+     * Toggle like/unlike en un apunte
+     * @param {number} apunteId - ID del apunte
+     * @returns {Object} { data: { liked: boolean, count: number }, error }
+     */
+    async toggleLike(apunteId) {
+        try {
+            // 1. Obtener usuario actual
+            const { data: { user } } = await supabase.auth.getUser();
+            if (!user) {
+                return {
+                    data: null,
+                    error: { message: 'Debes iniciar sesión para dar like' }
+                };
+            }
+
+            const { data: usuarioData, error: userError } = await supabase
+                .from('usuario')
+                .select('id_usuario')
+                .eq('auth_id', user.id)
+                .single();
+
+            if (userError || !usuarioData) {
+                return {
+                    data: null,
+                    error: { message: 'Usuario no encontrado' }
+                };
+            }
+
+            const userId = usuarioData.id_usuario;
+
+            // 2. Verificar si ya dio like
+            const { data: existingLike, error: checkError } = await supabase
+                .from('likes')
+                .select('*')
+                .eq('id_usuario', userId)
+                .eq('id_apunte', apunteId)
+                .eq('tipo', 'like')
+                .maybeSingle();
+
+            if (checkError) {
+                console.error('Error verificando like:', checkError);
+                return { data: null, error: checkError };
+            }
+
+            let liked = false;
+
+            if (existingLike) {
+                // 3A. Ya dio like → eliminar (unlike)
+                const { error: deleteError } = await supabase
+                    .from('likes')
+                    .delete()
+                    .eq('id_usuario', userId)
+                    .eq('id_apunte', apunteId);
+
+                if (deleteError) {
+                    console.error('Error eliminando like:', deleteError);
+                    return { data: null, error: deleteError };
+                }
+
+                liked = false;
+            } else {
+                // 3B. No dio like → insertar (like)
+                const { error: insertError } = await supabase
+                    .from('likes')
+                    .insert([{
+                        id_usuario: userId,
+                        id_apunte: apunteId,
+                        tipo: 'like'
+                    }]);
+
+                if (insertError) {
+                    console.error('Error insertando like:', insertError);
+                    return { data: null, error: insertError };
+                }
+
+                liked = true;
+            }
+
+            // 4. Obtener nuevo conteo
+            const { count, error: countError } = await supabase
+                .from('likes')
+                .select('*', { count: 'exact', head: true })
+                .eq('id_apunte', apunteId)
+                .eq('tipo', 'like');
+
+            if (countError) {
+                console.error('Error contando likes:', countError);
+            }
+
+            return {
+                data: {
+                    liked,
+                    count: count || 0
+                },
+                error: null
+            };
+
+        } catch (error) {
+            console.error('Error en toggleLike:', error);
+            return { data: null, error };
+        }
+    },
+
+    /**
+     * Verificar si el usuario actual dio like a un apunte
+     * @param {number} apunteId - ID del apunte
+     * @returns {Object} { data: boolean, error }
+     */
+    async checkIfLiked(apunteId) {
+        try {
+            const { data: { user } } = await supabase.auth.getUser();
+            if (!user) {
+                return { data: false, error: null };
+            }
+
+            const { data: usuarioData, error: userError } = await supabase
+                .from('usuario')
+                .select('id_usuario')
+                .eq('auth_id', user.id)
+                .single();
+
+            if (userError || !usuarioData) {
+                return { data: false, error: null };
+            }
+
+            const { data, error } = await supabase
+                .from('likes')
+                .select('*')
+                .eq('id_usuario', usuarioData.id_usuario)
+                .eq('id_apunte', apunteId)
+                .eq('tipo', 'like')
+                .maybeSingle();
+
+            return { data: !!data, error };
+
+        } catch (error) {
+            console.error('Error en checkIfLiked:', error);
+            return { data: false, error };
+        }
+    },
+
+    /**
+     * Obtener conteo de likes de un apunte
+     * @param {number} apunteId - ID del apunte
+     * @returns {Object} { data: number, error }
+     */
+    async getLikesCount(apunteId) {
+        try {
+            const { count, error } = await supabase
+                .from('likes')
+                .select('*', { count: 'exact', head: true })
+                .eq('id_apunte', apunteId)
+                .eq('tipo', 'like');
+
+            return { data: count || 0, error };
+
+        } catch (error) {
+            console.error('Error en getLikesCount:', error);
+            return { data: 0, error };
+        }
     }
 }
 

@@ -1,10 +1,20 @@
 import { useLocation } from "react-router-dom";
 import { useMemo, useState, useEffect } from "react";
+import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
+import {
+    faHome,
+    faBookOpen,
+    faChalkboardTeacher,
+    faFileAlt,
+    faUser,
+    faGraduationCap,
+    faSearch,
+    faExclamationCircle
+} from '@fortawesome/free-solid-svg-icons';
 import SearchBar from "../components/SearchBar";
 import { searchAPI } from "../api/database";
 import CourseCard from "../components/CourseCard.jsx";
 import ProfessorCard from "../components/ProfessorCard";
-
 import ApunteCard from "../components/ApunteCard.jsx";
 import { UserCard } from "../components/UserCard";
 import { MentorCard } from "../components/MentorCard";
@@ -16,18 +26,14 @@ export default function SearchResults() {
     const q = (params.get("q") || "").trim();
 
     // Normalización singular → plural
-    // SearchBar manda singular (materia, profesor, apunte, usuario, mentor)
-    // Nosotros normalizamos a plural internamente
     const _raw = (params.get("type") || "todos").toLowerCase();
     const _map = {
-        // Plural (default)
         todos: "todos",
         materias: "materias",
         profesores: "profesores",
         apuntes: "apuntes",
         usuarios: "usuarios",
         mentores: "mentores",
-        // Singular → plural
         materia: "materias",
         profesor: "profesores",
         apunte: "apuntes",
@@ -36,7 +42,6 @@ export default function SearchResults() {
     };
     const type = _map[_raw] || "todos";
 
-    // Estado de pestaña (ya con 'type' normalizado a plural)
     const [tab, setTab] = useState(type);
     const [loading, setLoading] = useState(false);
 
@@ -48,10 +53,7 @@ export default function SearchResults() {
 
     useEffect(() => {
         if (q) fetchAll(q);
-        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [q]);
-
-
 
     const fetchAll = async (query) => {
         setLoading(true);
@@ -60,12 +62,48 @@ export default function SearchResults() {
 
             if (error) throw new Error(error.message || JSON.stringify(error));
 
-
             setSubjects(data?.materias ?? []);
             setNotes(data?.apuntes ?? []);
-            setProfessors(data?.profesores ?? []);
             setMentors(data?.mentores ?? []);
             setUsers(data?.usuarios ?? []);
+
+            // 🎯 Cargar todas las materias de cada profesor
+            const profs = data?.profesores ?? [];
+            console.log("📋 Profesores antes:", profs); // 👈 AGREGÁ
+
+            if (profs.length > 0) {
+                const profesorIds = profs.map(p => p.id_profesor);
+
+                const { data: imparteData } = await supabase
+                    .from('imparte')
+                    .select('id_profesor, materia(nombre_materia)')
+                    .in('id_profesor', profesorIds);
+
+                console.log("📚 Imparte data:", imparteData); // 👈 AGREGÁ
+
+                const materiasMap = {};
+                imparteData?.forEach(item => {
+                    if (!materiasMap[item.id_profesor]) {
+                        materiasMap[item.id_profesor] = [];
+                    }
+                    if (item.materia?.nombre_materia) {
+                        materiasMap[item.id_profesor].push(item.materia.nombre_materia);
+                    }
+                });
+
+                console.log("🗺️ Materias map:", materiasMap); // 👈 AGREGÁ
+
+                const profsConMaterias = profs.map(p => ({
+                    ...p,
+                    materias: materiasMap[p.id_profesor] || []
+                }));
+
+                console.log("✅ Profesores CON materias:", profsConMaterias); // 👈 AGREGÁ
+
+                setProfessors(profsConMaterias);
+            } else {
+                setProfessors([]);
+            }
 
         } catch (e) {
             console.error("❌ Error en fetchAll:", e);
@@ -85,15 +123,13 @@ export default function SearchResults() {
         const getCurrentUserId = async () => {
             try {
                 const { data: { user } } = await supabase.auth.getUser();
-                if (!user) {
-                    return;
-                }
+                if (!user) return;
 
                 const { data, error } = await supabase
                     .from('usuario')
                     .select('id_usuario')
                     .eq('auth_id', user.id)
-                    .maybeSingle(); // ← Cambiar .single() por .maybeSingle()
+                    .maybeSingle();
 
                 if (error) {
                     console.error('Error en query:', error);
@@ -119,8 +155,6 @@ export default function SearchResults() {
             });
         };
 
-
-
         return {
             subjects: removeDuplicates(subjects, (s) => s.id_materia ?? s.id),
             professors: removeDuplicates(professors, (p) => p.id_profesor ?? p.id),
@@ -134,9 +168,6 @@ export default function SearchResults() {
         };
     }, [subjects, professors, mentors, notes, users, currentUserId]);
 
-
-
-    // Usamos plural para los tabs y la lógica de show
     const show = (k) => tab === "todos" || tab === k;
     const total =
         filtered.subjects.length +
@@ -154,12 +185,51 @@ export default function SearchResults() {
         usuarios: filtered.users.length,
     };
 
+    // Configuración de tabs
+    const tabsConfig = [
+        { key: "todos", label: "Todos", icon: faHome },
+        { key: "materias", label: "Materias", icon: faBookOpen },
+        { key: "profesores", label: "Profesores", icon: faChalkboardTeacher },
+        { key: "mentores", label: "Mentores", icon: faGraduationCap },
+        { key: "apuntes", label: "Apuntes", icon: faFileAlt },
+        { key: "usuarios", label: "Usuarios", icon: faUser },
+    ];
+
+    // Configuración de secciones para "Todos" (orden personalizado)
+    const sectionsConfig = [
+        { key: "materias", label: "Materias", icon: faBookOpen, data: filtered.subjects, Component: CourseCard, getProps: (m) => ({
+                course: {
+                    tipo: 'materia',
+                    id: m.id_materia,
+                    titulo: m.nombre_materia,
+                    subtitulo: m.semestre ? `Semestre: ${m.semestre}` : '',
+                    conteo: {
+                        apuntes: m.total_apuntes ?? 0,
+                        profesores: m.total_profesores ?? 0,
+                        mentores: m.total_mentores ?? 0
+                    }
+                }
+            })},
+        { key: "apuntes", label: "Apuntes", icon: faFileAlt, data: filtered.notes, Component: ApunteCard, getProps: (a) => ({ note: a })},
+        { key: "mentores", label: "Mentores", icon: faGraduationCap, data: filtered.mentors, Component: MentorCard, getProps: (m) => ({ mentor: m })},
+        { key: "usuarios", label: "Usuarios", icon: faUser, data: filtered.users, Component: UserCard, getProps: (u) => ({ usuario: u })},
+        {
+            key: "profesores",
+            label: "Profesores",
+            icon: faChalkboardTeacher,
+            data: filtered.professors,
+            Component: ProfessorCard,
+            getProps: (p) => ({ professor: p })
+        },
+    ];
+
     return (
         <div
             style={{
                 minHeight: "100vh",
                 background: "#F9FAFB",
                 padding: "20px 0 40px 0",
+                fontFamily: 'Inter, sans-serif'
             }}
         >
             <div style={{ maxWidth: 1200, margin: "0 auto", padding: "0 20px" }}>
@@ -174,13 +244,20 @@ export default function SearchResults() {
                                 fontSize: 28,
                                 fontWeight: 700,
                                 color: "#111827",
+                                fontFamily: 'Inter, sans-serif'
                             }}
                         >
                             {q ? `Resultados para "${q}"` : "Buscar en Kerana"}
                         </h1>
-                        <p style={{ margin: 0, fontSize: 16, color: "#6B7280" }}>
+                        <p style={{
+                            margin: 0,
+                            fontSize: 16,
+                            color: "#6B7280",
+                            fontFamily: 'Inter, sans-serif',
+                            fontWeight: 500
+                        }}>
                             {total > 0
-                                ? `${total} resultados encontrados`
+                                ? `${total} resultado${total === 1 ? '' : 's'} encontrado${total === 1 ? '' : 's'}`
                                 : "Encuentra profesores, materias, usuarios y apuntes"}
                         </p>
                     </div>
@@ -196,44 +273,54 @@ export default function SearchResults() {
                         justifyContent: "center",
                     }}
                 >
-                    {["todos", "materias", "profesores", "mentores", "apuntes", "usuarios"].map((t) => (
+                    {tabsConfig.map((t) => (
                         <button
-                            key={t}
-                            onClick={() => setTab(t)}
+                            key={t.key}
+                            onClick={() => setTab(t.key)}
                             style={{
                                 padding: "10px 20px",
-                                borderRadius: 8,
-                                background: tab === t ? "#2563EB" : "white",
-                                color: tab === t ? "white" : "#374151",
+                                borderRadius: 10,
+                                background: tab === t.key ? "#2563EB" : "white",
+                                color: tab === t.key ? "white" : "#374151",
                                 fontWeight: 600,
                                 fontSize: 14,
                                 cursor: "pointer",
-                                border: tab === t ? "1px solid #2563EB" : "1px solid #D1D5DB",
+                                border: tab === t.key ? "2px solid #2563EB" : "2px solid #D1D5DB",
                                 transition: "all 0.2s ease",
                                 display: "flex",
                                 alignItems: "center",
                                 gap: 8,
+                                fontFamily: 'Inter, sans-serif'
+                            }}
+                            onMouseEnter={(e) => {
+                                if (tab !== t.key) {
+                                    e.currentTarget.style.borderColor = "#2563EB";
+                                    e.currentTarget.style.background = "#EFF6FF";
+                                }
+                            }}
+                            onMouseLeave={(e) => {
+                                if (tab !== t.key) {
+                                    e.currentTarget.style.borderColor = "#D1D5DB";
+                                    e.currentTarget.style.background = "white";
+                                }
                             }}
                         >
-                            {t === "todos" && "🔍 Todos"}
-                            {t === "materias" && "📖 Materias"}
-                            {t === "profesores" && "👨‍🏫 Profesores"}
-                            {t === "apuntes" && "📄 Apuntes"}
-                            {t === "usuarios" && "👤 Usuarios"}
-                            {t === "mentores" && "🎓 Mentores"}
+                            <FontAwesomeIcon icon={t.icon} style={{ fontSize: 14 }} />
+                            {t.label}
 
-                            {counts[t] > 0 && (
+                            {counts[t.key] > 0 && (
                                 <span
                                     style={{
-                                        background: tab === t ? "rgba(255,255,255,0.2)" : "#6B7280",
-                                        color: "white",
+                                        background: tab === t.key ? "rgba(255,255,255,0.25)" : "#E5E7EB",
+                                        color: tab === t.key ? "white" : "#374151",
                                         padding: "2px 8px",
                                         borderRadius: 12,
                                         fontSize: 12,
-                                        fontWeight: 600,
+                                        fontWeight: 700,
+                                        fontFamily: 'Inter, sans-serif'
                                     }}
                                 >
-                                    {counts[t]}
+                                    {counts[t.key]}
                                 </span>
                             )}
                         </button>
@@ -263,85 +350,220 @@ export default function SearchResults() {
                         ))}
                     </div>
                 ) : total === 0 ? (
+                    // Empty state profesional (sin resultados totales)
                     <div
                         style={{
                             textAlign: "center",
-                            padding: "60px 20px",
+                            padding: "80px 20px",
                             background: "white",
-                            borderRadius: 12,
-                            border: "1px solid #E5E7EB",
+                            borderRadius: 16,
+                            border: "2px solid #E5E7EB",
                         }}
                     >
-                        <div style={{ fontSize: "3rem", marginBottom: 16 }}>🔍</div>
-                        <h3 style={{ margin: "0 0 12px 0", color: "#111827" }}>
-                            No encontramos resultados
+                        <div style={{
+                            width: 80,
+                            height: 80,
+                            margin: "0 auto 24px",
+                            background: "#F3F4F6",
+                            borderRadius: "50%",
+                            display: "flex",
+                            alignItems: "center",
+                            justifyContent: "center"
+                        }}>
+                            <FontAwesomeIcon
+                                icon={faSearch}
+                                style={{
+                                    fontSize: 32,
+                                    color: "#9CA3AF"
+                                }}
+                            />
+                        </div>
+                        <h3 style={{
+                            margin: "0 0 12px 0",
+                            color: "#111827",
+                            fontSize: 20,
+                            fontWeight: 700,
+                            fontFamily: 'Inter, sans-serif'
+                        }}>
+                            No se encontraron resultados
                         </h3>
-                        <p style={{ margin: 0, color: "#6B7280", fontSize: 16 }}>
+                        <p style={{
+                            margin: 0,
+                            color: "#6B7280",
+                            fontSize: 15,
+                            fontWeight: 500,
+                            fontFamily: 'Inter, sans-serif'
+                        }}>
                             {q
-                                ? `No hay resultados para "${q}". Prueba con otros términos.`
-                                : "Comienza buscando en el campo de arriba."}
+                                ? `No hay resultados para "${q}". Intenta con otros términos de búsqueda.`
+                                : "Comienza escribiendo en el buscador para encontrar profesores, materias, apuntes y más."}
                         </p>
                     </div>
                 ) : (
-                    <div
-                        style={{
-                            display: "grid",
-                            gap: 16,
-                            gridTemplateColumns: "repeat(auto-fill, minmax(280px, 1fr))",
-                        }}
-                    >
-                        {/* Materias */}
-                        {show("materias") &&
-                            filtered.subjects.map((m) => (
-                                <CourseCard
-                                    key={`materia-${m.id_materia}`}
-                                    course={{
-                                        tipo: 'materia',
-                                        id: m.id_materia,
-                                        titulo: m.nombre_materia,
-                                        subtitulo: m.semestre ? `Semestre: ${m.semestre}` : '',
-                                        conteo: {
-                                            apuntes: m.total_apuntes ?? 0,
-                                            profesores: m.total_profesores ?? 0,
-                                            mentores: m.total_mentores ?? 0
-                                        }
+                    <>
+                        {/* Banner sutil cuando no hay resultados en categoría específica */}
+                        {tab !== "todos" && counts[tab] === 0 && (
+                            <div style={{
+                                background: '#FEF3C7',
+                                border: '2px solid #FDE68A',
+                                borderRadius: '12px',
+                                padding: '14px 18px',
+                                marginBottom: '20px',
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: '12px'
+                            }}>
+                                <FontAwesomeIcon
+                                    icon={faExclamationCircle}
+                                    style={{
+                                        fontSize: 18,
+                                        color: '#D97706',
+                                        flexShrink: 0
                                     }}
                                 />
-                            ))}
+                                <span style={{
+                                    color: '#92400E',
+                                    fontSize: '14px',
+                                    fontWeight: 600,
+                                    fontFamily: 'Inter, sans-serif'
+                                }}>
+                                    No se encontraron {tabsConfig.find(t => t.key === tab)?.label.toLowerCase()} para "{q}"
+                                </span>
+                            </div>
+                        )}
 
-                        {/* Profesores */}
-                        {show("profesores") &&
-                            filtered.professors.map((p, index) => (
-                                <ProfessorCard
-                                    key={`profesor-${p.id_profesor}-${index}`}
-                                    professor={p}
-                                />
-                            ))}
+                        {/* Layout por secciones (solo en "Todos") */}
+                        {tab === "todos" ? (
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: 40 }}>
+                                {sectionsConfig.map((section) => {
+                                    if (section.data.length === 0) return null;
 
-                        {/* Apuntes */}
-                        {show("apuntes") &&
-                            filtered.notes.map((a, index) => (
-                                <ApunteCard key={`apunte-${a.id_apunte}-${index}`} note={a} />
-                            ))}
+                                    return (
+                                        <div key={section.key}>
+                                            {/* Título de sección */}
+                                            <div style={{
+                                                display: 'flex',
+                                                alignItems: 'center',
+                                                gap: 12,
+                                                marginBottom: 16,
+                                                paddingBottom: 12,
+                                                borderBottom: '2px solid #E5E7EB'
+                                            }}>
+                                                <FontAwesomeIcon
+                                                    icon={section.icon}
+                                                    style={{
+                                                        fontSize: 20,
+                                                        color: '#13346b'
+                                                    }}
+                                                />
+                                                <h2 style={{
+                                                    margin: 0,
+                                                    fontSize: 20,
+                                                    fontWeight: 700,
+                                                    color: '#13346b',
+                                                    fontFamily: 'Inter, sans-serif'
+                                                }}>
+                                                    {section.label}
+                                                </h2>
+                                                <span style={{
+                                                    background: '#EFF6FF',
+                                                    color: '#1E40AF',
+                                                    padding: '4px 12px',
+                                                    borderRadius: 12,
+                                                    fontSize: 13,
+                                                    fontWeight: 700,
+                                                    fontFamily: 'Inter, sans-serif'
+                                                }}>
+                                                    {section.data.length}
+                                                </span>
+                                            </div>
 
-                        {/* Usuarios */}
-                        {show("usuarios") &&
-                            filtered.users.map((user, index) => (
-                                <UserCard
-                                    key={`usuario-${user.id_usuario}-${index}`}
-                                    usuario={user}
-                                />
-                            ))}
+                                            {/* Grid de resultados */}
+                                            <div
+                                                style={{
+                                                    display: "grid",
+                                                    gap: 16,
+                                                    gridTemplateColumns: "repeat(auto-fill, minmax(280px, 1fr))",
+                                                }}
+                                            >
+                                                {section.data.map((item, index) => {
+                                                    const Component = section.Component;
+                                                    const props = section.getProps(item);
+                                                    return (
+                                                        <Component
+                                                            key={`${section.key}-${item.id_materia || item.id_profesor || item.id_mentor || item.id_apunte || item.id_usuario}-${index}`}
+                                                            {...props}
+                                                        />
+                                                    );
+                                                })}
+                                            </div>
+                                        </div>
+                                    );
+                                })}
+                            </div>
+                        ) : (
+                            // Layout normal (grid simple cuando NO es "Todos")
+                            <div
+                                style={{
+                                    display: "grid",
+                                    gap: 16,
+                                    gridTemplateColumns: "repeat(auto-fill, minmax(280px, 1fr))",
+                                }}
+                            >
+                                {/* Materias */}
+                                {show("materias") &&
+                                    filtered.subjects.map((m) => (
+                                        <CourseCard
+                                            key={`materia-${m.id_materia}`}
+                                            course={{
+                                                tipo: 'materia',
+                                                id: m.id_materia,
+                                                titulo: m.nombre_materia,
+                                                subtitulo: m.semestre ? `Semestre: ${m.semestre}` : '',
+                                                conteo: {
+                                                    apuntes: m.total_apuntes ?? 0,
+                                                    profesores: m.total_profesores ?? 0,
+                                                    mentores: m.total_mentores ?? 0
+                                                }
+                                            }}
+                                        />
+                                    ))}
 
-                        {/* Mentores */}
-                        {show("mentores") &&
-                            filtered.mentors.map((m, index) => (
-                                <MentorCard
-                                    key={`mentor-${m.id_mentor}-${index}`}
-                                    mentor={m}
-                                />
-                            ))}
-                    </div>
+                                {/* Profesores */}
+                                {show("profesores") &&
+                                    filtered.professors.map((p, index) => (
+                                        <ProfessorCard
+                                            key={`profesor-${p.id_profesor}-${index}`}
+                                            professor={p}
+                                        />
+                                    ))}
+
+                                {/* Apuntes */}
+                                {show("apuntes") &&
+                                    filtered.notes.map((a, index) => (
+                                        <ApunteCard key={`apunte-${a.id_apunte}-${index}`} note={a} />
+                                    ))}
+
+                                {/* Usuarios */}
+                                {show("usuarios") &&
+                                    filtered.users.map((user, index) => (
+                                        <UserCard
+                                            key={`usuario-${user.id_usuario}-${index}`}
+                                            usuario={user}
+                                        />
+                                    ))}
+
+                                {/* Mentores */}
+                                {show("mentores") &&
+                                    filtered.mentors.map((m, index) => (
+                                        <MentorCard
+                                            key={`mentor-${m.id_mentor}-${index}`}
+                                            mentor={m}
+                                        />
+                                    ))}
+                            </div>
+                        )}
+                    </>
                 )}
             </div>
         </div>
