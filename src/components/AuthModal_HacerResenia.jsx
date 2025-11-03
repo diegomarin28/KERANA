@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { ratingsAPI } from "../api/database";
+import { ratingsAPI, creditsAPI } from "../api/database";
 import { supabase } from "../supabase";
 import { validarComentario } from "../utils/wordFilter";
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
@@ -644,7 +644,18 @@ export default function AuthModal_HacerResenia({
                 if (error) {
                     setToast({ message: 'Error al enviar reseña: ' + error.message, type: 'error' });
                 } else {
-                    setToast({ message: '¡Reseña enviada correctamente!', type: 'success' });
+                    // 💰 Otorgar 10 créditos por reseña
+                    if (data?.id) {
+                        const { data: creditosResult, error: creditosError } = await creditsAPI.grantReviewCredits(data.id);
+                        if (!creditosError && creditosResult) {
+                            console.log(`💰 Créditos otorgados por reseña: ${creditosResult.creditosOtorgados}`);
+                            setToast({ message: `¡Reseña enviada! +${creditosResult.creditosOtorgados} créditos`, type: 'success' });
+                        } else {
+                            setToast({ message: '¡Reseña enviada correctamente!', type: 'success' });
+                        }
+                    } else {
+                        setToast({ message: '¡Reseña enviada correctamente!', type: 'success' });
+                    }
 
                     if (onSave) {
                         onSave({

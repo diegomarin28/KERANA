@@ -1,4 +1,5 @@
 import { supabase } from '../supabase';
+import { creditsAPI } from '../api/database';
 
 /** Verifica si un username está disponible (case-insensitive) */
 export async function isUsernameAvailable(username) {
@@ -92,7 +93,7 @@ export async function createOrUpdateUserProfile(authUser, extras = {}) {
             nombre,
             username,
             foto: extras.foto || fotoFromMeta || null,
-            creditos: 10, // créditos iniciales
+            creditos: 0, // Inicialmente 0, el bono se da después
             fecha_creado: new Date().toISOString(),
         };
 
@@ -117,9 +118,18 @@ export async function createOrUpdateUserProfile(authUser, extras = {}) {
                     .single();
 
                 if (retryError) throw retryError;
+
+                // 🎁 Otorgar bono de bienvenida de 50 créditos
+                await creditsAPI.grantWelcomeBonus(retryData.id_usuario);
+
                 return { data: retryData, error: null };
             }
             throw error;
+        }
+
+        // 🎁 Otorgar bono de bienvenida de 50 créditos
+        if (data?.id_usuario) {
+            await creditsAPI.grantWelcomeBonus(data.id_usuario);
         }
 
         return { data, error: null };
