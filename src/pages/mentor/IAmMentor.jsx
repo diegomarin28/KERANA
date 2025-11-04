@@ -506,7 +506,7 @@ export default function IAmMentor() {
 
                             {mentorships.length === 0 ? (
                                 <Card style={{ padding: 40, textAlign: 'center', marginTop: 20 }}>
-                                    <div style={{ fontSize: 48, marginBottom: 16, color: '#0d9488' }}>
+                                    <div style={{ fontSize: 48, marginBottom: 16, color: '#0b7a72' }}>
                                         <FontAwesomeIcon icon={faBook} />
                                     </div>
                                     <h3 style={{ margin: '0 0 12px 0' }}>No tenés materias asignadas</h3>
@@ -705,11 +705,11 @@ export default function IAmMentor() {
                                                 {sesion.emails_participantes && sesion.emails_participantes.length > 0 && (
                                                     <div
                                                         style={{
-                                                            background: '#f0fdf4',
+                                                            background: '#fff',
                                                             borderRadius: 12,
                                                             padding: 16,
                                                             marginBottom: 16,
-                                                            border: '2px solid #99f6e4'
+                                                            border: '2px solid #6ee7d8'
                                                         }}
                                                     >
                                                         <div
