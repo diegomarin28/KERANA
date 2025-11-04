@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { supabase } from '../supabase';
 import { slotsAPI } from '../api/slots';
 import { sesionesAPI } from '../api/sesiones';
+import { notificationTypes } from '../api/notificationTypes';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import {
     faCalendar, faChevronLeft, faChevronRight, faClock,
@@ -10,7 +11,7 @@ import {
     faFileAlt, faDollarSign, faHome, faUniversity
 } from '@fortawesome/free-solid-svg-icons';
 
-export default function GlobalCalendar() {
+export function GlobalCalendar() {
     const [loading, setLoading] = useState(true);
     const [currentDate, setCurrentDate] = useState(new Date());
     const [selectedDate, setSelectedDate] = useState(new Date());
@@ -31,22 +32,21 @@ export default function GlobalCalendar() {
     // Estados para el filtro de materias
     const [materias, setMaterias] = useState([]);
     const [selectedMateria, setSelectedMateria] = useState(null);
+
+    // Estados para el modal mejorado
     const [numPersonas, setNumPersonas] = useState(1);
     const [emailsParticipantes, setEmailsParticipantes] = useState(['']);
     const [descripcionSesion, setDescripcionSesion] = useState('');
     const [erroresValidacion, setErroresValidacion] = useState({});
 
-
     const months = ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio',
         'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'];
     const daysOfWeek = ['DOM', 'LUN', 'MAR', 'MIÉ', 'JUE', 'VIE', 'SÁB'];
 
-    // ✅ Configurar Supabase Realtime
+    // Configurar Supabase Realtime
     useEffect(() => {
         loadInitialData();
 
-        // Suscribirse a cambios en slots_disponibles
-        console.log('🔌 Configurando suscripción Realtime...');
         const subscription = supabase
             .channel('slots-disponibles-changes')
             .on(
@@ -57,21 +57,17 @@ export default function GlobalCalendar() {
                     table: 'slots_disponibles'
                 },
                 async (payload) => {
-                    console.log('🔄 Slot actualizado en tiempo real:', payload);
-                    // ✅ Recargar disponibilidad inmediatamente
+                    console.log('📄 Slot actualizado en tiempo real:', payload);
                     await loadAvailability();
                 }
             )
             .subscribe((status) => {
-                console.log('📡 Estado de suscripción Realtime:', status);
                 if (status === 'SUBSCRIBED') {
                     console.log('✅ Suscripción Realtime activa');
                 }
             });
 
-        // Cleanup: desuscribirse al desmontar
         return () => {
-            console.log('🔌 Cerrando suscripción Realtime...');
             supabase.removeChannel(subscription);
         };
     }, [selectedMateria]);
@@ -81,6 +77,24 @@ export default function GlobalCalendar() {
             loadMentorsForDate(selectedDate);
         }
     }, [selectedDate, availabilityByDate]);
+
+    // Autocompletar email del usuario
+    useEffect(() => {
+        if (showConfirmModal && currentUserId) {
+            const fetchUserEmail = async () => {
+                const { data } = await supabase
+                    .from('usuario')
+                    .select('correo')
+                    .eq('id_usuario', currentUserId)
+                    .single();
+
+                if (data?.correo) {
+                    setEmailsParticipantes([data.correo]);
+                }
+            };
+            fetchUserEmail();
+        }
+    }, [showConfirmModal, currentUserId]);
 
     const loadInitialData = async () => {
         setLoading(true);
@@ -112,10 +126,10 @@ export default function GlobalCalendar() {
         const regex = /^[a-zA-Z0-9._%+-]+@correo\.um\.edu\.uy$/;
         return regex.test(email.trim());
     };
+
     const validarFormulario = () => {
         const errores = {};
 
-        // Validar emails
         emailsParticipantes.forEach((email, index) => {
             if (!email.trim()) {
                 errores[`email_${index}`] = 'El email es obligatorio';
@@ -131,19 +145,16 @@ export default function GlobalCalendar() {
     const handleNumPersonasChange = (cantidad) => {
         setNumPersonas(cantidad);
 
-        // Ajustar array de emails
         const nuevosEmails = [...emailsParticipantes];
         if (cantidad > emailsParticipantes.length) {
-            // Agregar emails vacíos
             while (nuevosEmails.length < cantidad) {
                 nuevosEmails.push('');
             }
         } else {
-            // Recortar emails
             nuevosEmails.length = cantidad;
         }
         setEmailsParticipantes(nuevosEmails);
-        setErroresValidacion({}); // Limpiar errores
+        setErroresValidacion({});
     };
 
     const handleEmailChange = (index, value) => {
@@ -151,7 +162,6 @@ export default function GlobalCalendar() {
         nuevosEmails[index] = value;
         setEmailsParticipantes(nuevosEmails);
 
-        // Limpiar error de ese campo
         if (erroresValidacion[`email_${index}`]) {
             const nuevosErrores = { ...erroresValidacion };
             delete nuevosErrores[`email_${index}`];
@@ -169,25 +179,6 @@ export default function GlobalCalendar() {
         setSelectedSlot(null);
     };
 
-    useEffect(() => {
-        if (showConfirmModal && currentUserId) {
-            // Autocompletar primer email con el del usuario actual
-            const fetchUserEmail = async () => {
-                const { data } = await supabase
-                    .from('usuario')
-                    .select('correo')
-                    .eq('id_usuario', currentUserId)
-                    .single();
-
-                if (data?.correo) {
-                    setEmailsParticipantes([data.correo]);
-                }
-            };
-            fetchUserEmail();
-        }
-    }, [showConfirmModal, currentUserId]);
-
-
     const loadAvailability = async () => {
         const now = new Date();
         const threeMonthsLater = new Date(now.getTime() + 90 * 24 * 60 * 60 * 1000);
@@ -203,9 +194,6 @@ export default function GlobalCalendar() {
                 return;
             }
 
-            console.log('📊 Slots cargados:', slotsData);
-
-            // Obtener IDs de materias únicos
             const materiaIds = [...new Set(
                 slotsData?.map(s => s.mentor?.mentor_materia?.[0]?.id_materia).filter(Boolean)
             )];
@@ -213,7 +201,6 @@ export default function GlobalCalendar() {
             let materiasMap = {};
             let materiasArray = [];
 
-            // Consultar nombres de materias
             if (materiaIds.length > 0) {
                 const { data: materiasData } = await supabase
                     .from('materia')
@@ -229,14 +216,12 @@ export default function GlobalCalendar() {
 
             setMaterias(materiasArray);
 
-            // Aplicar filtro de materia si existe
             const slots = selectedMateria
                 ? slotsData?.filter(slot =>
                     slot.mentor?.mentor_materia?.[0]?.id_materia === selectedMateria
                 )
                 : slotsData;
 
-            // Organizar slots por fecha
             const availability = {};
             slots?.forEach(slot => {
                 const mentorMateria = slot.mentor?.mentor_materia?.[0];
@@ -257,12 +242,10 @@ export default function GlobalCalendar() {
                 availability[slot.fecha].slots.push(slot);
             });
 
-            // Convertir Sets a arrays
             Object.keys(availability).forEach(date => {
                 availability[date].mentors = Array.from(availability[date].mentors);
             });
 
-            console.log('📅 Disponibilidad organizada:', availability);
             setAvailabilityByDate(availability);
         } catch (error) {
             console.error('Error:', error);
@@ -305,7 +288,6 @@ export default function GlobalCalendar() {
             mentor.slots.sort((a, b) => a.hora.localeCompare(b.hora));
         });
 
-        console.log('👨‍🏫 Mentores para fecha:', dateKey, Object.values(mentorMap));
         setMentorsForDate(Object.values(mentorMap));
     };
 
@@ -380,7 +362,6 @@ export default function GlobalCalendar() {
             setShowErrorModal(true);
             return;
         }
-        console.log('🔍 Mentor seleccionado:', mentor);
         setSelectedMentor(mentor);
         setSelectedSlot(slot);
         setShowConfirmModal(true);
@@ -389,7 +370,6 @@ export default function GlobalCalendar() {
     const confirmBooking = async () => {
         if (!selectedMentor || !selectedSlot || !currentEstudianteId) return;
 
-        // ✅ VALIDAR FORMULARIO
         if (!validarFormulario()) {
             setErrorMessage('Por favor corrige los errores en el formulario');
             return;
@@ -398,7 +378,6 @@ export default function GlobalCalendar() {
         setIsBooking(true);
 
         try {
-            // ✅ PASO 1: Verificar que el slot sigue disponible
             const { data: slotActual, error: checkError } = await supabase
                 .from('slots_disponibles')
                 .select('disponible')
@@ -413,19 +392,9 @@ export default function GlobalCalendar() {
                 return;
             }
 
-            // ✅ PASO 2: CALCULAR PRECIO
             const precioTotal = calcularPrecio(numPersonas, selectedSlot.modalidad);
 
             // 🟡 AQUÍ VAS A AGREGAR MERCADO PAGO DESPUÉS
-            // const pagoExitoso = await procesarPagoMercadoPago(precioTotal, selectedMentor, selectedSlot);
-            // if (!pagoExitoso) {
-            //     setErrorMessage('El pago no pudo procesarse. Intenta nuevamente.');
-            //     setShowErrorModal(true);
-            //     setIsBooking(false);
-            //     return;
-            // }
-
-            // 🟢 POR AHORA: PAGO SIMULADO (comentar esta línea cuando integres MP)
             const pagoExitoso = true;
 
             if (!pagoExitoso) {
@@ -435,7 +404,6 @@ export default function GlobalCalendar() {
                 return;
             }
 
-            // ✅ PASO 3: REGISTRAR LA SESIÓN CON TODOS LOS DATOS
             const fechaHora = `${formatDateKey(selectedDate)}T${selectedSlot.hora}`;
 
             const { data: sesionData, error: sesionError } = await supabase
@@ -447,11 +415,11 @@ export default function GlobalCalendar() {
                     fecha_hora: fechaHora,
                     duracion_minutos: selectedSlot.duracion,
                     estado: 'confirmada',
-                    pagado: true, // ✅ Marcar como pagado
-                    precio: precioTotal, // ✅ Guardar precio calculado
-                    cantidad_alumnos: numPersonas, // ✅ NUEVO
-                    emails_participantes: emailsParticipantes, // ✅ NUEVO (array)
-                    descripcion_alumno: descripcionSesion.trim() || null // ✅ NUEVO
+                    pagado: true,
+                    precio: precioTotal,
+                    cantidad_alumnos: numPersonas,
+                    emails_participantes: emailsParticipantes,
+                    descripcion_alumno: descripcionSesion.trim() || null
                 })
                 .select()
                 .single();
@@ -466,30 +434,44 @@ export default function GlobalCalendar() {
 
             console.log('✅ Sesión creada:', sesionData);
 
-            // ✅ PASO 4: Marcar slot como no disponible
             const { error: slotError } = await supabase
                 .rpc('marcar_slot_no_disponible', { p_id_slot: selectedSlot.id_slot });
 
             if (slotError) {
                 console.error('❌ Error updating slot:', slotError);
-                // No mostramos error al usuario porque la sesión YA se creó
-                // Solo logueamos para debugging
             }
 
-            // ✅ PASO 5: SI ES VIRTUAL → Enviar emails (después lo implementamos)
-            // if (selectedSlot.modalidad === 'virtual') {
-            //     await enviarEmailsConfirmacion({
-            //         sesionId: sesionData.id_sesion,
-            //         mentorId: selectedMentor.mentorId,
-            //         alumnoId: currentEstudianteId,
-            //         emails: emailsParticipantes,
-            //         materia: selectedMentor.materia,
-            //         fecha: formatDateKey(selectedDate),
-            //         hora: selectedSlot.hora
-            //     });
-            // }
+            // ✅ PASO 5: Notificar al mentor
+            try {
+                // Obtener id_usuario del mentor
+                const { data: mentorUser } = await supabase
+                    .from('mentor')
+                    .select('id_usuario')
+                    .eq('id_mentor', selectedMentor.mentorId)
+                    .single();
 
-            // ✅ ÉXITO
+                // Obtener nombre del estudiante
+                const { data: estudianteData } = await supabase
+                    .from('usuario')
+                    .select('nombre')
+                    .eq('id_usuario', currentEstudianteId)
+                    .single();
+
+                if (mentorUser && estudianteData) {
+                    await notificationTypes.nuevaClaseAgendada(
+                        mentorUser.id_usuario,
+                        currentEstudianteId,
+                        estudianteData.nombre,
+                        sesionData.id_sesion,
+                        fechaHora,
+                        selectedMentor.materia
+                    );
+                }
+            } catch (notifError) {
+                console.error('Error enviando notificación:', notifError);
+                // No mostrar error al usuario
+            }
+
             setShowSuccessModal(true);
             resetModal();
 
@@ -550,7 +532,7 @@ export default function GlobalCalendar() {
                 </p>
             </div>
 
-            {/* Filtro de materia mejorado */}
+            {/* Filtro de materia */}
             <div style={{
                 background: '#fff',
                 borderRadius: 16,
@@ -676,7 +658,7 @@ export default function GlobalCalendar() {
                         <button
                             onClick={() => setCurrentDate(new Date(currentDate.getFullYear(), currentDate.getMonth() - 1))}
                             style={{
-                                background: 'linear-gradient(135deg, #2563eb 0%, #1e40af 100%)',
+                                background: '#2563eb',
                                 color: '#fff',
                                 border: 'none',
                                 borderRadius: 10,
@@ -685,6 +667,14 @@ export default function GlobalCalendar() {
                                 fontWeight: 600,
                                 transition: 'all 0.2s ease',
                                 fontSize: 16
+                            }}
+                            onMouseEnter={(e) => {
+                                e.target.style.background = '#1e40af';
+                                e.target.style.transform = 'translateY(-1px)';
+                            }}
+                            onMouseLeave={(e) => {
+                                e.target.style.background = '#2563eb';
+                                e.target.style.transform = 'translateY(0)';
                             }}
                         >
                             <FontAwesomeIcon icon={faChevronLeft} />
@@ -700,7 +690,7 @@ export default function GlobalCalendar() {
                         <button
                             onClick={() => setCurrentDate(new Date(currentDate.getFullYear(), currentDate.getMonth() + 1))}
                             style={{
-                                background: 'linear-gradient(135deg, #2563eb 0%, #1e40af 100%)',
+                                background: '#2563eb',
                                 color: '#fff',
                                 border: 'none',
                                 borderRadius: 10,
@@ -709,6 +699,14 @@ export default function GlobalCalendar() {
                                 fontWeight: 600,
                                 transition: 'all 0.2s ease',
                                 fontSize: 16
+                            }}
+                            onMouseEnter={(e) => {
+                                e.target.style.background = '#1e40af';
+                                e.target.style.transform = 'translateY(-1px)';
+                            }}
+                            onMouseLeave={(e) => {
+                                e.target.style.background = '#2563eb';
+                                e.target.style.transform = 'translateY(0)';
                             }}
                         >
                             <FontAwesomeIcon icon={faChevronRight} />
@@ -752,9 +750,9 @@ export default function GlobalCalendar() {
                                         borderRadius: 10,
                                         cursor: isPast ? 'not-allowed' : 'pointer',
                                         background: isPast ? '#f9fafb' :
-                                            selected ? 'linear-gradient(135deg, #2563eb 0%, #1e40af 100%)' :
-                                                hasAvailability ? 'linear-gradient(135deg, #d1fae5 0%, #a7f3d0 100%)' :
-                                                    today ? 'linear-gradient(135deg, #dbeafe 0%, #bfdbfe 100%)' : '#fff',
+                                            selected ? '#2563eb' :
+                                                hasAvailability ? '#d1fae5' :
+                                                    today ? '#dbeafe' : '#fff',
                                         border: today && !selected ? '2px solid #2563eb' : '2px solid #f1f5f9',
                                         color: selected ? '#fff' : isPast ? '#9ca3af' : '#0f172a',
                                         opacity: isPast ? 0.5 : 1,
@@ -782,7 +780,7 @@ export default function GlobalCalendar() {
                                             position: 'absolute',
                                             bottom: 4,
                                             fontSize: 10,
-                                            background: selected ? 'rgba(255,255,255,0.3)' : 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
+                                            background: selected ? 'rgba(255,255,255,0.3)' : '#10b981',
                                             color: '#fff',
                                             borderRadius: 12,
                                             padding: '2px 6px',
@@ -801,7 +799,7 @@ export default function GlobalCalendar() {
                             <div style={{
                                 width: 16,
                                 height: 16,
-                                background: 'linear-gradient(135deg, #d1fae5 0%, #a7f3d0 100%)',
+                                background: '#d1fae5',
                                 borderRadius: 4,
                                 border: '2px solid #6ee7b7'
                             }} />
@@ -811,7 +809,7 @@ export default function GlobalCalendar() {
                             <div style={{
                                 width: 16,
                                 height: 16,
-                                background: 'linear-gradient(135deg, #2563eb 0%, #1e40af 100%)',
+                                background: '#2563eb',
                                 borderRadius: 4
                             }} />
                             <span style={{ color: '#64748b' }}>Seleccionado</span>
@@ -820,7 +818,7 @@ export default function GlobalCalendar() {
                             <div style={{
                                 width: 16,
                                 height: 16,
-                                background: 'linear-gradient(135deg, #dbeafe 0%, #bfdbfe 100%)',
+                                background: '#dbeafe',
                                 border: '2px solid #2563eb',
                                 borderRadius: 4
                             }} />
@@ -865,7 +863,7 @@ export default function GlobalCalendar() {
                                 width: 80,
                                 height: 80,
                                 borderRadius: '50%',
-                                background: 'linear-gradient(135deg, #f1f5f9 0%, #e2e8f0 100%)',
+                                background: '#f1f5f9',
                                 display: 'flex',
                                 alignItems: 'center',
                                 justifyContent: 'center',
@@ -934,7 +932,7 @@ export default function GlobalCalendar() {
                                                 </p>
                                             </div>
                                             <div style={{
-                                                background: 'linear-gradient(135deg, #dbeafe 0%, #bfdbfe 100%)',
+                                                background: '#dbeafe',
                                                 color: '#1e40af',
                                                 padding: '6px 12px',
                                                 borderRadius: 8,
@@ -956,9 +954,7 @@ export default function GlobalCalendar() {
                                     }}>
                                         {mentor.slots.map(slot => {
                                             const modalidadIcon = slot.modalidad === 'virtual' ? '💻' : '🏢';
-                                            const modalidadColor = slot.modalidad === 'virtual'
-                                                ? 'linear-gradient(135deg, #dbeafe 0%, #bfdbfe 100%)'
-                                                : 'linear-gradient(135deg, #d1fae5 0%, #a7f3d0 100%)';
+                                            const modalidadColor = slot.modalidad === 'virtual' ? '#dbeafe' : '#d1fae5';
                                             const modalidadText = slot.modalidad === 'virtual' ? '#1e40af' : '#065f46';
                                             const modalidadBorder = slot.modalidad === 'virtual' ? '#93c5fd' : '#6ee7b7';
                                             const locacionText = slot.modalidad === 'presencial' && slot.locacion
@@ -1069,6 +1065,7 @@ export default function GlobalCalendar() {
                 </div>
             </div>
 
+            {/* Modal de confirmación */}
             {showConfirmModal && selectedMentor && selectedSlot && (
                 <div style={{
                     position: 'fixed',
@@ -1153,8 +1150,8 @@ export default function GlobalCalendar() {
                                     <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 4 }}>
                                         <FontAwesomeIcon icon={faUser} style={{ color: '#64748b', fontSize: 12 }} />
                                         <span style={{ color: '#64748b', fontSize: 13, fontWeight: 600, fontFamily: 'Inter, sans-serif' }}>
-                                Mentor
-                            </span>
+                                            Mentor
+                                        </span>
                                     </div>
                                     <p style={{ margin: 0, fontWeight: 700, fontSize: 16, color: '#0f172a', fontFamily: 'Inter, sans-serif' }}>
                                         {selectedMentor.mentorName}
@@ -1164,8 +1161,8 @@ export default function GlobalCalendar() {
                                     <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 4 }}>
                                         <FontAwesomeIcon icon={faBook} style={{ color: '#64748b', fontSize: 12 }} />
                                         <span style={{ color: '#64748b', fontSize: 13, fontWeight: 600, fontFamily: 'Inter, sans-serif' }}>
-                                Materia
-                            </span>
+                                            Materia
+                                        </span>
                                     </div>
                                     <p style={{ margin: 0, fontWeight: 700, fontSize: 16, color: '#0f172a', fontFamily: 'Inter, sans-serif' }}>
                                         {selectedMentor.materia}
@@ -1176,8 +1173,8 @@ export default function GlobalCalendar() {
                                         <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 4 }}>
                                             <FontAwesomeIcon icon={faCalendar} style={{ color: '#64748b', fontSize: 12 }} />
                                             <span style={{ color: '#64748b', fontSize: 13, fontWeight: 600, fontFamily: 'Inter, sans-serif' }}>
-                                    Fecha
-                                </span>
+                                                Fecha
+                                            </span>
                                         </div>
                                         <p style={{ margin: 0, fontWeight: 600, fontSize: 14, color: '#0f172a', fontFamily: 'Inter, sans-serif' }}>
                                             {selectedDate.getDate()}/{selectedDate.getMonth() + 1}/{selectedDate.getFullYear()}
@@ -1187,8 +1184,8 @@ export default function GlobalCalendar() {
                                         <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 4 }}>
                                             <FontAwesomeIcon icon={faClock} style={{ color: '#64748b', fontSize: 12 }} />
                                             <span style={{ color: '#64748b', fontSize: 13, fontWeight: 600, fontFamily: 'Inter, sans-serif' }}>
-                                    Hora
-                                </span>
+                                                Hora
+                                            </span>
                                         </div>
                                         <p style={{ margin: 0, fontWeight: 700, fontSize: 14, color: '#2563eb', fontFamily: 'Inter, sans-serif' }}>
                                             {formatTimeRange(selectedSlot.hora, selectedSlot.duracion)}
@@ -1202,8 +1199,8 @@ export default function GlobalCalendar() {
                                             style={{ color: '#64748b', fontSize: 12 }}
                                         />
                                         <span style={{ color: '#64748b', fontSize: 13, fontWeight: 600, fontFamily: 'Inter, sans-serif' }}>
-                                Modalidad
-                            </span>
+                                            Modalidad
+                                        </span>
                                     </div>
                                     <p style={{
                                         margin: 0,
@@ -1218,12 +1215,12 @@ export default function GlobalCalendar() {
                                         {selectedSlot.modalidad === 'virtual' ? 'Virtual' : 'Presencial'}
                                         {selectedSlot.modalidad === 'presencial' && selectedSlot.locacion && (
                                             <span style={{ fontSize: 12, opacity: 0.8 }}>
-                                    <FontAwesomeIcon
-                                        icon={selectedSlot.locacion === 'casa' ? faHome : faUniversity}
-                                        style={{ marginRight: 4 }}
-                                    />
+                                                <FontAwesomeIcon
+                                                    icon={selectedSlot.locacion === 'casa' ? faHome : faUniversity}
+                                                    style={{ marginRight: 4 }}
+                                                />
                                                 {selectedSlot.locacion === 'casa' ? 'Casa del mentor' : 'Facultad'}
-                                </span>
+                                            </span>
                                         )}
                                     </p>
                                 </div>
@@ -1246,29 +1243,26 @@ export default function GlobalCalendar() {
                                 ¿Cuántas personas asistirán?
                             </label>
                             <div style={{ display: 'flex', gap: 12 }}>
-                                {[1, 2, 3].map(num => (
+                                {Array.from({ length: selectedSlot.max_alumnos }, (_, i) => i + 1).map(num => (
                                     <button
                                         key={num}
                                         onClick={() => handleNumPersonasChange(num)}
-                                        disabled={isBooking || num > selectedSlot.max_alumnos}
+                                        disabled={isBooking}
                                         style={{
                                             flex: 1,
                                             padding: '14px',
-                                            background: numPersonas === num
-                                                ? 'linear-gradient(135deg, #2563eb 0%, #1e40af 100%)'
-                                                : '#fff',
+                                            background: numPersonas === num ? '#2563eb' : '#fff',
                                             color: numPersonas === num ? '#fff' : '#0f172a',
                                             border: numPersonas === num ? 'none' : '2px solid #e2e8f0',
                                             borderRadius: 10,
                                             fontWeight: 700,
                                             fontSize: 16,
-                                            cursor: (isBooking || num > selectedSlot.max_alumnos) ? 'not-allowed' : 'pointer',
-                                            opacity: num > selectedSlot.max_alumnos ? 0.5 : 1,
+                                            cursor: isBooking ? 'not-allowed' : 'pointer',
                                             transition: 'all 0.2s ease',
                                             fontFamily: 'Inter, sans-serif'
                                         }}
                                         onMouseEnter={e => {
-                                            if (!isBooking && num <= selectedSlot.max_alumnos && numPersonas !== num) {
+                                            if (!isBooking && numPersonas !== num) {
                                                 e.target.style.borderColor = '#2563eb';
                                                 e.target.style.transform = 'translateY(-2px)';
                                             }
@@ -1288,7 +1282,7 @@ export default function GlobalCalendar() {
 
                         {/* Precio calculado */}
                         <div style={{
-                            background: 'linear-gradient(135deg, #dbeafe 0%, #bfdbfe 100%)',
+                            background: '#dbeafe',
                             border: '2px solid #93c5fd',
                             borderRadius: 12,
                             padding: 16,
@@ -1300,12 +1294,12 @@ export default function GlobalCalendar() {
                             <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                                 <FontAwesomeIcon icon={faDollarSign} style={{ color: '#1e40af', fontSize: 18 }} />
                                 <span style={{ color: '#1e40af', fontSize: 14, fontWeight: 600, fontFamily: 'Inter, sans-serif' }}>
-                        Precio total:
-                    </span>
+                                    Precio total:
+                                </span>
                             </div>
                             <span style={{ color: '#1e40af', fontSize: 24, fontWeight: 800, fontFamily: 'Inter, sans-serif' }}>
-                    ${calcularPrecio(numPersonas, selectedSlot.modalidad)} UYU
-                </span>
+                                ${calcularPrecio(numPersonas, selectedSlot.modalidad)} UYU
+                            </span>
                         </div>
 
                         {/* Emails de participantes */}
@@ -1491,7 +1485,7 @@ export default function GlobalCalendar() {
                                 style={{
                                     flex: 1,
                                     padding: '14px',
-                                    background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
+                                    background: '#10b981',
                                     color: '#fff',
                                     border: 'none',
                                     borderRadius: 10,
@@ -1504,12 +1498,14 @@ export default function GlobalCalendar() {
                                 }}
                                 onMouseEnter={e => {
                                     if (!isBooking) {
+                                        e.target.style.background = '#059669';
                                         e.target.style.transform = 'translateY(-2px)';
                                         e.target.style.boxShadow = '0 8px 24px rgba(16, 185, 129, 0.3)';
                                     }
                                 }}
                                 onMouseLeave={e => {
                                     if (!isBooking) {
+                                        e.target.style.background = '#10b981';
                                         e.target.style.transform = 'translateY(0)';
                                         e.target.style.boxShadow = 'none';
                                     }
@@ -1555,7 +1551,7 @@ export default function GlobalCalendar() {
                             width: 80,
                             height: 80,
                             borderRadius: '50%',
-                            background: 'linear-gradient(135deg, #d1fae5 0%, #a7f3d0 100%)',
+                            background: '#d1fae5',
                             display: 'flex',
                             alignItems: 'center',
                             justifyContent: 'center',
@@ -1589,7 +1585,7 @@ export default function GlobalCalendar() {
                             style={{
                                 width: '100%',
                                 padding: '16px',
-                                background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
+                                background: '#10b981',
                                 color: '#fff',
                                 border: 'none',
                                 borderRadius: 12,
@@ -1600,10 +1596,12 @@ export default function GlobalCalendar() {
                                 fontFamily: 'Inter, sans-serif'
                             }}
                             onMouseEnter={e => {
+                                e.target.style.background = '#059669';
                                 e.target.style.transform = 'translateY(-2px)';
                                 e.target.style.boxShadow = '0 8px 24px rgba(16, 185, 129, 0.4)';
                             }}
                             onMouseLeave={e => {
+                                e.target.style.background = '#10b981';
                                 e.target.style.transform = 'translateY(0)';
                                 e.target.style.boxShadow = 'none';
                             }}
@@ -1646,7 +1644,7 @@ export default function GlobalCalendar() {
                             width: 80,
                             height: 80,
                             borderRadius: '50%',
-                            background: 'linear-gradient(135deg, #fee2e2 0%, #fecaca 100%)',
+                            background: '#fee2e2',
                             display: 'flex',
                             alignItems: 'center',
                             justifyContent: 'center',
@@ -1680,7 +1678,7 @@ export default function GlobalCalendar() {
                             style={{
                                 width: '100%',
                                 padding: '16px',
-                                background: 'linear-gradient(135deg, #ef4444 0%, #dc2626 100%)',
+                                background: '#ef4444',
                                 color: '#fff',
                                 border: 'none',
                                 borderRadius: 12,
@@ -1691,10 +1689,12 @@ export default function GlobalCalendar() {
                                 fontFamily: 'Inter, sans-serif'
                             }}
                             onMouseEnter={e => {
+                                e.target.style.background = '#dc2626';
                                 e.target.style.transform = 'translateY(-2px)';
                                 e.target.style.boxShadow = '0 8px 24px rgba(239, 68, 68, 0.4)';
                             }}
                             onMouseLeave={e => {
+                                e.target.style.background = '#ef4444';
                                 e.target.style.transform = 'translateY(0)';
                                 e.target.style.boxShadow = 'none';
                             }}

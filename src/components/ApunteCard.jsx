@@ -12,16 +12,37 @@ export default function ApunteCard({ note, currentUserId }) {
     const [liked, setLiked] = useState(false);
     const [likesCount, setLikesCount] = useState(note.likes_count || 0);
     const [loading, setLoading] = useState(false);
+    const [hasPurchased, setHasPurchased] = useState(false);
 
     useEffect(() => {
-        // Verificar si el usuario actual ya dio like
-        const checkLiked = async () => {
-            const { data } = await notesAPI.checkIfLiked(note.id_apunte);
-            setLiked(data);
+        const checkLikedAndPurchased = async () => {
+            // Verificar si el usuario actual ya dio like
+            const { data: likeData } = await notesAPI.checkIfLiked(note.id_apunte);
+            setLiked(likeData);
+
+            // Verificar si puede dar like (compró el apunte o es el dueño)
+            if (note.id_usuario === currentUserId) {
+                // Es el dueño - no puede dar like
+                setHasPurchased(false);
+                return;
+            }
+
+            // Verificar si lo compró
+            const { data: compraData } = await supabase
+                .from('compra_apunte')
+                .select('id')
+                .eq('apunte_id', note.id_apunte)
+                .eq('comprador_id', currentUserId)
+                .maybeSingle();
+
+
+            setHasPurchased(!!compraData);
         };
 
-        checkLiked();
-    }, [note.id_apunte]);
+        if (currentUserId) {
+            checkLikedAndPurchased();
+        }
+    }, [note.id_apunte, currentUserId, note.id_usuario]);
 
     if (!note) return null;
 
@@ -52,6 +73,11 @@ export default function ApunteCard({ note, currentUserId }) {
             const currentPath = window.location.pathname;
             navigate(`${currentPath}?auth=signin`);
             return;
+        }
+
+        // Verificar si puede dar like
+        if (!hasPurchased) {
+            return; // No hacer nada si no compró
         }
 
         setLoading(true);
@@ -115,10 +141,10 @@ export default function ApunteCard({ note, currentUserId }) {
                 </h3>
                 <div style={{
                     display: 'flex',
-                    alignItems: 'center',
-                    gap: 8,
-                    marginBottom: 8,
-                    flexWrap: 'wrap'
+                    flexDirection: 'column',
+                    gap: 4,
+                    alignItems: 'flex-start',
+                    marginBottom: 8
                 }}>
                     <span style={{
                         padding: '2px 8px',
@@ -134,26 +160,26 @@ export default function ApunteCard({ note, currentUserId }) {
                     {(likesCount !== undefined && likesCount !== null) && (
                         <button
                             onClick={handleLike}
-                            disabled={loading}
+                            disabled={loading || !hasPurchased}
                             style={{
                                 background: 'transparent',
                                 border: 'none',
-                                cursor: loading ? 'not-allowed' : 'pointer',
+                                cursor: (loading || !hasPurchased) ? 'not-allowed' : 'pointer',
                                 display: 'flex',
                                 alignItems: 'center',
                                 gap: 4,
                                 padding: '4px 8px',
                                 borderRadius: 8,
                                 transition: 'all 0.2s ease',
-                                opacity: loading ? 0.6 : 1
+                                opacity: (loading || !hasPurchased) ? 0.4 : 1
                             }}
                             onMouseEnter={(e) => {
-                                if (!loading) {
+                                if (!loading && hasPurchased) {
                                     e.currentTarget.style.background = '#f8fafc';
                                 }
                             }}
                             onMouseLeave={(e) => {
-                                if (!loading) {
+                                if (!loading && hasPurchased) {
                                     e.currentTarget.style.background = 'transparent';
                                 }
                             }}

@@ -19,6 +19,26 @@ export default function Home() {
     const [topNotes, setTopNotes] = useState([]);
     const [loadingTop, setLoadingTop] = useState(true);
 
+    const [currentUserId, setCurrentUserId] = useState(null);
+
+    useEffect(() => {
+        const getCurrentUser = async () => {
+            const { data: { user } } = await supabase.auth.getUser();
+            if (user) {
+                const { data: userData } = await supabase
+                    .from('usuario')
+                    .select('id_usuario')
+                    .eq('auth_id', user.id)
+                    .single();
+
+                if (userData) {
+                    setCurrentUserId(userData.id_usuario);
+                }
+            }
+        };
+        getCurrentUser();
+    }, []);
+
     useEffect(() => {
         let mounted = true;
         (async () => {
@@ -339,6 +359,7 @@ export default function Home() {
                                                 signedUrl: n.signedUrl,
                                                 thumbnail_path: n.thumbnail_path
                                             }}
+                                            currentUserId={currentUserId}
                                         />
                                     </div>
                                 ))}

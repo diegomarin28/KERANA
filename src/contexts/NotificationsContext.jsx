@@ -20,6 +20,30 @@ export function NotificationsProvider({ children }) {
     const [newSinceLastVisitMessage, setNewSinceLastVisitMessage] = useState('');
     const [loading, setLoading] = useState(true);
 
+    // 🆕 Función para obtener settings desde localStorage
+    const getNotificationSettings = useCallback(() => {
+        try {
+            const stored = localStorage.getItem('kerana_notification_settings');
+            if (stored) {
+                return JSON.parse(stored);
+            }
+            return {}; // Si no hay settings, mostrar todas
+        } catch (e) {
+            console.error('Error leyendo settings:', e);
+            return {};
+        }
+    }, []);
+
+    // 🆕 Función para filtrar notificaciones según preferencias
+    const filtrarNotificaciones = useCallback((notifs) => {
+        const settings = getNotificationSettings();
+
+        return notifs.filter(notif => {
+            // Si el tipo no está en settings o está en true, mostrar
+            return settings[notif.tipo] !== false;
+        });
+    }, [getNotificationSettings]);
+
     const cargarNotificaciones = useCallback(async () => {
         try {
             setLoading(true);
@@ -41,10 +65,14 @@ export function NotificationsProvider({ children }) {
                 return;
             }
 
-            setNotificaciones(data || []);
+            // 🆕 Filtrar notificaciones según preferencias
+            const notifsOriginales = data || [];
+            const notifsFiltradas = filtrarNotificaciones(notifsOriginales);
 
-            // Calcular cuántas son nuevas desde última visita
-            const newCount = notificationStorage.countNewSinceLastVisit(data || []);
+            setNotificaciones(notifsFiltradas);
+
+            // Calcular cuántas son nuevas desde última visita (de las filtradas)
+            const newCount = notificationStorage.countNewSinceLastVisit(notifsFiltradas);
             setNewSinceLastVisit(newCount);
 
             if (newCount > 0) {
@@ -59,17 +87,21 @@ export function NotificationsProvider({ children }) {
         } finally {
             setLoading(false);
         }
-    }, []);
+    }, [filtrarNotificaciones]);
 
     const contarNoLeidas = useCallback(async () => {
         try {
-            const { count } = await notificationsAPI.contarNoLeidas();
-            setUnreadCount(count || 0);
+            // 🆕 Obtener todas las notifs y filtrar para contar correctamente
+            const { data } = await notificationsAPI.obtenerMisNotificaciones();
+            const notifsFiltradas = filtrarNotificaciones(data || []);
+            const unreadFiltered = notifsFiltradas.filter(n => !n.leida).length;
+
+            setUnreadCount(unreadFiltered);
         } catch (error) {
             console.error('Error contando no leídas:', error);
             setUnreadCount(0);
         }
-    }, []);
+    }, [filtrarNotificaciones]);
 
     const marcarComoLeida = useCallback(async (notificationId) => {
         try {
@@ -134,6 +166,18 @@ export function NotificationsProvider({ children }) {
             : `${newCount} nuevas desde tu última visita`;
         setNewSinceLastVisitMessage(message);
     }, [newSinceLastVisit]);
+
+    // 🆕 Recargar cuando cambien los settings
+    useEffect(() => {
+        const handleSettingsChange = () => {
+            console.log('⚙️ Settings cambiaron, recargando notificaciones...');
+            cargarNotificaciones();
+            contarNoLeidas();
+        };
+
+        window.addEventListener('notificationSettingsChanged', handleSettingsChange);
+        return () => window.removeEventListener('notificationSettingsChanged', handleSettingsChange);
+    }, [cargarNotificaciones, contarNoLeidas]);
 
     useEffect(() => {
         cargarNotificaciones();

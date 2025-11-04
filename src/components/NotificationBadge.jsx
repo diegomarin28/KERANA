@@ -119,10 +119,19 @@ export default function NotificationBadge({ inHero = true }) {
 
     const handleNotificationClick = async (e, notif) => {
         e.stopPropagation();
+
         if (!notif.leida) {
             await marcarComoLeida(notif.id);
             return;
         }
+
+        // 🆕 Si es notificación de clase agendada → ir a página mentor
+        if (notif.tipo === 'nueva_clase_agendada') {
+            setIsOpen(false);
+            navigate('/i-am-mentor');
+            return;
+        }
+
         if (notif.emisor?.username) {
             setIsOpen(false);
             navigate(`/user/${notif.emisor.username}`);

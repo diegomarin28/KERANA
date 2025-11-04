@@ -14,6 +14,9 @@ export default function Credits() {
     const [loading, setLoading] = useState(true);
     const [userCredits, setUserCredits] = useState(0);
     const [processingPayment, setProcessingPayment] = useState(false);
+    const [showConfirmModal, setShowConfirmModal] = useState(false);
+    const [showSuccessModal, setShowSuccessModal] = useState(false);
+    const [selectedPaquete, setSelectedPaquete] = useState(null);
 
     useEffect(() => {
         cargarPaquetes();
@@ -56,23 +59,89 @@ export default function Credits() {
     };
 
     const handleComprar = async (paquete) => {
+        setSelectedPaquete(paquete);
+        setShowConfirmModal(true);
+    };
+
+    const confirmPurchase = async () => {
+        setShowConfirmModal(false);
         setProcessingPayment(true);
 
         try {
-            // Llamar a Edge Function para crear preferencia
-            const { data, error } = await supabase.functions.invoke('crear_preferencia_mp', {
-                body: { id_paquete: paquete.id_paquete }
-            });
+            const { data: { user } } = await supabase.auth.getUser();
+            if (!user) {
+                alert('Debes iniciar sesión para comprar créditos');
+                setProcessingPayment(false);
+                return;
+            }
 
-            if (error) throw error;
+            // Obtener datos del usuario
+            const { data: userData } = await supabase
+                .from('usuario')
+                .select('id_usuario, creditos')
+                .eq('auth_id', user.id)
+                .single();
 
-            // Redirigir a MercadoPago (en producción usar init_point)
-            window.location.href = data.sandbox_init_point; // Para pruebas
-            // window.location.href = data.init_point; // Para producción
+            // Crear compra
+            const { data: compraData, error: compraError } = await supabase
+                .from('compra_creditos')
+                .insert({
+                    id_usuario: userData.id_usuario,
+                    id_paquete: selectedPaquete.id_paquete,
+                    cantidad_creditos: selectedPaquete.cantidad_creditos,
+                    monto_pagado: selectedPaquete.precio_uyu,
+                    moneda: 'UYU',
+                    mercadopago_preference_id: `DEV_PREF_${Date.now()}`,
+                    mercadopago_payment_id: `DEV_PAY_${Date.now()}`,
+                    mercadopago_status: 'approved',
+                    estado: 'aprobado',
+                    creado_en: new Date().toISOString()
+                })
+                .select()
+                .single();
+
+            if (compraError) {
+                console.error('Error creando compra:', compraError);
+                throw compraError;
+            }
+
+            // Acreditar créditos
+            const { error: updateError } = await supabase
+                .from('usuario')
+                .update({ creditos: userData.creditos + selectedPaquete.cantidad_creditos })
+                .eq('id_usuario', userData.id_usuario);
+
+            if (updateError) {
+                console.error('Error acreditando créditos:', updateError);
+                throw updateError;
+            }
+
+            // Registrar en historial
+            const { error: historialError } = await supabase
+                .from('historial_creditos')
+                .insert({
+                    id_usuario: userData.id_usuario,
+                    cantidad_creditos: selectedPaquete.cantidad_creditos,
+                    tipo_transaccion: 'compra_paquete',
+                    descripcion: `Compra de paquete ${selectedPaquete.nombre}`
+                });
+
+            if (historialError) {
+                console.error('Error en historial:', historialError);
+            }
+
+            // Mostrar modal de éxito
+            setProcessingPayment(false);
+            setShowSuccessModal(true);
+
+            // Redirigir después de 2 segundos
+            setTimeout(() => {
+                window.location.href = '/mis-creditos';
+            }, 2000);
 
         } catch (error) {
             console.error('Error al procesar pago:', error);
-            alert('Error al procesar el pago. Intenta nuevamente.');
+            alert('Error al procesar el pago: ' + error.message);
             setProcessingPayment(false);
         }
     };
@@ -254,6 +323,231 @@ export default function Credits() {
                     </div>
                 </div>
             </div>
+
+            {/* Modal de Confirmación */}
+            {showConfirmModal && selectedPaquete && (
+                <div style={{
+                    position: 'fixed',
+                    inset: 0,
+                    background: 'rgba(0, 0, 0, 0.7)',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    zIndex: 9999,
+                    backdropFilter: 'blur(4px)'
+                }} onClick={() => setShowConfirmModal(false)}>
+                    <div style={{
+                        background: '#fff',
+                        borderRadius: 20,
+                        padding: 40,
+                        maxWidth: 450,
+                        width: '90%',
+                        boxShadow: '0 25px 80px rgba(0, 0, 0, 0.4)'
+                    }} onClick={(e) => e.stopPropagation()}>
+                        <div style={{ textAlign: 'center' }}>
+                            <div style={{
+                                width: 80,
+                                height: 80,
+                                background: 'linear-gradient(135deg, #2563eb 0%, #1e40af 100%)',
+                                borderRadius: '50%',
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                margin: '0 auto 24px',
+                                boxShadow: '0 8px 24px rgba(37, 99, 235, 0.4)'
+                            }}>
+                                <FontAwesomeIcon icon={faCreditCard} style={{ fontSize: 36, color: '#fff' }} />
+                            </div>
+                            <h2 style={{
+                                fontSize: 28,
+                                fontWeight: 800,
+                                color: '#0f172a',
+                                margin: '0 0 12px',
+                                fontFamily: 'Inter, sans-serif'
+                            }}>
+                                Confirmar compra
+                            </h2>
+                            <p style={{
+                                fontSize: 16,
+                                color: '#64748b',
+                                margin: '0 0 24px',
+                                fontFamily: 'Inter, sans-serif'
+                            }}>
+                                Estás a punto de comprar:
+                            </p>
+                            <div style={{
+                                background: '#f8fafc',
+                                borderRadius: 16,
+                                padding: 24,
+                                marginBottom: 24
+                            }}>
+                                <div style={{
+                                    fontSize: 24,
+                                    fontWeight: 700,
+                                    color: '#0f172a',
+                                    marginBottom: 8,
+                                    fontFamily: 'Inter, sans-serif'
+                                }}>
+                                    {selectedPaquete.nombre}
+                                </div>
+                                <div style={{
+                                    fontSize: 48,
+                                    fontWeight: 800,
+                                    color: '#2563eb',
+                                    marginBottom: 8,
+                                    fontFamily: 'Inter, sans-serif',
+                                    letterSpacing: '-0.02em'
+                                }}>
+                                    {selectedPaquete.cantidad_creditos}
+                                </div>
+                                <div style={{
+                                    fontSize: 14,
+                                    color: '#64748b',
+                                    fontWeight: 500,
+                                    fontFamily: 'Inter, sans-serif'
+                                }}>
+                                    créditos
+                                </div>
+                                <div style={{
+                                    fontSize: 32,
+                                    fontWeight: 800,
+                                    color: '#0f172a',
+                                    marginTop: 16,
+                                    fontFamily: 'Inter, sans-serif'
+                                }}>
+                                    ${selectedPaquete.precio_uyu} <span style={{ fontSize: 16, fontWeight: 600, color: '#64748b' }}>UYU</span>
+                                </div>
+                            </div>
+                            <div style={{ display: 'flex', gap: 12 }}>
+                                <button
+                                    onClick={() => setShowConfirmModal(false)}
+                                    style={{
+                                        flex: 1,
+                                        padding: '14px 24px',
+                                        borderRadius: 12,
+                                        background: '#f1f5f9',
+                                        color: '#64748b',
+                                        border: 'none',
+                                        fontSize: 16,
+                                        fontWeight: 600,
+                                        cursor: 'pointer',
+                                        fontFamily: 'Inter, sans-serif',
+                                        transition: 'all 0.2s ease'
+                                    }}
+                                    onMouseEnter={(e) => e.currentTarget.style.background = '#e2e8f0'}
+                                    onMouseLeave={(e) => e.currentTarget.style.background = '#f1f5f9'}
+                                >
+                                    Cancelar
+                                </button>
+                                <button
+                                    onClick={confirmPurchase}
+                                    disabled={processingPayment}
+                                    style={{
+                                        flex: 1,
+                                        padding: '14px 24px',
+                                        borderRadius: 12,
+                                        background: 'linear-gradient(135deg, #2563eb 0%, #1e40af 100%)',
+                                        color: '#fff',
+                                        border: 'none',
+                                        fontSize: 16,
+                                        fontWeight: 600,
+                                        cursor: processingPayment ? 'not-allowed' : 'pointer',
+                                        fontFamily: 'Inter, sans-serif',
+                                        transition: 'all 0.2s ease',
+                                        opacity: processingPayment ? 0.6 : 1
+                                    }}
+                                    onMouseEnter={(e) => {
+                                        if (!processingPayment) {
+                                            e.currentTarget.style.transform = 'translateY(-2px)';
+                                            e.currentTarget.style.boxShadow = '0 8px 24px rgba(37, 99, 235, 0.4)';
+                                        }
+                                    }}
+                                    onMouseLeave={(e) => {
+                                        if (!processingPayment) {
+                                            e.currentTarget.style.transform = 'translateY(0)';
+                                            e.currentTarget.style.boxShadow = 'none';
+                                        }
+                                    }}
+                                >
+                                    {processingPayment ? 'Procesando...' : 'Confirmar'}
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* Modal de Éxito */}
+            {showSuccessModal && selectedPaquete && (
+                <div style={{
+                    position: 'fixed',
+                    inset: 0,
+                    background: 'rgba(0, 0, 0, 0.7)',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    zIndex: 9999,
+                    backdropFilter: 'blur(4px)'
+                }}>
+                    <div style={{
+                        background: '#fff',
+                        borderRadius: 20,
+                        padding: 40,
+                        maxWidth: 450,
+                        width: '90%',
+                        boxShadow: '0 25px 80px rgba(0, 0, 0, 0.4)',
+                        textAlign: 'center'
+                    }}>
+                        <div style={{
+                            width: 80,
+                            height: 80,
+                            background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
+                            borderRadius: '50%',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            margin: '0 auto 24px',
+                            boxShadow: '0 8px 24px rgba(16, 185, 129, 0.4)'
+                        }}>
+                            <FontAwesomeIcon icon={faCheck} style={{ fontSize: 36, color: '#fff' }} />
+                        </div>
+                        <h2 style={{
+                            fontSize: 28,
+                            fontWeight: 800,
+                            color: '#10b981',
+                            margin: '0 0 12px',
+                            fontFamily: 'Inter, sans-serif'
+                        }}>
+                            ¡Compra exitosa!
+                        </h2>
+                        <p style={{
+                            fontSize: 16,
+                            color: '#64748b',
+                            margin: '0 0 24px',
+                            fontFamily: 'Inter, sans-serif'
+                        }}>
+                            Tus créditos han sido acreditados correctamente
+                        </p>
+                        <div style={{
+                            fontSize: 48,
+                            fontWeight: 800,
+                            color: '#10b981',
+                            fontFamily: 'Inter, sans-serif',
+                            letterSpacing: '-0.02em'
+                        }}>
+                            +{selectedPaquete.cantidad_creditos}
+                        </div>
+                        <div style={{
+                            fontSize: 14,
+                            color: '#94a3b8',
+                            marginTop: 8,
+                            fontFamily: 'Inter, sans-serif'
+                        }}>
+                            Redirigiendo...
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
     );
 }
