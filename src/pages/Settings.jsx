@@ -52,6 +52,8 @@ export default function Settings() {
         { key: 'nuevo_like', label: 'Likes a tus apuntes', color: '#ef4444' },
         { key: 'nueva_resenia', label: 'Reseñas a tus materias favoritas', color: '#f59e0b' },
         { key: 'nuevo_apunte', label: 'Nuevos apuntes de tus seguidos', color: '#3b82f6' },
+        { key: 'compra_apunte', label: 'Compras de tus apuntes', color: '#10b981' },
+        { key: 'mentor_nuevas_horas', label: 'Nuevas horas disponibles de mentores', color: '#0d9488' },
         ...(isMentor ? [{ key: 'nueva_clase_agendada', label: 'Clases agendadas', color: '#0d9488' }] : []),
         { key: 'system', label: 'Sistema', color: '#64748b' },
         { key: 'update', label: 'Actualizaciones', color: '#0ea5e9' },

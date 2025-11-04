@@ -18,6 +18,7 @@ export default function ApunteCard({ note, currentUserId }) {
         const checkLikedAndPurchased = async () => {
             // Verificar si el usuario actual ya dio like
             const { data: likeData } = await notesAPI.checkIfLiked(note.id_apunte);
+
             setLiked(likeData);
 
             // Verificar si puede dar like (compró el apunte o es el dueño)

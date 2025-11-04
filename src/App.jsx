@@ -10,6 +10,7 @@ import { ConnectionMonitor } from './components/ConnectionMonitor';
 import AuthSessionManager from './components/AuthSessionManager';
 import ErrorBoundary from './components/ErrorBoundary';
 import { GlobalCalendar } from './pages/GlobalCalendar';
+import { UpcomingMentorships } from './pages/student/UpcomingMentorships';
 
 
 // Componentes lazy
@@ -200,6 +201,7 @@ function AppRoutes() {
                     <Route path="/credits/failure" element={<CreditsFailure />} />
                     <Route path="/credits/pending" element={<CreditsFailure />} />
                     <Route path="/mis-creditos"  element={<AuthGuard requireAuth={true}><MyCredits /></AuthGuard>} />
+                    <Route path="/upcoming-mentorships" element={<UpcomingMentorships />} />
 
                     {/* Varios */}
                     <Route path="/equipo" element={<Equipo />} />

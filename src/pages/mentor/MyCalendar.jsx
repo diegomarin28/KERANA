@@ -8,6 +8,7 @@ import {
     faCheckCircle, faSave, faCalendarDay, faInfoCircle
 } from '@fortawesome/free-solid-svg-icons';
 import {useEffect, useState} from "react";
+import { notificationTypes } from '../../api/notificationTypes';
 
 
 export default function MyCalendar() {
@@ -489,6 +490,36 @@ export default function MyCalendar() {
             console.error('❌ Error guardando slots:', err);
             setError('Error inesperado guardando horarios');
             setTimeout(() => setError(''), 4000);
+        }
+
+        try {
+            // Obtener datos del mentor
+            const { data: mentorData } = await supabase
+                .from('mentor')
+                .select('id_usuario')
+                .eq('id_mentor', currentMentorId)
+                .single();
+
+            if (mentorData) {
+                const { data: usuarioData } = await supabase
+                    .from('usuario')
+                    .select('nombre')
+                    .eq('id_usuario', mentorData.id_usuario)
+                    .single();
+
+                if (usuarioData) {
+                    await notificationTypes.mentorNuevasHorasDisponibles(
+                        mentorData.id_usuario,
+                        usuarioData.nombre,
+                        dateKey,
+                        slots.length,
+                        currentMentorId
+                    );
+                }
+            }
+        } catch (notifError) {
+            console.error('Error enviando notificaciones:', notifError);
+            // No mostrar error al usuario, los horarios ya se guardaron
         }
     };
 
