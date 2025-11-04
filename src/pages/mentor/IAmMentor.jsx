@@ -15,7 +15,7 @@ import {
     faMapMarkerAlt,
     faEnvelope,
     faComment,
-    faChalkboardTeacher,
+    faBuilding,
     faPlus,
     faEdit,
     faTrash,
@@ -27,7 +27,7 @@ import {
     faCreditCard,
     faFileContract,
     faChevronDown,
-    faChevronUp,
+    faVideo,
     faGraduationCap,
     faHome,
     faUniversity,
@@ -561,141 +561,211 @@ export default function IAmMentor() {
                                     </p>
                                 </Card>
                             ) : (
-                                <div style={{ display: 'grid', gap: 12, marginTop: 20 }}>
-                                    {proximasSesiones.map(sesion => {
-                                        const alumnosActuales = sesion.slot_info?.reservas_actuales || sesion.cantidad_alumnos || 1;
-                                        const nombreAlumno = sesion.alumno?.nombre || 'Sin nombre';
-                                        const fechaInicio = new Date(sesion.fecha_hora);
-                                        const duracionMinutos = sesion.slot_info?.duracion || sesion.duracion_minutos || 60;
+                                <div style={{ display: 'flex', flexDirection: 'column', gap: 20, marginTop: 20 }}>
+                                    {proximasSesiones.map((sesion) => {
+                                        const fecha = new Date(sesion.fecha_hora);
+                                        const inicio = fecha.toLocaleTimeString('es-UY', { hour: '2-digit', minute: '2-digit' });
+                                        const fechaLocal = fecha.toLocaleDateString('es-UY', { weekday: 'short', day: 'numeric', month: 'short' });
 
                                         return (
                                             <div
                                                 key={sesion.id_sesion}
-                                                onClick={() => {
-                                                    setSelectedSession(sesion);
-                                                    setShowSessionModal(true);
-                                                }}
                                                 style={{
                                                     background: '#fff',
-                                                    borderRadius: 12,
-                                                    padding: 16,
+                                                    borderRadius: 16,
+                                                    padding: 24,
                                                     border: '2px solid #f1f5f9',
-                                                    boxShadow: '0 1px 3px rgba(0,0,0,0.05)',
+                                                    boxShadow: '0 2px 8px rgba(0,0,0,0.04)',
                                                     transition: 'all 0.2s ease',
-                                                    cursor: 'pointer',
-                                                    display: 'flex',
-                                                    alignItems: 'center',
-                                                    gap: 12
                                                 }}
-                                                onMouseEnter={e => {
+                                                onMouseEnter={(e) => {
                                                     e.currentTarget.style.borderColor = '#0d9488';
-                                                    e.currentTarget.style.boxShadow = '0 4px 12px rgba(13, 148, 136, 0.15)';
+                                                    e.currentTarget.style.boxShadow = '0 8px 24px rgba(13,148,136,0.15)';
                                                     e.currentTarget.style.transform = 'translateY(-2px)';
                                                 }}
-                                                onMouseLeave={e => {
+                                                onMouseLeave={(e) => {
                                                     e.currentTarget.style.borderColor = '#f1f5f9';
-                                                    e.currentTarget.style.boxShadow = '0 1px 3px rgba(0,0,0,0.05)';
+                                                    e.currentTarget.style.boxShadow = '0 2px 8px rgba(0,0,0,0.04)';
                                                     e.currentTarget.style.transform = 'translateY(0)';
                                                 }}
                                             >
-                                                {/* Avatar */}
+                                                {/* Header */}
                                                 <div style={{
-                                                    width: 48,
-                                                    height: 48,
-                                                    borderRadius: 10,
-                                                    background: sesion.alumno?.foto
-                                                        ? `url(${sesion.alumno.foto}) center/cover`
-                                                        : '#0d9488',
                                                     display: 'flex',
-                                                    alignItems: 'center',
-                                                    justifyContent: 'center',
-                                                    color: '#fff',
-                                                    fontSize: 20,
-                                                    fontWeight: 700,
-                                                    flexShrink: 0
+                                                    justifyContent: 'space-between',
+                                                    alignItems: 'flex-start',
+                                                    borderBottom: '2px solid #f1f5f9',
+                                                    paddingBottom: 12,
+                                                    marginBottom: 16
                                                 }}>
-                                                    {!sesion.alumno?.foto && (sesion.alumno?.nombre?.[0] || '?')}
-                                                </div>
-
-                                                {/* Info compacta */}
-                                                <div style={{ flex: 1, minWidth: 0 }}>
-                                                    <div style={{
-                                                        fontSize: 15,
-                                                        fontWeight: 700,
-                                                        color: '#0f172a',
-                                                        marginBottom: 4,
-                                                        fontFamily: 'Inter, sans-serif',
-                                                        whiteSpace: 'nowrap',
-                                                        overflow: 'hidden',
-                                                        textOverflow: 'ellipsis'
-                                                    }}>
-                                                        {nombreAlumno}
+                                                    <div>
+                                                        <h3 style={{ fontSize: 20, fontWeight: 700, color: '#0f172a', margin: 0 }}>
+                                                            <FontAwesomeIcon icon={faBook} style={{ marginRight: 8, color: '#0d9488' }} />
+                                                            {sesion.materia?.nombre_materia || 'Materia sin nombre'}
+                                                        </h3>
+                                                        <p style={{ fontSize: 14, color: '#64748b', margin: '4px 0 0 0', fontWeight: 500 }}>
+                                                            <FontAwesomeIcon icon={faUser} style={{ marginRight: 6, fontSize: 12 }} />
+                                                            Alumno: {sesion.alumno?.nombre || 'Sin nombre'}
+                                                        </p>
                                                     </div>
-
                                                     <div style={{
+                                                        background: '#ccfbf1',
+                                                        color: '#0d9488',
+                                                        padding: '8px 16px',
+                                                        borderRadius: 8,
                                                         fontSize: 13,
-                                                        color: '#64748b',
-                                                        fontFamily: 'Inter, sans-serif',
-                                                        display: 'flex',
-                                                        alignItems: 'center',
-                                                        gap: 8,
-                                                        flexWrap: 'wrap'
+                                                        fontWeight: 700,
                                                     }}>
-                                                        <span style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-                                                            <FontAwesomeIcon icon={faBook} style={{ fontSize: 11 }} />
-                                                            {sesion.materia?.nombre_materia || 'Materia'}
-                                                        </span>
-                                                        <span style={{ color: '#cbd5e1' }}>•</span>
-                                                        <span style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-                                                            <FontAwesomeIcon icon={faCalendar} style={{ fontSize: 11 }} />
-                                                            {fechaInicio.toLocaleDateString('es-UY', {
-                                                                day: 'numeric',
-                                                                month: 'short'
-                                                            })}
-                                                        </span>
-                                                        <span style={{ color: '#cbd5e1' }}>•</span>
-                                                        <span style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-                                                            <FontAwesomeIcon icon={faClock} style={{ fontSize: 11 }} />
-                                                            {fechaInicio.toLocaleTimeString('es-UY', {
-                                                                hour: '2-digit',
-                                                                minute: '2-digit'
-                                                            })}
-                                                        </span>
+                                                        {fechaLocal} • {inicio}
                                                     </div>
                                                 </div>
 
-                                                {/* Badge de personas */}
+                                                {/* Grid info */}
                                                 <div style={{
-                                                    display: 'flex',
-                                                    alignItems: 'center',
-                                                    gap: 4,
-                                                    padding: '4px 10px',
-                                                    borderRadius: 6,
-                                                    background: '#ccfbf1',
-                                                    color: '#0d9488',
-                                                    fontSize: 12,
-                                                    fontWeight: 600,
-                                                    border: '1px solid #99f6e4',
-                                                    fontFamily: 'Inter, sans-serif',
-                                                    flexShrink: 0
+                                                    display: 'grid',
+                                                    gridTemplateColumns: window.innerWidth > 768 ? 'repeat(2, 1fr)' : '1fr',
+                                                    gap: 16,
+                                                    marginBottom: 16
                                                 }}>
-                                                    <FontAwesomeIcon icon={faUsers} style={{ fontSize: 11 }} />
-                                                    {alumnosActuales}
+                                                    <div>
+                                                        <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6 }}>
+                                                            <FontAwesomeIcon icon={faClock} style={{ color: '#64748b', fontSize: 14 }} />
+                                                            <span style={{ fontSize: 13, fontWeight: 600, color: '#64748b' }}>Duración</span>
+                                                        </div>
+                                                        <p style={{ margin: 0, fontSize: 15, fontWeight: 700, color: '#0f172a' }}>
+                                                            {sesion.duracion_minutos || 60} minutos
+                                                        </p>
+                                                    </div>
+
+                                                    <div>
+                                                        <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6 }}>
+                                                            <FontAwesomeIcon
+                                                                icon={sesion.modalidad === 'virtual' ? faVideo : faBuilding}
+                                                                style={{ color: '#64748b', fontSize: 14 }}
+                                                            />
+                                                            <span style={{ fontSize: 13, fontWeight: 600, color: '#64748b' }}>Modalidad</span>
+                                                        </div>
+                                                        <p style={{ margin: 0, fontSize: 15, fontWeight: 700, color: '#0d9488' }}>
+                                                            {sesion.modalidad === 'virtual' ? 'Virtual' : 'Presencial'}
+                                                            {sesion.locacion && (
+                                                                <span style={{ fontWeight: 500, marginLeft: 6, fontSize: 13, color: '#64748b' }}>
+                        ({sesion.locacion === 'casa' ? 'Casa del mentor' : 'Facultad'})
+                      </span>
+                                                            )}
+                                                        </p>
+                                                    </div>
+
+                                                    <div>
+                                                        <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6 }}>
+                                                            <FontAwesomeIcon icon={faUsers} style={{ color: '#64748b', fontSize: 14 }} />
+                                                            <span style={{ fontSize: 13, fontWeight: 600, color: '#64748b' }}>Participantes</span>
+                                                        </div>
+                                                        <p style={{ margin: 0, fontSize: 15, fontWeight: 700, color: '#0f172a' }}>
+                                                            {sesion.slot_info?.reservas_actuales || 1} alumno(s)
+                                                        </p>
+                                                    </div>
+
+                                                    <div>
+                                                        <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6 }}>
+                                                            <FontAwesomeIcon icon={faDollarSign} style={{ color: '#64748b', fontSize: 14 }} />
+                                                            <span style={{ fontSize: 13, fontWeight: 600, color: '#64748b' }}>Pago</span>
+                                                        </div>
+                                                        <p style={{ margin: 0, fontSize: 15, fontWeight: 700, color: '#10b981' }}>
+                                                            ${sesion.precio || 400} UYU
+                                                        </p>
+                                                    </div>
                                                 </div>
 
-                                                {/* Badge de estado */}
-                                                <span style={{
-                                                    padding: '4px 10px',
-                                                    background: sesion.estado === 'confirmada' ? '#d1fae5' : '#fef3c7',
-                                                    color: sesion.estado === 'confirmada' ? '#065f46' : '#92400e',
-                                                    borderRadius: 6,
-                                                    fontSize: 11,
-                                                    fontWeight: 600,
-                                                    fontFamily: 'Inter, sans-serif',
-                                                    flexShrink: 0
-                                                }}>
-                                                    {sesion.estado === 'confirmada' ? '✓' : '⏳'}
-                                                </span>
+                                                {/* Descripción del alumno */}
+                                                {sesion.notas_alumno && (
+                                                    <div style={{
+                                                        background: '#f8fafc',
+                                                        borderRadius: 12,
+                                                        padding: 16,
+                                                        marginBottom: 16,
+                                                        borderLeft: '3px solid #0d9488'
+                                                    }}>
+                                                        <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
+                                                            <FontAwesomeIcon icon={faComment} style={{ color: '#0d9488', fontSize: 14 }} />
+                                                            <span style={{ fontSize: 13, fontWeight: 700, color: '#0f172a' }}>Notas del alumno</span>
+                                                        </div>
+                                                        <p style={{ margin: 0, fontSize: 14, fontWeight: 500, color: '#475569', lineHeight: 1.6 }}>
+                                                            {sesion.notas_alumno}
+                                                        </p>
+                                                    </div>
+                                                )}
+
+                                                {/* Botones */}
+                                                <div style={{ display: 'flex', gap: 12 }}>
+                                                    <button
+                                                        style={{
+                                                            flex: 1,
+                                                            padding: '12px',
+                                                            background: '#fff',
+                                                            color: '#0d9488',
+                                                            border: '2px solid #0d9488',
+                                                            borderRadius: 10,
+                                                            fontWeight: 700,
+                                                            fontSize: 14,
+                                                            cursor: 'pointer',
+                                                            transition: 'all 0.2s ease',
+                                                            fontFamily: 'Inter, sans-serif'
+                                                        }}
+                                                        onMouseEnter={(e) => {
+                                                            e.target.style.background = '#0d9488';
+                                                            e.target.style.color = '#fff';
+                                                            e.target.style.transform = 'translateY(-1px)';
+                                                        }}
+                                                        onMouseLeave={(e) => {
+                                                            e.target.style.background = '#fff';
+                                                            e.target.style.color = '#0d9488';
+                                                            e.target.style.transform = 'translateY(0)';
+                                                        }}
+                                                    >
+                                                        <FontAwesomeIcon icon={faCheck} style={{ marginRight: 8 }} />
+                                                        Marcar como completada
+                                                    </button>
+
+                                                    <button
+                                                        onClick={() => {
+                                                            const fechaSesion = new Date(sesion.fecha_hora);
+                                                            const ahora = new Date();
+                                                            const horasRestantes = (fechaSesion - ahora) / (1000 * 60 * 60);
+                                                            setConfirmCancelSession({
+                                                                id: sesion.id_sesion,
+                                                                esMasDe36Horas: horasRestantes > 36,
+                                                                fecha: fechaSesion,
+                                                                materia: sesion.materia?.nombre_materia,
+                                                            });
+                                                        }}
+                                                        style={{
+                                                            flex: 1,
+                                                            padding: '12px',
+                                                            background: '#fff',
+                                                            color: '#ef4444',
+                                                            border: '2px solid #ef4444',
+                                                            borderRadius: 10,
+                                                            fontWeight: 700,
+                                                            fontSize: 14,
+                                                            cursor: 'pointer',
+                                                            transition: 'all 0.2s ease',
+                                                            fontFamily: 'Inter, sans-serif'
+                                                        }}
+                                                        onMouseEnter={(e) => {
+                                                            e.target.style.background = '#ef4444';
+                                                            e.target.style.color = '#fff';
+                                                            e.target.style.transform = 'translateY(-1px)';
+                                                        }}
+                                                        onMouseLeave={(e) => {
+                                                            e.target.style.background = '#fff';
+                                                            e.target.style.color = '#ef4444';
+                                                            e.target.style.transform = 'translateY(0)';
+                                                        }}
+                                                    >
+                                                        <FontAwesomeIcon icon={faTimes} style={{ marginRight: 8 }} />
+                                                        Cancelar mentoría
+                                                    </button>
+                                                </div>
                                             </div>
                                         );
                                     })}
