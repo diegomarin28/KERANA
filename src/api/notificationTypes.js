@@ -40,32 +40,6 @@ export const notificationTypes = {
     },
 
     /**
-     * Aceptaron tu solicitud de seguimiento
-     */
-    async solicitudAceptada(seguidorId, seguidoId, nombreSeguido) {
-        return createNotification({
-            usuarioId: seguidorId,
-            tipo: 'solicitud_aceptada',
-            emisorId: seguidoId,
-            relacionId: null,
-            mensaje: `${nombreSeguido} aceptó tu solicitud para seguirle`,
-        });
-    },
-
-    /**
-     * Alguien comentó en tu apunte
-     */
-    async nuevoComentario(autorApunteId, comentadorId, nombreComentador, apunteId, tituloApunte) {
-        return createNotification({
-            usuarioId: autorApunteId,
-            tipo: 'nuevo_comentario',
-            emisorId: comentadorId,
-            relacionId: apunteId,
-            mensaje: `${nombreComentador} comentó en tu apunte "${tituloApunte}"`,
-        });
-    },
-
-    /**
      * Alguien dio like a tu apunte
      */
     async nuevoLike(autorApunteId, likerId, nombreLiker, apunteId, tituloApunte) {
@@ -92,19 +66,6 @@ export const notificationTypes = {
     },
 
     /**
-     * Un mentor aceptó tu solicitud
-     */
-    async mentorAcepto(estudianteId, mentorId, nombreMentor, materiaId, materiaNombre) {
-        return createNotification({
-            usuarioId: estudianteId,
-            tipo: 'mentor_acepto',
-            emisorId: mentorId,
-            relacionId: materiaId,
-            mensaje: `${nombreMentor} aceptó ser tu mentor en ${materiaNombre}`,
-        });
-    },
-
-    /**
      * Nuevo apunte en materia que seguís
      */
     async nuevoApunte(usuarioId, autorId, nombreAutor, apunteId, tituloApunte, materiaNombre) {
@@ -118,15 +79,27 @@ export const notificationTypes = {
     },
 
     /**
-     * Tu apunte fue aprobado
+     * ✨ NUEVA: Alguien agendó una clase contigo (para mentores)
      */
-    async apunteAprobado(usuarioId, apunteId, tituloApunte) {
+    async nuevaClaseAgendada(mentorUserId, estudianteId, nombreEstudiante, sesionId, fechaHora, materiaNombre) {
+        // Formatear fecha y hora para el mensaje
+        const fecha = new Date(fechaHora);
+        const fechaFormateada = fecha.toLocaleDateString('es-UY', {
+            day: 'numeric',
+            month: 'long',
+            year: 'numeric'
+        });
+        const horaFormateada = fecha.toLocaleTimeString('es-UY', {
+            hour: '2-digit',
+            minute: '2-digit'
+        });
+
         return createNotification({
-            usuarioId: usuarioId,
-            tipo: 'apunte_aprobado',
-            emisorId: null,
-            relacionId: apunteId,
-            mensaje: `Tu apunte "${tituloApunte}" fue aprobado y ya está visible`,
+            usuarioId: mentorUserId,
+            tipo: 'nueva_clase_agendada',
+            emisorId: estudianteId,
+            relacionId: sesionId,
+            mensaje: `${nombreEstudiante} agendó una clase de ${materiaNombre} para el ${fechaFormateada} a las ${horaFormateada}`,
         });
     },
 

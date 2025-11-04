@@ -6,6 +6,8 @@ import { Card } from '../components/UI/Card';
 import { Button } from '../components/UI/Button';
 import FileDrop from "../components/FileDrop";
 import { useNotificationSound } from '../hooks/useNotificationSound';
+import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
+import { faCheckCircle } from '@fortawesome/free-solid-svg-icons';
 import * as pdfjsLib from "pdfjs-dist";
 
 // Configurar worker de PDF.js
@@ -205,11 +207,8 @@ export default function Upload() {
             const fileName = formData.file.name; // ya saneado
             const thumbnailFileName = `thumb_${fileName.replace(/\.pdf$/i, '.jpg')}`;
 
-            // 1) Generar thumbnail y contar páginas del PDF
-            setUploadProgress('Generando vista previa y contando páginas...');
-            const thumbnailBlob = await generateThumbnail(formData.file);
-
-            // Contar páginas del PDF
+            // 1) Contar páginas del PDF PRIMERO (validación)
+            setUploadProgress('Verificando PDF...');
             let numPaginas = 0;
             try {
                 const arrayBuffer = await formData.file.arrayBuffer();
@@ -217,11 +216,26 @@ export default function Upload() {
                 numPaginas = pdf.numPages;
                 console.log(`📄 PDF tiene ${numPaginas} páginas`);
             } catch (pdfError) {
-                console.warn('No se pudo contar páginas del PDF:', pdfError);
-                numPaginas = 0; // Default si falla
+                console.error('Error al leer el PDF:', pdfError);
+                setError('No se pudo leer el archivo PDF. Asegurate de que sea un PDF válido.');
+                setLoading(false);
+                setUploading(false);
+                return;
             }
 
-            // 2) Subir PDF al bucket 'apuntes'
+            // ⚠️ VALIDACIÓN: Mínimo 3 páginas
+            if (numPaginas < 3) {
+                setError(`El apunte debe tener al menos 3 páginas. Tu PDF tiene ${numPaginas} página${numPaginas === 1 ? '' : 's'}.`);
+                setLoading(false);
+                setUploading(false);
+                return;
+            }
+
+            // 2) Generar thumbnail
+            setUploadProgress('Generando vista previa...');
+            const thumbnailBlob = await generateThumbnail(formData.file);
+
+            // 3) Subir PDF al bucket 'apuntes'
             setUploadProgress('Subiendo PDF...');
             const { error: uploadError } = await supabase.storage
                 .from('apuntes')
@@ -269,6 +283,7 @@ export default function Upload() {
                     mime_type: 'pdf',
                     file_size: formData.file.size,
                     num_paginas: numPaginas,
+                    creditos: numPaginas * 10,  // Precio automático: 10 créditos por página
                     created_at: new Date().toISOString()
                 }])
                 .select();
@@ -283,8 +298,8 @@ export default function Upload() {
                 throw new Error('Error al guardar en base de datos: ' + insertError.message);
             }
 
-            // 5) 💰 Otorgar créditos por subir apunte
-            if (apunteData && apunteData[0] && numPaginas >= 3) {
+            // 5) 💰 Otorgar créditos por subir apunte (ya validamos 3+ páginas)
+            if (apunteData && apunteData[0]) {
                 setUploadProgress('Calculando créditos...');
                 const { data: creditosResult, error: creditosError } = await creditsAPI.grantNoteUploadCredits(
                     apunteData[0].id_apunte,
@@ -297,11 +312,19 @@ export default function Upload() {
                     if (creditosResult.bonoPrimerApunte > 0) {
                         console.log(`🎁 ¡Bono de primer apunte! +${creditosResult.bonoPrimerApunte} créditos`);
                     }
+
+                    // 6) 🎯 Verificar y otorgar bonos por hitos
+                    setUploadProgress('Verificando hitos...');
+                    const { data: hitosResult, error: hitosError } = await creditsAPI.checkAndGrantMilestoneBonus();
+
+                    if (!hitosError && hitosResult?.bonosOtorgados?.length > 0) {
+                        hitosResult.bonosOtorgados.forEach(bono => {
+                            console.log(`🏆 ¡Hito alcanzado! ${bono.hito} apuntes = +${bono.creditos} créditos`);
+                        });
+                    }
                 } else {
                     console.warn('No se pudieron otorgar créditos:', creditosError);
                 }
-            } else if (numPaginas < 3) {
-                console.warn('⚠️ Apunte tiene menos de 3 páginas, no se otorgan créditos');
             }
 
             playSound('apunte_publicado');
@@ -324,32 +347,92 @@ export default function Upload() {
             {/* Modal de éxito */}
             {showSuccessModal && (
                 <div style={{
-                    position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)',
-                    display: 'flex', alignItems: 'center', justifyContent: 'center',
-                    zIndex: 1000, backdropFilter: 'blur(4px)'
+                    position: 'fixed',
+                    inset: 0,
+                    background: 'rgba(0, 0, 0, 0.7)',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    zIndex: 1000,
+                    backdropFilter: 'blur(4px)'
                 }}>
                     <Card style={{
-                        maxWidth: 450, padding: 40, textAlign: 'center', background: '#fff',
-                        boxShadow: '0 20px 25px -5px rgba(0,0,0,0.1)'
+                        maxWidth: 480,
+                        padding: 48,
+                        textAlign: 'center',
+                        background: '#fff',
+                        boxShadow: '0 20px 60px rgba(0, 0, 0, 0.3)',
+                        borderRadius: 16
                     }}>
+                        {/* Ícono de éxito */}
                         <div style={{
-                            width: 80, height: 80,
-                            background: 'linear-gradient(135deg,#667eea 0%,#764ba2 100%)',
-                            borderRadius: '50%', display: 'flex', alignItems: 'center',
-                            justifyContent: 'center', margin: '0 auto 24px', fontSize: 40
-                        }}>📚</div>
-                        <h2 style={{
-                            margin: '0 0 12px', fontSize: 28, fontWeight: 700,
-                            background: 'linear-gradient(135deg,#667eea 0%,#764ba2 100%)',
-                            WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent'
-                        }}>¡Apunte publicado!</h2>
-                        <p style={{ color: '#6b7280', fontSize: 16, marginBottom: 32 }}>
-                            <strong style={{ color: '#374151' }}>KERANA</strong> y toda su comunidad te agradecen por compartir tu conocimiento 🎓
-                        </p>
-                        <Button onClick={() => navigate('/')} style={{
-                            padding: '14px 32px', background: 'linear-gradient(135deg,#667eea 0%,#764ba2 100%)',
-                            color: '#fff', border: 'none', borderRadius: 8, fontWeight: 600, width: '100%'
+                            width: 96,
+                            height: 96,
+                            background: '#2563eb',
+                            borderRadius: '50%',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            margin: '0 auto 24px',
+                            boxShadow: '0 8px 24px rgba(37, 99, 235, 0.3)'
                         }}>
+                            <FontAwesomeIcon
+                                icon={faCheckCircle}
+                                style={{
+                                    fontSize: 48,
+                                    color: '#fff'
+                                }}
+                            />
+                        </div>
+
+                        {/* Título */}
+                        <h2 style={{
+                            margin: '0 0 12px',
+                            fontSize: 32,
+                            fontWeight: 700,
+                            color: '#0f172a',
+                            fontFamily: 'Inter, sans-serif'
+                        }}>
+                            ¡Apunte publicado!
+                        </h2>
+
+                        {/* Mensaje */}
+                        <p style={{
+                            color: '#64748b',
+                            fontSize: 16,
+                            marginBottom: 32,
+                            lineHeight: 1.6
+                        }}>
+                            <strong style={{ color: '#2563eb' }}>Kerana</strong> y toda su comunidad te agradecen por compartir tu conocimiento.
+                        </p>
+
+                        {/* Botón */}
+                        <Button
+                            onClick={() => navigate('/')}
+                            style={{
+                                padding: '14px 32px',
+                                background: '#2563eb',
+                                color: '#fff',
+                                border: 'none',
+                                borderRadius: 10,
+                                fontWeight: 600,
+                                fontSize: 15,
+                                width: '100%',
+                                cursor: 'pointer',
+                                transition: 'all 0.2s ease',
+                                fontFamily: 'Inter, sans-serif'
+                            }}
+                            onMouseEnter={(e) => {
+                                e.currentTarget.style.background = '#1e40af';
+                                e.currentTarget.style.transform = 'translateY(-2px)';
+                                e.currentTarget.style.boxShadow = '0 8px 24px rgba(37, 99, 235, 0.3)';
+                            }}
+                            onMouseLeave={(e) => {
+                                e.currentTarget.style.background = '#2563eb';
+                                e.currentTarget.style.transform = 'translateY(0)';
+                                e.currentTarget.style.boxShadow = 'none';
+                            }}
+                        >
                             Volver al inicio
                         </Button>
                     </Card>

@@ -889,6 +889,29 @@ export const notesAPI = {
                 }
 
                 liked = true;
+
+                // 🎁 Verificar bonos por likes del autor del apunte
+                try {
+                    const { data: apunteData } = await supabase
+                        .from('apunte')
+                        .select('id_usuario')
+                        .eq('id_apunte', apunteId)
+                        .single();
+
+                    if (apunteData) {
+                        // Importar creditsAPI si no está disponible
+                        const { data: bonusResult } = await creditsAPI.checkAndGrantLikesBonus(apunteData.id_usuario);
+
+                        if (bonusResult?.bonosOtorgados?.length > 0) {
+                            bonusResult.bonosOtorgados.forEach(bono => {
+                                console.log(`🎉 ¡El autor alcanzó un hito! ${bono.hito} likes = +${bono.creditos} créditos`);
+                            });
+                        }
+                    }
+                } catch (bonusError) {
+                    console.error('Error verificando bonos de likes:', bonusError);
+                    // No fallar el like si falla el bono
+                }
             }
 
             // 4. Obtener nuevo conteo
@@ -2476,13 +2499,14 @@ export const creditsAPI = {
         if (error) return { data: null, error }
 
         // Registrar en historial de transacciones
-        await supabase.from('historial_creditos').insert({
+        const historialData = {
             id_usuario: userData.id_usuario,
             cantidad_creditos: amount,
             tipo_transaccion: reason,
-            descripcion: reason,
-            referencia_id: referenciaId
-        })
+            descripcion: reason
+        };
+
+        await supabase.from('historial_creditos').insert(historialData)
 
         return { data, error: null }
     },
@@ -2666,7 +2690,7 @@ export const creditsAPI = {
             const { count: apuntesCount } = await supabase
                 .from('apunte')
                 .select('id_apunte', { count: 'exact', head: true })
-                .eq('id_usuario_subio', userData.id_usuario)
+                .eq('id_usuario', userData.id_usuario)
 
             // Definir hitos y sus bonos
             const milestones = {
@@ -2679,8 +2703,38 @@ export const creditsAPI = {
                 1000: 10000
             }
 
-            // TODO: Verificar qué bonos ya fueron otorgados
-            // Por ahora solo retornamos info
+            // Verificar qué bonos ya fueron otorgados
+            const { data: bonosOtorgados } = await supabase
+                .from('bonos_otorgados')
+                .select('tipo_bono')
+                .eq('id_usuario', userData.id_usuario)
+                .in('tipo_bono', Object.keys(milestones).map(m => `hito_${m}`))
+
+            const bonosYaOtorgados = new Set(
+                (bonosOtorgados || []).map(b => b.tipo_bono)
+            )
+
+            // Buscar hitos alcanzados que no se hayan otorgado
+            const bonosNuevos = []
+            for (const [hito, creditos] of Object.entries(milestones)) {
+                const hitoNum = Number(hito)
+                const tipoBono = `hito_${hito}`
+
+                if (apuntesCount >= hitoNum && !bonosYaOtorgados.has(tipoBono)) {
+                    // Otorgar este bono
+                    await this.addCredits(creditos, 'bono_hito', null)
+                    await supabase.from('bonos_otorgados').insert({
+                        id_usuario: userData.id_usuario,
+                        tipo_bono: tipoBono,
+                        cantidad_creditos: creditos
+                    })
+
+                    bonosNuevos.push({ hito: hitoNum, creditos })
+                    console.log(`🎁 Bono por hito alcanzado: ${hitoNum} apuntes = ${creditos} créditos`)
+                }
+            }
+
+            // Encontrar próximo hito
             const nextMilestone = Object.keys(milestones)
                 .map(Number)
                 .find(m => m > apuntesCount)
@@ -2688,6 +2742,7 @@ export const creditsAPI = {
             return {
                 data: {
                     apuntesSubidos: apuntesCount,
+                    bonosOtorgados: bonosNuevos,
                     proximoHito: nextMilestone,
                     bonoProximo: nextMilestone ? milestones[nextMilestone] : null
                 },
@@ -2757,6 +2812,361 @@ export const creditsAPI = {
             return { data: { creditosOtorgados: 50 }, error: null }
         } catch (error) {
             return { data: null, error }
+        }
+    },
+
+    // Verificar y otorgar bonos por compras
+    async checkAndGrantPurchaseBonus() {
+        try {
+            const { data: { user } } = await supabase.auth.getUser()
+            if (!user) return { data: null, error: 'No hay usuario logueado' }
+
+            // Obtener id_usuario
+            const { data: userData, error: userError } = await supabase
+                .from('usuario')
+                .select('id_usuario')
+                .eq('auth_id', user.id)
+                .single()
+
+            if (userError) throw userError
+
+            // Contar apuntes comprados por el usuario
+            const { count: comprasCount } = await supabase
+                .from('compra_apunte')
+                .select('id', { count: 'exact', head: true })
+                .eq('comprador_id', userData.id_usuario)
+
+            // Definir hitos y sus bonos
+            const purchaseMilestones = {
+                10: 50,
+                25: 100,
+                50: 200,
+                100: 350
+            }
+
+            // Verificar qué bonos ya fueron otorgados
+            const { data: bonosOtorgados } = await supabase
+                .from('bonos_otorgados')
+                .select('tipo_bono')
+                .eq('id_usuario', userData.id_usuario)
+                .in('tipo_bono', Object.keys(purchaseMilestones).map(m => `compras_${m}`))
+
+            const bonosYaOtorgados = new Set(
+                (bonosOtorgados || []).map(b => b.tipo_bono)
+            )
+
+            // Buscar hitos alcanzados que no se hayan otorgado
+            const bonosNuevos = []
+            for (const [hito, creditos] of Object.entries(purchaseMilestones)) {
+                const hitoNum = Number(hito)
+                const tipoBono = `compras_${hito}`
+
+                if (comprasCount >= hitoNum && !bonosYaOtorgados.has(tipoBono)) {
+                    // Otorgar este bono
+                    await this.addCredits(creditos, 'bono_compras', null)
+                    await supabase.from('bonos_otorgados').insert({
+                        id_usuario: userData.id_usuario,
+                        tipo_bono: tipoBono,
+                        cantidad_creditos: creditos
+                    })
+
+                    bonosNuevos.push({ hito: hitoNum, creditos })
+                    console.log(`🛒 Bono por compras alcanzado: ${hitoNum} apuntes = ${creditos} créditos`)
+                }
+            }
+
+            // Encontrar próximo hito
+            const nextMilestone = Object.keys(purchaseMilestones)
+                .map(Number)
+                .find(m => m > comprasCount)
+
+            return {
+                data: {
+                    apuntesComprados: comprasCount,
+                    bonosOtorgados: bonosNuevos,
+                    proximoHito: nextMilestone,
+                    bonoProximo: nextMilestone ? purchaseMilestones[nextMilestone] : null
+                },
+                error: null
+            }
+        } catch (error) {
+            return { data: null, error }
+        }
+    },
+
+    // Verificar y otorgar bonos por likes en tus apuntes
+    async checkAndGrantLikesBonus(apunteAutorId) {
+        try {
+            // Contar likes totales en todos los apuntes del usuario
+            const { data: apuntesData, error: apuntesError } = await supabase
+                .from('apunte')
+                .select('id_apunte')
+                .eq('id_usuario', apunteAutorId);
+
+            if (apuntesError) throw apuntesError;
+
+            const apunteIds = (apuntesData || []).map(a => a.id_apunte);
+            if (apunteIds.length === 0) return { data: null, error: null };
+
+            // Contar likes totales
+            const { count: likesCount } = await supabase
+                .from('likes')
+                .select('*', { count: 'exact', head: true })
+                .in('id_apunte', apunteIds)
+                .eq('tipo', 'like');
+
+            // Definir hitos y sus bonos (Opción 1: 50% del valor)
+            const likesMilestones = {
+                25: 12,
+                50: 25,
+                100: 50,
+                250: 125,
+                500: 250,
+                1000: 500
+            };
+
+            // Verificar qué bonos ya fueron otorgados
+            const { data: bonosOtorgados } = await supabase
+                .from('bonos_otorgados')
+                .select('tipo_bono')
+                .eq('id_usuario', apunteAutorId)
+                .in('tipo_bono', Object.keys(likesMilestones).map(m => `likes_${m}`));
+
+            const bonosYaOtorgados = new Set(
+                (bonosOtorgados || []).map(b => b.tipo_bono)
+            );
+
+            // Buscar hitos alcanzados que no se hayan otorgado
+            const bonosNuevos = [];
+            for (const [hito, creditos] of Object.entries(likesMilestones)) {
+                const hitoNum = Number(hito);
+                const tipoBono = `likes_${hito}`;
+
+                if (likesCount >= hitoNum && !bonosYaOtorgados.has(tipoBono)) {
+                    // Otorgar este bono
+                    // Primero obtener el auth_id del autor para usar addCredits
+                    const { data: autorData } = await supabase
+                        .from('usuario')
+                        .select('auth_id, creditos')
+                        .eq('id_usuario', apunteAutorId)
+                        .single();
+
+                    if (autorData) {
+                        // Actualizar créditos directamente
+                        await supabase
+                            .from('usuario')
+                            .update({ creditos: autorData.creditos + creditos })
+                            .eq('id_usuario', apunteAutorId);
+
+                        // Registrar en historial
+                        const historialData = {
+                            id_usuario: apunteAutorId,
+                            cantidad_creditos: creditos,
+                            tipo_transaccion: 'bono_likes',
+                            descripcion: `Bono por ${hitoNum} likes en tus apuntes`
+                        };
+                        await supabase.from('historial_creditos').insert(historialData);
+
+                        // Registrar bono otorgado
+                        await supabase.from('bonos_otorgados').insert({
+                            id_usuario: apunteAutorId,
+                            tipo_bono: tipoBono,
+                            cantidad_creditos: creditos
+                        });
+
+                        bonosNuevos.push({ hito: hitoNum, creditos });
+                        console.log(`❤️ Bono por likes alcanzado: ${hitoNum} likes = ${creditos} créditos`);
+                    }
+                }
+            }
+
+            return {
+                data: {
+                    likesTotales: likesCount || 0,
+                    bonosOtorgados: bonosNuevos
+                },
+                error: null
+            };
+        } catch (error) {
+            console.error('Error en checkAndGrantLikesBonus:', error);
+            return { data: null, error };
+        }
+    },
+
+    // Verificar y otorgar bonos por ventas (5% del total con tope de 200)
+    async checkAndGrantSalesBonus(vendedorId) {
+        try {
+            // 1. Obtener todos los apuntes del vendedor
+            const { data: apuntesData, error: apuntesError } = await supabase
+                .from('apunte')
+                .select('id_apunte, creditos')
+                .eq('id_usuario', vendedorId);
+
+            if (apuntesError) throw apuntesError;
+
+            const apunteIds = (apuntesData || []).map(a => a.id_apunte);
+            if (apunteIds.length === 0) return { data: null, error: null };
+
+            // 2. Contar ventas totales de sus apuntes
+            const { count: ventasCount } = await supabase
+                .from('compra_apunte')
+                .select('*', { count: 'exact', head: true })
+                .in('apunte_id', apunteIds);
+
+            // 3. Calcular total acumulado en ventas
+            const { data: comprasData } = await supabase
+                .from('compra_apunte')
+                .select('apunte_id')
+                .in('apunte_id', apunteIds);
+
+            let totalAcumulado = 0;
+            if (comprasData) {
+                // Sumar el precio de cada apunte vendido
+                for (const compra of comprasData) {
+                    const apunte = apuntesData.find(a => a.id_apunte === compra.apunte_id);
+                    if (apunte) {
+                        totalAcumulado += apunte.creditos || 0;
+                    }
+                }
+            }
+
+            // 4. Definir hitos
+            const salesMilestones = {
+                10: true,
+                25: true,
+                50: true,
+                100: true,
+                250: true,
+                500: true,
+                1000: true
+            };
+
+            // 5. Verificar qué bonos ya fueron otorgados
+            const { data: bonosOtorgados } = await supabase
+                .from('bonos_otorgados')
+                .select('tipo_bono')
+                .eq('id_usuario', vendedorId)
+                .in('tipo_bono', Object.keys(salesMilestones).map(m => `ventas_${m}`));
+
+            const bonosYaOtorgados = new Set(
+                (bonosOtorgados || []).map(b => b.tipo_bono)
+            );
+
+            // 6. Buscar hitos alcanzados que no se hayan otorgado
+            const bonosNuevos = [];
+            for (const hito of Object.keys(salesMilestones)) {
+                const hitoNum = Number(hito);
+                const tipoBono = `ventas_${hito}`;
+
+                if (ventasCount >= hitoNum && !bonosYaOtorgados.has(tipoBono)) {
+                    // Calcular 5% del total con tope de 200
+                    let creditos = Math.floor(totalAcumulado * 0.05);
+                    creditos = Math.min(creditos, 200); // Aplicar tope
+
+                    if (creditos > 0) {
+                        // Obtener datos del vendedor
+                        const { data: vendedorData } = await supabase
+                            .from('usuario')
+                            .select('creditos')
+                            .eq('id_usuario', vendedorId)
+                            .single();
+
+                        if (vendedorData) {
+                            // Actualizar créditos
+                            await supabase
+                                .from('usuario')
+                                .update({ creditos: vendedorData.creditos + creditos })
+                                .eq('id_usuario', vendedorId);
+
+                            // Registrar en historial
+                            const historialData = {
+                                id_usuario: vendedorId,
+                                cantidad_creditos: creditos,
+                                tipo_transaccion: 'bono_ventas',
+                                descripcion: `Bono por ${hitoNum} ventas (5% de ${totalAcumulado})`
+                            };
+                            await supabase.from('historial_creditos').insert(historialData);
+
+                            // Registrar bono otorgado
+                            await supabase.from('bonos_otorgados').insert({
+                                id_usuario: vendedorId,
+                                tipo_bono: tipoBono,
+                                cantidad_creditos: creditos
+                            });
+
+                            bonosNuevos.push({ hito: hitoNum, creditos });
+                            console.log(`💰 Bono por ventas alcanzado: ${hitoNum} ventas = +${creditos} créditos (5% de ${totalAcumulado})`);
+                        }
+                    }
+                }
+            }
+
+            return {
+                data: {
+                    ventasTotales: ventasCount || 0,
+                    totalAcumulado,
+                    bonosOtorgados: bonosNuevos
+                },
+                error: null
+            };
+        } catch (error) {
+            console.error('Error en checkAndGrantSalesBonus:', error);
+            return { data: null, error };
+        }
+    },
+
+    // Obtener Top Mensual (actual o histórico)
+    async getTopMensual(mes = null, año = null) {
+        try {
+            // Si no se especifica mes/año, usar el mes anterior
+            if (!mes || !año) {
+                const ahora = new Date();
+                const mesAnterior = new Date(ahora.getFullYear(), ahora.getMonth() - 1, 1);
+                mes = mesAnterior.getMonth() + 1;
+                año = mesAnterior.getFullYear();
+            }
+
+            const { data, error } = await supabase
+                .from('top_mensual')
+                .select(`
+                    *,
+                    apunte(id_apunte, titulo, thumbnail_path),
+                    usuario(id_usuario, nombre, username, foto)
+                `)
+                .eq('mes', mes)
+                .eq('año', año)
+                .order('posicion', { ascending: true });
+
+            return { data, error };
+        } catch (error) {
+            return { data: null, error };
+        }
+    },
+
+    // Obtener todos los tops históricos
+    async getTopHistorico() {
+        try {
+            const { data, error } = await supabase
+                .from('top_mensual')
+                .select('mes, año')
+                .order('año', { ascending: false })
+                .order('mes', { ascending: false });
+
+            // Obtener lista única de mes/año
+            const mesesUnicos = [];
+            const seen = new Set();
+
+            for (const item of data || []) {
+                const key = `${item.año}-${item.mes}`;
+                if (!seen.has(key)) {
+                    seen.add(key);
+                    mesesUnicos.push({ mes: item.mes, año: item.año });
+                }
+            }
+
+            return { data: mesesUnicos, error };
+        } catch (error) {
+            return { data: null, error };
         }
     }
 }

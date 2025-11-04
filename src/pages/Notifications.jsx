@@ -59,6 +59,12 @@ export default function Notifications() {
             return; // ← DETENER AQUÍ
         }
 
+        // 🆕 Si es notificación de clase agendada → ir a página mentor
+        if (notif.tipo === 'nueva_clase_agendada') {
+            navigate('/i-am-mentor');
+            return;
+        }
+
         // Si YA está leída: ir al perfil (segundo click)
         if (notif.emisor?.username) {
             navigate(`/user/${notif.emisor.username}`);
@@ -502,7 +508,9 @@ const headerWrapperStyle = {
 };
 
 const headerStyle = {
-    textAlign: 'left',
+    display: 'flex',
+    flexDirection: 'column',
+    alignItems: 'center',  // Centrar todo
 };
 
 const backButtonStyle = {
@@ -534,9 +542,10 @@ const subtitleStyle = {
     fontSize: 14,
     color: '#64748b',
     margin: 0,
-    paddingLeft: 56,
+    paddingLeft: 0,  // Cambio: quitar el padding left
     fontWeight: 500,
-    fontFamily: 'Inter, sans-serif'
+    fontFamily: 'Inter, sans-serif',
+    textAlign: 'center'  // Añadido
 };
 
 const actionsStyle = {
@@ -643,16 +652,18 @@ const deleteButtonStyle = {
     right: 12,
     width: 28,
     height: 28,
-    display: 'grid',
-    placeItems: 'center',
+    display: 'flex',          // Cambio de 'grid' a 'flex'
+    alignItems: 'center',     // Añadido
+    justifyContent: 'center', // Añadido
     background: 'transparent',
     border: 'none',
     borderRadius: '50%',
     color: '#94a3b8',
-    fontSize: 20,
+    fontSize: 18,             // Reducido de 20 a 18
     fontWeight: 700,
     cursor: 'pointer',
     transition: 'all 0.2s ease',
+    padding: 0,               // Añadido para asegurar centrado
 };
 
 const unreadDotStyle = {

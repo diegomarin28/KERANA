@@ -1,3 +1,7 @@
+import { useEffect } from 'react';
+import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
+import { faCheckCircle } from '@fortawesome/free-solid-svg-icons';
+
 export default function CreditsSuccess() {
     useEffect(() => {
         // Recargar créditos del usuario
@@ -11,7 +15,7 @@ export default function CreditsSuccess() {
 
         // Redirigir después de 3 segundos
         setTimeout(() => {
-            window.location.href = '/credits';
+            window.location.href = '/mis-creditos';
         }, 3000);
     }, []);
 
@@ -24,7 +28,9 @@ export default function CreditsSuccess() {
             padding: 20,
         }}>
             <div>
-                <div style={{ fontSize: 64, marginBottom: 20 }}>✅</div>
+                <div style={{ fontSize: 64, marginBottom: 20, color: '#10b981' }}>
+                    <FontAwesomeIcon icon={faCheckCircle} />
+                </div>
                 <h1 style={{
                     fontSize: 32,
                     fontWeight: 800,

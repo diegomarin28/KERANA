@@ -545,7 +545,7 @@ export default function Profile() {
 
                             {/* Créditos - Clickeable */}
                             <div
-                                onClick={() => navigate('/credits')}
+                                onClick={() => navigate('/mis-creditos')}
                                 style={{
                                     cursor: 'pointer',
                                     padding: '12px',
@@ -693,16 +693,16 @@ export default function Profile() {
                             cursor: 'pointer',
                         }}
 
-                         onMouseEnter={(e) => {
-                             e.currentTarget.style.transform = 'translateY(-4px)';
-                             e.currentTarget.style.boxShadow = '0 12px 32px rgba(0,0,0,0.08)';
-                             e.currentTarget.style.borderColor = '#f59e0b';
-                         }}
-                         onMouseLeave={(e) => {
-                             e.currentTarget.style.transform = 'translateY(0)';
-                             e.currentTarget.style.boxShadow = '0 2px 8px rgba(0,0,0,0.04)';
-                             e.currentTarget.style.borderColor = '#f1f5f9';
-                         }}
+                        onMouseEnter={(e) => {
+                            e.currentTarget.style.transform = 'translateY(-4px)';
+                            e.currentTarget.style.boxShadow = '0 12px 32px rgba(0,0,0,0.08)';
+                            e.currentTarget.style.borderColor = '#f59e0b';
+                        }}
+                        onMouseLeave={(e) => {
+                            e.currentTarget.style.transform = 'translateY(0)';
+                            e.currentTarget.style.boxShadow = '0 2px 8px rgba(0,0,0,0.04)';
+                            e.currentTarget.style.borderColor = '#f1f5f9';
+                        }}
                     >
                         <div style={{
                             display: 'flex',

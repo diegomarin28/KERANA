@@ -13,6 +13,7 @@ const DEFAULT_SETTINGS = {
     nuevo_apunte: true,
     apunte_aprobado: true,
     mentor_aprobado: true,
+    nueva_clase_agendada: true, // 🆕 Agregado
     system: true,
     update: true,
 
@@ -60,11 +61,21 @@ export function useNotificationSettings() {
             ...settings,
             [key]: !settings[key]
         };
-        saveSettings(newSettings);
+        const success = saveSettings(newSettings);
+
+        // 🆕 Forzar recarga de notificaciones
+        if (success) {
+            window.dispatchEvent(new Event('notificationSettingsChanged'));
+        }
     };
 
     const resetToDefault = () => {
-        saveSettings(DEFAULT_SETTINGS);
+        const success = saveSettings(DEFAULT_SETTINGS);
+
+        // 🆕 Forzar recarga de notificaciones
+        if (success) {
+            window.dispatchEvent(new Event('notificationSettingsChanged'));
+        }
     };
 
     const isTypeEnabled = (type) => {
