@@ -12,7 +12,7 @@ import {
     faCalendar,
     faClock,
     faUsers,
-    faMapMarkerAlt,
+    faFileAlt,
     faEnvelope,
     faComment,
     faBuilding,
@@ -155,19 +155,26 @@ export default function IAmMentor() {
             const { data: sesiones, error: sesionesError } = await supabase
                 .from('mentor_sesion')
                 .select(`
-                id_sesion,
-                fecha_hora,
-                duracion_minutos,
-                estado,
-                precio,
-                notas_alumno,
-                id_alumno,
-                id_materia
-            `)
+                        id_sesion,
+                        id_mentor,
+                        id_alumno,
+                        id_materia,
+                        fecha_hora,
+                        duracion_minutos,
+                        estado,
+                        precio,
+                        pagado,
+                        notas_alumno,
+                        notas_mentor,
+                        cantidad_alumnos,
+                        emails_participantes,
+                        descripcion_alumno
+                      `)
                 .eq('id_mentor', mentorData.id_mentor)
                 .eq('estado', 'confirmada')
                 .gte('fecha_hora', ahora.toISOString())
                 .order('fecha_hora', { ascending: true });
+
 
             if (sesionesError) throw sesionesError;
 
@@ -694,6 +701,82 @@ export default function IAmMentor() {
                                                         </p>
                                                     </div>
                                                 )}
+                                                {/* Emails de participantes */}
+                                                {sesion.emails_participantes && sesion.emails_participantes.length > 0 && (
+                                                    <div
+                                                        style={{
+                                                            background: '#f0fdf4',
+                                                            borderRadius: 12,
+                                                            padding: 16,
+                                                            marginBottom: 16,
+                                                            border: '2px solid #99f6e4'
+                                                        }}
+                                                    >
+                                                        <div
+                                                            style={{
+                                                                display: 'flex',
+                                                                alignItems: 'center',
+                                                                gap: 8,
+                                                                marginBottom: 8
+                                                            }}
+                                                        >
+                                                            <FontAwesomeIcon icon={faEnvelope} style={{ color: '#0d9488', fontSize: 14 }} />
+                                                            <span style={{ fontSize: 13, fontWeight: 700, color: '#0d9488' }}>
+        Emails de participantes
+      </span>
+                                                        </div>
+                                                        <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                                                            {sesion.emails_participantes.map((email, idx) => (
+                                                                <div
+                                                                    key={idx}
+                                                                    style={{
+                                                                        fontSize: 13,
+                                                                        fontWeight: 500,
+                                                                        color: '#0f172a',
+                                                                        padding: '6px 10px',
+                                                                        background: '#ccfbf1',
+                                                                        borderRadius: 8,
+                                                                        border: '1px solid #99f6e4'
+                                                                    }}
+                                                                >
+                                                                    • {email}
+                                                                </div>
+                                                            ))}
+                                                        </div>
+                                                    </div>
+                                                )}
+
+                                                {/* Descripción del alumno */}
+                                                {sesion.descripcion_alumno && (
+                                                    <div
+                                                        style={{
+                                                            background: '#f8fafc',
+                                                            borderRadius: 12,
+                                                            padding: 16,
+                                                            marginBottom: 16,
+                                                            borderLeft: '3px solid #0d9488'
+                                                        }}
+                                                    >
+                                                        <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
+                                                            <FontAwesomeIcon icon={faFileAlt} style={{ color: '#0d9488', fontSize: 14 }} />
+                                                            <span style={{ fontSize: 13, fontWeight: 700, color: '#0f172a' }}>
+        Descripción del alumno
+      </span>
+                                                        </div>
+                                                        <p
+                                                            style={{
+                                                                margin: 0,
+                                                                fontSize: 14,
+                                                                fontWeight: 500,
+                                                                color: '#475569',
+                                                                lineHeight: 1.6
+                                                            }}
+                                                        >
+                                                            {sesion.descripcion_alumno}
+                                                        </p>
+                                                    </div>
+                                                )}
+
 
                                                 {/* Botones */}
                                                 <div style={{ display: 'flex', gap: 12 }}>
