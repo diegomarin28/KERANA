@@ -7,6 +7,8 @@ import {supabase} from "../supabase.js";
 import { ratingsAPI } from '../api/database';
 import AuthModal_HacerResenia from '../components/AuthModal_HacerResenia';
 import ReviewsSection from '../components/ReviewsSection';
+import MentorCalendarModal from '../components/MentorCalendarModal';
+import {slotsAPI} from "../api/slots.js";
 
 export default function PublicProfileMentor() {
     const { username } = useParams();
@@ -35,8 +37,7 @@ export default function PublicProfileMentor() {
     const [isFavoriteMentor, setIsFavoriteMentor] = useState(false);
     const [loadingFavorite, setLoadingFavorite] = useState(false);
 
-    const [showCalendlyModal, setShowCalendlyModal] = useState(false);
-    const [calendlyUrl, setCalendlyUrl] = useState(null);
+    const [showCalendarModal, setShowCalendarModal] = useState(false);
 
     const carouselRef = useRef(null);
 
@@ -94,61 +95,6 @@ export default function PublicProfileMentor() {
                 }
             }
 
-            // Obtener URL de Calendly del mentor (si tiene id_mentor)
-            if (mentorData?.id_mentor) {
-                const { data: calendlyData } = await supabase
-                    .from('usuario')
-                    .select('calendly_url')
-                    .eq('id_usuario', userId)
-                    .single();
-
-                console.log('🔍 DEBUG Calendly - URL original:', calendlyData?.calendly_url);
-
-                let finalUrl = calendlyData?.calendly_url || null;
-
-                // Pre-rellenar con los datos del usuario actual (quien está viendo el perfil)
-                if (finalUrl) {
-                    const { data: { user } } = await supabase.auth.getUser();
-                    console.log('🔍 DEBUG Calendly - Usuario actual:', user);
-                    console.log('🔍 DEBUG Calendly - Email del usuario:', user?.email);
-
-                    if (user?.email) {
-                        try {
-                            const url = new URL(finalUrl);
-                            url.searchParams.set('email', user.email);
-
-                            // Obtener el nombre del usuario actual
-                            const { data: currentUserData, error: userError } = await supabase
-                                .from('usuario')
-                                .select('nombre')
-                                .eq('correo', user.email)
-                                .single();
-
-                            if (userError) {
-                                console.error('❌ Error obteniendo nombre:', userError);
-                            }
-
-                            console.log('🔍 DEBUG Calendly - Datos usuario:', currentUserData);
-
-                            if (currentUserData?.nombre) {
-                                url.searchParams.set('name', currentUserData.nombre);
-                            }
-
-                            finalUrl = url.toString();
-                            console.log('✅ DEBUG Calendly - URL FINAL:', finalUrl);
-                        } catch (error) {
-                            console.error('❌ DEBUG Calendly - Error:', error);
-                        }
-                    } else {
-                        console.warn('⚠️ DEBUG Calendly - No hay email de usuario');
-                    }
-                } else {
-                    console.warn('⚠️ DEBUG Calendly - No hay URL de Calendly configurada');
-                }
-
-                setCalendlyUrl(finalUrl);
-                console.log('💾 DEBUG Calendly - URL guardada en estado:', finalUrl);
-            }
             const { data: notesData } = await publicProfileAPI.getRecentNotes(userId, 4);
             setRecentNotes(notesData || []);
 
@@ -636,8 +582,6 @@ export default function PublicProfileMentor() {
                                     </svg>
                                 </button>
 
-
-
                                 <div style={{ position: 'relative' }}>
                                     <button onClick={handleShare} style={shareButtonStyle} title="Compartir perfil">
                                         <svg style={{ width: 18, height: 18 }} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.368 2.684 3 3 0 00-5.368-2.684z" /></svg>
@@ -678,35 +622,33 @@ export default function PublicProfileMentor() {
                                 </p>
                             </div>
 
-                            {calendlyUrl && (
-                                <button
-                                    onClick={() => setShowCalendlyModal(true)}
-                                    style={{
-                                        background: '#10B981',
-                                        color: '#fff',
-                                        fontWeight: 700,
-                                        padding: '12px 20px',
-                                        borderRadius: '12px',
-                                        border: 'none',
-                                        cursor: 'pointer',
-                                        fontSize: 16,
-                                        boxShadow: '0 4px 12px rgba(16, 185, 129, 0.25)',
-                                        transition: 'all 0.2s ease-in-out'
-                                    }}
-                                    onMouseEnter={(e) => {
-                                        e.currentTarget.style.background = '#059669';
-                                        e.currentTarget.style.transform = 'translateY(-2px)';
-                                        e.currentTarget.style.boxShadow = '0 8px 20px rgba(16, 185, 129, 0.35)';
-                                    }}
-                                    onMouseLeave={(e) => {
-                                        e.currentTarget.style.background = '#10B981';
-                                        e.currentTarget.style.transform = 'translateY(0)';
-                                        e.currentTarget.style.boxShadow = '0 4px 12px rgba(16, 185, 129, 0.25)';
-                                    }}
-                                >
-                                    📅 Agendar Mentoría
-                                </button>
-                            )}
+                            <button
+                                onClick={() => setShowCalendarModal(true)}
+                                style={{
+                                    background: '#10B981',
+                                    color: '#fff',
+                                    fontWeight: 700,
+                                    padding: '12px 20px',
+                                    borderRadius: '12px',
+                                    border: 'none',
+                                    cursor: 'pointer',
+                                    fontSize: 16,
+                                    boxShadow: '0 4px 12px rgba(16, 185, 129, 0.25)',
+                                    transition: 'all 0.2s ease-in-out'
+                                }}
+                                onMouseEnter={(e) => {
+                                    e.currentTarget.style.background = '#059669';
+                                    e.currentTarget.style.transform = 'translateY(-2px)';
+                                    e.currentTarget.style.boxShadow = '0 8px 20px rgba(16, 185, 129, 0.35)';
+                                }}
+                                onMouseLeave={(e) => {
+                                    e.currentTarget.style.background = '#10B981';
+                                    e.currentTarget.style.transform = 'translateY(0)';
+                                    e.currentTarget.style.boxShadow = '0 4px 12px rgba(16, 185, 129, 0.25)';
+                                }}
+                            >
+                                📅 Agendar Mentoría
+                            </button>
                         </div>
 
                         <div style={mentorCardStyle}>
@@ -839,98 +781,6 @@ export default function PublicProfileMentor() {
                     </div>
                 )}
 
-                {showCalendlyModal && (
-                    <div
-                        style={{
-                            position: 'fixed',
-                            inset: 0,
-                            background: 'rgba(0,0,0,0.6)',
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'center',
-                            zIndex: 1000,
-                            padding: '20px'
-                        }}
-                        onClick={() => setShowCalendlyModal(false)}
-                    >
-                        <div
-                            style={{
-                                background: '#fff',
-                                borderRadius: 12,
-                                width: '100%',
-                                maxWidth: '900px',
-                                height: '85vh',
-                                maxHeight: '700px',
-                                position: 'relative',
-                                overflow: 'hidden',
-                                boxShadow: '0 10px 30px rgba(0,0,0,0.3)',
-                                display: 'flex',
-                                flexDirection: 'column'
-                            }}
-                            onClick={(e) => e.stopPropagation()}
-                        >
-                            {/* Header limpio con info */}
-                            <div style={{
-                                padding: '16px 20px',
-                                borderBottom: '1px solid #e5e7eb',
-                                background: 'linear-gradient(135deg, #10B981 0%, #059669 100%)',
-                                color: 'white'
-                            }}>
-                                <div style={{
-                                    display: 'flex',
-                                    alignItems: 'center',
-                                    justifyContent: 'space-between'
-                                }}>
-                                    <div>
-                                        <h3 style={{ margin: 0, fontSize: 18, fontWeight: 700 }}>
-                                            📅 Agendar Mentoría
-                                        </h3>
-                                        <p style={{ margin: '4px 0 0 0', fontSize: 13, opacity: 0.9 }}>
-                                            Tu email ya está pre-cargado ✓
-                                        </p>
-                                    </div>
-                                    <button
-                                        onClick={() => setShowCalendlyModal(false)}
-                                        style={{
-                                            background: 'rgba(255,255,255,0.2)',
-                                            border: 'none',
-                                            borderRadius: '50%',
-                                            width: 32,
-                                            height: 32,
-                                            fontSize: 18,
-                                            cursor: 'pointer',
-                                            display: 'flex',
-                                            alignItems: 'center',
-                                            justifyContent: 'center',
-                                            color: 'white',
-                                            transition: 'all 0.2s ease'
-                                        }}
-                                        onMouseEnter={(e) => {
-                                            e.currentTarget.style.background = 'rgba(255,255,255,0.3)';
-                                        }}
-                                        onMouseLeave={(e) => {
-                                            e.currentTarget.style.background = 'rgba(255,255,255,0.2)';
-                                        }}
-                                    >
-                                        ✕
-                                    </button>
-                                </div>
-                            </div>
-
-                            {/* Iframe Calendly */}
-                            <iframe
-                                src={calendlyUrl}
-                                style={{
-                                    border: 'none',
-                                    width: '100%',
-                                    height: '100%',
-                                    flex: 1
-                                }}
-                                title="Agendar Mentoría"
-                            />
-                        </div>
-                    </div>
-                )}
                 {tab === 'resenas' && (
                     <div style={{ marginTop: 24 }}>
                         <ReviewsSection
@@ -982,6 +832,7 @@ export default function PublicProfileMentor() {
                         </div>
                     </div>
                 )}
+
                 {/* Modal de nueva reseña */}
                 {showReviewModal && mentorInfo && (
                     <AuthModal_HacerResenia
@@ -1008,6 +859,23 @@ export default function PublicProfileMentor() {
                         preSelectedEntity={editingReview.selectedEntity}
                         initialData={editingReview}
                         isEditing={true}
+                    />
+                )}
+
+                {/* Modal de calendario para agendar */}
+                {showCalendarModal && mentorInfo && (
+                    <MentorCalendarModal
+                        open={showCalendarModal}
+                        onClose={() => setShowCalendarModal(false)}
+                        mentorId={mentorInfo.id_mentor}
+                        mentorName={profile.nombre}
+                        mentorMaterias={mentorInfo.materias?.map(m => ({
+                            id: m.materia.id_materia,
+                            nombre: m.materia.nombre_materia
+                        })) || []}
+                        supabase={supabase}
+                        slotsAPI={slotsAPI}
+                        currentUserId={profile.id_usuario}
                     />
                 )}
 
@@ -1066,7 +934,8 @@ const carouselArrowStyle = { position: 'absolute', top: '50%', transform: 'trans
 const filtersContainerStyle = { display: 'flex', gap: 10, marginBottom: 24, flexWrap: 'wrap', alignItems: 'center', background: 'white', padding: 16, borderRadius: 8, boxShadow: '0 0 0 1px rgba(0,0,0,0.08)' };
 const filterLabelStyle = { fontSize: 14, fontWeight: 600, color: '#666', display: 'flex', alignItems: 'center' };
 const filterChipStyle = { padding: '8px 16px', borderRadius: 20, fontWeight: 600, fontSize: 13, cursor: 'pointer', transition: 'all 0.2s ease', border: '2px solid' };
-const notesGridStyle = { display: 'grid', gap: 24, gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))' };const emptyStateStyle = { textAlign: 'center', padding: '80px 20px', background: 'white', borderRadius: 8, boxShadow: '0 0 0 1px rgba(0,0,0,0.08)' };
+const notesGridStyle = { display: 'grid', gap: 24, gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))' };
+const emptyStateStyle = { textAlign: 'center', padding: '80px 20px', background: 'white', borderRadius: 8, boxShadow: '0 0 0 1px rgba(0,0,0,0.08)' };
 const emptyIconStyle = { fontSize: '4rem', marginBottom: 16, opacity: 0.5 };
 const emptyTitleStyle = { margin: '0 0 8px 0', fontSize: 20, fontWeight: 700, color: '#111827' };
 const emptyDescStyle = { margin: 0, color: '#666', fontSize: 15 };

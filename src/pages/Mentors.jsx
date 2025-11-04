@@ -5,6 +5,8 @@ import { MentorCard } from '../components/MentorCard';
 import { useNavigate } from 'react-router-dom';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faSearch, faGraduationCap, faFilter, faCalendarAlt, faChevronDown, faList, faCalendarDay } from '@fortawesome/free-solid-svg-icons';
+import MentorCalendarModal from '../components/MentorCalendarModal';
+import { slotsAPI } from '../api/slots.js'; // Importar slotsAPI correctamente
 
 export default function Mentors() {
     const navigate = useNavigate();
@@ -17,7 +19,8 @@ export default function Mentors() {
 
     // Estados para modales del calendario
     const [showCalendarView, setShowCalendarView] = useState(false);
-    const [selectedMentorCalendar, setSelectedMentorCalendar] = useState(null);
+    const [selectedMentorForCalendar, setSelectedMentorForCalendar] = useState(null);
+    const [showCalendarModal, setShowCalendarModal] = useState(false);
 
     // Estado para dropdown
     const [dropdownOpen, setDropdownOpen] = useState(false);
@@ -55,11 +58,12 @@ export default function Mentors() {
 
             const { data: currentUserData } = await supabase.rpc('obtener_usuario_actual_id');
 
-            // Obtener mentores con calendly_disponible
+            // Obtener mentores
             const { data: mentorsData, error: mentorsError } = await supabase
                 .from('mentor')
                 .select('id_mentor, estrellas_mentor, descripcion, id_usuario, acepta_virtual')
                 .neq('id_usuario', currentUserData || 0)
+                .order('estrellas_mentor', { ascending: false, nullsFirst: false })
                 .limit(50);
 
             if (mentorsError) throw mentorsError;
@@ -76,14 +80,30 @@ export default function Mentors() {
                 (mentorsData || []).map(async (m) => {
                     const { data: usuario } = await supabase
                         .from('usuario')
-                        .select('nombre, username, foto, calendly_url')
+                        .select('nombre, username, foto')
                         .eq('id_usuario', m.id_usuario)
                         .maybeSingle();
 
                     const { data: materias } = await supabase
                         .from('mentor_materia')
-                        .select('materia(nombre_materia)')
+                        .select('materia(id_materia, nombre_materia)')
                         .eq('id_mentor', m.id_mentor);
+
+                    // Obtener rating calculado desde la tabla rating (igual que MentorCard)
+                    const { data: reviewsData } = await supabase
+                        .from('rating')
+                        .select('estrellas, tags')
+                        .eq('tipo', 'mentor')
+                        .eq('ref_id', m.id_mentor);
+
+                    let ratingPromedio = 0;
+                    let numReviews = 0;
+
+                    if (reviewsData && reviewsData.length > 0) {
+                        const sum = reviewsData.reduce((acc, r) => acc + (r.estrellas || 0), 0);
+                        ratingPromedio = +(sum / reviewsData.length).toFixed(1);
+                        numReviews = reviewsData.length;
+                    }
 
                     return {
                         id_mentor: m.id_mentor,
@@ -91,12 +111,15 @@ export default function Mentors() {
                         mentor_nombre: usuario?.nombre || 'Mentor',
                         username: usuario?.username,
                         foto: usuario?.foto,
-                        estrellas_mentor: m.estrellas_mentor || 0,
+                        estrellas_mentor: ratingPromedio,
+                        num_reviews: numReviews,
                         descripcion: m.descripcion,
                         materias: materias?.map(mm => mm.materia.nombre_materia) || [],
-                        siguiendo: siguiendoIds.has(m.id_usuario),
-                        calendlyUrl: usuario?.calendly_url,
-                        calendlyDisponible: m.calendly_disponible !== false
+                        materiasCompletas: materias?.map(mm => ({
+                            id: mm.materia.id_materia,
+                            nombre: mm.materia.nombre_materia
+                        })) || [],
+                        siguiendo: siguiendoIds.has(m.id_usuario)
                     };
                 })
             );
@@ -124,18 +147,19 @@ export default function Mentors() {
         return matchesSearch && matchesMateria;
     });
 
-    // Filtrar solo mentores con calendario activo
-    const mentorsWithCalendly = filteredMentors.filter(m =>
-        m.calendlyUrl && m.calendlyDisponible !== false
-    );
-
     const handleOpenCalendarView = () => {
         setShowCalendarView(true);
         setDropdownOpen(false);
     };
 
     const handleOpenMentorCalendar = (mentor) => {
-        setSelectedMentorCalendar(mentor);
+        setSelectedMentorForCalendar(mentor);
+        setShowCalendarModal(true);
+    };
+
+    const handleCloseCalendarModal = () => {
+        setShowCalendarModal(false);
+        setSelectedMentorForCalendar(null);
     };
 
     const handleNavigateGlobalCalendar = () => {
@@ -296,7 +320,7 @@ export default function Mentors() {
                 </div>
 
                 {/* Dropdown para Calendarios - Debajo del Header */}
-                {mentorsWithCalendly.length > 0 && (
+                {filteredMentors.length > 0 && (
                     <div style={{
                         marginBottom: '24px',
                         display: 'flex',
@@ -402,7 +426,7 @@ export default function Mentors() {
                                                 fontWeight: 500,
                                                 marginTop: '2px'
                                             }}>
-                                                {mentorsWithCalendly.length} {mentorsWithCalendly.length === 1 ? 'mentor disponible' : 'mentores disponibles'}
+                                                {filteredMentors.length} {filteredMentors.length === 1 ? 'mentor disponible' : 'mentores disponibles'}
                                             </div>
                                         </div>
                                     </button>
@@ -734,17 +758,14 @@ export default function Mentors() {
                                         fontSize: '22px',
                                         fontWeight: 700
                                     }}>
-                                        📅 Calendarios Disponibles
+                                        📅 Mentores Disponibles
                                     </h2>
                                     <div style={{
                                         fontSize: '14px',
                                         opacity: 0.95,
                                         fontWeight: 500
                                     }}>
-                                        {filterMateria === 'all'
-                                            ? `${mentorsWithCalendly.length} mentores con calendario activo`
-                                            : `${mentorsWithCalendly.length} mentores de ${filterMateria}`
-                                        }
+                                        {filteredMentors.length} mentores disponibles
                                     </div>
                                 </div>
                                 <button
@@ -779,7 +800,7 @@ export default function Mentors() {
                                     rowGap: '30px',
                                     columnGap: '20px'
                                 }}>
-                                    {mentorsWithCalendly.map(mentor => (
+                                    {filteredMentors.map(mentor => (
                                         <div
                                             key={mentor.id_mentor}
                                             style={{
@@ -790,7 +811,10 @@ export default function Mentors() {
                                                 transition: 'all 0.2s ease',
                                                 cursor: 'pointer'
                                             }}
-                                            onClick={() => handleOpenMentorCalendar(mentor)}
+                                            onClick={() => {
+                                                handleOpenMentorCalendar(mentor);
+                                                setShowCalendarView(false);
+                                            }}
                                             onMouseEnter={(e) => {
                                                 e.currentTarget.style.borderColor = '#0d9488';
                                                 e.currentTarget.style.transform = 'translateY(-4px)';
@@ -891,17 +915,27 @@ export default function Mentors() {
                                                 marginBottom: '16px'
                                             }}>
                                                 <span style={{
-                                                    color: '#fbbf24',
-                                                    fontSize: '16px'
+                                                    color: mentor.estrellas_mentor > 0 ? '#fbbf24' : '#d1d5db',
+                                                    fontSize: '18px'
                                                 }}>
                                                     ⭐
                                                 </span>
                                                 <span style={{
-                                                    fontWeight: 600,
-                                                    fontSize: '14px'
+                                                    fontWeight: 700,
+                                                    fontSize: '16px',
+                                                    color: mentor.estrellas_mentor > 0 ? '#111827' : '#9ca3af'
                                                 }}>
-                                                    {mentor.estrellas_mentor}
+                                                    {mentor.estrellas_mentor > 0 ? mentor.estrellas_mentor.toFixed(1) : '0.0'}
                                                 </span>
+                                                {mentor.num_reviews > 0 && (
+                                                    <span style={{
+                                                        fontSize: '14px',
+                                                        color: '#6b7280',
+                                                        fontWeight: 500
+                                                    }}>
+                                                        ({mentor.num_reviews})
+                                                    </span>
+                                                )}
                                             </div>
 
                                             {/* Botón */}
@@ -925,7 +959,7 @@ export default function Mentors() {
                                     ))}
                                 </div>
 
-                                {mentorsWithCalendly.length === 0 && (
+                                {filteredMentors.length === 0 && (
                                     <div style={{
                                         textAlign: 'center',
                                         padding: '60px 20px'
@@ -942,17 +976,14 @@ export default function Mentors() {
                                             fontWeight: 700,
                                             color: '#0f172a'
                                         }}>
-                                            No hay calendarios disponibles
+                                            No hay mentores disponibles
                                         </h3>
                                         <p style={{
                                             color: '#6b7280',
                                             margin: 0,
                                             fontWeight: 500
                                         }}>
-                                            {filterMateria === 'all'
-                                                ? 'Los mentores aún no han configurado sus calendarios'
-                                                : `No hay mentores de ${filterMateria} con calendario configurado`
-                                            }
+                                            Intenta con otros criterios de búsqueda
                                         </p>
                                     </div>
                                 )}
@@ -961,129 +992,18 @@ export default function Mentors() {
                     </>
                 )}
 
-                {/* Modal Calendario Individual */}
-                {selectedMentorCalendar && (
-                    <>
-                        <div
-                            onClick={() => setSelectedMentorCalendar(null)}
-                            style={{
-                                position: 'fixed',
-                                inset: 0,
-                                background: 'rgba(0,0,0,0.7)',
-                                zIndex: 1002,
-                                backdropFilter: 'blur(8px)'
-                            }}
-                        />
-                        <div style={{
-                            position: 'fixed',
-                            top: '50%',
-                            left: '50%',
-                            transform: 'translate(-50%, -50%)',
-                            background: '#fff',
-                            borderRadius: '24px',
-                            padding: 0,
-                            width: 'min(96vw, 1000px)',
-                            height: 'min(92vh, 800px)',
-                            zIndex: 1003,
-                            boxShadow: '0 25px 80px rgba(0,0,0,0.3)',
-                            overflow: 'hidden',
-                            display: 'flex',
-                            flexDirection: 'column',
-                            fontFamily: 'Inter, sans-serif'
-                        }}>
-                            {/* Header */}
-                            <div style={{
-                                padding: '20px 28px',
-                                borderBottom: '1px solid #e5e7eb',
-                                display: 'flex',
-                                justifyContent: 'space-between',
-                                alignItems: 'center',
-                                background: '#0d9488',
-                                color: 'white'
-                            }}>
-                                <div style={{
-                                    display: 'flex',
-                                    alignItems: 'center',
-                                    gap: '12px'
-                                }}>
-                                    {selectedMentorCalendar.foto ? (
-                                        <img
-                                            src={selectedMentorCalendar.foto}
-                                            alt={selectedMentorCalendar.mentor_nombre}
-                                            style={{
-                                                width: '48px',
-                                                height: '48px',
-                                                borderRadius: '50%',
-                                                objectFit: 'cover'
-                                            }}
-                                        />
-                                    ) : (
-                                        <div style={{
-                                            width: '48px',
-                                            height: '48px',
-                                            borderRadius: '50%',
-                                            background: 'rgba(255,255,255,0.3)',
-                                            display: 'flex',
-                                            alignItems: 'center',
-                                            justifyContent: 'center',
-                                            fontSize: '20px',
-                                            fontWeight: 700
-                                        }}>
-                                            {selectedMentorCalendar.mentor_nombre.charAt(0)}
-                                        </div>
-                                    )}
-                                    <div>
-                                        <h2 style={{
-                                            margin: '0 0 4px 0',
-                                            fontSize: '20px',
-                                            fontWeight: 700
-                                        }}>
-                                            Agendar con {selectedMentorCalendar.mentor_nombre}
-                                        </h2>
-                                        <div style={{
-                                            fontSize: '13px',
-                                            opacity: 0.95,
-                                            fontWeight: 500
-                                        }}>
-                                            {selectedMentorCalendar.materias.join(', ')}
-                                        </div>
-                                    </div>
-                                </div>
-                                <button
-                                    onClick={() => setSelectedMentorCalendar(null)}
-                                    style={{
-                                        background: 'rgba(255,255,255,0.2)',
-                                        border: 'none',
-                                        fontSize: '28px',
-                                        cursor: 'pointer',
-                                        color: 'white',
-                                        padding: '4px 14px',
-                                        borderRadius: '10px',
-                                        transition: 'background 0.2s ease',
-                                        fontWeight: 300
-                                    }}
-                                    onMouseEnter={(e) => e.currentTarget.style.background = 'rgba(255,255,255,0.3)'}
-                                    onMouseLeave={(e) => e.currentTarget.style.background = 'rgba(255,255,255,0.2)'}
-                                >
-                                    ×
-                                </button>
-                            </div>
-
-                            {/* Iframe de Calendly */}
-                            <div style={{
-                                flex: 1,
-                                background: '#fafafa'
-                            }}>
-                                <iframe
-                                    src={selectedMentorCalendar.calendlyUrl}
-                                    width="100%"
-                                    height="100%"
-                                    frameBorder="0"
-                                    style={{ border: 'none' }}
-                                />
-                            </div>
-                        </div>
-                    </>
+                {/* Modal de Calendario Personalizado */}
+                {showCalendarModal && selectedMentorForCalendar && (
+                    <MentorCalendarModal
+                        open={showCalendarModal}
+                        onClose={handleCloseCalendarModal}
+                        mentorId={selectedMentorForCalendar.id_mentor}
+                        mentorName={selectedMentorForCalendar.mentor_nombre}
+                        mentorMaterias={selectedMentorForCalendar.materiasCompletas}
+                        supabase={supabase}
+                        slotsAPI={slotsAPI}
+                        currentUserId={currentUserId}
+                    />
                 )}
             </div>
 
