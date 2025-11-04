@@ -13,7 +13,12 @@ export default function AuthModal_SignIn({ open, onClose, onSignedIn }) {
     const [msg, setMsg] = useState({ type: "", text: "" });
     const [acceptedTerms, setAcceptedTerms] = useState(false);
     const [showTermsModal, setShowTermsModal] = useState(false);
-    const [showSuccessModal, setShowSuccessModal] = useState(false); // 🆕 Modal de éxito
+    const [showSuccessModal, setShowSuccessModal] = useState(false);
+    const [showResetModal, setShowResetModal] = useState(false); // 🆕 Modal de reset
+    const [resetEmail, setResetEmail] = useState(""); // 🆕 Email para reset
+    const [resetLoading, setResetLoading] = useState(false); // 🆕 Loading del reset
+    const [resetMsg, setResetMsg] = useState({ type: "", text: "" }); // 🆕 Mensaje del reset
+    const [failedAttempts, setFailedAttempts] = useState(0); // 🆕 Contador de intentos fallidos
 
     // ✨ Errores específicos por campo
     const [fieldErrors, setFieldErrors] = useState({
@@ -44,6 +49,7 @@ export default function AuthModal_SignIn({ open, onClose, onSignedIn }) {
         setFieldErrors({ name: "", username: "", email: "", password: "", terms: "" });
         setShowPwd(false);
         setAcceptedTerms(false);
+        setFailedAttempts(0); // 🆕 Reset contador
     };
 
     const onCloseModal = () => { reset(); onClose?.(); };
@@ -61,6 +67,9 @@ export default function AuthModal_SignIn({ open, onClose, onSignedIn }) {
             });
 
             if (error) {
+                // 🆕 Incrementar contador de intentos fallidos
+                setFailedAttempts(prev => prev + 1);
+
                 if (error.message?.includes("Invalid login credentials")) {
                     setFieldErrors({
                         ...fieldErrors,
@@ -80,6 +89,9 @@ export default function AuthModal_SignIn({ open, onClose, onSignedIn }) {
                 }
                 return;
             }
+
+            // 🆕 Reset contador si login exitoso
+            setFailedAttempts(0);
 
             if (data.user) await createOrUpdateUserProfile(data.user);
             onSignedIn?.(data.user);
@@ -238,7 +250,72 @@ export default function AuthModal_SignIn({ open, onClose, onSignedIn }) {
         }
     }
 
+    // 🆕 Función para resetear contraseña
+    async function handlePasswordReset(e) {
+        e.preventDefault();
+        setResetLoading(true);
+        setResetMsg({ type: "", text: "" });
 
+        try {
+            if (!resetEmail.trim()) {
+                setResetMsg({ type: "error", text: "Ingresá tu email" });
+                setResetLoading(false);
+                return;
+            }
+
+            // ✅ Verificar si el email existe en la base de datos
+            const { data: existingUser, error: checkError } = await supabase
+                .from('usuario')
+                .select('correo')
+                .eq('correo', resetEmail.trim().toLowerCase())
+                .maybeSingle();
+
+            if (checkError && checkError.code !== 'PGRST116') {
+                console.error('Error verificando email:', checkError);
+                throw checkError;
+            }
+
+            if (!existingUser) {
+                setResetMsg({
+                    type: "error",
+                    text: "No hay ninguna cuenta asociada a este correo"
+                });
+                setResetLoading(false);
+                return;
+            }
+
+            // ✅ Si el email existe, enviar correo de recuperación
+            const { error } = await supabase.auth.resetPasswordForEmail(
+                resetEmail.trim().toLowerCase(),
+                {
+                    redirectTo: `${window.location.origin}/auth/reset-password`,
+                }
+            );
+
+            if (error) throw error;
+
+            setResetMsg({
+                type: "success",
+                text: "✅ Email enviado. Revisá tu bandeja de entrada para restablecer tu contraseña."
+            });
+
+            // Cerrar modal después de 3 segundos
+            setTimeout(() => {
+                setShowResetModal(false);
+                setResetEmail("");
+                setResetMsg({ type: "", text: "" });
+            }, 3000);
+
+        } catch (error) {
+            console.error('Error reset password:', error);
+            setResetMsg({
+                type: "error",
+                text: "No se pudo enviar el email. Intentá nuevamente."
+            });
+        } finally {
+            setResetLoading(false);
+        }
+    }
     return (
         <div style={backdrop}>
             <div style={modal}>
@@ -328,6 +405,27 @@ export default function AuthModal_SignIn({ open, onClose, onSignedIn }) {
                             }
                         />
 
+                        {/* 🆕 Botón "Olvidé mi contraseña" - SOLO en modo login */}
+                        {mode === "login" && (
+                            <div style={{ textAlign: "right", marginTop: -4 }}>
+                                <button
+                                    type="button"
+                                    onClick={() => {
+                                        setShowResetModal(true);
+                                        setResetEmail(email); // Pre-llenar con el email actual
+                                    }}
+                                    style={{
+                                        ...forgotPasswordBtn,
+                                        fontWeight: failedAttempts >= 2 ? 700 : 500, // 🆕 Negrita después de 2 intentos
+                                        fontSize: failedAttempts >= 2 ? 14 : 13,
+                                        color: failedAttempts >= 2 ? "#dc2626" : "#2563eb"
+                                    }}
+                                >
+                                    {failedAttempts >= 2 ? "❗ " : ""}Olvidé mi contraseña
+                                </button>
+                            </div>
+                        )}
+
                         {mode === "signup" && (
                             <>
                                 {!fieldErrors.password && (
@@ -392,6 +490,23 @@ export default function AuthModal_SignIn({ open, onClose, onSignedIn }) {
                         )}
                     </div>
                 </div>
+
+                {/* 🆕 Modal de Reset Password */}
+                {showResetModal && (
+                    <ResetPasswordModal
+                        email={resetEmail}
+                        setEmail={setResetEmail}
+                        onSubmit={handlePasswordReset}
+                        loading={resetLoading}
+                        message={resetMsg}
+                        onClose={() => {
+                            setShowResetModal(false);
+                            setResetEmail("");
+                            setResetMsg({ type: "", text: "" });
+                        }}
+                    />
+                )}
+
                 {showTermsModal && (
                     <TermsModal onClose={() => setShowTermsModal(false)} onAccept={() => {
                         setAcceptedTerms(true);
@@ -469,6 +584,66 @@ function Alert({ type, text }) {
     );
 }
 
+// 🆕 Modal de Reset Password
+function ResetPasswordModal({ email, setEmail, onSubmit, loading, message, onClose }) {
+    return (
+        <div style={resetBackdrop} onClick={onClose}>
+            <div style={resetModal} onClick={(e) => e.stopPropagation()}>
+                <div style={resetHeader}>
+                    <div style={resetIconContainer}>
+                        <svg width="48" height="48" viewBox="0 0 24 24" fill="none">
+                            <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-2h2v2zm0-4h-2V7h2v6z" fill="#2563eb"/>
+                        </svg>
+                    </div>
+                    <h3 style={resetTitle}>Restablecer contraseña</h3>
+                    <p style={resetSubtitle}>Te enviaremos un link para crear una nueva contraseña</p>
+                    <button onClick={onClose} style={resetCloseBtn}>✕</button>
+                </div>
+
+                <form onSubmit={onSubmit} style={resetFormStyle}>
+                    {message.text && (
+                        <Alert type={message.type} text={message.text} />
+                    )}
+
+                    <label style={{ display: "grid", gap: 6 }}>
+                        <span style={labelCss}>Email</span>
+                        <div style={inputWrap}>
+                            <span style={inputIcon}>✉️</span>
+                            <input
+                                style={inputCss}
+                                type="email"
+                                value={email}
+                                onChange={(e) => setEmail(e.target.value)}
+                                placeholder="tu@correo.com"
+                                required
+                                disabled={loading}
+                            />
+                        </div>
+                    </label>
+
+                    <div style={resetButtonsContainer}>
+                        <button
+                            type="button"
+                            onClick={onClose}
+                            style={resetCancelBtn}
+                            disabled={loading}
+                        >
+                            Cancelar
+                        </button>
+                        <button
+                            type="submit"
+                            style={resetSubmitBtn}
+                            disabled={loading}
+                        >
+                            {loading ? "Enviando..." : "Enviar link"}
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    );
+}
+
 function TermsModal({ onClose, onAccept }) {
     return (
         <div style={termsBackdrop}>
@@ -525,6 +700,7 @@ function TermsModal({ onClose, onAccept }) {
         </div>
     );
 }
+
 function SuccessModal({ onClose }) {
     return (
         <div style={successBackdrop}>
@@ -626,10 +802,9 @@ const googleBtn = {
     cursor: "pointer",
     fontWeight: 600,
     fontSize: 14,
-    transition: "all 0.2s ease",
     boxShadow: "0 2px 8px rgba(30, 64, 175, 0.1)",
+    transition: "all 0.2s ease"
 };
-
 const divider = {
     display: "grid",
     alignItems: "center",
@@ -732,6 +907,18 @@ const plainIconBtn = {
     cursor: "pointer",
     fontSize: 16,
     opacity: 0.7,
+};
+
+// 🆕 Botón "Olvidé mi contraseña"
+const forgotPasswordBtn = {
+    background: "none",
+    border: "none",
+    cursor: "pointer",
+    fontSize: 13,
+    padding: "4px 0",
+    transition: "all 0.2s ease",
+    textDecoration: "none",
+    fontFamily: "Inter, sans-serif"
 };
 
 const termsContainer = {
@@ -856,6 +1043,7 @@ const errorTextStyle = {
     marginTop: 4,
     lineHeight: 1.4
 };
+
 const successBackdrop = {
     position: "fixed",
     inset: 0,
@@ -907,5 +1095,114 @@ const successBtn = {
     fontWeight: 700,
     cursor: "pointer",
     boxShadow: "0 8px 20px rgba(16, 185, 129, 0.3)",
+    transition: "all 0.2s ease"
+};
+
+// 🆕 Estilos del Modal de Reset Password
+const resetBackdrop = {
+    position: "fixed",
+    inset: 0,
+    background: "rgba(0,10,30,.85)",
+    backdropFilter: "blur(10px)",
+    zIndex: 1004,
+    display: "grid",
+    placeItems: "center",
+    padding: 20
+};
+
+const resetModal = {
+    background: "white",
+    borderRadius: 20,
+    maxWidth: 480,
+    width: "100%",
+    boxShadow: "0 25px 80px rgba(0,0,0,0.4)",
+    animation: "slideUp 0.3s ease",
+    overflow: "hidden"
+};
+
+const resetHeader = {
+    position: "relative",
+    padding: "32px 24px 24px",
+    textAlign: "center",
+    borderBottom: "1px solid #e5e7eb"
+};
+
+const resetIconContainer = {
+    margin: "0 auto 16px",
+    width: 64,
+    height: 64,
+    background: "linear-gradient(135deg, #dbeafe 0%, #bfdbfe 100%)",
+    borderRadius: "50%",
+    display: "grid",
+    placeItems: "center"
+};
+
+const resetTitle = {
+    margin: "0 0 8px 0",
+    fontSize: 22,
+    fontWeight: 800,
+    color: "#1e293b",
+    letterSpacing: "-0.5px"
+};
+
+const resetSubtitle = {
+    margin: 0,
+    fontSize: 14,
+    color: "#64748b",
+    lineHeight: 1.5
+};
+
+const resetCloseBtn = {
+    position: "absolute",
+    top: 16,
+    right: 16,
+    width: 32,
+    height: 32,
+    borderRadius: 8,
+    background: "rgba(0,0,0,0.05)",
+    border: "none",
+    cursor: "pointer",
+    display: "grid",
+    placeItems: "center",
+    fontSize: 16,
+    color: "#64748b",
+    transition: "all 0.2s ease"
+};
+
+const resetFormStyle = {
+    padding: "24px",
+    display: "grid",
+    gap: 16
+};
+
+const resetButtonsContainer = {
+    display: "grid",
+    gridTemplateColumns: "1fr 1fr",
+    gap: 12,
+    marginTop: 8
+};
+
+const resetCancelBtn = {
+    padding: "12px 20px",
+    borderRadius: 10,
+    border: "2px solid #e5e7eb",
+    background: "white",
+    color: "#374151",
+    cursor: "pointer",
+    fontWeight: 600,
+    fontSize: 14,
+    transition: "all 0.2s ease"
+};
+
+const resetSubmitBtn = {
+    padding: "12px 20px",
+    borderRadius: 10,
+    border: "none",
+    background: "linear-gradient(135deg, #2563eb 0%, #1e40af 100%)",
+    color: "white",
+    cursor: "pointer",
+    fontWeight: 700,
+    fontSize: 14,
+    boxShadow: "0 4px 12px rgba(37, 99, 235, 0.3)",
     transition: "all 0.2s ease"
 };
