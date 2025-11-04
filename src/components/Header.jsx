@@ -151,6 +151,16 @@ export default function Header() {
         };
     }, []);
 
+    // Listener para actualización de créditos en tiempo real
+    useEffect(() => {
+        const handleCreditsUpdate = () => {
+            loadUserProfile(); // Recarga el perfil para actualizar créditos
+        };
+
+        window.addEventListener('creditsUpdated', handleCreditsUpdate);
+        return () => window.removeEventListener('creditsUpdated', handleCreditsUpdate);
+    }, [user?.id]);
+
     useEffect(() => {
         if (user && userProfile === null) {
             loadUserProfile();
@@ -472,7 +482,7 @@ export default function Header() {
 
                         {user && userProfile && (
                             <button
-                                onClick={() => navigate("/credits")}
+                                onClick={() => navigate("/mis-creditos")}
                                 style={{
                                     display: "flex",
                                     alignItems: "center",
@@ -866,7 +876,7 @@ export default function Header() {
                                                     icon={<FontAwesomeIcon icon={faCreditCard} />}
                                                     label="Mis créditos"
                                                     badge={userProfile?.creditos || 0}
-                                                    onClick={() => go("/credits")}
+                                                    onClick={() => go("/mis-creditos")}
                                                 />
 
                                                 <div style={{

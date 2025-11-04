@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { ratingsAPI, creditsAPI } from "../api/database";
 import { supabase } from "../supabase";
 import { validarComentario } from "../utils/wordFilter";
@@ -8,6 +8,8 @@ import {
     faStarHalfAlt,
     faCheck,
     faTimes,
+    faCheckCircle,
+    faTimesCircle,
     faChalkboardTeacher,
     faGraduationCap,
     faSearch,
@@ -214,6 +216,93 @@ const WorkloadSlider = ({ value, onChange }) => {
     );
 };
 
+// Componente Toast fuera del componente principal para evitar re-renders
+const Toast = ({ message, type, onClose }) => {
+    useEffect(() => {
+        const timer = setTimeout(() => {
+            onClose();
+        }, 5000);
+        return () => clearTimeout(timer);
+    }, []); // ⭐ Solo ejecutar UNA VEZ al montar
+
+    const isSuccess = type === 'success';
+
+    return (
+        <div style={{
+            position: "fixed",
+            top: 24,
+            right: 24,
+            zIndex: 9999,
+            background: isSuccess
+                ? "linear-gradient(135deg, #d1fae5 0%, #a7f3d0 100%)"
+                : "linear-gradient(135deg, #fee2e2 0%, #fecaca 100%)",
+            border: `2px solid ${isSuccess ? '#10b981' : '#ef4444'}`,
+            borderRadius: 12,
+            padding: "16px 20px",
+            minWidth: 320,
+            maxWidth: 480,
+            boxShadow: "0 12px 32px rgba(0,0,0,0.12)",
+            display: "flex",
+            alignItems: "center",
+            gap: 12,
+            animation: "slideInRight 0.3s cubic-bezier(0.16, 1, 0.3, 1)",
+            fontFamily: "'Inter', sans-serif"
+        }}>
+            <div style={{
+                fontSize: 20,
+                color: isSuccess ? '#10b981' : '#ef4444'
+            }}>
+                <FontAwesomeIcon icon={isSuccess ? faCheckCircle : faTimesCircle} />
+            </div>
+            <p style={{
+                margin: 0,
+                color: isSuccess ? '#065f46' : '#991b1b',
+                fontSize: 14,
+                fontWeight: 600,
+                flex: 1,
+                lineHeight: 1.4
+            }}>
+                {message}
+            </p>
+            <button
+                onClick={onClose}
+                style={{
+                    border: "none",
+                    background: "transparent",
+                    color: isSuccess ? '#065f46' : '#991b1b',
+                    cursor: "pointer",
+                    fontSize: 16,
+                    padding: 4,
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    opacity: 0.7,
+                    transition: "opacity 0.2s ease"
+                }}
+                onMouseEnter={(e) => e.currentTarget.style.opacity = 1}
+                onMouseLeave={(e) => e.currentTarget.style.opacity = 0.7}
+            >
+                <FontAwesomeIcon icon={faTimes} />
+            </button>
+
+            <style>
+                {`
+                @keyframes slideInRight {
+                    from {
+                        transform: translateX(400px);
+                        opacity: 0;
+                    }
+                    to {
+                        transform: translateX(0);
+                        opacity: 1;
+                    }
+                }
+            `}
+            </style>
+        </div>
+    );
+};
+
 export default function AuthModal_HacerResenia({
                                                    open,
                                                    onClose,
@@ -238,6 +327,9 @@ export default function AuthModal_HacerResenia({
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [toast, setToast] = useState(null);
     const [wordFilterError, setWordFilterError] = useState(null);
+    const handleCloseToast = useCallback(() => {
+        setToast(null);
+    }, []);
 
     const [searchTerm, setSearchTerm] = useState("");
     const [searchResults, setSearchResults] = useState([]);
@@ -393,6 +485,7 @@ export default function AuthModal_HacerResenia({
         getCurrentUser();
     }, [form.tipo]);
 
+
     useEffect(() => {
         if (!form.selectedEntity) {
             setMaterias([]);
@@ -472,92 +565,13 @@ export default function AuthModal_HacerResenia({
         loadMaterias();
     }, [form.selectedEntity, form.tipo]);
 
+    useEffect(() => {
+        if (!open) {
+            setToast(null);
+        }
+    }, [open]);
+
     if (!open) return null;
-
-    const Toast = ({ message, type, onClose }) => {
-        useEffect(() => {
-            const timer = setTimeout(() => {
-                onClose();
-            }, 4000);
-            return () => clearTimeout(timer);
-        }, [onClose]);
-
-        const isSuccess = type === 'success';
-
-        return (
-            <div style={{
-                position: "fixed",
-                top: 24,
-                right: 24,
-                zIndex: 9999,
-                background: isSuccess
-                    ? "linear-gradient(135deg, #d1fae5 0%, #a7f3d0 100%)"
-                    : "linear-gradient(135deg, #fee2e2 0%, #fecaca 100%)",
-                border: `2px solid ${isSuccess ? '#10b981' : '#ef4444'}`,
-                borderRadius: 12,
-                padding: "16px 20px",
-                minWidth: 320,
-                maxWidth: 480,
-                boxShadow: "0 12px 32px rgba(0,0,0,0.12)",
-                display: "flex",
-                alignItems: "center",
-                gap: 12,
-                animation: "slideInRight 0.3s cubic-bezier(0.16, 1, 0.3, 1)",
-                fontFamily: "'Inter', sans-serif"
-            }}>
-                <div style={{
-                    fontSize: 22
-                }}>
-                    {isSuccess ? '✅' : '❌'}
-                </div>
-                <p style={{
-                    margin: 0,
-                    color: isSuccess ? '#065f46' : '#991b1b',
-                    fontSize: 14,
-                    fontWeight: 600,
-                    flex: 1,
-                    lineHeight: 1.4
-                }}>
-                    {message}
-                </p>
-                <button
-                    onClick={onClose}
-                    style={{
-                        border: "none",
-                        background: "transparent",
-                        color: isSuccess ? '#065f46' : '#991b1b',
-                        cursor: "pointer",
-                        fontSize: 16,
-                        padding: 4,
-                        display: "flex",
-                        alignItems: "center",
-                        justifyContent: "center",
-                        opacity: 0.7,
-                        transition: "opacity 0.2s ease"
-                    }}
-                    onMouseEnter={(e) => e.currentTarget.style.opacity = 1}
-                    onMouseLeave={(e) => e.currentTarget.style.opacity = 0.7}
-                >
-                    <FontAwesomeIcon icon={faTimes} />
-                </button>
-
-                <style>
-                    {`
-                    @keyframes slideInRight {
-                        from {
-                            transform: translateX(400px);
-                            opacity: 0;
-                        }
-                        to {
-                            transform: translateX(0);
-                            opacity: 1;
-                        }
-                    }
-                `}
-                </style>
-            </div>
-        );
-    };
 
     const toggleTag = (tagId) => {
         setForm(prev => {
@@ -650,6 +664,11 @@ export default function AuthModal_HacerResenia({
                         if (!creditosError && creditosResult) {
                             console.log(`💰 Créditos otorgados por reseña: ${creditosResult.creditosOtorgados}`);
                             setToast({ message: `¡Reseña enviada! +${creditosResult.creditosOtorgados} créditos`, type: 'success' });
+
+                            // 🔄 Disparar evento para actualizar créditos en tiempo real
+                            window.dispatchEvent(new CustomEvent('creditsUpdated', {
+                                detail: { amount: creditosResult.creditosOtorgados }
+                            }));
                         } else {
                             setToast({ message: '¡Reseña enviada correctamente!', type: 'success' });
                         }
@@ -696,7 +715,7 @@ export default function AuthModal_HacerResenia({
                 <Toast
                     message={toast.message}
                     type={toast.type}
-                    onClose={() => setToast(null)}
+                    onClose={handleCloseToast}
                 />
             )}
 

@@ -9,7 +9,7 @@ import { AvatarProvider } from './contexts/AvatarContext';
 import { ConnectionMonitor } from './components/ConnectionMonitor';
 import AuthSessionManager from './components/AuthSessionManager';
 import ErrorBoundary from './components/ErrorBoundary';
-import GlobalCalendar from './pages/GlobalCalendar';
+import { GlobalCalendar } from './pages/GlobalCalendar';
 
 
 // Componentes lazy
@@ -51,6 +51,7 @@ const FollowersPage = lazy(() => import('./pages/FollowersPage.jsx'));
 const FolderView = lazy(() => import("./pages/FolderView"));
 const PublicProfileMentor = lazy(() => import("./pages/PublicProfileMentor"));
 const Credits = lazy(() => import("./pages/Credits"));
+const MyCredits = lazy(() => import("./pages/MyCredits"));
 const CreateProfile = lazy(() => import("./pages/CreateProfile"));
 const ResetPassword = lazy(() => import("./pages/ResetPassword"));
 
@@ -70,6 +71,8 @@ import { MentorOnboardingModal } from './components/MentorOnboardingModal';
 import { MentorWelcomeModal } from './components/MentorWelcomeModal';
 import CreditsSuccess from './pages/CreditsSuccess';
 import CreditsFailure from './pages/CreditsFailure';
+import { useTopMensual } from './hooks/useTopMensual';
+import TopMensualModal from './components/TopMensualModal';
 
 
 
@@ -201,6 +204,7 @@ function AppRoutes() {
                     <Route path="/credits/success" element={<CreditsSuccess />} />
                     <Route path="/credits/failure" element={<CreditsFailure />} />
                     <Route path="/credits/pending" element={<CreditsFailure />} />
+                    <Route path="/mis-creditos"  element={<AuthGuard requireAuth={true}><MyCredits /></AuthGuard>} />
 
                     {/* Varios */}
                     <Route path="/equipo" element={<Equipo />} />
@@ -210,6 +214,8 @@ function AppRoutes() {
                     <Route path="/notes" element={<Notes />} />
                     <Route path="/apuntes/:id" element={<ApunteView />} />
                     <Route path="/user/:username" element={<PublicProfile />} />
+
+                    <Route path="/calendario-global" element={<GlobalCalendar />} />
 
                     {/* Autenticación */}
                     <Route path="/signin" element={<Navigate to="/?auth=signin" replace />} />
@@ -230,7 +236,7 @@ function AppRoutes() {
                     <Route path="*" element={
                         <div style={{ padding: "40px", textAlign: "center" }}>
                             <h1>404 - Página no encontrada</h1>
-                            <p>La página que buscas no existe.</p>
+                            <p>La página que buscas está en mantenimiento, intenta nuevamentes más tarde.</p>
                         </div>
                     } />
                 </Routes>
@@ -249,6 +255,7 @@ function AppRoutes() {
 export default function App() {
     const { credits, seguidores, siguiendo, apuntes, loading: loadingStats } = useSidebarStats();
     const { showModal, loading: loadingOnboarding, completeOnboarding } = useMentorOnboarding();
+    const { showModal: showTopModal, topData, userPosition, calculating: calculatingTop, closeModal: closeTopModal } = useTopMensual();
 
     return (
         <BrowserRouter>
@@ -265,6 +272,35 @@ export default function App() {
                             open={showModal}
                             onComplete={completeOnboarding}
                         />
+
+                        {/* Modal Top Mensual - Se muestra automáticamente día 1-5 */}
+                        {showTopModal && (
+                            <TopMensualModal
+                                topData={topData}
+                                userPosition={userPosition}
+                                onClose={closeTopModal}
+                            />
+                        )}
+
+                        {/* Loading mientras calcula el top */}
+                        {calculatingTop && (
+                            <div style={{
+                                position: 'fixed',
+                                top: 20,
+                                right: 20,
+                                background: '#2563eb',
+                                color: '#fff',
+                                padding: '12px 20px',
+                                borderRadius: 8,
+                                fontSize: 14,
+                                fontWeight: 600,
+                                zIndex: 9998,
+                                boxShadow: '0 4px 12px rgba(37, 99, 235, 0.3)'
+                            }}>
+                                Calculando Top Mensual...
+                            </div>
+                        )}
+
                         <AppRoutes />
                     </NotificationsProvider>
                 </NotificationProvider>

@@ -221,7 +221,7 @@ export default function Sidebar({
                                 </div>
                             )}
                             <div style={{ display: "flex", gap: 6, fontSize: 12, opacity: .9 }}>
-                                <StatLink onClick={() => { navigate("/credits"); onClose?.(); }} label="Créditos" value={stats?.credits || 0} />
+                                <StatLink onClick={() => { navigate("/mis-creditos"); onClose?.(); }} label="Créditos" value={stats?.credits || 0} />
                                 <StatLink onClick={() => { navigate("/followers"); onClose?.(); }} label="Seguidores" value={stats?.seguidores || 0} />
                                 <StatLink onClick={() => { navigate("/followers"); onClose?.(); }} label="Siguiendo" value={stats?.siguiendo || 0} />
                                 <StatLink onClick={() => { navigate("/my_papers"); onClose?.(); }} label="Apuntes" value={stats?.apuntes || 0} />

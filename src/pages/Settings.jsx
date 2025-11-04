@@ -1,5 +1,23 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
+import {
+    faUser,
+    faLock,
+    faChartBar,
+    faCog,
+    faBell,
+    faEye,
+    faFileAlt,
+    faPalette,
+    faGlobe,
+    faMobileAlt,
+    faExclamationTriangle,
+    faHourglass,
+    faCheck,
+    faArrowLeft,
+    faEnvelope
+} from '@fortawesome/free-solid-svg-icons';
 import { useNotificationSettings } from '../hooks/useNotificationSettings';
 import { usePrivacySettings } from '../hooks/usePrivacySettings';
 import { downloadUserData, getUserDataSummary } from '../utils/exportUserData';
@@ -7,6 +25,7 @@ import { supabase } from '../supabase';
 import emailjs from '@emailjs/browser';
 
 emailjs.init('JA_sGzk8UJMPOtSmE')
+import { useMentorStatus } from '../hooks/useMentorStatus';
 
 const TAB_STORAGE_KEY = 'kerana_settings_active_tab';
 
@@ -23,22 +42,20 @@ export default function Settings() {
     }, [activeTab]);
 
     const tabs = [
-        { id: 'account', label: 'Cuenta' },
-        { id: 'notifications', label: 'Notificaciones' },
-        { id: 'privacy', label: 'Privacidad' },
-        { id: 'appearance', label: 'Apariencia' },
+        { id: 'account', label: 'Cuenta', icon: faUser },
+        { id: 'notifications', label: 'Notificaciones', icon: faBell },
+        { id: 'privacy', label: 'Privacidad', icon: faLock },
+        { id: 'appearance', label: 'Apariencia', icon: faPalette },
     ];
+
+    const { isMentor } = useMentorStatus();
 
     const notificationTypes = [
         { key: 'nuevo_seguidor', label: 'Nuevos seguidores', color: '#0095f6' },
-        { key: 'solicitud_aceptada', label: 'Solicitudes aceptadas', color: '#10b981' },
-        { key: 'nuevo_comentario', label: 'Comentarios', color: '#8b5cf6' },
-        { key: 'nuevo_like', label: 'Likes', color: '#ef4444' },
-        { key: 'nueva_resenia', label: 'Reseñas', color: '#f59e0b' },
-        { key: 'mentor_acepto', label: 'Mentores', color: '#06b6d4' },
-        { key: 'nuevo_apunte', label: 'Nuevos apuntes', color: '#3b82f6' },
-        { key: 'apunte_aprobado', label: 'Aprobados', color: '#22c55e' },
-        { key: 'mentor_aprobado', label: 'Mentor', color: '#a855f7' },
+        { key: 'nuevo_like', label: 'Likes a tus apuntes', color: '#ef4444' },
+        { key: 'nueva_resenia', label: 'Reseñas a tus materias favoritas', color: '#f59e0b' },
+        { key: 'nuevo_apunte', label: 'Nuevos apuntes de tus seguidos', color: '#3b82f6' },
+        ...(isMentor ? [{ key: 'nueva_clase_agendada', label: 'Clases agendadas', color: '#0d9488' }] : []),
         { key: 'system', label: 'Sistema', color: '#64748b' },
         { key: 'update', label: 'Actualizaciones', color: '#0ea5e9' },
     ];
@@ -54,7 +71,8 @@ export default function Settings() {
                         onMouseEnter={(e) => e.target.style.background = '#f1f5f9'}
                         onMouseLeave={(e) => e.target.style.background = '#fff'}
                     >
-                        ← Volver
+                        <FontAwesomeIcon icon={faArrowLeft} style={{ marginRight: 6 }} />
+                        Volver
                     </button>
                     <h1 style={titleStyle}>Configuración</h1>
                     <p style={subtitleStyle}>
@@ -92,7 +110,8 @@ export default function Settings() {
                                 }
                             }}
                         >
-                            <span style={{ fontSize: 14, fontWeight: 600 }}>
+                            <FontAwesomeIcon icon={tab.icon} style={{ marginRight: 8, fontSize: 14 }} />
+                            <span style={{ fontSize: 14, fontWeight: 600, fontFamily: 'Inter, sans-serif' }}>
                                 {tab.label}
                             </span>
                         </button>
@@ -159,7 +178,7 @@ function AccountTab({ navigate }) {
 
     return (
         <>
-            <Card title="Información de Cuenta" icon="👤" color="#0095f6">
+            <Card title="Información de Cuenta" icon={faUser} color="#0095f6">
                 <p style={descriptionStyle}>
                     Administrá tu información personal
                 </p>
@@ -167,7 +186,7 @@ function AccountTab({ navigate }) {
                 <ActionButton onClick={() => navigate('/edit-profile')} label="Editar perfil" />
             </Card>
 
-            <Card title="Seguridad" icon="🔒" color="#ef4444">
+            <Card title="Seguridad" icon={faLock} color="#ef4444">
                 {!changePasswordOpen ? (
                     <ActionButton onClick={() => setChangePasswordOpen(true)} label="Cambiar contraseña" />
                 ) : (
@@ -216,7 +235,7 @@ function AccountTab({ navigate }) {
                 )}
             </Card>
 
-            <Card title="Gestión de Datos" icon="📊" color="#8b5cf6">
+            <Card title="Gestión de Datos" icon={faChartBar} color="#8b5cf6">
                 <DataManagementSection />
             </Card>
         </>
@@ -314,14 +333,12 @@ function DeleteAccountModal({ isOpen, onClose }) {
     const [isOAuthUser, setIsOAuthUser] = useState(false);
     const navigate = useNavigate();
 
-    // Detectar tipo de autenticación al abrir el modal
     useEffect(() => {
         if (isOpen) {
             detectAuthMethod();
         }
     }, [isOpen]);
 
-    // Reset al cerrar
     useEffect(() => {
         if (!isOpen) {
             setStep(1);
@@ -399,14 +416,11 @@ function DeleteAccountModal({ isOpen, onClose }) {
         setStep(3);
 
         try {
-            // Obtener usuario de auth
             const { data: { user }, error: userError } = await supabase.auth.getUser();
             if (userError || !user) throw new Error('Usuario no autenticado');
 
-            // Usar directamente el user.id
             const userId = user.id;
 
-            // CASO 1: Usuario OAuth - Verificar código
             if (isOAuthUser) {
                 if (!verificationCode || verificationCode.length !== 6) {
                     setError('Ingresá el código de 6 dígitos');
@@ -415,15 +429,11 @@ function DeleteAccountModal({ isOpen, onClose }) {
                     return;
                 }
 
-                // Verificar código
                 const { data: verifyData, error: verifyError } = await supabase.rpc('verify_code', {
                     target_user_id: userId,
                     input_code: verificationCode,
                     code_purpose: 'delete_account'
                 });
-
-                console.log('✅ Resultado de verificación:', verifyData); // ← AGREGAR ESTO
-
 
                 if (verifyError) throw verifyError;
                 if (!verifyData?.success) {
@@ -433,7 +443,6 @@ function DeleteAccountModal({ isOpen, onClose }) {
                     return;
                 }
             }
-            // CASO 2: Usuario Email/Password - Verificar contraseña
             else {
                 if (!password) {
                     setError('Ingresá tu contraseña');
@@ -455,8 +464,6 @@ function DeleteAccountModal({ isOpen, onClose }) {
                 }
             }
 
-
-            // Eliminar cuenta
             const { data, error: deleteError } = await supabase.rpc(
                 'delete_user_account_with_reason',
                 {
@@ -464,15 +471,12 @@ function DeleteAccountModal({ isOpen, onClose }) {
                     reason: deletionReason.trim() || 'No especificado'
                 }
             );
+
             if (deleteError) throw deleteError;
             if (!data?.success) throw new Error(data?.error || 'Error al eliminar cuenta');
 
-            console.log('Datos eliminados:', data.deleted_counts);
-
-            // Cerrar sesión
             await supabase.auth.signOut();
 
-            // Redirigir
             localStorage.setItem('account_deleted', 'true');
             window.location.href = '/';
 
@@ -484,6 +488,7 @@ function DeleteAccountModal({ isOpen, onClose }) {
             setLoading(false);
         }
     };
+
     if (!isOpen) return null;
 
     return (
@@ -493,7 +498,9 @@ function DeleteAccountModal({ isOpen, onClose }) {
                 {step === 1 && (
                     <>
                         <div style={iconContainerStyle}>
-                            <div style={dangerIconStyle}>⚠️</div>
+                            <div style={dangerIconStyle}>
+                                <FontAwesomeIcon icon={faExclamationTriangle} style={{ fontSize: 48, color: '#ef4444' }} />
+                            </div>
                         </div>
                         <h2 style={modalTitleStyle}>¿Eliminar tu cuenta?</h2>
                         <div style={warningBoxStyle}>
@@ -502,13 +509,13 @@ function DeleteAccountModal({ isOpen, onClose }) {
                             </p>
                             <p style={warningTextStyle}>Se eliminarán:</p>
                             <ul style={listStyle}>
-                                <li> Todos tus apuntes subidos</li>
-                                <li> Tus favoritos y guardados</li>
-                                <li> Notificaciones e historial</li>
-                                <li> Reseñas y comentarios</li>
-                                <li> Solicitudes de mentoría</li>
-                                <li> Información de perfil</li>
-                                <li> Créditos y transacciones</li>
+                                <li>Todos tus apuntes subidos</li>
+                                <li>Tus favoritos y guardados</li>
+                                <li>Notificaciones e historial</li>
+                                <li>Reseñas y comentarios</li>
+                                <li>Solicitudes de mentoría</li>
+                                <li>Información de perfil</li>
+                                <li>Créditos y transacciones</li>
                             </ul>
                         </div>
                         <div style={buttonsContainerStyle}>
@@ -526,12 +533,13 @@ function DeleteAccountModal({ isOpen, onClose }) {
                 {step === 2 && (
                     <>
                         <div style={iconContainerStyle}>
-                            <div style={dangerIconStyle}>🔒</div>
+                            <div style={dangerIconStyle}>
+                                <FontAwesomeIcon icon={faLock} style={{ fontSize: 48, color: '#ef4444' }} />
+                            </div>
                         </div>
                         <h2 style={modalTitleStyle}>Confirmación final</h2>
 
                         {isOAuthUser ? (
-                            // OAuth: Código por email
                             <>
                                 <p style={modalDescriptionStyle}>
                                     Para confirmar la eliminación, te enviamos un código de verificación a:
@@ -544,7 +552,7 @@ function DeleteAccountModal({ isOpen, onClose }) {
                                     textAlign: 'center',
                                     border: '2px solid #bae6fd'
                                 }}>
-                                    <strong style={{ color: '#0369a1' }}>{userEmail}</strong>
+                                    <strong style={{ color: '#0369a1', fontFamily: 'Inter, sans-serif' }}>{userEmail}</strong>
                                 </div>
 
                                 {!codeSent ? (
@@ -555,15 +563,21 @@ function DeleteAccountModal({ isOpen, onClose }) {
                                             ...primaryButtonStyle,
                                             width: '100%',
                                             marginBottom: '16px',
-                                            opacity: loading ? 0.5 : 1
+                                            opacity: loading ? 0.5 : 1,
+                                            display: 'flex',
+                                            alignItems: 'center',
+                                            justifyContent: 'center',
+                                            gap: 8
                                         }}
                                     >
-                                        {loading ? 'Enviando código...' : '📧 Enviar código'}
+                                        <FontAwesomeIcon icon={faEnvelope} />
+                                        {loading ? 'Enviando código...' : 'Enviar código'}
                                     </button>
                                 ) : (
                                     <>
-                                        <p style={{ ...modalDescriptionStyle, color: '#10b981', fontWeight: 600 }}>
-                                            ✅ Código enviado! Revisá tu email.
+                                        <p style={{ ...modalDescriptionStyle, color: '#10b981', fontWeight: 600, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}>
+                                            <FontAwesomeIcon icon={faCheck} />
+                                            Código enviado! Revisá tu email.
                                         </p>
                                         <input
                                             type="text"
@@ -578,7 +592,6 @@ function DeleteAccountModal({ isOpen, onClose }) {
                                 )}
                             </>
                         ) : (
-                            // Email/Password: Contraseña
                             <>
                                 <p style={modalDescriptionStyle}>
                                     Para confirmar, ingresá tu contraseña:
@@ -593,13 +606,15 @@ function DeleteAccountModal({ isOpen, onClose }) {
                                 />
                             </>
                         )}
+
                         <div style={{ marginTop: 16, marginBottom: 12 }}>
                             <label style={{
                                 display: 'block',
                                 fontSize: 13,
                                 color: '#64748b',
                                 fontWeight: 600,
-                                marginBottom: 8
+                                marginBottom: 8,
+                                fontFamily: 'Inter, sans-serif'
                             }}>
                                 ¿Por qué eliminás tu cuenta? (opcional)
                             </label>
@@ -620,7 +635,8 @@ function DeleteAccountModal({ isOpen, onClose }) {
                                 fontSize: 11,
                                 color: '#94a3b8',
                                 textAlign: 'right',
-                                marginTop: 4
+                                marginTop: 4,
+                                fontFamily: 'Inter, sans-serif'
                             }}>
                                 {deletionReason.length}/500
                             </div>
@@ -660,7 +676,9 @@ function DeleteAccountModal({ isOpen, onClose }) {
                 {step === 3 && (
                     <>
                         <div style={iconContainerStyle}>
-                            <div style={loadingIconStyle}>⏳</div>
+                            <div style={loadingIconStyle}>
+                                <FontAwesomeIcon icon={faHourglass} style={{ fontSize: 48, color: '#0095f6' }} />
+                            </div>
                         </div>
                         <h2 style={modalTitleStyle}>Eliminando tu cuenta...</h2>
                         <p style={modalDescriptionStyle}>
@@ -673,6 +691,7 @@ function DeleteAccountModal({ isOpen, onClose }) {
         </div>
     );
 }
+
 function DataStat({ label, value, color }) {
     return (
         <div style={{
@@ -691,10 +710,11 @@ function DataStat({ label, value, color }) {
                 background: `linear-gradient(135deg, ${color} 0%, ${color}dd 100%)`,
                 WebkitBackgroundClip: 'text',
                 WebkitTextFillColor: 'transparent',
+                fontFamily: 'Inter, sans-serif'
             }}>
                 {value}
             </div>
-            <div style={{ fontSize: 11, color: '#64748b', fontWeight: 600 }}>
+            <div style={{ fontSize: 11, color: '#64748b', fontWeight: 600, fontFamily: 'Inter, sans-serif' }}>
                 {label}
             </div>
         </div>
@@ -707,7 +727,7 @@ function DataStat({ label, value, color }) {
 function NotificationsTab({ settings, toggleSetting, resetToDefault, notificationTypes }) {
     return (
         <>
-            <Card title="Configuración General" icon="⚙️" color="#0095f6">
+            <Card title="Configuración General" icon={faCog} color="#0095f6">
                 <div style={{ display: 'grid', gap: 10 }}>
                     <SettingToggle
                         label="Sonido"
@@ -730,25 +750,17 @@ function NotificationsTab({ settings, toggleSetting, resetToDefault, notificatio
                         onChange={() => toggleSetting('badge')}
                         color="#8b5cf6"
                     />
-                    <SettingToggle
-                        label="Email"
-                        description="Próximamente disponible"
-                        checked={settings.email}
-                        onChange={() => toggleSetting('email')}
-                        color="#64748b"
-                        disabled
-                    />
                 </div>
             </Card>
 
-            <Card title="Tipos de Notificaciones" icon="🔔" color="#8b5cf6">
+            <Card title="Tipos de Notificaciones" icon={faBell} color="#8b5cf6">
                 <div style={{ display: 'grid', gap: 10 }}>
                     {notificationTypes.map(type => (
                         <SettingToggle
                             key={type.key}
                             label={type.label}
                             checked={settings[type.key]}
-                            onChange={() => toggleSetting(type.key)}
+                            onChange={() => type.onClick ? type.onClick() : toggleSetting(type.key)}
                             color={type.color}
                         />
                     ))}
@@ -768,7 +780,7 @@ function NotificationsTab({ settings, toggleSetting, resetToDefault, notificatio
 // TAB: PRIVACIDAD
 // ============================================
 function PrivacyTab({ navigate }) {
-    const { settings, loading, saving, togglePerfilPublico, toggleMostrarEmail, togglePermitirMensajes } = usePrivacySettings();
+    const { settings, loading, saving, togglePerfilPublico, toggleMostrarEmail } = usePrivacySettings();
     const [saveMessage, setSaveMessage] = useState('');
 
     const handleToggle = async (toggleFunction, name) => {
@@ -779,8 +791,8 @@ function PrivacyTab({ navigate }) {
 
     if (loading) {
         return (
-            <Card title="Privacidad" icon="🔒" color="#ef4444">
-                <p style={{ color: '#64748b', textAlign: 'center', padding: 30 }}>Cargando configuración...</p>
+            <Card title="Privacidad" icon={faLock} color="#ef4444">
+                <p style={{ color: '#64748b', textAlign: 'center', padding: 30, fontFamily: 'Inter, sans-serif' }}>Cargando configuración...</p>
             </Card>
         );
     }
@@ -794,7 +806,7 @@ function PrivacyTab({ navigate }) {
                 />
             )}
 
-            <Card title="Privacidad del Perfil" icon="👁️" color="#0095f6">
+            <Card title="Privacidad del Perfil" icon={faEye} color="#0095f6">
                 <div style={{ display: 'grid', gap: 10 }}>
                     <SettingToggle
                         label="Perfil público"
@@ -812,18 +824,10 @@ function PrivacyTab({ navigate }) {
                         color="#8b5cf6"
                         disabled={saving}
                     />
-                    <SettingToggle
-                        label="Permitir mensajes"
-                        description="Otros pueden enviarte mensajes"
-                        checked={settings.permitir_mensajes}
-                        onChange={() => handleToggle(togglePermitirMensajes, 'Mensajes')}
-                        color="#10b981"
-                        disabled={saving}
-                    />
                 </div>
             </Card>
 
-            <Card title="Políticas y Términos" icon="📄" color="#64748b">
+            <Card title="Políticas y Términos" icon={faFileAlt} color="#64748b">
                 <ActionButton onClick={() => navigate('/privacy')} label="Política de Privacidad" />
                 <ActionButton onClick={() => navigate('/terms')} label="Términos y Condiciones" />
             </Card>
@@ -841,7 +845,7 @@ function AppearanceTab() {
 
     return (
         <>
-            <Card title="Tema Visual" icon="🎨" color="#f59e0b">
+            <Card title="Tema Visual" icon={faPalette} color="#f59e0b">
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 12 }}>
                     <ThemeCard
                         label="Modo Claro"
@@ -859,7 +863,7 @@ function AppearanceTab() {
                 </div>
             </Card>
 
-            <Card title="Idioma" icon="🌍" color="#06b6d4">
+            <Card title="Idioma" icon={faGlobe} color="#06b6d4">
                 <select value={idioma} onChange={(e) => setIdioma(e.target.value)} style={selectStyle}>
                     <option value="es">Español (Uruguay)</option>
                     <option value="en" disabled>English (Coming soon)</option>
@@ -867,7 +871,7 @@ function AppearanceTab() {
                 </select>
             </Card>
 
-            <Card title="Visualización" icon="📱" color="#8b5cf6">
+            <Card title="Visualización" icon={faMobileAlt} color="#8b5cf6">
                 <SettingToggle
                     label="Modo compacto"
                     description="Reduce el espaciado de los elementos"
@@ -906,17 +910,18 @@ function Card({ title, icon, color, children }) {
                     height: 32,
                     borderRadius: '50%',
                     background: `${color}15`,
-                    display: 'grid',
-                    placeItems: 'center',
-                    fontSize: 16,
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
                 }}>
-                    {icon}
+                    <FontAwesomeIcon icon={icon} style={{ fontSize: 16, color: color }} />
                 </div>
                 <h2 style={{
                     margin: 0,
                     fontSize: 16,
                     fontWeight: 700,
                     color: '#0f172a',
+                    fontFamily: 'Inter, sans-serif'
                 }}>
                     {title}
                 </h2>
@@ -947,6 +952,7 @@ function SettingToggle({ label, description, checked, onChange, color, disabled 
                     color: '#0f172a',
                     lineHeight: 1.3,
                     marginBottom: description ? 4 : 0,
+                    fontFamily: 'Inter, sans-serif'
                 }}>
                     {label}
                 </div>
@@ -955,6 +961,7 @@ function SettingToggle({ label, description, checked, onChange, color, disabled 
                         fontSize: 12,
                         color: '#64748b',
                         lineHeight: 1.3,
+                        fontFamily: 'Inter, sans-serif'
                     }}>
                         {description}
                     </div>
@@ -1014,6 +1021,7 @@ function ActionButton({ onClick, label, disabled, danger }) {
                 marginBottom: 8,
                 opacity: disabled ? 0.6 : 1,
                 transition: 'all 0.2s ease',
+                fontFamily: 'Inter, sans-serif'
             }}
             onMouseEnter={(e) => {
                 if (!disabled) {
@@ -1065,6 +1073,7 @@ function ThemeCard({ label, active, onClick, disabled, gradient }) {
                 fontWeight: 600,
                 color: active ? '#0095f6' : '#64748b',
                 marginBottom: 4,
+                fontFamily: 'Inter, sans-serif'
             }}>
                 {label}
             </div>
@@ -1072,6 +1081,7 @@ function ThemeCard({ label, active, onClick, disabled, gradient }) {
                 <div style={{
                     fontSize: 11,
                     color: '#94a3b8',
+                    fontFamily: 'Inter, sans-serif'
                 }}>
                     Próximamente
                 </div>
@@ -1085,13 +1095,12 @@ function ThemeCard({ label, active, onClick, disabled, gradient }) {
                     height: 20,
                     borderRadius: '50%',
                     background: '#0095f6',
-                    display: 'grid',
-                    placeItems: 'center',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
                     color: '#fff',
-                    fontSize: 12,
-                    fontWeight: 700,
                 }}>
-                    ✓
+                    <FontAwesomeIcon icon={faCheck} style={{ fontSize: 12 }} />
                 </div>
             )}
         </button>
@@ -1110,6 +1119,7 @@ function MessageBanner({ message, type }) {
             fontWeight: 600,
             textAlign: 'center',
             border: `2px solid ${type === 'success' ? '#6ee7b7' : '#fca5a5'}`,
+            fontFamily: 'Inter, sans-serif'
         }}>
             {message}
         </div>
@@ -1123,6 +1133,7 @@ const pageStyle = {
     minHeight: '100vh',
     background: 'linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%)',
     padding: '30px 16px',
+    fontFamily: 'Inter, sans-serif'
 };
 
 const containerStyle = {
@@ -1146,6 +1157,11 @@ const backButtonStyle = {
     cursor: 'pointer',
     marginBottom: 16,
     transition: 'all 0.2s ease',
+    fontFamily: 'Inter, sans-serif',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6
 };
 
 const titleStyle = {
@@ -1153,12 +1169,14 @@ const titleStyle = {
     fontWeight: 800,
     color: '#0b1e3a',
     margin: '0 0 8px 0',
+    fontFamily: 'Inter, sans-serif'
 };
 
 const subtitleStyle = {
     fontSize: 14,
     color: '#64748b',
     margin: 0,
+    fontFamily: 'Inter, sans-serif'
 };
 
 const tabsContainerStyle = {
@@ -1182,6 +1200,7 @@ const tabButtonStyle = {
     alignItems: 'center',
     justifyContent: 'center',
     transition: 'all 0.2s ease',
+    fontFamily: 'Inter, sans-serif'
 };
 
 const contentStyle = {
@@ -1198,6 +1217,7 @@ const primaryButtonStyle = {
     borderRadius: 10,
     cursor: 'pointer',
     transition: 'all 0.2s ease',
+    fontFamily: 'Inter, sans-serif'
 };
 
 const secondaryButtonStyle = {
@@ -1210,6 +1230,7 @@ const secondaryButtonStyle = {
     borderRadius: 10,
     cursor: 'pointer',
     transition: 'all 0.2s ease',
+    fontFamily: 'Inter, sans-serif'
 };
 
 const resetButtonStyle = {
@@ -1222,6 +1243,7 @@ const resetButtonStyle = {
     borderRadius: 10,
     cursor: 'pointer',
     transition: 'all 0.2s ease',
+    fontFamily: 'Inter, sans-serif'
 };
 
 const selectStyle = {
@@ -1235,6 +1257,7 @@ const selectStyle = {
     cursor: 'pointer',
     fontWeight: 500,
     transition: 'all 0.2s ease',
+    fontFamily: 'Inter, sans-serif'
 };
 
 const inputStyle = {
@@ -1248,6 +1271,7 @@ const inputStyle = {
     marginBottom: 10,
     boxSizing: 'border-box',
     transition: 'all 0.2s ease',
+    fontFamily: 'Inter, sans-serif'
 };
 
 const descriptionStyle = {
@@ -1255,6 +1279,7 @@ const descriptionStyle = {
     marginBottom: 16,
     fontSize: 13,
     lineHeight: 1.5,
+    fontFamily: 'Inter, sans-serif'
 };
 
 const statsGridStyle = {
@@ -1294,6 +1319,7 @@ const modalStyle = {
     width: '100%',
     boxShadow: '0 20px 60px rgba(0,0,0,0.3)',
     animation: 'slideUp 0.3s cubic-bezier(0.16, 1, 0.3, 1)',
+    fontFamily: 'Inter, sans-serif'
 };
 
 const iconContainerStyle = {
@@ -1302,13 +1328,11 @@ const iconContainerStyle = {
 };
 
 const dangerIconStyle = {
-    fontSize: 48,
     display: 'inline-block',
     animation: 'pulse 2s ease-in-out infinite',
 };
 
 const loadingIconStyle = {
-    fontSize: 48,
     display: 'inline-block',
     animation: 'spin 2s linear infinite',
 };
@@ -1319,6 +1343,7 @@ const modalTitleStyle = {
     color: '#0f172a',
     textAlign: 'center',
     marginBottom: 16,
+    fontFamily: 'Inter, sans-serif'
 };
 
 const modalDescriptionStyle = {
@@ -1327,6 +1352,7 @@ const modalDescriptionStyle = {
     textAlign: 'center',
     marginBottom: 20,
     lineHeight: 1.5,
+    fontFamily: 'Inter, sans-serif'
 };
 
 const warningBoxStyle = {
@@ -1342,6 +1368,7 @@ const warningTextStyle = {
     color: '#991b1b',
     marginBottom: 8,
     lineHeight: 1.5,
+    fontFamily: 'Inter, sans-serif'
 };
 
 const listStyle = {
@@ -1349,6 +1376,7 @@ const listStyle = {
     color: '#991b1b',
     paddingLeft: 20,
     margin: '8px 0 0 0',
+    fontFamily: 'Inter, sans-serif'
 };
 
 const modalInputStyle = {
@@ -1364,6 +1392,7 @@ const modalInputStyle = {
     boxSizing: 'border-box',
     outline: 'none',
     transition: 'all 0.2s ease',
+    fontFamily: 'Inter, sans-serif'
 };
 
 const errorStyle = {
@@ -1376,6 +1405,7 @@ const errorStyle = {
     marginBottom: 12,
     textAlign: 'center',
     border: '2px solid #fca5a5',
+    fontFamily: 'Inter, sans-serif'
 };
 
 const buttonsContainerStyle = {
@@ -1395,6 +1425,7 @@ const cancelButtonStyle = {
     borderRadius: 10,
     cursor: 'pointer',
     transition: 'all 0.2s ease',
+    fontFamily: 'Inter, sans-serif'
 };
 
 const dangerButtonStyle = {
@@ -1408,6 +1439,7 @@ const dangerButtonStyle = {
     cursor: 'pointer',
     transition: 'all 0.2s ease',
     boxShadow: '0 4px 12px rgba(239, 68, 68, 0.3)',
+    fontFamily: 'Inter, sans-serif'
 };
 
 const spinnerStyle = {
@@ -1457,7 +1489,7 @@ if (typeof document !== 'undefined' && !document.getElementById('settings-animat
             to { transform: rotate(360deg); }
         }
         
-        input:focus, select:focus {
+        input:focus, select:focus, textarea:focus {
             outline: none;
             border-color: #0095f6 !important;
             box-shadow: 0 0 0 3px rgba(0, 149, 246, 0.1);

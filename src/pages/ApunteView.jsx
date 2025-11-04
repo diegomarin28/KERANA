@@ -13,7 +13,7 @@ import {
     faHandHoldingHeart
 } from '@fortawesome/free-solid-svg-icons';
 import { supabase } from '../supabase';
-import { notesAPI } from '../api/database';
+import { notesAPI, creditsAPI } from '../api/database';
 import { Card } from '../components/UI/Card';
 import { Button } from '../components/UI/Button';
 import PDFThumbnail from '../components/PDFThumbnail';
@@ -167,17 +167,15 @@ export const ApunteView = () => {
         try {
             setPurchasing(true);
 
-            const { data: gastadoOk, error: gastarError } = await supabase.rpc('gastar_moneda', {
-                p_id_usuario: currentUserId,
-                p_cantidad: apunte.creditos
-            });
+            // 1. Descontar créditos al comprador
+            const { error: deductError } = await creditsAPI.deductCredits(
+                apunte.creditos,
+                'compra_apunte'
+            );
 
-            if (gastarError) throw gastarError;
-            if (!gastadoOk) {
-                alert("Error al procesar el pago. Intentá de nuevo.");
-                return;
-            }
+            if (deductError) throw deductError;
 
+            // 2. Registrar la compra en compra_apunte
             const { error: compraError } = await supabase
                 .from('compra_apunte')
                 .insert({
@@ -185,26 +183,86 @@ export const ApunteView = () => {
                     comprador_id: currentUserId
                 });
 
-            if (compraError) throw compraError;
-
-            const creditosVendedor = 5;
-
-            const { error: agregarError } = await supabase.rpc('agregar_creditos', {
-                uid: apunte.id_usuario,
-                cantidad: creditosVendedor
-            });
-
-            if (agregarError) {
-                console.error('Error agregando créditos al vendedor:', agregarError);
+            if (compraError) {
+                // Si falla, revertir los créditos
+                await creditsAPI.addCredits(apunte.creditos, 'reversion_compra');
+                throw compraError;
             }
 
+            // 3. Calcular créditos para el vendedor
+            // El vendedor recibe todo el precio del apunte
+            // (Ya se le dio el 80% al subirlo, ahora recibe el valor de cada venta)
+            const creditosVendedor = apunte.creditos;
+
+            // Obtener auth_id del vendedor para usar creditsAPI
+            const { data: vendedorData, error: vendedorError } = await supabase
+                .from('usuario')
+                .select('auth_id')
+                .eq('id_usuario', apunte.id_usuario)
+                .single();
+
+            if (!vendedorError && vendedorData) {
+                // Temporalmente cambiar el contexto para agregar créditos al vendedor
+                // Nota: Esta es una solución temporal, idealmente creditsAPI debería aceptar id_usuario
+                const currentUser = await supabase.auth.getUser();
+
+                // Por ahora usamos un update directo para el vendedor
+                const { data: vendedorActual, error: vendedorCreditError } = await supabase
+                    .from('usuario')
+                    .select('creditos')
+                    .eq('id_usuario', apunte.id_usuario)
+                    .single();
+
+                if (!vendedorCreditError && vendedorActual) {
+                    await supabase
+                        .from('usuario')
+                        .update({ creditos: vendedorActual.creditos + creditosVendedor })
+                        .eq('id_usuario', apunte.id_usuario);
+
+                    // Registrar en historial
+                    await supabase
+                        .from('historial_creditos')
+                        .insert({
+                            id_usuario: apunte.id_usuario,
+                            cantidad_creditos: creditosVendedor,
+                            tipo_transaccion: 'venta_apunte',
+                            descripcion: `Venta de apunte: ${apunte.titulo}`,
+                            referencia_id: apunte.id_apunte
+                        });
+
+                    console.log(`💰 Vendedor recibió ${creditosVendedor} créditos por la venta`);
+                }
+            }
+
+            // 4. Verificar y otorgar bonos por compras
+            const { data: bonusResult, error: bonusError } = await creditsAPI.checkAndGrantPurchaseBonus();
+
+            if (!bonusError && bonusResult?.bonosOtorgados?.length > 0) {
+                bonusResult.bonosOtorgados.forEach(bono => {
+                    console.log(`🎁 ¡Hito de compras alcanzado! ${bono.hito} apuntes comprados = +${bono.creditos} créditos`);
+                });
+            }
+
+            // 4.5. Verificar y otorgar bonos por ventas al vendedor
+            const { data: salesBonusResult, error: salesBonusError } = await creditsAPI.checkAndGrantSalesBonus(apunte.id_usuario);
+
+            if (!salesBonusError && salesBonusResult?.bonosOtorgados?.length > 0) {
+                salesBonusResult.bonosOtorgados.forEach(bono => {
+                    console.log(`💰 ¡El vendedor alcanzó un hito! ${bono.hito} ventas = +${bono.creditos} créditos`);
+                });
+            }
+
+            // 5. Actualizar UI
             setHasPurchased(true);
             setUserCredits(prev => prev - apunte.creditos);
             setShowSuccessModal(true);
 
+            console.log(`✅ Compra exitosa: -${apunte.creditos} créditos para comprador, +${creditosVendedor} para vendedor`);
+
         } catch (err) {
             console.error('Error en la compra:', err);
-            alert("Error al procesar la compra: " + (err.message || err));
+            setErrorMessage("Error al procesar la compra: " + (err.message || err));
+            setShowErrorModal(true);
         } finally {
             setPurchasing(false);
         }
