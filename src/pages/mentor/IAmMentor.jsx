@@ -6,6 +6,36 @@ import { useMentorPayment } from '../../hooks/useMentorPayment';
 import { MentorWelcomeModal } from '../../components/MentorWelcomeModal';
 import { useMentorStatus } from '../../hooks/useMentorStatus';
 import { SuccessModal } from '../../components/SuccessModal';
+import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
+import {
+    faBook,
+    faCalendar,
+    faClock,
+    faUsers,
+    faMapMarkerAlt,
+    faEnvelope,
+    faComment,
+    faChalkboardTeacher,
+    faPlus,
+    faEdit,
+    faTrash,
+    faTimes,
+    faCheck,
+    faCheckCircle,
+    faExclamationCircle,
+    faCog,
+    faCreditCard,
+    faFileContract,
+    faChevronDown,
+    faChevronUp,
+    faGraduationCap,
+    faHome,
+    faUniversity,
+    faUser,
+    faDollarSign,
+    faCalendarAlt,
+    faCalendarCheck
+} from '@fortawesome/free-solid-svg-icons';
 
 const LOCALIDADES = {
     montevideo: [
@@ -32,6 +62,8 @@ export default function IAmMentor() {
     const [showWelcome, setShowWelcome] = useState(false);
     const [proximasSesiones, setProximasSesiones] = useState([]);
     const [loadingSesiones, setLoadingSesiones] = useState(false);
+    const [selectedSession, setSelectedSession] = useState(null);
+    const [showSessionModal, setShowSessionModal] = useState(false);
 
     const { isMentor, mentorData: mentorStatusData, loading: mentorLoading } = useMentorStatus();
     const { paymentData, hasPaymentConfigured, savePaymentData } = useMentorPayment();
@@ -355,7 +387,9 @@ export default function IAmMentor() {
 
                 {!hasPaymentConfigured && (
                     <div style={warningBannerStyle}>
-                        <span style={{ fontSize: 20 }}>⚠️</span>
+                        <span style={{ fontSize: 20, color: '#f59e0b' }}>
+                            <FontAwesomeIcon icon={faExclamationCircle} />
+                        </span>
                         <div>
                             <strong>Configurá tu método de pago</strong>
                             <p style={{ margin: '4px 0 0 0', fontSize: 14 }}>
@@ -391,7 +425,9 @@ export default function IAmMentor() {
                         fontWeight: 600,
                         fontSize: 14
                     }}>
-                        <span style={{ fontSize: 20 }}>✅</span>
+                        <span style={{ fontSize: 20, color: '#10b981' }}>
+                            <FontAwesomeIcon icon={faCheckCircle} />
+                        </span>
                         Sesión cancelada exitosamente
                     </div>
                 )}
@@ -405,7 +441,8 @@ export default function IAmMentor() {
                             color: activeTab === 'materias' ? 'white' : '#6B7280'
                         }}
                     >
-                        📚 Materias
+                        <FontAwesomeIcon icon={faGraduationCap} style={{ marginRight: 8 }} />
+                        Materias
                     </button>
                     <button
                         onClick={() => setActiveTab('proximas')}
@@ -415,7 +452,8 @@ export default function IAmMentor() {
                             color: activeTab === 'proximas' ? 'white' : '#6B7280'
                         }}
                     >
-                        📅 Próximas Mentorías
+                        <FontAwesomeIcon icon={faCalendarCheck} style={{ marginRight: 8 }} />
+                        Próximas Mentorías
                     </button>
                     <button
                         onClick={() => setActiveTab('config')}
@@ -425,7 +463,8 @@ export default function IAmMentor() {
                             color: activeTab === 'config' ? 'white' : '#6B7280'
                         }}
                     >
-                        ⚙️ Configuración
+                        <FontAwesomeIcon icon={faCog} style={{ marginRight: 8 }} />
+                        Configuración
                     </button>
                     <button
                         onClick={() => setActiveTab('pago')}
@@ -435,7 +474,8 @@ export default function IAmMentor() {
                             color: activeTab === 'pago' ? 'white' : '#6B7280'
                         }}
                     >
-                        💳 Método de Pago
+                        <FontAwesomeIcon icon={faCreditCard} style={{ marginRight: 8 }} />
+                        Método de Pago
                         {!hasPaymentConfigured && <span style={badgeStyle}>!</span>}
                     </button>
                     <button
@@ -446,7 +486,8 @@ export default function IAmMentor() {
                             color: activeTab === 'terminos' ? 'white' : '#6B7280'
                         }}
                     >
-                        📄 Términos
+                        <FontAwesomeIcon icon={faFileContract} style={{ marginRight: 8 }} />
+                        Términos
                     </button>
                 </div>
 
@@ -458,7 +499,9 @@ export default function IAmMentor() {
 
                             {mentorships.length === 0 ? (
                                 <Card style={{ padding: 40, textAlign: 'center', marginTop: 20 }}>
-                                    <div style={{ fontSize: 48, marginBottom: 16 }}>📚</div>
+                                    <div style={{ fontSize: 48, marginBottom: 16, color: '#0d9488' }}>
+                                        <FontAwesomeIcon icon={faBook} />
+                                    </div>
                                     <h3 style={{ margin: '0 0 12px 0' }}>No tenés materias asignadas</h3>
                                     <p style={{ color: '#6b7280', margin: 0 }}>
                                         Contactá a soporte para agregar materias
@@ -509,180 +552,151 @@ export default function IAmMentor() {
                                 </div>
                             ) : proximasSesiones.length === 0 ? (
                                 <Card style={{ padding: 40, textAlign: 'center', marginTop: 20 }}>
-                                    <div style={{ fontSize: 48, marginBottom: 16 }}>📅</div>
+                                    <div style={{ fontSize: 48, marginBottom: 16, color: '#0d9488' }}>
+                                        <FontAwesomeIcon icon={faCalendarAlt} />
+                                    </div>
                                     <h3 style={{ margin: '0 0 12px 0' }}>No tenés mentorías programadas</h3>
                                     <p style={{ color: '#6b7280', margin: 0 }}>
                                         Cuando los alumnos agenden clases, aparecerán aquí
                                     </p>
                                 </Card>
                             ) : (
-                                <div style={{ display: 'grid', gap: 16, marginTop: 20 }}>
+                                <div style={{ display: 'grid', gap: 12, marginTop: 20 }}>
                                     {proximasSesiones.map(sesion => {
-                                        const alumnosActuales = sesion.slot_info?.reservas_actuales || 1;
-                                        const maxAlumnos = sesion.slot_info?.max_alumnos || 1;
+                                        const alumnosActuales = sesion.slot_info?.reservas_actuales || sesion.cantidad_alumnos || 1;
                                         const nombreAlumno = sesion.alumno?.nombre || 'Sin nombre';
-
                                         const fechaInicio = new Date(sesion.fecha_hora);
                                         const duracionMinutos = sesion.slot_info?.duracion || sesion.duracion_minutos || 60;
-                                        const fechaFin = new Date(fechaInicio.getTime() + duracionMinutos * 60000);
-                                        const horaInicio = fechaInicio.toLocaleTimeString('es-UY', { hour: '2-digit', minute: '2-digit', hour12: false });
-                                        const horaFin = fechaFin.toLocaleTimeString('es-UY', { hour: '2-digit', minute: '2-digit', hour12: false });
 
                                         return (
-                                            <Card key={sesion.id_sesion} style={{
-                                                padding: 20,
-                                                position: 'relative'
-                                            }}>
-                                                <div style={{
+                                            <div
+                                                key={sesion.id_sesion}
+                                                onClick={() => {
+                                                    setSelectedSession(sesion);
+                                                    setShowSessionModal(true);
+                                                }}
+                                                style={{
+                                                    background: '#fff',
+                                                    borderRadius: 12,
+                                                    padding: 16,
+                                                    border: '2px solid #f1f5f9',
+                                                    boxShadow: '0 1px 3px rgba(0,0,0,0.05)',
+                                                    transition: 'all 0.2s ease',
+                                                    cursor: 'pointer',
                                                     display: 'flex',
-                                                    justifyContent: 'space-between',
                                                     alignItems: 'center',
-                                                    marginBottom: 16
+                                                    gap: 12
+                                                }}
+                                                onMouseEnter={e => {
+                                                    e.currentTarget.style.borderColor = '#0d9488';
+                                                    e.currentTarget.style.boxShadow = '0 4px 12px rgba(13, 148, 136, 0.15)';
+                                                    e.currentTarget.style.transform = 'translateY(-2px)';
+                                                }}
+                                                onMouseLeave={e => {
+                                                    e.currentTarget.style.borderColor = '#f1f5f9';
+                                                    e.currentTarget.style.boxShadow = '0 1px 3px rgba(0,0,0,0.05)';
+                                                    e.currentTarget.style.transform = 'translateY(0)';
+                                                }}
+                                            >
+                                                {/* Avatar */}
+                                                <div style={{
+                                                    width: 48,
+                                                    height: 48,
+                                                    borderRadius: 10,
+                                                    background: sesion.alumno?.foto
+                                                        ? `url(${sesion.alumno.foto}) center/cover`
+                                                        : '#0d9488',
+                                                    display: 'flex',
+                                                    alignItems: 'center',
+                                                    justifyContent: 'center',
+                                                    color: '#fff',
+                                                    fontSize: 20,
+                                                    fontWeight: 700,
+                                                    flexShrink: 0
                                                 }}>
+                                                    {!sesion.alumno?.foto && (sesion.alumno?.nombre?.[0] || '?')}
+                                                </div>
+
+                                                {/* Info compacta */}
+                                                <div style={{ flex: 1, minWidth: 0 }}>
                                                     <div style={{
-                                                        fontSize: 16,
+                                                        fontSize: 15,
                                                         fontWeight: 700,
-                                                        color: '#374151',
-                                                        display: 'flex',
-                                                        alignItems: 'center',
-                                                        gap: 8
+                                                        color: '#0f172a',
+                                                        marginBottom: 4,
+                                                        fontFamily: 'Inter, sans-serif',
+                                                        whiteSpace: 'nowrap',
+                                                        overflow: 'hidden',
+                                                        textOverflow: 'ellipsis'
                                                     }}>
-                                                        📅 {fechaInicio.toLocaleDateString('es-UY', {
-                                                        weekday: 'long',
-                                                        day: 'numeric',
-                                                        month: 'long'
-                                                    })}
+                                                        {nombreAlumno}
                                                     </div>
 
-                                                    <span style={{
-                                                        padding: '4px 12px',
-                                                        background: sesion.estado === 'confirmada' ? '#D1FAE5' : '#FEF3C7',
-                                                        color: sesion.estado === 'confirmada' ? '#065F46' : '#92400E',
-                                                        borderRadius: 8,
-                                                        fontSize: 12,
-                                                        fontWeight: 700
-                                                    }}>
-                                                        {sesion.estado === 'confirmada' ? '✓ Confirmada' : '⏳ Pendiente'}
-                                                    </span>
-                                                </div>
-
-                                                <div style={{
-                                                    fontSize: 24,
-                                                    fontWeight: 700,
-                                                    color: '#1F2937',
-                                                    marginBottom: 16,
-                                                    letterSpacing: '-0.5px'
-                                                }}>
-                                                    🕐 {horaInicio} - {horaFin}
-                                                </div>
-
-                                                <div style={{
-                                                    marginBottom: 16
-                                                }}>
-                                                    <span style={{
-                                                        display: 'inline-flex',
+                                                    <div style={{
+                                                        fontSize: 13,
+                                                        color: '#64748b',
+                                                        fontFamily: 'Inter, sans-serif',
+                                                        display: 'flex',
                                                         alignItems: 'center',
                                                         gap: 8,
-                                                        padding: '8px 14px',
-                                                        background: sesion.modalidad === 'virtual'
-                                                            ? '#EFF6FF'
-                                                            : '#ECFDF5',
-                                                        border: `2px solid ${sesion.modalidad === 'virtual' ? '#BFDBFE' : '#A7F3D0'}`,
-                                                        borderRadius: 8,
-                                                        fontWeight: 700,
-                                                        fontSize: 14,
-                                                        color: sesion.modalidad === 'virtual' ? '#1E40AF' : '#065F46'
+                                                        flexWrap: 'wrap'
                                                     }}>
-                                                        {sesion.modalidad === 'virtual' ? '💻' : '🏢'}
-                                                        {sesion.modalidad === 'virtual' ? 'Virtual' :
-                                                            sesion.locacion === 'casa' ? 'Presencial - Casa' : 'Presencial - Facultad'}
-                                                    </span>
+                                                        <span style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                                                            <FontAwesomeIcon icon={faBook} style={{ fontSize: 11 }} />
+                                                            {sesion.materia?.nombre_materia || 'Materia'}
+                                                        </span>
+                                                        <span style={{ color: '#cbd5e1' }}>•</span>
+                                                        <span style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                                                            <FontAwesomeIcon icon={faCalendar} style={{ fontSize: 11 }} />
+                                                            {fechaInicio.toLocaleDateString('es-UY', {
+                                                                day: 'numeric',
+                                                                month: 'short'
+                                                            })}
+                                                        </span>
+                                                        <span style={{ color: '#cbd5e1' }}>•</span>
+                                                        <span style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                                                            <FontAwesomeIcon icon={faClock} style={{ fontSize: 11 }} />
+                                                            {fechaInicio.toLocaleTimeString('es-UY', {
+                                                                hour: '2-digit',
+                                                                minute: '2-digit'
+                                                            })}
+                                                        </span>
+                                                    </div>
                                                 </div>
 
-                                                <button
-                                                    onClick={() => {
-                                                        const fechaSesion = new Date(sesion.fecha_hora);
-                                                        const ahora = new Date();
-                                                        const horasRestantes = (fechaSesion - ahora) / (1000 * 60 * 60);
-
-                                                        setConfirmCancelSession({
-                                                            id: sesion.id_sesion,
-                                                            esMasDe36Horas: horasRestantes > 36,
-                                                            fecha: fechaInicio,
-                                                            materia: sesion.materia?.nombre_materia
-                                                        });
-                                                    }}
-                                                    style={{
-                                                        position: 'absolute',
-                                                        right: 20,
-                                                        top: '50%',
-                                                        transform: 'translateY(-50%)',
-                                                        padding: '8px 16px',
-                                                        background: '#FEF2F2',
-                                                        color: '#DC2626',
-                                                        border: '2px solid #FECACA',
-                                                        borderRadius: 8,
-                                                        fontSize: 13,
-                                                        fontWeight: 700,
-                                                        cursor: 'pointer',
-                                                        transition: 'all 0.2s ease',
-                                                        whiteSpace: 'nowrap',
-                                                        display: 'flex',
-                                                        alignItems: 'center',
-                                                        gap: 6
-                                                    }}
-                                                    onMouseEnter={e => {
-                                                        e.target.style.background = '#FEE2E2';
-                                                        e.target.style.transform = 'translateY(-50%) translateY(-1px)';
-                                                    }}
-                                                    onMouseLeave={e => {
-                                                        e.target.style.background = '#FEF2F2';
-                                                        e.target.style.transform = 'translateY(-50%)';
-                                                    }}
-                                                >
-                                                    ❌ Cancelar
-                                                </button>
-
+                                                {/* Badge de personas */}
                                                 <div style={{
                                                     display: 'flex',
                                                     alignItems: 'center',
-                                                    gap: 16,
-                                                    flexWrap: 'wrap',
-                                                    paddingTop: 12,
-                                                    borderTop: '2px solid #F3F4F6',
-                                                    fontSize: 14
+                                                    gap: 4,
+                                                    padding: '4px 10px',
+                                                    borderRadius: 6,
+                                                    background: '#ccfbf1',
+                                                    color: '#0d9488',
+                                                    fontSize: 12,
+                                                    fontWeight: 600,
+                                                    border: '1px solid #99f6e4',
+                                                    fontFamily: 'Inter, sans-serif',
+                                                    flexShrink: 0
                                                 }}>
-                                                    <span style={{ fontWeight: 600, color: '#6B7280' }}>
-                                                        👤 {nombreAlumno}
-                                                    </span>
-
-                                                    <span style={{ color: '#D1D5DB' }}>•</span>
-
-                                                    <span style={{ fontWeight: 600, color: '#6B7280' }}>
-                                                        📚 {sesion.materia?.nombre_materia || 'Materia'}
-                                                    </span>
-
-                                                    <span style={{ color: '#D1D5DB' }}>•</span>
-
-                                                    <span style={{ fontWeight: 600, color: '#6B7280' }}>
-                                                        👥 {alumnosActuales}/{maxAlumnos}
-                                                    </span>
+                                                    <FontAwesomeIcon icon={faUsers} style={{ fontSize: 11 }} />
+                                                    {alumnosActuales}
                                                 </div>
 
-                                                {sesion.notas_alumno && (
-                                                    <div style={{
-                                                        marginTop: 12,
-                                                        padding: 12,
-                                                        background: '#F9FAFB',
-                                                        borderLeft: '3px solid #6366F1',
-                                                        borderRadius: 6,
-                                                        fontSize: 13,
-                                                        color: '#374151'
-                                                    }}>
-                                                        <strong>💬 Nota:</strong> {sesion.notas_alumno}
-                                                    </div>
-                                                )}
-                                            </Card>
+                                                {/* Badge de estado */}
+                                                <span style={{
+                                                    padding: '4px 10px',
+                                                    background: sesion.estado === 'confirmada' ? '#d1fae5' : '#fef3c7',
+                                                    color: sesion.estado === 'confirmada' ? '#065f46' : '#92400e',
+                                                    borderRadius: 6,
+                                                    fontSize: 11,
+                                                    fontWeight: 600,
+                                                    fontFamily: 'Inter, sans-serif',
+                                                    flexShrink: 0
+                                                }}>
+                                                    {sesion.estado === 'confirmada' ? '✓' : '⏳'}
+                                                </span>
+                                            </div>
                                         );
                                     })}
                                 </div>
@@ -808,7 +822,9 @@ export default function IAmMentor() {
 
                             {hasPaymentConfigured && (
                                 <div style={successBannerStyle}>
-                                    <span style={{ fontSize: 20 }}>✅</span>
+                                    <span style={{ fontSize: 20, color: '#10b981' }}>
+                                        <FontAwesomeIcon icon={faCheckCircle} />
+                                    </span>
                                     <div>
                                         <strong>Método de pago configurado</strong>
                                         <p style={{ margin: '4px 0 0 0', fontSize: 14 }}>
@@ -849,7 +865,8 @@ export default function IAmMentor() {
 
                                     <div style={{ padding: 16, background: '#FEF3C7', border: '2px solid #F59E0B', borderRadius: 12 }}>
                                         <p style={{ margin: 0, fontSize: 14, color: '#92400E' }}>
-                                            ⚠️ <strong>Importante:</strong> Asegurate de tener una cuenta activa en Mercado Pago.
+                                            <FontAwesomeIcon icon={faExclamationCircle} style={{ marginRight: 6, color: '#f59e0b' }} />
+                                            <strong>Importante:</strong> Asegurate de tener una cuenta activa en Mercado Pago.
                                             Si no tenés una, podés crearla en <a href="https://www.mercadopago.com.uy" target="_blank" style={{ color: '#10B981', fontWeight: 600 }}>mercadopago.com.uy</a>
                                         </p>
                                     </div>
@@ -880,18 +897,21 @@ export default function IAmMentor() {
                                     </div>
 
                                     <div style={infoBoxStyle}>
-                                        <h3 style={subtitleTermsStyle}>📅 Política de Cancelaciones</h3>
+                                        <h3 style={subtitleTermsStyle}>
+                                            <FontAwesomeIcon icon={faCalendarAlt} style={{ marginRight: 8, color: '#0d9488' }} />
+                                            Política de Cancelaciones
+                                        </h3>
                                         <ul style={listTermsStyle}>
                                             <li><strong>Cancelación del estudiante:</strong>
                                                 <ul style={{ marginTop: 8 }}>
-                                                    <li>✅ Más de 12 horas antes: Reembolso completo</li>
-                                                    <li>⚠️ Menos de 12 horas: Se te acredita 25%</li>
+                                                    <li><span style={{ color: '#10b981' }}>✓</span> Más de 12 horas antes: Reembolso completo</li>
+                                                    <li><span style={{ color: '#f59e0b' }}>!</span> Menos de 12 horas: Se te acredita 25%</li>
                                                 </ul>
                                             </li>
                                             <li><strong>Cancelación tuya:</strong>
                                                 <ul style={{ marginTop: 8 }}>
-                                                    <li>✅ Más de 36 horas antes: Sin penalización</li>
-                                                    <li>❌ Menos de 36 horas: 1 strike</li>
+                                                    <li><span style={{ color: '#10b981' }}>✓</span> Más de 36 horas antes: Sin penalización</li>
+                                                    <li><span style={{ color: '#ef4444' }}>✕</span> Menos de 36 horas: 1 strike</li>
                                                     <li>⛔ 3 strikes = Baneo de 1 año</li>
                                                 </ul>
                                             </li>
@@ -990,8 +1010,8 @@ export default function IAmMentor() {
                             margin: '0 auto 20px',
                             boxShadow: '0 4px 12px rgba(220, 38, 38, 0.3)'
                         }}>
-                            <span style={{ fontSize: 32 }}>
-                                {confirmCancelSession.esMasDe36Horas ? '⚠️' : '🚫'}
+                            <span style={{ fontSize: 32, color: '#dc2626' }}>
+                                <FontAwesomeIcon icon={confirmCancelSession.esMasDe36Horas ? faExclamationCircle : faTimes} />
                             </span>
                         </div>
                         <h3 style={{
@@ -1002,7 +1022,7 @@ export default function IAmMentor() {
                         }}>
                             {confirmCancelSession.esMasDe36Horas
                                 ? '¿Estás seguro de cancelar esta clase?'
-                                : '⚠️ Estás incumpliendo la política de cancelación'}
+                                : 'Estás incumpliendo la política de cancelación'}
                         </h3>
                         <p style={{
                             color: '#991b1b',
@@ -1137,6 +1157,480 @@ export default function IAmMentor() {
                                 }}
                             >
                                 {isCanceling ? 'Cancelando...' : (confirmCancelSession.esMasDe36Horas ? 'Sí, cancelar' : 'Entiendo, cancelar igual')}
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* Modal de detalle de sesión */}
+            {showSessionModal && selectedSession && (
+                <div style={{
+                    position: 'fixed',
+                    top: 0,
+                    left: 0,
+                    right: 0,
+                    bottom: 0,
+                    background: 'rgba(0, 0, 0, 0.7)',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    zIndex: 1000,
+                    padding: 20
+                }} onClick={() => setShowSessionModal(false)}>
+                    <div style={{
+                        background: '#fff',
+                        borderRadius: 16,
+                        width: '100%',
+                        maxWidth: 600,
+                        maxHeight: '90vh',
+                        overflow: 'auto',
+                        boxShadow: '0 20px 60px rgba(0,0,0,0.3)'
+                    }} onClick={e => e.stopPropagation()}>
+                        {/* Header del modal */}
+                        <div style={{
+                            padding: '24px 24px 20px',
+                            borderBottom: '2px solid #f1f5f9',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'space-between'
+                        }}>
+                            <h2 style={{
+                                margin: 0,
+                                fontSize: 22,
+                                fontWeight: 700,
+                                color: '#0f172a',
+                                fontFamily: 'Inter, sans-serif'
+                            }}>
+                                Detalle de Mentoría
+                            </h2>
+                            <button
+                                onClick={() => setShowSessionModal(false)}
+                                style={{
+                                    width: 36,
+                                    height: 36,
+                                    borderRadius: 8,
+                                    border: 'none',
+                                    background: '#f1f5f9',
+                                    color: '#64748b',
+                                    cursor: 'pointer',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    justifyContent: 'center',
+                                    transition: 'all 0.2s ease',
+                                    fontSize: 16
+                                }}
+                                onMouseEnter={e => {
+                                    e.target.style.background = '#e2e8f0';
+                                    e.target.style.color = '#0f172a';
+                                }}
+                                onMouseLeave={e => {
+                                    e.target.style.background = '#f1f5f9';
+                                    e.target.style.color = '#64748b';
+                                }}
+                            >
+                                <FontAwesomeIcon icon={faTimes} />
+                            </button>
+                        </div>
+
+                        {/* Contenido del modal */}
+                        <div style={{ padding: 24 }}>
+                            {/* Info del alumno */}
+                            <div style={{
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: 16,
+                                marginBottom: 24,
+                                padding: 16,
+                                background: '#f8fafc',
+                                borderRadius: 12,
+                                border: '2px solid #e2e8f0'
+                            }}>
+                                <div style={{
+                                    width: 64,
+                                    height: 64,
+                                    borderRadius: 12,
+                                    background: selectedSession.alumno?.foto
+                                        ? `url(${selectedSession.alumno.foto}) center/cover`
+                                        : '#0d9488',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    justifyContent: 'center',
+                                    color: '#fff',
+                                    fontSize: 28,
+                                    fontWeight: 700,
+                                    flexShrink: 0
+                                }}>
+                                    {!selectedSession.alumno?.foto && (selectedSession.alumno?.nombre?.[0] || '?')}
+                                </div>
+                                <div style={{ flex: 1 }}>
+                                    <div style={{
+                                        fontSize: 18,
+                                        fontWeight: 700,
+                                        color: '#0f172a',
+                                        marginBottom: 4,
+                                        fontFamily: 'Inter, sans-serif'
+                                    }}>
+                                        {selectedSession.alumno?.nombre || 'Sin nombre'}
+                                    </div>
+                                    {selectedSession.alumno?.username && (
+                                        <div style={{
+                                            fontSize: 14,
+                                            color: '#64748b',
+                                            fontFamily: 'Inter, sans-serif',
+                                            display: 'flex',
+                                            alignItems: 'center',
+                                            gap: 6
+                                        }}>
+                                            <FontAwesomeIcon icon={faUser} style={{ fontSize: 12 }} />
+                                            @{selectedSession.alumno.username}
+                                        </div>
+                                    )}
+                                </div>
+                                <span style={{
+                                    padding: '6px 12px',
+                                    background: selectedSession.estado === 'confirmada' ? '#d1fae5' : '#fef3c7',
+                                    color: selectedSession.estado === 'confirmada' ? '#065f46' : '#92400e',
+                                    borderRadius: 8,
+                                    fontSize: 12,
+                                    fontWeight: 600,
+                                    fontFamily: 'Inter, sans-serif'
+                                }}>
+                                    {selectedSession.estado === 'confirmada' ? '✓ Confirmada' : '⏳ Pendiente'}
+                                </span>
+                            </div>
+
+                            {/* Detalles de la sesión */}
+                            <div style={{ display: 'grid', gap: 16, marginBottom: 24 }}>
+                                {/* Materia */}
+                                <div style={{
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    gap: 12,
+                                    padding: 12,
+                                    background: '#f8fafc',
+                                    borderRadius: 10,
+                                    border: '1px solid #e2e8f0'
+                                }}>
+                                    <div style={{
+                                        width: 40,
+                                        height: 40,
+                                        borderRadius: 8,
+                                        background: '#0d9488',
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        justifyContent: 'center',
+                                        color: '#fff',
+                                        fontSize: 16
+                                    }}>
+                                        <FontAwesomeIcon icon={faBook} />
+                                    </div>
+                                    <div style={{ flex: 1 }}>
+                                        <div style={{
+                                            fontSize: 12,
+                                            color: '#64748b',
+                                            marginBottom: 2,
+                                            fontFamily: 'Inter, sans-serif'
+                                        }}>
+                                            Materia
+                                        </div>
+                                        <div style={{
+                                            fontSize: 14,
+                                            fontWeight: 600,
+                                            color: '#0f172a',
+                                            fontFamily: 'Inter, sans-serif'
+                                        }}>
+                                            {selectedSession.materia?.nombre_materia || 'No especificada'}
+                                        </div>
+                                    </div>
+                                </div>
+
+                                {/* Fecha y hora */}
+                                <div style={{
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    gap: 12,
+                                    padding: 12,
+                                    background: '#f8fafc',
+                                    borderRadius: 10,
+                                    border: '1px solid #e2e8f0'
+                                }}>
+                                    <div style={{
+                                        width: 40,
+                                        height: 40,
+                                        borderRadius: 8,
+                                        background: '#2563eb',
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        justifyContent: 'center',
+                                        color: '#fff',
+                                        fontSize: 16
+                                    }}>
+                                        <FontAwesomeIcon icon={faCalendarAlt} />
+                                    </div>
+                                    <div style={{ flex: 1 }}>
+                                        <div style={{
+                                            fontSize: 12,
+                                            color: '#64748b',
+                                            marginBottom: 2,
+                                            fontFamily: 'Inter, sans-serif'
+                                        }}>
+                                            Fecha y hora
+                                        </div>
+                                        <div style={{
+                                            fontSize: 14,
+                                            fontWeight: 600,
+                                            color: '#0f172a',
+                                            fontFamily: 'Inter, sans-serif'
+                                        }}>
+                                            {new Date(selectedSession.fecha_hora).toLocaleDateString('es-UY', {
+                                                weekday: 'long',
+                                                day: 'numeric',
+                                                month: 'long',
+                                                year: 'numeric'
+                                            })} a las {new Date(selectedSession.fecha_hora).toLocaleTimeString('es-UY', {
+                                            hour: '2-digit',
+                                            minute: '2-digit'
+                                        })}
+                                        </div>
+                                        <div style={{
+                                            fontSize: 12,
+                                            color: '#64748b',
+                                            marginTop: 2,
+                                            fontFamily: 'Inter, sans-serif'
+                                        }}>
+                                            Duración: {selectedSession.duracion_minutos || 60} minutos
+                                        </div>
+                                    </div>
+                                </div>
+
+                                {/* Ubicación */}
+                                <div style={{
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    gap: 12,
+                                    padding: 12,
+                                    background: '#f8fafc',
+                                    borderRadius: 10,
+                                    border: '1px solid #e2e8f0'
+                                }}>
+                                    <div style={{
+                                        width: 40,
+                                        height: 40,
+                                        borderRadius: 8,
+                                        background: selectedSession.modalidad === 'virtual' ? '#8b5cf6' : '#10b981',
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        justifyContent: 'center',
+                                        color: '#fff',
+                                        fontSize: 16
+                                    }}>
+                                        <FontAwesomeIcon icon={selectedSession.modalidad === 'virtual' ? faUniversity : faHome} />
+                                    </div>
+                                    <div style={{ flex: 1 }}>
+                                        <div style={{
+                                            fontSize: 12,
+                                            color: '#64748b',
+                                            marginBottom: 2,
+                                            fontFamily: 'Inter, sans-serif'
+                                        }}>
+                                            Modalidad
+                                        </div>
+                                        <div style={{
+                                            fontSize: 14,
+                                            fontWeight: 600,
+                                            color: '#0f172a',
+                                            fontFamily: 'Inter, sans-serif'
+                                        }}>
+                                            {selectedSession.modalidad === 'virtual' ? 'Virtual (Teams)' : 'Presencial'}
+                                            {selectedSession.modalidad === 'presencial' && selectedSession.locacion && (
+                                                <span style={{ color: '#64748b', fontWeight: 500 }}>
+                                                    {' '}- {selectedSession.locacion === 'casa' ? 'Casa' : 'Facultad'}
+                                                </span>
+                                            )}
+                                        </div>
+                                    </div>
+                                </div>
+
+                                {/* Cantidad de participantes */}
+                                <div style={{
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    gap: 12,
+                                    padding: 12,
+                                    background: '#f8fafc',
+                                    borderRadius: 10,
+                                    border: '1px solid #e2e8f0'
+                                }}>
+                                    <div style={{
+                                        width: 40,
+                                        height: 40,
+                                        borderRadius: 8,
+                                        background: '#0d9488',
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        justifyContent: 'center',
+                                        color: '#fff',
+                                        fontSize: 16
+                                    }}>
+                                        <FontAwesomeIcon icon={faUsers} />
+                                    </div>
+                                    <div style={{ flex: 1 }}>
+                                        <div style={{
+                                            fontSize: 12,
+                                            color: '#64748b',
+                                            marginBottom: 2,
+                                            fontFamily: 'Inter, sans-serif'
+                                        }}>
+                                            Participantes
+                                        </div>
+                                        <div style={{
+                                            fontSize: 14,
+                                            fontWeight: 600,
+                                            color: '#0f172a',
+                                            fontFamily: 'Inter, sans-serif'
+                                        }}>
+                                            {selectedSession.cantidad_alumnos || 1} {selectedSession.cantidad_alumnos === 1 ? 'persona' : 'personas'}
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            {/* Emails de participantes */}
+                            {selectedSession.emails_participantes && selectedSession.emails_participantes.length > 0 && (
+                                <div style={{
+                                    marginBottom: 24,
+                                    padding: 16,
+                                    background: '#f0f9ff',
+                                    borderRadius: 12,
+                                    border: '2px solid #bae6fd'
+                                }}>
+                                    <div style={{
+                                        fontSize: 14,
+                                        fontWeight: 600,
+                                        color: '#0f172a',
+                                        marginBottom: 12,
+                                        fontFamily: 'Inter, sans-serif',
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        gap: 8
+                                    }}>
+                                        <FontAwesomeIcon icon={faEnvelope} style={{ color: '#0284c7' }} />
+                                        Emails de participantes:
+                                    </div>
+                                    <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                                        {selectedSession.emails_participantes.map((email, idx) => (
+                                            <div key={idx} style={{
+                                                fontSize: 13,
+                                                color: '#0c4a6e',
+                                                fontFamily: 'Inter, sans-serif',
+                                                padding: '8px 12px',
+                                                background: '#e0f2fe',
+                                                borderRadius: 6,
+                                                display: 'flex',
+                                                alignItems: 'center',
+                                                gap: 8
+                                            }}>
+                                                <span style={{
+                                                    width: 24,
+                                                    height: 24,
+                                                    borderRadius: 6,
+                                                    background: '#0284c7',
+                                                    color: '#fff',
+                                                    display: 'flex',
+                                                    alignItems: 'center',
+                                                    justifyContent: 'center',
+                                                    fontSize: 11,
+                                                    fontWeight: 700
+                                                }}>
+                                                    {idx + 1}
+                                                </span>
+                                                {email}
+                                            </div>
+                                        ))}
+                                    </div>
+                                </div>
+                            )}
+
+                            {/* Descripción del alumno */}
+                            {selectedSession.descripcion_alumno && (
+                                <div style={{
+                                    marginBottom: 24,
+                                    padding: 16,
+                                    background: '#f0fdf4',
+                                    borderLeft: '4px solid #0d9488',
+                                    borderRadius: 8
+                                }}>
+                                    <div style={{
+                                        fontSize: 14,
+                                        fontWeight: 600,
+                                        color: '#0f172a',
+                                        marginBottom: 8,
+                                        fontFamily: 'Inter, sans-serif',
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        gap: 8
+                                    }}>
+                                        <FontAwesomeIcon icon={faComment} style={{ color: '#0d9488' }} />
+                                        Descripción de la sesión:
+                                    </div>
+                                    <p style={{
+                                        margin: 0,
+                                        fontSize: 14,
+                                        color: '#065f46',
+                                        lineHeight: 1.6,
+                                        fontFamily: 'Inter, sans-serif'
+                                    }}>
+                                        "{selectedSession.descripcion_alumno}"
+                                    </p>
+                                </div>
+                            )}
+
+                            {/* Botón cancelar */}
+                            <button
+                                onClick={() => {
+                                    const fechaSesion = new Date(selectedSession.fecha_hora);
+                                    const ahora = new Date();
+                                    const horasRestantes = (fechaSesion - ahora) / (1000 * 60 * 60);
+
+                                    setConfirmCancelSession({
+                                        id: selectedSession.id_sesion,
+                                        esMasDe36Horas: horasRestantes > 36,
+                                        fecha: fechaSesion,
+                                        materia: selectedSession.materia?.nombre_materia
+                                    });
+                                    setShowSessionModal(false);
+                                }}
+                                style={{
+                                    width: '100%',
+                                    padding: '12px',
+                                    background: '#fef2f2',
+                                    color: '#dc2626',
+                                    border: '2px solid #fecaca',
+                                    borderRadius: 10,
+                                    fontSize: 14,
+                                    fontWeight: 600,
+                                    cursor: 'pointer',
+                                    transition: 'all 0.2s ease',
+                                    fontFamily: 'Inter, sans-serif',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    justifyContent: 'center',
+                                    gap: 8
+                                }}
+                                onMouseEnter={e => {
+                                    e.target.style.background = '#fee2e2';
+                                    e.target.style.transform = 'translateY(-1px)';
+                                    e.target.style.boxShadow = '0 4px 12px rgba(220, 38, 38, 0.2)';
+                                }}
+                                onMouseLeave={e => {
+                                    e.target.style.background = '#fef2f2';
+                                    e.target.style.transform = 'translateY(0)';
+                                    e.target.style.boxShadow = 'none';
+                                }}
+                            >
+                                <FontAwesomeIcon icon={faTimes} />
+                                Cancelar mentoría
                             </button>
                         </div>
                     </div>

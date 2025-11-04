@@ -22,6 +22,9 @@ import { useNotificationSettings } from '../hooks/useNotificationSettings';
 import { usePrivacySettings } from '../hooks/usePrivacySettings';
 import { downloadUserData, getUserDataSummary } from '../utils/exportUserData';
 import { supabase } from '../supabase';
+import emailjs from '@emailjs/browser';
+
+emailjs.init('JA_sGzk8UJMPOtSmE')
 import { useMentorStatus } from '../hooks/useMentorStatus';
 
 const TAB_STORAGE_KEY = 'kerana_settings_active_tab';
@@ -52,6 +55,8 @@ export default function Settings() {
         { key: 'nuevo_like', label: 'Likes a tus apuntes', color: '#ef4444' },
         { key: 'nueva_resenia', label: 'Reseñas a tus materias favoritas', color: '#f59e0b' },
         { key: 'nuevo_apunte', label: 'Nuevos apuntes de tus seguidos', color: '#3b82f6' },
+        { key: 'compra_apunte', label: 'Compras de tus apuntes', color: '#10b981' },
+        { key: 'mentor_nuevas_horas', label: 'Nuevas horas disponibles de mentores', color: '#0d9488' },
         ...(isMentor ? [{ key: 'nueva_clase_agendada', label: 'Clases agendadas', color: '#0d9488' }] : []),
         { key: 'system', label: 'Sistema', color: '#64748b' },
         { key: 'update', label: 'Actualizaciones', color: '#0ea5e9' },
@@ -369,40 +374,33 @@ function DeleteAccountModal({ isOpen, onClose }) {
         setError('');
 
         try {
+            // Obtener auth UUID
             const { data: { user }, error: userError } = await supabase.auth.getUser();
             if (userError || !user) throw new Error('Usuario no autenticado');
 
-            const userId = user.id;
-
+            // Generar código en Supabase usando auth.uid()
             const { data, error } = await supabase.rpc('generate_verification_code', {
-                target_user_id: userId,
+                target_user_id: user.id,
                 code_purpose: 'delete_account'
             });
-
             if (error) throw error;
             if (!data?.success) throw new Error(data?.error || 'Error al generar código');
 
-            const response = await fetch(
-                `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/send-verification-email`,
+            // Calcular hora de expiración (10 minutos)
+            const expiryTime = new Date(Date.now() + 10 * 60 * 1000)
+                .toLocaleTimeString('es-UY', { hour: '2-digit', minute: '2-digit' });
+
+            // Enviar email con EmailJS
+            await emailjs.send(
+                'service_fbf675u',      // Tu Service ID
+                'template_u2ywaso',     // Tu Template ID
                 {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}`,
-                    },
-                    body: JSON.stringify({
-                        email: data.email,
-                        name: data.name,
-                        code: data.code,
-                    }),
+                    to_email: data.email,
+                    to_name: data.name,
+                    verification_code: data.code,
+                    expiry_time: expiryTime,
                 }
             );
-
-            const result = await response.json();
-
-            if (!result.success) {
-                throw new Error(result.error || 'Error al enviar email');
-            }
 
             setCodeSent(true);
             setError('');
@@ -446,7 +444,8 @@ function DeleteAccountModal({ isOpen, onClose }) {
                     setLoading(false);
                     return;
                 }
-            } else {
+            }
+            else {
                 if (!password) {
                     setError('Ingresá tu contraseña');
                     setStep(2);

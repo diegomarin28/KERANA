@@ -10,6 +10,7 @@ import { ConnectionMonitor } from './components/ConnectionMonitor';
 import AuthSessionManager from './components/AuthSessionManager';
 import ErrorBoundary from './components/ErrorBoundary';
 import { GlobalCalendar } from './pages/GlobalCalendar';
+import { UpcomingMentorships } from './pages/student/UpcomingMentorships';
 
 
 // Componentes lazy
@@ -52,6 +53,10 @@ const FolderView = lazy(() => import("./pages/FolderView"));
 const PublicProfileMentor = lazy(() => import("./pages/PublicProfileMentor"));
 const Credits = lazy(() => import("./pages/Credits"));
 const MyCredits = lazy(() => import("./pages/MyCredits"));
+const CreateProfile = lazy(() => import("./pages/CreateProfile"));
+const ResetPassword = lazy(() => import("./pages/ResetPassword"));
+
+
 
 // Componentes cargados inmediatamente
 import { useSidebarStats } from './hooks/useSidebarStats';
@@ -180,6 +185,7 @@ function AppRoutes() {
 
                     {/* Usuario - PROTEGIDAS */}
                     <Route path="/profile" element={<AuthGuard requireAuth={true}><Profile /></AuthGuard>} />
+                    <Route path="/profile/setup" element={<AuthGuard requireAuth={true}><CreateProfile /></AuthGuard>} />
                     <Route path="/edit-profile" element={<EditProfile />} />
                     <Route path="/panel" element={<AuthGuard requireAuth={true}><UserDashboard /></AuthGuard>} />
                     <Route path="/user-card" element={<UserCard />} />
@@ -200,6 +206,7 @@ function AppRoutes() {
                     <Route path="/credits/failure" element={<CreditsFailure />} />
                     <Route path="/credits/pending" element={<CreditsFailure />} />
                     <Route path="/mis-creditos"  element={<AuthGuard requireAuth={true}><MyCredits /></AuthGuard>} />
+                    <Route path="/upcoming-mentorships" element={<UpcomingMentorships />} />
 
                     {/* Varios */}
                     <Route path="/equipo" element={<Equipo />} />
@@ -216,6 +223,7 @@ function AppRoutes() {
                     <Route path="/signin" element={<Navigate to="/?auth=signin" replace />} />
                     <Route path="/auth/confirm" element={<AuthConfirm />} />
                     <Route path="/auth/callback" element={<AuthCallback />} />
+                    <Route path="/auth/reset-password" element={<ResetPassword />} />
 
                     <Route path="/help-center" element={<HelpCenter />} />
                     <Route path="/terms" element={<Terms />} />

@@ -130,6 +130,47 @@ export const notificationTypes = {
     },
 
     /**
+     * 🆕 Mentor agregó nuevas horas disponibles
+     */
+    async mentorNuevasHorasDisponibles(mentorUserId, mentorNombre, fecha, cantidadSlots, mentorId) {
+        // Obtener todos los seguidores activos del mentor
+        const { data: seguidores } = await supabase
+            .from('seguidores')
+            .select('seguidor_id')
+            .eq('seguido_id', mentorUserId)
+            .eq('estado', 'activo');
+
+        if (!seguidores || seguidores.length === 0) {
+            console.log('⚠️ Mentor no tiene seguidores activos');
+            return { data: null, error: null };
+        }
+
+        // Formatear fecha
+        const fechaObj = new Date(fecha);
+        const fechaFormateada = fechaObj.toLocaleDateString('es-UY', {
+            day: 'numeric',
+            month: 'long',
+            year: 'numeric'
+        });
+
+        // Enviar notificación a cada seguidor
+        const notificaciones = seguidores.map(seg =>
+            createNotification({
+                usuarioId: seg.seguidor_id,
+                tipo: 'mentor_nuevas_horas',
+                emisorId: mentorUserId,
+                relacionId: mentorId,
+                mensaje: `${mentorNombre} agregó ${cantidadSlots} ${cantidadSlots === 1 ? 'horario' : 'horarios'} disponible${cantidadSlots === 1 ? '' : 's'} para el ${fechaFormateada}`,
+            })
+        );
+
+        await Promise.all(notificaciones);
+        console.log(`✅ ${seguidores.length} notificaciones enviadas`);
+
+        return { data: { enviadas: seguidores.length }, error: null };
+    },
+
+    /**
      * Actualización de la plataforma
      */
     async actualizacion(usuarioId, mensaje) {
@@ -142,3 +183,4 @@ export const notificationTypes = {
         });
     },
 };
+

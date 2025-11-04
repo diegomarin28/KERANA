@@ -61,13 +61,20 @@ export default function Notifications() {
 
         // 🆕 Si es notificación de clase agendada → ir a página mentor
         if (notif.tipo === 'nueva_clase_agendada') {
-            navigate('/i-am-mentor');
+            navigate('/mentor/courses');
             return;
         }
 
         // Si YA está leída: ir al perfil (segundo click)
         if (notif.emisor?.username) {
             navigate(`/user/${notif.emisor.username}`);
+        }
+
+        if (notif.tipo === 'mentor_nuevas_horas') {
+            if (notif.emisor?.username) {
+                navigate(`/user/${notif.emisor.username}`);
+            }
+            return;
         }
     };
 
@@ -627,6 +634,7 @@ const buttonSeguirStyle = {
     transition: 'all 0.15s cubic-bezier(0.4, 0, 0.2, 1)',
     whiteSpace: 'nowrap',
     flexShrink: 0,
+    minWidth: '105px',
     fontFamily: 'Inter, sans-serif'
 };
 
@@ -642,6 +650,7 @@ const buttonSiguiendoStyle = {
     transition: 'all 0.15s cubic-bezier(0.4, 0, 0.2, 1)',
     whiteSpace: 'nowrap',
     flexShrink: 0,
+    minWidth: '105px',
     fontFamily: 'Inter, sans-serif'
 };
 

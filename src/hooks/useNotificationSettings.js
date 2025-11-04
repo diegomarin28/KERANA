@@ -13,8 +13,10 @@ const DEFAULT_SETTINGS = {
     nuevo_apunte: true,
     apunte_aprobado: true,
     mentor_aprobado: true,
-    nueva_clase_agendada: true, // 🆕 Agregado
+    nueva_clase_agendada: true,
+    mentor_nuevas_horas: true,
     system: true,
+    compra_apunte: true,
     update: true,
 
     // Configuraciones generales
