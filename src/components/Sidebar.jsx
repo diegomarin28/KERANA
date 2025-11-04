@@ -22,7 +22,8 @@ import {
     faShieldAlt,
     faTimes,
     faCheckCircle,
-    faBookOpen
+    faBookOpen,
+    faCalendarCheck
 } from '@fortawesome/free-solid-svg-icons';
 
 export default function Sidebar({
@@ -42,6 +43,7 @@ export default function Sidebar({
     const { updateTrigger } = useAvatar();
     const navigate = useNavigate();
     const [avatarLoading, setAvatarLoading] = useState(true);
+    const [tieneSesiones, setTieneSesiones] = useState(false);
 
     useEffect(() => {
         if (user) {
@@ -59,6 +61,32 @@ export default function Sidebar({
             document.body.style.overflow = "unset";
         };
     }, [open, updateTrigger]);
+
+    useEffect(() => {
+        if (user) {
+            verificarSesiones();
+        }
+    }, [user]);
+
+    const verificarSesiones = async () => {
+        if (!user) return;
+
+        try {
+            const { data: userId } = await supabase.rpc('obtener_usuario_actual_id');
+            if (!userId) return;
+
+            const { count } = await supabase
+                .from('mentor_sesion')
+                .select('*', { count: 'exact', head: true })
+                .eq('id_alumno', userId)
+                .eq('estado', 'confirmada')
+                .gte('fecha_hora', new Date().toISOString());
+
+            setTieneSesiones(count > 0);
+        } catch (error) {
+            console.error('Error verificando sesiones:', error);
+        }
+    };
 
     useEffect(() => {
         if (!open) return;
@@ -235,13 +263,20 @@ export default function Sidebar({
                     <MenuLink icon={faShoppingCart} label="Comprados" onClick={() => go("/purchased")} />
                     <MenuLink icon={faBookmark} label="Favoritos" onClick={() => go("/favorites")} />
                     <MenuLink icon={faFileAlt} label="Mis Apuntes" onClick={() => go("/my_papers")} />
+                    {tieneSesiones && (
+                        <MenuLink
+                            icon={faCalendarCheck}
+                            label="Próximas Mentorías"
+                            onClick={() => go("/upcoming-mentorships")}
+                        />
+                    )}
 
                     {/* SECCIÓN DE MENTOR */}
                     {isMentor && !mentorLoading && (
                         <>
                             <Group title="Panel de Mentor" />
                             <MenuLink icon={faBookOpen} label="Soy Mentor" onClick={() => go("/mentor/courses")} />
-                            <MenuLink icon={faUsers} label="Mis Alumnos" onClick={() => go("/mentor/students")} />
+                            {/* <MenuLink icon={faUsers} label="Mis Alumnos" onClick={() => go("/mentor/students")} />*/}
                             <MenuLink icon={faCalendar} label="Mi Calendario" onClick={() => go("/mentor/calendar")} />
                         </>
                     )}

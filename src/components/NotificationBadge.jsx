@@ -128,13 +128,19 @@ export default function NotificationBadge({ inHero = true }) {
         // 🆕 Si es notificación de clase agendada → ir a página mentor
         if (notif.tipo === 'nueva_clase_agendada') {
             setIsOpen(false);
-            navigate('/i-am-mentor');
+            navigate('/mentor/courses');
             return;
         }
 
         if (notif.emisor?.username) {
             setIsOpen(false);
             navigate(`/user/${notif.emisor.username}`);
+        }
+        if (notif.tipo === 'mentor_nuevas_horas') {
+            if (notif.emisor?.username) {
+                navigate(`/user/${notif.emisor.username}`);
+            }
+            return;
         }
     };
 
@@ -445,7 +451,7 @@ export default function NotificationBadge({ inHero = true }) {
                                                 </p>
                                             </div>
 
-                                            {/* Botón Seguir/Siguiendo */}
+                                            {/* Botón Seguir */}
                                             {isFollowerNotif && !isFollowing && (
                                                 <button
                                                     onClick={(e) => handleFollowBack(e, notif)}
@@ -461,6 +467,7 @@ export default function NotificationBadge({ inHero = true }) {
                                                         transition: 'all 0.15s cubic-bezier(0.4, 0, 0.2, 1)',
                                                         whiteSpace: 'nowrap',
                                                         flexShrink: 0,
+                                                        minWidth: '105px',
                                                     }}
                                                     onMouseEnter={(e) => {
                                                         e.target.style.background = '#1877f2';
@@ -474,6 +481,7 @@ export default function NotificationBadge({ inHero = true }) {
                                                     Seguir
                                                 </button>
                                             )}
+                                            {/* Botón Siguiendo */}
                                             {isFollowerNotif && isFollowing && (
                                                 <button
                                                     onClick={(e) => handleShowUnfollowModal(e, notif)}
@@ -489,6 +497,7 @@ export default function NotificationBadge({ inHero = true }) {
                                                         flexShrink: 0,
                                                         cursor: 'pointer',
                                                         transition: 'all 0.15s cubic-bezier(0.4, 0, 0.2, 1)',
+                                                        minWidth: '105px',
                                                     }}
                                                     onMouseEnter={(e) => {
                                                         e.target.style.background = '#dbdbdb';

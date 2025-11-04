@@ -18,6 +18,7 @@ import { Card } from '../components/UI/Card';
 import { Button } from '../components/UI/Button';
 import PDFThumbnail from '../components/PDFThumbnail';
 import emailjs from '@emailjs/browser';
+import { notificationTypes } from '../api/notificationTypes';
 
 export const ApunteView = () => {
     const { id } = useParams();
@@ -374,6 +375,32 @@ export const ApunteView = () => {
 
             setLiked(data.liked);
             setLikesCount(data.count);
+
+            // 🆕 Si dio like (no unlike), enviar notificación al dueño
+            if (data.liked && apunte.id_usuario !== currentUserId) {
+                try {
+                    // Obtener nombre del usuario actual
+                    const { data: userData } = await supabase
+                        .from('usuario')
+                        .select('nombre')
+                        .eq('id_usuario', currentUserId)
+                        .single();
+
+                    if (userData) {
+                        await notificationTypes.nuevoLike(
+                            apunte.id_usuario,        // receptor (dueño del apunte)
+                            currentUserId,             // emisor (quien da like)
+                            userData.nombre,           // nombre del emisor
+                            apunte.id_apunte,         // id del apunte
+                            apunte.titulo             // título del apunte
+                        );
+                        console.log('✅ Notificación de like enviada');
+                    }
+                } catch (notifError) {
+                    console.error('Error enviando notificación de like:', notifError);
+                    // No mostrar error al usuario, el like ya se registró
+                }
+            }
 
         } catch (error) {
             console.error('Error en handleLike:', error);

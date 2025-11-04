@@ -1,5 +1,11 @@
 import { useEffect, useState, useRef } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
+import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
+import {
+    faSpinner,
+    faCheckCircle,
+    faExclamationTriangle
+} from '@fortawesome/free-solid-svg-icons';
 import { supabase } from '../supabase';
 import { Card } from '../components/UI/Card';
 import { Button } from '../components/UI/Button';
@@ -115,18 +121,23 @@ export default function AuthConfirm() {
     };
 
     const containerStyle = {
-        minHeight: '60vh',
+        minHeight: '100vh',
         display: 'flex',
         justifyContent: 'center',
         alignItems: 'center',
-        padding: 20
+        padding: 20,
+        background: '#f8fafc',
+        fontFamily: 'Inter, sans-serif'
     };
 
     const cardStyle = {
-        padding: 40,
+        padding: '48px 40px',
         textAlign: 'center',
-        maxWidth: 500,
-        width: '100%'
+        maxWidth: 480,
+        width: '100%',
+        borderRadius: 16,
+        border: '2px solid #f1f5f9',
+        boxShadow: '0 8px 24px rgba(0,0,0,0.08)'
     };
 
     if (status === 'loading') {
@@ -134,18 +145,37 @@ export default function AuthConfirm() {
             <div style={containerStyle}>
                 <Card style={cardStyle}>
                     <div style={{
-                        width: 50,
-                        height: 50,
-                        border: '3px solid #f3f4f6',
-                        borderTop: '3px solid #2563eb',
+                        width: 80,
+                        height: 80,
                         borderRadius: '50%',
-                        animation: 'spin 1s linear infinite',
-                        margin: '0 auto 20px'
-                    }} />
-                    <h2 style={{ margin: '0 0 16px 0', color: '#1f2937', fontFamily: 'Inter, sans-serif' }}>
+                        background: '#2563eb',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        margin: '0 auto 24px'
+                    }}>
+                        <FontAwesomeIcon
+                            icon={faSpinner}
+                            spin
+                            style={{ fontSize: 36, color: '#fff' }}
+                        />
+                    </div>
+                    <h2 style={{
+                        margin: '0 0 12px 0',
+                        color: '#13346b',
+                        fontFamily: 'Inter, sans-serif',
+                        fontSize: 24,
+                        fontWeight: 700
+                    }}>
                         Procesando...
                     </h2>
-                    <p style={{ color: '#6b7280', margin: 0, fontFamily: 'Inter, sans-serif' }}>
+                    <p style={{
+                        color: '#64748b',
+                        margin: 0,
+                        fontFamily: 'Inter, sans-serif',
+                        fontSize: 15,
+                        fontWeight: 500
+                    }}>
                         {message}
                     </p>
                 </Card>
@@ -159,13 +189,40 @@ export default function AuthConfirm() {
                 <Card style={{
                     ...cardStyle,
                     background: '#fef2f2',
-                    border: '1px solid #fecaca'
+                    border: '2px solid #fecaca'
                 }}>
-                    <div style={{ fontSize: 48, marginBottom: 16 }}>⚠️</div>
-                    <h2 style={{ margin: '0 0 16px 0', color: '#dc2626', fontFamily: 'Inter, sans-serif' }}>
+                    <div style={{
+                        width: 80,
+                        height: 80,
+                        borderRadius: '50%',
+                        background: '#ef4444',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        margin: '0 auto 24px'
+                    }}>
+                        <FontAwesomeIcon
+                            icon={faExclamationTriangle}
+                            style={{ fontSize: 36, color: '#fff' }}
+                        />
+                    </div>
+                    <h2 style={{
+                        margin: '0 0 12px 0',
+                        color: '#dc2626',
+                        fontFamily: 'Inter, sans-serif',
+                        fontSize: 24,
+                        fontWeight: 700
+                    }}>
                         Error de autenticación
                     </h2>
-                    <p style={{ color: '#991b1b', margin: '0 0 24px 0', fontFamily: 'Inter, sans-serif' }}>
+                    <p style={{
+                        color: '#991b1b',
+                        margin: '0 0 28px 0',
+                        fontFamily: 'Inter, sans-serif',
+                        fontSize: 15,
+                        fontWeight: 500,
+                        lineHeight: 1.5
+                    }}>
                         {message}
                     </p>
                     <div style={{
@@ -174,12 +231,58 @@ export default function AuthConfirm() {
                         justifyContent: 'center',
                         flexWrap: 'wrap'
                     }}>
-                        <Button variant="primary" onClick={handleRetry}>
+                        <button
+                            onClick={handleRetry}
+                            style={{
+                                padding: '12px 24px',
+                                background: '#2563eb',
+                                color: '#fff',
+                                border: 'none',
+                                borderRadius: 10,
+                                fontSize: 15,
+                                fontWeight: 600,
+                                cursor: 'pointer',
+                                transition: 'all 0.2s ease',
+                                fontFamily: 'Inter, sans-serif'
+                            }}
+                            onMouseEnter={(e) => {
+                                e.target.style.background = '#1e40af';
+                                e.target.style.transform = 'translateY(-2px)';
+                                e.target.style.boxShadow = '0 4px 12px rgba(37, 99, 235, 0.3)';
+                            }}
+                            onMouseLeave={(e) => {
+                                e.target.style.background = '#2563eb';
+                                e.target.style.transform = 'translateY(0)';
+                                e.target.style.boxShadow = 'none';
+                            }}
+                        >
                             Reintentar
-                        </Button>
-                        <Button variant="secondary" onClick={handleGoHome}>
+                        </button>
+                        <button
+                            onClick={handleGoHome}
+                            style={{
+                                padding: '12px 24px',
+                                background: '#fff',
+                                color: '#64748b',
+                                border: '2px solid #e2e8f0',
+                                borderRadius: 10,
+                                fontSize: 15,
+                                fontWeight: 600,
+                                cursor: 'pointer',
+                                transition: 'all 0.2s ease',
+                                fontFamily: 'Inter, sans-serif'
+                            }}
+                            onMouseEnter={(e) => {
+                                e.target.style.background = '#f8fafc';
+                                e.target.style.borderColor = '#2563eb';
+                            }}
+                            onMouseLeave={(e) => {
+                                e.target.style.background = '#fff';
+                                e.target.style.borderColor = '#e2e8f0';
+                            }}
+                        >
                             Ir al inicio
-                        </Button>
+                        </button>
                     </div>
                 </Card>
             </div>
@@ -192,18 +295,68 @@ export default function AuthConfirm() {
                 <Card style={{
                     ...cardStyle,
                     background: '#f0fdf4',
-                    border: '1px solid #bbf7d0'
+                    border: '2px solid #bbf7d0'
                 }}>
-                    <div style={{ fontSize: 48, marginBottom: 16 }}>✅</div>
-                    <h2 style={{ margin: '0 0 16px 0', color: '#166534', fontFamily: 'Inter, sans-serif' }}>
+                    <div style={{
+                        width: 80,
+                        height: 80,
+                        borderRadius: '50%',
+                        background: '#10b981',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        margin: '0 auto 24px'
+                    }}>
+                        <FontAwesomeIcon
+                            icon={faCheckCircle}
+                            style={{ fontSize: 36, color: '#fff' }}
+                        />
+                    </div>
+                    <h2 style={{
+                        margin: '0 0 12px 0',
+                        color: '#166534',
+                        fontFamily: 'Inter, sans-serif',
+                        fontSize: 24,
+                        fontWeight: 700
+                    }}>
                         ¡Autenticación exitosa!
                     </h2>
-                    <p style={{ color: '#166534', margin: '0 0 24px 0', fontFamily: 'Inter, sans-serif' }}>
+                    <p style={{
+                        color: '#166534',
+                        margin: '0 0 28px 0',
+                        fontFamily: 'Inter, sans-serif',
+                        fontSize: 15,
+                        fontWeight: 500,
+                        lineHeight: 1.5
+                    }}>
                         {message}
                     </p>
-                    <Button variant="primary" onClick={() => navigate('/profile/setup')}>
+                    <button
+                        onClick={() => navigate('/profile/setup')}
+                        style={{
+                            padding: '12px 32px',
+                            background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
+                            color: '#fff',
+                            border: 'none',
+                            borderRadius: 10,
+                            fontSize: 15,
+                            fontWeight: 700,
+                            cursor: 'pointer',
+                            transition: 'all 0.2s ease',
+                            fontFamily: 'Inter, sans-serif',
+                            boxShadow: '0 4px 12px rgba(16, 185, 129, 0.2)'
+                        }}
+                        onMouseEnter={(e) => {
+                            e.target.style.transform = 'translateY(-2px)';
+                            e.target.style.boxShadow = '0 8px 20px rgba(16, 185, 129, 0.3)';
+                        }}
+                        onMouseLeave={(e) => {
+                            e.target.style.transform = 'translateY(0)';
+                            e.target.style.boxShadow = '0 4px 12px rgba(16, 185, 129, 0.2)';
+                        }}
+                    >
                         Continuar
-                    </Button>
+                    </button>
                 </Card>
             </div>
         );

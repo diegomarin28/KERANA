@@ -3,6 +3,7 @@ import { supabase } from '../supabase';
 import { slotsAPI } from '../api/slots';
 import { sesionesAPI } from '../api/sesiones';
 import { notificationTypes } from '../api/notificationTypes';
+import { enviarEmailsConfirmacion } from '../utils/emailService';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import {
     faCalendar, faChevronLeft, faChevronRight, faClock,
@@ -394,8 +395,18 @@ export function GlobalCalendar() {
 
             const precioTotal = calcularPrecio(numPersonas, selectedSlot.modalidad);
 
-            // 🟡 AQUÍ VAS A AGREGAR MERCADO PAGO DESPUÉS
-            const pagoExitoso = true;
+            // 🟡 TODO: INTEGRAR MERCADO PAGO SPLIT PAYMENT AQUÍ
+            // ============================================================
+            // 1. Obtener CVU del mentor desde la tabla mentor
+            // 2. Crear preferencia de pago con split payment:
+            //    - Total: precioTotal
+            //    - Split: mentor recibe X%, Kerana recibe Y%
+            // 3. Redirigir al usuario a Mercado Pago
+            // 4. Recibir webhook de confirmación de pago
+            // 5. Si pago exitoso → continuar con creación de sesión
+            // 6. Si pago falla → mostrar error y no crear sesión
+            // ============================================================
+            const pagoExitoso = true; // ⚠️ CAMBIAR cuando integres MP
 
             if (!pagoExitoso) {
                 setErrorMessage('El pago no pudo procesarse. Intenta nuevamente.');
@@ -470,6 +481,70 @@ export function GlobalCalendar() {
             } catch (notifError) {
                 console.error('Error enviando notificación:', notifError);
                 // No mostrar error al usuario
+            }
+
+            // ✅ PASO 6: Enviar emails de confirmación (SOLO SI ES VIRTUAL)
+            if (selectedSlot.modalidad === 'virtual') {
+                try {
+                    console.log('📧 Enviando emails de confirmación...');
+
+                    // Obtener datos del mentor
+                    const { data: mentorData } = await supabase
+                        .from('mentor')
+                        .select(`
+                            id_usuario,
+                            usuario:id_usuario(nombre, correo)
+                        `)
+                        .eq('id_mentor', selectedMentor.mentorId)
+                        .single();
+
+                    // Obtener datos del alumno
+                    const { data: alumnoData } = await supabase
+                        .from('usuario')
+                        .select('nombre, correo')
+                        .eq('id_usuario', currentEstudianteId)
+                        .single();
+
+                    if (mentorData?.usuario && alumnoData) {
+                        // Formatear fecha legible
+                        const fechaFormateada = new Date(fechaHora).toLocaleDateString('es-UY', {
+                            weekday: 'long',
+                            day: 'numeric',
+                            month: 'long',
+                            year: 'numeric'
+                        });
+
+                        const horaFormateada = selectedSlot.hora;
+
+                        // Enviar ambos emails en paralelo
+                        const resultadoEmails = await enviarEmailsConfirmacion({
+                            mentorEmail: mentorData.usuario.correo,
+                            mentorNombre: mentorData.usuario.nombre,
+                            alumnoEmail: alumnoData.correo,
+                            alumnoNombre: alumnoData.nombre,
+                            materiaNombre: selectedMentor.materia,
+                            fecha: fechaFormateada,
+                            hora: horaFormateada,
+                            duracion: selectedSlot.duracion,
+                            cantidadAlumnos: numPersonas,
+                            emailsParticipantes: emailsParticipantes,
+                            descripcion: descripcionSesion.trim() || null,
+                            modalidad: selectedSlot.modalidad
+                        });
+
+                        if (resultadoEmails.success) {
+                            console.log('✅ Emails enviados exitosamente');
+                        } else {
+                            console.error('⚠️ Error enviando emails:', {
+                                mentor: resultadoEmails.mentor,
+                                alumno: resultadoEmails.alumno
+                            });
+                        }
+                    }
+                } catch (emailError) {
+                    console.error('❌ Error en sistema de emails:', emailError);
+                    // No mostrar error al usuario - la sesión ya está creada
+                }
             }
 
             setShowSuccessModal(true);
