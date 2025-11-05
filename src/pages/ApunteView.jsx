@@ -141,7 +141,24 @@ export const ApunteView = () => {
             setIsFavorite(favoriteData.length > 0);
 
             // Verificar si ya dio like
+// Verificar si ya dio like
             const { data: likeCheck } = await notesAPI.checkIfLiked(id);
+
+// 🔍 DEBUG: Verificar likes reales en BD
+            const { data: likesDebug } = await supabase
+                .from('likes')
+                .select('*')
+                .eq('id_usuario', usuarioData.id_usuario)
+                .eq('id_apunte', id);
+
+            console.log('🔍 Likes reales en BD:', likesDebug);
+            console.log('🔍 Check liked en ApunteView:', {
+                apunte_id: id,
+                liked: likeCheck,
+                currentUserId: usuarioData.id_usuario,
+                likesCount: likesDebug?.length || 0
+            });
+
             setLiked(likeCheck);
 
             // Cargar conteo de likes
@@ -231,7 +248,6 @@ export const ApunteView = () => {
                             referencia_id: apunte.id_apunte
                         });
 
-                    console.log(`💰 Vendedor recibió ${creditosVendedor} créditos por la venta`);
                 }
             }
 
@@ -240,7 +256,6 @@ export const ApunteView = () => {
 
             if (!bonusError && bonusResult?.bonosOtorgados?.length > 0) {
                 bonusResult.bonosOtorgados.forEach(bono => {
-                    console.log(`🎁 ¡Hito de compras alcanzado! ${bono.hito} apuntes comprados = +${bono.creditos} créditos`);
                 });
             }
 
@@ -249,7 +264,6 @@ export const ApunteView = () => {
 
             if (!salesBonusError && salesBonusResult?.bonosOtorgados?.length > 0) {
                 salesBonusResult.bonosOtorgados.forEach(bono => {
-                    console.log(`💰 ¡El vendedor alcanzó un hito! ${bono.hito} ventas = +${bono.creditos} créditos`);
                 });
             }
 
@@ -258,7 +272,7 @@ export const ApunteView = () => {
             setUserCredits(prev => prev - apunte.creditos);
             setShowSuccessModal(true);
 
-            console.log(`✅ Compra exitosa: -${apunte.creditos} créditos para comprador, +${creditosVendedor} para vendedor`);
+
 
         } catch (err) {
             console.error('Error en la compra:', err);
@@ -394,7 +408,6 @@ export const ApunteView = () => {
                             apunte.id_apunte,         // id del apunte
                             apunte.titulo             // título del apunte
                         );
-                        console.log('✅ Notificación de like enviada');
                     }
                 } catch (notifError) {
                     console.error('Error enviando notificación de like:', notifError);

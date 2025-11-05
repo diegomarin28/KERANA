@@ -76,14 +76,26 @@ export function UpcomingMentorships() {
                 const fecha = sesion.fecha_hora.split('T')[0];
                 const hora = sesion.fecha_hora.split('T')[1].substring(0, 5);
 
-                const { data: slot } = await supabase
+// asegurar 'hora' con ceros a la izquierda
+                const horaHHmm = hora?.slice(0,5) || new Date(sesion.fecha_hora)
+                    .toTimeString()
+                    .slice(0,5); // 'HH:MM'
+
+                const { data: slot, error: slotError } = await supabase
                     .from('slots_disponibles')
                     .select('modalidad, locacion')
                     .eq('id_mentor', sesion.id_mentor)
-                    .eq('fecha', fecha)
-                    .eq('hora', hora)
+                    .eq('fecha', fecha)                  // 'YYYY-MM-DD'
+                    .eq('hora', horaHHmm)                // 'HH:MM'
                     .eq('duracion', sesion.duracion_minutos)
-                    .single();
+                    .maybeSingle();                      // <- clave
+
+                if (slotError) console.warn('slots_disponibles vacio o error suave:', slotError);
+
+// fallback seguro
+                const modalidad = slot?.modalidad || 'virtual';
+                const locacion  = slot?.locacion  || null;
+
 
                 return {
                     ...sesion,
@@ -499,12 +511,6 @@ export function UpcomingMentorships() {
                                     <p style={{ margin: 0, fontSize: 14, fontWeight: 600, color: '#065f46' }}>
                                         <FontAwesomeIcon icon={faHome} style={{ marginRight: 6 }} />
                                         {sesion.mentor.direccion}
-                                        {sesion.mentor.lugar_presencial && (
-                                            <span style={{ display: 'block', marginTop: 4, fontSize: 13, opacity: 0.8 }}>
-                    <FontAwesomeIcon icon={faMapMarkerAlt} style={{ marginRight: 4 }} />
-                                                {sesion.mentor.lugar_presencial}
-                </span>
-                                        )}
                                     </p>
                                 </div>
                             )}

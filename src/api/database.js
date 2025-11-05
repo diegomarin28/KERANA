@@ -2503,7 +2503,8 @@ export const creditsAPI = {
             id_usuario: userData.id_usuario,
             cantidad_creditos: amount,
             tipo_transaccion: reason,
-            descripcion: reason
+            descripcion: reason,
+            referencia_id: referenciaId
         };
 
         await supabase.from('historial_creditos').insert(historialData)

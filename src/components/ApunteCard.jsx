@@ -15,10 +15,12 @@ export default function ApunteCard({ note, currentUserId }) {
     const [hasPurchased, setHasPurchased] = useState(false);
 
     useEffect(() => {
+
+        setLikesCount(note.likes_count || 0);
+
         const checkLikedAndPurchased = async () => {
             // Verificar si el usuario actual ya dio like
             const { data: likeData } = await notesAPI.checkIfLiked(note.id_apunte);
-
             setLiked(likeData);
 
             // Verificar si puede dar like (compró el apunte o es el dueño)
@@ -36,14 +38,13 @@ export default function ApunteCard({ note, currentUserId }) {
                 .eq('comprador_id', currentUserId)
                 .maybeSingle();
 
-
             setHasPurchased(!!compraData);
         };
 
         if (currentUserId) {
             checkLikedAndPurchased();
         }
-    }, [note.id_apunte, currentUserId, note.id_usuario]);
+    }, [note.id_apunte, note.likes_count, currentUserId, note.id_usuario]);
 
     if (!note) return null;
 

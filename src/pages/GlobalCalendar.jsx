@@ -9,7 +9,7 @@ import {
     faCalendar, faChevronLeft, faChevronRight, faClock,
     faUser, faBook, faCheckCircle, faTimes, faVideo,
     faBuilding, faUsers, faFilter, faXmark, faEnvelope,
-    faFileAlt, faDollarSign, faHome, faUniversity
+    faFileAlt, faDollarSign, faHome, faUniversity, faAngleDown
 } from '@fortawesome/free-solid-svg-icons';
 
 export function GlobalCalendar() {
@@ -123,19 +123,31 @@ export function GlobalCalendar() {
         return preciosBase[modalidad]?.[cantidad] || 0;
     };
 
-    const validarEmail = (email) => {
+    const validarEmailInstitucional = (email) => {
         const regex = /^[a-zA-Z0-9._%+-]+@correo\.um\.edu\.uy$/;
+        return regex.test(email.trim());
+    };
+
+    const validarEmailGenerico = (email) => {
+        // validación básica de email
+        const regex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
         return regex.test(email.trim());
     };
 
     const validarFormulario = () => {
         const errores = {};
+        const esVirtual = selectedSlot?.modalidad === 'virtual';
 
         emailsParticipantes.forEach((email, index) => {
             if (!email.trim()) {
                 errores[`email_${index}`] = 'El email es obligatorio';
-            } else if (!validarEmail(email)) {
-                errores[`email_${index}`] = 'Debe ser un email @correo.um.edu.uy';
+            } else {
+                const ok = esVirtual ? validarEmailInstitucional(email) : validarEmailGenerico(email);
+                if (!ok) {
+                    errores[`email_${index}`] = esVirtual
+                        ? 'Debe ser un email @correo.um.edu.uy'
+                        : 'Email inválido';
+                }
             }
         });
 
@@ -614,65 +626,66 @@ export function GlobalCalendar() {
                 padding: 20,
                 border: '2px solid #f1f5f9',
                 marginBottom: 24,
-                boxShadow: '0 2px 8px rgba(0,0,0,0.04)'
+                boxShadow: '0 2px 8px rgba(0,0,0,0.04)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                flexWrap: 'wrap',
+                gap: 16
             }}>
-                <div style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'space-between',
-                    flexWrap: 'wrap',
-                    gap: 16
-                }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-                        <FontAwesomeIcon icon={faFilter} style={{ color: '#2563eb', fontSize: 18 }} />
-                        <span style={{ fontWeight: 700, fontSize: 16, color: '#0f172a' }}>
-                            Filtrar por materia
-                        </span>
-                    </div>
+                {/* Izquierda: Título */}
+                <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                    <FontAwesomeIcon icon={faFilter} style={{ color: '#2563eb', fontSize: 18 }} />
+                    <span style={{ fontWeight: 700, fontSize: 16, color: '#0f172a' }}>
+      Filtrar por materia
+    </span>
+                </div>
 
-                    <div style={{ position: 'relative', minWidth: 250 }}>
-                        <select
-                            value={selectedMateria || ''}
-                            onChange={(e) => setSelectedMateria(e.target.value ? parseInt(e.target.value) : null)}
-                            style={{
-                                width: '100%',
-                                padding: '12px 40px 12px 16px',
-                                border: '2px solid #e2e8f0',
-                                borderRadius: 10,
-                                fontSize: 14,
-                                fontWeight: 600,
-                                cursor: 'pointer',
-                                outline: 'none',
-                                background: '#fff',
-                                color: '#0f172a',
-                                appearance: 'none',
-                                fontFamily: 'Inter, sans-serif',
-                                transition: 'all 0.2s ease'
-                            }}
-                            onFocus={(e) => e.target.style.borderColor = '#2563eb'}
-                            onBlur={(e) => e.target.style.borderColor = '#e2e8f0'}
-                        >
-                            <option value="">📚 Todas las materias</option>
-                            {materias.map(materia => (
-                                <option key={materia.id_materia} value={materia.id_materia}>
-                                    {materia.nombre_materia}
-                                </option>
-                            ))}
-                        </select>
-                        <div style={{
-                            position: 'absolute',
-                            right: 12,
-                            top: '50%',
-                            transform: 'translateY(-50%)',
-                            pointerEvents: 'none',
-                            color: '#64748b'
-                        }}>
-                            ▼
-                        </div>
+                {/* Derecha: Selector */}
+                <div style={{ position: 'relative', minWidth: 250 }}>
+                    <select
+                        value={selectedMateria || ''}
+                        onChange={(e) => setSelectedMateria(e.target.value ? parseInt(e.target.value) : null)}
+                        style={{
+                            width: '100%',
+                            padding: '12px 40px 12px 16px',
+                            border: '2px solid #e2e8f0',
+                            borderRadius: 10,
+                            fontSize: 14,
+                            fontWeight: 600,
+                            cursor: 'pointer',
+                            outline: 'none',
+                            background: '#fff',
+                            color: '#0f172a',
+                            appearance: 'none',
+                            fontFamily: 'Inter, sans-serif',
+                            transition: 'all 0.2s ease'
+                        }}
+                        onFocus={(e) => e.target.style.borderColor = '#2563eb'}
+                        onBlur={(e) => e.target.style.borderColor = '#e2e8f0'}
+                    >
+                        <option value="">Todas las materias</option>
+                        {materias.map(materia => (
+                            <option key={materia.id_materia} value={materia.id_materia}>
+                                {materia.nombre_materia}
+                            </option>
+                        ))}
+                    </select>
+
+                    {/* Flecha Font Awesome */}
+                    <div style={{
+                        position: 'absolute',
+                        right: 12,
+                        top: '50%',
+                        transform: 'translateY(-50%)',
+                        pointerEvents: 'none',
+                        color: '#64748b'
+                    }}>
+                        <FontAwesomeIcon icon={faAngleDown} />
                     </div>
                 </div>
 
-                {selectedMateria && (
+            {selectedMateria && (
                     <div style={{
                         marginTop: 16,
                         padding: 12,
@@ -683,9 +696,10 @@ export function GlobalCalendar() {
                         alignItems: 'center',
                         justifyContent: 'space-between'
                     }}>
-                        <span style={{ color: '#065f46', fontWeight: 600, fontSize: 14 }}>
-                            📚 Filtrando por: {selectedMateriaName}
-                        </span>
+                         <span style={{ color: '#065f46', fontWeight: 600, fontSize: 14, display:'flex', alignItems:'center', gap:6 }}>
+                              <FontAwesomeIcon icon={faBook} />
+                              Filtrando por: {selectedMateriaName}
+                            </span>
                         <button
                             onClick={() => setSelectedMateria(null)}
                             style={{
@@ -1015,70 +1029,37 @@ export function GlobalCalendar() {
                                                 fontWeight: 700,
                                                 display: 'flex',
                                                 alignItems: 'center',
-                                                gap: 4
+                                                gap: 6
                                             }}>
-                                                👤 Hasta {Math.max(...mentor.slots.map(s => s.max_alumnos))}
+                                                <FontAwesomeIcon icon={faUsers} style={{ fontSize: 12 }} />
+                                                Hasta {Math.max(...mentor.slots.map(s => s.max_alumnos))}
                                             </div>
                                         </div>
                                     </div>
 
+                                    {/* GRID de slots */}
                                     <div style={{
                                         display: 'grid',
                                         gridTemplateColumns: 'repeat(auto-fill, minmax(140px, 1fr))',
                                         gap: 8
                                     }}>
-                                        {mentor.slots.map(slot => {
-                                            const modalidadIcon = slot.modalidad === 'virtual' ? '💻' : '🏢';
-                                            const modalidadColor = slot.modalidad === 'virtual' ? '#dbeafe' : '#d1fae5';
+                                        {mentor.slots.map((slot) => {
+                                            const modalidadIcon = slot.modalidad === 'virtual' ? faVideo : faBuilding;
                                             const modalidadText = slot.modalidad === 'virtual' ? '#1e40af' : '#065f46';
-                                            const modalidadBorder = slot.modalidad === 'virtual' ? '#93c5fd' : '#6ee7b7';
-                                            const locacionText = slot.modalidad === 'presencial' && slot.locacion
-                                                ? (slot.locacion === 'casa' ? '🏠' : '🎓')
-                                                : null;
+                                            const locacionIcon =
+                                                slot.modalidad === 'presencial' && slot.locacion
+                                                    ? (slot.locacion === 'casa' ? faHome : faUniversity)
+                                                    : null;
 
                                             return (
-                                                <button
-                                                    key={slot.id_slot}
-                                                    onClick={() => handleBookSlot(mentor, slot)}
-                                                    disabled={!slot.disponible}
-                                                    style={{
-                                                        padding: '12px',
-                                                        background: slot.disponible ? modalidadColor : '#f1f5f9',
-                                                        border: slot.disponible ? `2px solid ${modalidadBorder}` : '2px solid #e2e8f0',
-                                                        borderRadius: 10,
-                                                        cursor: slot.disponible ? 'pointer' : 'not-allowed',
-                                                        transition: 'all 0.2s ease',
-                                                        fontFamily: 'Inter, sans-serif',
-                                                        opacity: slot.disponible ? 1 : 0.5,
-                                                        display: 'flex',
-                                                        flexDirection: 'column',
-                                                        gap: 6,
-                                                        alignItems: 'flex-start'
-                                                    }}
-                                                    onMouseEnter={(e) => {
-                                                        if (slot.disponible) {
-                                                            e.target.style.transform = 'translateY(-2px)';
-                                                            e.target.style.boxShadow = '0 4px 12px rgba(0, 0, 0, 0.1)';
-                                                        }
-                                                    }}
-                                                    onMouseLeave={(e) => {
-                                                        if (slot.disponible) {
-                                                            e.target.style.transform = 'translateY(0)';
-                                                            e.target.style.boxShadow = 'none';
-                                                        }
-                                                    }}
-                                                >
-                                                    <div style={{
-                                                        fontSize: 13,
-                                                        fontWeight: 700,
-                                                        color: slot.disponible ? modalidadText : '#94a3b8',
-                                                        display: 'flex',
-                                                        alignItems: 'center',
-                                                        gap: 6
-                                                    }}>
+                                                <div key={slot.id_slot} style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                                                    {/* Hora */}
+                                                    <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
                                                         <FontAwesomeIcon icon={faClock} style={{ fontSize: 11 }} />
                                                         {formatTimeRange(slot.hora, slot.duracion)}
                                                     </div>
+
+                                                    {/* Modalidad y locación */}
                                                     <div style={{
                                                         display: 'flex',
                                                         alignItems: 'center',
@@ -1086,50 +1067,64 @@ export function GlobalCalendar() {
                                                         width: '100%',
                                                         gap: 6
                                                     }}>
-                                                        <span style={{
-                                                            fontSize: 11,
-                                                            fontWeight: 600,
-                                                            color: slot.disponible ? modalidadText : '#94a3b8',
-                                                            display: 'flex',
-                                                            alignItems: 'center',
-                                                            gap: 4
-                                                        }}>
-                                                            {modalidadIcon} {slot.modalidad === 'virtual' ? 'Virtual' : 'Presencial'}
-                                                            {locacionText && <span>{locacionText}</span>}
-                                                        </span>
-                                                        <span style={{
-                                                            fontSize: 10,
+                                    <span style={{
+                                        fontSize: 11,
+                                        fontWeight: 600,
+                                        color: modalidadText,
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        gap: 6
+                                    }}>
+                                        <FontAwesomeIcon icon={modalidadIcon} />
+                                        {slot.modalidad === 'virtual' ? 'Virtual' : 'Presencial'}
+
+                                        {locacionIcon && (
+                                            <span style={{
+                                                display: 'inline-flex',
+                                                alignItems: 'center',
+                                                gap: 4,
+                                                color: '#64748b',
+                                                fontWeight: 500
+                                            }}>
+                                                (<FontAwesomeIcon icon={locacionIcon} />
+                                                {slot.locacion === 'casa' ? 'Casa del mentor' : 'Facultad'})
+                                            </span>
+                                        )}
+                                    </span>
+                                                    </div>
+
+                                                    {/* Botón reservar */}
+                                                    <button
+                                                        onClick={() => handleBookSlot(mentor, slot)}
+                                                        disabled={!slot.disponible}
+                                                        style={{
+                                                            marginTop: 6,
+                                                            padding: '8px 10px',
+                                                            borderRadius: 8,
+                                                            border: '2px solid #e2e8f0',
+                                                            background: slot.disponible ? '#fff' : '#f1f5f9',
+                                                            color: '#0f172a',
+                                                            fontSize: 12,
                                                             fontWeight: 700,
-                                                            background: slot.disponible ? 'rgba(255,255,255,0.5)' : 'rgba(0,0,0,0.1)',
-                                                            color: slot.disponible ? modalidadText : '#94a3b8',
-                                                            padding: '2px 6px',
-                                                            borderRadius: 4
-                                                        }}>
-                                                            {slot.duracion}min
-                                                        </span>
-                                                    </div>
-                                                    <div style={{
-                                                        fontSize: 10,
-                                                        fontWeight: 600,
-                                                        color: slot.disponible ? modalidadText : '#94a3b8',
-                                                        display: 'flex',
-                                                        alignItems: 'center',
-                                                        gap: 4
-                                                    }}>
-                                                        👤 {slot.max_alumnos} {slot.max_alumnos === 1 ? 'alumno' : 'alumnos'}
-                                                    </div>
-                                                    {!slot.disponible && (
-                                                        <span style={{
-                                                            fontSize: 10,
-                                                            color: '#94a3b8',
-                                                            fontWeight: 600,
-                                                            width: '100%',
-                                                            textAlign: 'center'
-                                                        }}>
-                                                            No disponible
-                                                        </span>
-                                                    )}
-                                                </button>
+                                                            cursor: slot.disponible ? 'pointer' : 'not-allowed',
+                                                            transition: 'all 0.2s ease'
+                                                        }}
+                                                        onMouseEnter={(e) => {
+                                                            if (slot.disponible) {
+                                                                e.currentTarget.style.borderColor = '#2563eb';
+                                                                e.currentTarget.style.transform = 'translateY(-2px)';
+                                                            }
+                                                        }}
+                                                        onMouseLeave={(e) => {
+                                                            if (slot.disponible) {
+                                                                e.currentTarget.style.borderColor = '#e2e8f0';
+                                                                e.currentTarget.style.transform = 'translateY(0)';
+                                                            }
+                                                        }}
+                                                    >
+                                                        {slot.disponible ? 'Agendar' : 'No disponible'}
+                                                    </button>
+                                                </div>
                                             );
                                         })}
                                     </div>
@@ -1140,7 +1135,7 @@ export function GlobalCalendar() {
                 </div>
             </div>
 
-            {/* Modal de confirmación */}
+            {/* 🆕 Modales FUERA del grid - al mismo nivel que el grid calendario/mentores */}
             {showConfirmModal && selectedMentor && selectedSlot && (
                 <div style={{
                     position: 'fixed',
@@ -1287,17 +1282,17 @@ export function GlobalCalendar() {
                                         alignItems: 'center',
                                         gap: 6
                                     }}>
+                                        <FontAwesomeIcon icon={selectedSlot.modalidad === 'virtual' ? faVideo : faBuilding} style={{ color: '#64748b' }} />
                                         {selectedSlot.modalidad === 'virtual' ? 'Virtual' : 'Presencial'}
+
                                         {selectedSlot.modalidad === 'presencial' && selectedSlot.locacion && (
-                                            <span style={{ fontSize: 12, opacity: 0.8 }}>
-                                                <FontAwesomeIcon
-                                                    icon={selectedSlot.locacion === 'casa' ? faHome : faUniversity}
-                                                    style={{ marginRight: 4 }}
-                                                />
-                                                {selectedSlot.locacion === 'casa' ? 'Casa del mentor' : 'Facultad'}
-                                            </span>
+                                            <span style={{ marginLeft: 6, fontSize: 13, fontWeight: 500, color: '#64748b', display:'inline-flex', alignItems:'center', gap:4 }}>
+      (<FontAwesomeIcon icon={selectedSlot.locacion === 'casa' ? faHome : faUniversity} />
+                                                {selectedSlot.locacion === 'casa' ? 'Casa del mentor' : 'Facultad'})
+    </span>
                                         )}
                                     </p>
+
                                 </div>
                             </div>
                         </div>
@@ -1390,9 +1385,12 @@ export function GlobalCalendar() {
                                 fontFamily: 'Inter, sans-serif'
                             }}>
                                 <FontAwesomeIcon icon={faEnvelope} style={{ color: '#2563eb' }} />
-                                Email{numPersonas > 1 ? 's' : ''} institucional{numPersonas > 1 ? 'es' : ''}
+                                {selectedSlot?.modalidad === 'virtual'
+                                    ? <>Email{numPersonas > 1 ? 's' : ''} institucional{numPersonas > 1 ? 'es' : ''}</>
+                                    : <>Email{numPersonas > 1 ? 's' : ''} de contacto</>}
                                 <span style={{ color: '#ef4444' }}>*</span>
                             </label>
+
                             <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
                                 {emailsParticipantes.map((email, index) => (
                                     <div key={index}>
@@ -1401,7 +1399,11 @@ export function GlobalCalendar() {
                                                 type="email"
                                                 value={email}
                                                 onChange={(e) => handleEmailChange(index, e.target.value)}
-                                                placeholder={index === 0 ? 'tu@correo.um.edu.uy' : `email${index + 1}@correo.um.edu.uy`}
+                                                placeholder={
+                                                    selectedSlot?.modalidad === 'virtual'
+                                                        ? (index === 0 ? 'tu@correo.um.edu.uy' : `email${index + 1}@correo.um.edu.uy`)
+                                                        : (index === 0 ? 'tu@email.com' : `email${index + 1}@email.com`)
+                                                }
                                                 disabled={isBooking}
                                                 style={{
                                                     width: '100%',
@@ -1454,14 +1456,10 @@ export function GlobalCalendar() {
                                     </div>
                                 ))}
                             </div>
-                            <p style={{
-                                margin: '8px 0 0 0',
-                                fontSize: 12,
-                                color: '#64748b',
-                                fontWeight: 500,
-                                fontFamily: 'Inter, sans-serif'
-                            }}>
-                                Solo se aceptan emails institucionales @correo.um.edu.uy
+                            <p style={{ /* estilos iguales */ }}>
+                                {selectedSlot?.modalidad === 'virtual'
+                                    ? 'Solo se aceptan emails institucionales @correo.um.edu.uy'
+                                    : ''}
                             </p>
                         </div>
 

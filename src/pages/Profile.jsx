@@ -582,10 +582,21 @@ export default function Profile() {
 
                             {/* Alumnos si es mentor */}
                             {isMentor && !mentorLoading && stats.alumnosMentor > 0 && (
-                                <div style={{
+                                <div
+                                    onClick={() => navigate('/mentor/courses')}
+                                    style={{
+                                        cursor: 'pointer',
                                     padding: '12px',
                                     borderRadius: '12px',
-                                }}>
+                                        transition: 'all 0.2s ease',
+                                }}
+                                    onMouseEnter={(e) => {
+                                    e.currentTarget.style.background = '#d1fae5';
+                                }}
+                                    onMouseLeave={(e) => {
+                                    e.currentTarget.style.background = 'transparent';
+                                }}
+                                    >
                                     <div style={{
                                         fontSize: '24px',
                                         fontWeight: 800,
