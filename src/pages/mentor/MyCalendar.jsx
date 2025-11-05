@@ -550,6 +550,23 @@ export default function MyCalendar() {
         return (savedSlots[dateKey] || []).length;
     };
 
+    // Escuchar cancelaciones desde IAmMentor
+    useEffect(() => {
+        const handleSlotCanceled = (event) => {
+            const { fecha, hora } = event.detail;
+            console.log('🔔 Slot cancelado desde IAmMentor:', fecha, hora);
+
+            // Recargar slots para actualizar la UI
+            loadSavedSlots();
+        };
+
+        window.addEventListener('slotCanceled', handleSlotCanceled);
+
+        return () => {
+            window.removeEventListener('slotCanceled', handleSlotCanceled);
+        };
+    }, [currentMentorId]);
+
     if (loading) return (
         <div style={{
             display: 'flex',
@@ -565,6 +582,7 @@ export default function MyCalendar() {
             Cargando calendario...
         </div>
     );
+
 
     const days = getDaysInMonth();
 
