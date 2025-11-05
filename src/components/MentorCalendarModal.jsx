@@ -8,7 +8,7 @@ import {
 } from '@fortawesome/free-solid-svg-icons';
 
 
-//Botón agendar particular
+//Botón agendar particular desde public profile mentor
 export default function MentorCalendarModal({
                                                 open,
                                                 onClose,
