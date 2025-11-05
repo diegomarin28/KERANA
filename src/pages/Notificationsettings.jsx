@@ -22,7 +22,6 @@ const DEFAULT_SETTINGS = {
     sonido: true,
     toasts: true,
     badge: true,
-    email: false, // Para futuro
 };
 
 export default function NotificationSettings() {

@@ -155,26 +155,25 @@ export default function IAmMentor() {
             const { data: sesiones, error: sesionesError } = await supabase
                 .from('mentor_sesion')
                 .select(`
-                        id_sesion,
-                        id_mentor,
-                        id_alumno,
-                        id_materia,
-                        fecha_hora,
-                        duracion_minutos,
-                        estado,
-                        precio,
-                        pagado,
-                        notas_alumno,
-                        notas_mentor,
-                        cantidad_alumnos,
-                        emails_participantes,
-                        descripcion_alumno
-                      `)
+        id_sesion,
+        id_mentor,
+        id_alumno,
+        id_materia,
+        fecha_hora,
+        duracion_minutos,
+        estado,
+        precio,
+        pagado,
+        notas_alumno,
+        notas_mentor,
+        cantidad_alumnos,
+        emails_participantes,
+        descripcion_alumno
+      `)
                 .eq('id_mentor', mentorData.id_mentor)
                 .eq('estado', 'confirmada')
                 .gte('fecha_hora', ahora.toISOString())
                 .order('fecha_hora', { ascending: true });
-
 
             if (sesionesError) throw sesionesError;
 
@@ -183,16 +182,12 @@ export default function IAmMentor() {
                 return;
             }
 
+            // --- Enriquecer con alumno, materia y slot ---
             const alumnoIds = [...new Set(sesiones.map(s => s.id_alumno).filter(Boolean))];
-
-            const { data: alumnos, error: alumnosError } = await supabase
+            const { data: alumnos } = await supabase
                 .from('usuario')
                 .select('id_usuario, nombre, foto')
                 .in('id_usuario', alumnoIds);
-
-            if (alumnosError) {
-                console.error('Error cargando alumnos:', alumnosError);
-            }
 
             const materiaIds = [...new Set(sesiones.map(s => s.id_materia).filter(Boolean))];
             const { data: materias } = await supabase
@@ -219,16 +214,11 @@ export default function IAmMentor() {
                 const fecha = fechaHora.toISOString().split('T')[0];
                 const hora = fechaHora.toTimeString().slice(0, 5);
 
-                const slot = slots?.find(s =>
-                    s.fecha === fecha &&
-                    s.hora.slice(0, 5) === hora
-                );
-
+                const slot = slots?.find(s => s.fecha === fecha && s.hora.slice(0, 5) === hora);
                 const key = `${fecha}-${hora}`;
                 const maxAlumnos = slot?.max_alumnos || 1;
 
                 const reservasActuales = maxAlumnos === 1 ? 1 : (reservasPorFechaHora[key] || 1);
-
                 const alumnoEncontrado = alumnos?.find(a => a.id_usuario === sesion.id_alumno);
 
                 return {
@@ -247,13 +237,42 @@ export default function IAmMentor() {
                 };
             });
 
-            setProximasSesiones(sesionesCompletas);
+            // --- Autocompletar las que ya terminaron y filtrar las futuras ---
+            const ahora2 = new Date();
+            const aCompletar = [];
+            const futuras = [];
+
+            for (const s of sesionesCompletas) {
+                const inicio = new Date(s.fecha_hora);
+                const durMin = s.slot_info?.duracion || s.duracion_minutos || 60;
+                const fin = new Date(inicio.getTime() + durMin * 60 * 1000);
+
+                if (s.estado === 'confirmada' && fin <= ahora2) {
+                    aCompletar.push(s.id_sesion);
+                } else {
+                    futuras.push(s);
+                }
+            }
+
+            if (aCompletar.length > 0) {
+                try {
+                    await supabase
+                        .from('mentor_sesion')
+                        .update({ estado: 'completada' })
+                        .in('id_sesion', aCompletar);
+                } catch (e) {
+                    console.error('No se pudo autocompletar sesiones:', e);
+                }
+            }
+
+            setProximasSesiones(futuras);
         } catch (err) {
             console.error('Error cargando sesiones:', err);
         } finally {
             setLoadingSesiones(false);
         }
     };
+
 
     useEffect(() => {
         if (activeTab === 'proximas' && mentorData?.id_mentor) {
@@ -705,11 +724,11 @@ export default function IAmMentor() {
                                                 {sesion.emails_participantes && sesion.emails_participantes.length > 0 && (
                                                     <div
                                                         style={{
-                                                            background: '#fff',
+                                                            background: '#f8fafc', // gris claro igual que descripción
                                                             borderRadius: 12,
                                                             padding: 16,
                                                             marginBottom: 16,
-                                                            border: '2px solid #6ee7d8'
+                                                            border: '2px solid #e2e8f0' // borde gris sutil
                                                         }}
                                                     >
                                                         <div
@@ -725,6 +744,7 @@ export default function IAmMentor() {
         Emails de participantes
       </span>
                                                         </div>
+
                                                         <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
                                                             {sesion.emails_participantes.map((email, idx) => (
                                                                 <div
@@ -733,10 +753,10 @@ export default function IAmMentor() {
                                                                         fontSize: 13,
                                                                         fontWeight: 500,
                                                                         color: '#0f172a',
-                                                                        padding: '6px 10px',
-                                                                        background: '#ccfbf1',
+                                                                        padding: '8px 12px',
+                                                                        background: '#ffffff', // fondo blanco para resaltar los mails
                                                                         borderRadius: 8,
-                                                                        border: '1px solid #99f6e4'
+                                                                        border: '1px solid #e2e8f0'
                                                                     }}
                                                                 >
                                                                     • {email}
@@ -745,6 +765,7 @@ export default function IAmMentor() {
                                                         </div>
                                                     </div>
                                                 )}
+
 
                                                 {/* Descripción del alumno */}
                                                 {sesion.descripcion_alumno && (
@@ -778,42 +799,14 @@ export default function IAmMentor() {
                                                 )}
 
 
-                                                {/* Botones */}
-                                                <div style={{ display: 'flex', gap: 12 }}>
-                                                    <button
-                                                        style={{
-                                                            flex: 1,
-                                                            padding: '12px',
-                                                            background: '#fff',
-                                                            color: '#0d9488',
-                                                            border: '2px solid #0d9488',
-                                                            borderRadius: 10,
-                                                            fontWeight: 700,
-                                                            fontSize: 14,
-                                                            cursor: 'pointer',
-                                                            transition: 'all 0.2s ease',
-                                                            fontFamily: 'Inter, sans-serif'
-                                                        }}
-                                                        onMouseEnter={(e) => {
-                                                            e.target.style.background = '#0d9488';
-                                                            e.target.style.color = '#fff';
-                                                            e.target.style.transform = 'translateY(-1px)';
-                                                        }}
-                                                        onMouseLeave={(e) => {
-                                                            e.target.style.background = '#fff';
-                                                            e.target.style.color = '#0d9488';
-                                                            e.target.style.transform = 'translateY(0)';
-                                                        }}
-                                                    >
-                                                        <FontAwesomeIcon icon={faCheck} style={{ marginRight: 8 }} />
-                                                        Marcar como completada
-                                                    </button>
-
+                                                {/* Botón cancelar (único) */}
+                                                <div style={{ display: 'flex' }}>
                                                     <button
                                                         onClick={() => {
                                                             const fechaSesion = new Date(sesion.fecha_hora);
                                                             const ahora = new Date();
                                                             const horasRestantes = (fechaSesion - ahora) / (1000 * 60 * 60);
+
                                                             setConfirmCancelSession({
                                                                 id: sesion.id_sesion,
                                                                 esMasDe36Horas: horasRestantes > 36,
@@ -822,7 +815,7 @@ export default function IAmMentor() {
                                                             });
                                                         }}
                                                         style={{
-                                                            flex: 1,
+                                                            width: '100%',
                                                             padding: '12px',
                                                             background: '#fff',
                                                             color: '#ef4444',
@@ -832,17 +825,17 @@ export default function IAmMentor() {
                                                             fontSize: 14,
                                                             cursor: 'pointer',
                                                             transition: 'all 0.2s ease',
-                                                            fontFamily: 'Inter, sans-serif'
+                                                            fontFamily: 'Inter, sans-serif',
                                                         }}
                                                         onMouseEnter={(e) => {
-                                                            e.target.style.background = '#ef4444';
-                                                            e.target.style.color = '#fff';
-                                                            e.target.style.transform = 'translateY(-1px)';
+                                                            e.currentTarget.style.background = '#ef4444';
+                                                            e.currentTarget.style.color = '#fff';
+                                                            e.currentTarget.style.transform = 'translateY(-1px)';
                                                         }}
                                                         onMouseLeave={(e) => {
-                                                            e.target.style.background = '#fff';
-                                                            e.target.style.color = '#ef4444';
-                                                            e.target.style.transform = 'translateY(0)';
+                                                            e.currentTarget.style.background = '#fff';
+                                                            e.currentTarget.style.color = '#ef4444';
+                                                            e.currentTarget.style.transform = 'translateY(0)';
                                                         }}
                                                     >
                                                         <FontAwesomeIcon icon={faTimes} style={{ marginRight: 8 }} />

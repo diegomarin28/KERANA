@@ -1,5 +1,11 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
+import {
+    faSpinner,
+    faCheckCircle,
+    faExclamationTriangle
+} from '@fortawesome/free-solid-svg-icons';
 import { supabase } from "../supabase";
 import { createOrUpdateUserProfile } from "../utils/authHelpers";
 
@@ -48,7 +54,7 @@ export default function AuthCallback() {
                     const needsSetup = !existingProfile.foto || !existingProfile.bio;
 
                     if (needsSetup) {
-                        console.log("📝 Perfil incompleto, redirigiendo a setup...");
+                        console.log("🔧 Perfil incompleto, redirigiendo a setup...");
                         setStatus("success");
                         setMessage("¡Bienvenido! Completá tu perfil...");
 
@@ -117,9 +123,25 @@ export default function AuthCallback() {
                         <div style={logoBadge}>KERANA</div>
                     </div>
 
-                    {/* Spinner moderno */}
+                    {/* Spinner con Font Awesome */}
                     <div style={spinnerContainer}>
-                        <div style={spinner}></div>
+                        <div style={{
+                            width: 80,
+                            height: 80,
+                            borderRadius: '50%',
+                            background: '#2563eb',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            margin: '0 auto',
+                            animation: 'pulse 2s ease-in-out infinite'
+                        }}>
+                            <FontAwesomeIcon
+                                icon={faSpinner}
+                                spin
+                                style={{ fontSize: 36, color: '#fff' }}
+                            />
+                        </div>
                     </div>
 
                     {/* Mensaje */}
@@ -130,33 +152,24 @@ export default function AuthCallback() {
 
             {status === "success" && (
                 <div style={cardStyle}>
-                    {/* Checkmark animado */}
+                    {/* Checkmark con Font Awesome */}
                     <div style={successIconContainer}>
-                        <svg
-                            width="64"
-                            height="64"
-                            viewBox="0 0 24 24"
-                            fill="none"
-                            style={successIcon}
-                        >
-                            <circle
-                                cx="12"
-                                cy="12"
-                                r="10"
-                                stroke="#10b981"
-                                strokeWidth="2"
-                                fill="none"
-                                style={successCircle}
+                        <div style={{
+                            width: 80,
+                            height: 80,
+                            borderRadius: '50%',
+                            background: '#10b981',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            margin: '0 auto',
+                            animation: 'scaleIn 0.5s cubic-bezier(0.16, 1, 0.3, 1)'
+                        }}>
+                            <FontAwesomeIcon
+                                icon={faCheckCircle}
+                                style={{ fontSize: 40, color: '#fff' }}
                             />
-                            <path
-                                d="M8 12l3 3l5-5"
-                                stroke="#10b981"
-                                strokeWidth="2.5"
-                                strokeLinecap="round"
-                                strokeLinejoin="round"
-                                style={successCheck}
-                            />
-                        </svg>
+                        </div>
                     </div>
 
                     <h2 style={{...titleStyle, color: '#10b981'}}>¡Todo listo!</h2>
@@ -166,28 +179,24 @@ export default function AuthCallback() {
 
             {status === "error" && (
                 <div style={cardStyle}>
-                    {/* Icono de error */}
+                    {/* Icono de error con Font Awesome */}
                     <div style={errorIconContainer}>
-                        <svg
-                            width="64"
-                            height="64"
-                            viewBox="0 0 24 24"
-                            fill="none"
-                        >
-                            <circle
-                                cx="12"
-                                cy="12"
-                                r="10"
-                                stroke="#ef4444"
-                                strokeWidth="2"
+                        <div style={{
+                            width: 80,
+                            height: 80,
+                            borderRadius: '50%',
+                            background: '#ef4444',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            margin: '0 auto',
+                            animation: 'shake 0.5s ease'
+                        }}>
+                            <FontAwesomeIcon
+                                icon={faExclamationTriangle}
+                                style={{ fontSize: 40, color: '#fff' }}
                             />
-                            <path
-                                d="M15 9l-6 6M9 9l6 6"
-                                stroke="#ef4444"
-                                strokeWidth="2.5"
-                                strokeLinecap="round"
-                            />
-                        </svg>
+                        </div>
                     </div>
 
                     <h2 style={{...titleStyle, color: '#ef4444'}}>Algo salió mal</h2>
@@ -196,8 +205,14 @@ export default function AuthCallback() {
                     <button
                         onClick={() => navigate("/?auth=signin")}
                         style={retryButton}
-                        onMouseEnter={(e) => e.target.style.transform = 'scale(1.02)'}
-                        onMouseLeave={(e) => e.target.style.transform = 'scale(1)'}
+                        onMouseEnter={(e) => {
+                            e.target.style.transform = 'translateY(-2px)';
+                            e.target.style.boxShadow = '0 8px 20px rgba(37, 99, 235, 0.3)';
+                        }}
+                        onMouseLeave={(e) => {
+                            e.target.style.transform = 'translateY(0)';
+                            e.target.style.boxShadow = '0 4px 12px rgba(37, 99, 235, 0.2)';
+                        }}
                     >
                         Intentar nuevamente
                     </button>
@@ -207,15 +222,15 @@ export default function AuthCallback() {
     );
 }
 
-// 🎨 ESTILOS MODERNOS
+// 🎨 ESTILOS MODERNOS - KERANA
 const containerStyle = {
     minHeight: "100vh",
     display: "flex",
     justifyContent: "center",
     alignItems: "center",
-    background: "#fafafa",
+    background: "#f8fafc",
     padding: "20px",
-    fontFamily: "-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif"
+    fontFamily: "Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif"
 };
 
 const cardStyle = {
@@ -223,9 +238,9 @@ const cardStyle = {
     borderRadius: "16px",
     padding: "48px 40px",
     textAlign: "center",
-    boxShadow: "0 4px 20px rgba(0,0,0,0.06)",
-    border: "1px solid #e5e7eb",
-    maxWidth: "420px",
+    boxShadow: "0 8px 24px rgba(0,0,0,0.08)",
+    border: "2px solid #f1f5f9",
+    maxWidth: "480px",
     width: "100%",
     animation: "fadeIn 0.3s ease"
 };
@@ -241,23 +256,13 @@ const logoBadge = {
     textTransform: "uppercase",
     padding: "8px 16px",
     borderRadius: "999px",
-    background: "linear-gradient(135deg, #667eea, #764ba2)",
+    background: "linear-gradient(135deg, #13346b 0%, #2563eb 60%, #0ea5a3 100%)",
     color: "white",
     fontWeight: "700"
 };
 
 const spinnerContainer = {
     margin: "24px 0"
-};
-
-const spinner = {
-    width: "56px",
-    height: "56px",
-    border: "4px solid #f3f4f6",
-    borderTop: "4px solid #667eea",
-    borderRadius: "50%",
-    animation: "spin 0.8s linear infinite",
-    margin: "0 auto"
 };
 
 const successIconContainer = {
@@ -268,63 +273,48 @@ const successIconContainer = {
     placeItems: "center"
 };
 
-const successIcon = {
-    animation: "scaleIn 0.5s cubic-bezier(0.16, 1, 0.3, 1)"
-};
-
-const successCircle = {
-    animation: "drawCircle 0.5s ease forwards"
-};
-
-const successCheck = {
-    strokeDasharray: "20",
-    strokeDashoffset: "20",
-    animation: "drawCheck 0.4s ease 0.3s forwards"
-};
-
 const errorIconContainer = {
     margin: "0 auto 24px",
     width: "80px",
     height: "80px",
     display: "grid",
-    placeItems: "center",
-    animation: "shake 0.5s ease"
+    placeItems: "center"
 };
 
 const titleStyle = {
-    margin: "0 0 8px 0",
+    margin: "0 0 12px 0",
     fontSize: "24px",
     fontWeight: "700",
-    color: "#1e293b",
-    letterSpacing: "-0.5px"
+    color: "#13346b",
+    letterSpacing: "-0.5px",
+    fontFamily: "Inter, sans-serif"
 };
 
 const subtitleStyle = {
     margin: 0,
     color: "#64748b",
     fontSize: "15px",
-    lineHeight: "1.6"
+    lineHeight: "1.6",
+    fontWeight: "500",
+    fontFamily: "Inter, sans-serif"
 };
 
 const retryButton = {
-    marginTop: "24px",
+    marginTop: "28px",
     padding: "12px 32px",
-    borderRadius: "12px",
-    background: "linear-gradient(135deg, #667eea, #764ba2)",
+    borderRadius: "10px",
+    background: "#2563eb",
     color: "white",
     border: "none",
     cursor: "pointer",
-    fontWeight: "600",
+    fontWeight: "700",
     fontSize: "15px",
-    transition: "transform 0.2s ease",
-    boxShadow: "0 4px 12px rgba(102, 126, 234, 0.4)"
+    transition: "all 0.2s ease",
+    boxShadow: "0 4px 12px rgba(37, 99, 235, 0.2)",
+    fontFamily: "Inter, sans-serif"
 };
 
 const keyframes = `
-    @keyframes spin {
-        0% { transform: rotate(0deg); }
-        100% { transform: rotate(360deg); }
-    }
     @keyframes fadeIn {
         from { opacity: 0; transform: translateY(10px); }
         to { opacity: 1; transform: translateY(0); }
@@ -333,16 +323,13 @@ const keyframes = `
         from { transform: scale(0); }
         to { transform: scale(1); }
     }
-    @keyframes drawCircle {
-        from { stroke-dasharray: 0, 100; }
-        to { stroke-dasharray: 100, 100; }
-    }
-    @keyframes drawCheck {
-        to { stroke-dashoffset: 0; }
-    }
     @keyframes shake {
         0%, 100% { transform: translateX(0); }
         25% { transform: translateX(-10px); }
         75% { transform: translateX(10px); }
+    }
+    @keyframes pulse {
+        0%, 100% { transform: scale(1); opacity: 1; }
+        50% { transform: scale(1.05); opacity: 0.9; }
     }
 `;

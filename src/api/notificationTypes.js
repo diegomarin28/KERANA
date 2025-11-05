@@ -154,7 +154,16 @@ export const notificationTypes = {
         });
 
         // Enviar notificación a cada seguidor
-        const notificaciones = seguidores.map(seg =>
+// Filtrar al propio mentor (para que no se auto notifique)
+        const seguidoresValidos = seguidores.filter(seg => seg.seguidor_id !== mentorUserId);
+
+        if (!seguidoresValidos.length) {
+            console.log('⚠️ No hay seguidores válidos (se excluyó al propio mentor)');
+            return { data: null, error: null };
+        }
+
+// Enviar notificación a cada seguidor válido
+        const notificaciones = seguidoresValidos.map(seg =>
             createNotification({
                 usuarioId: seg.seguidor_id,
                 tipo: 'mentor_nuevas_horas',
@@ -163,6 +172,7 @@ export const notificationTypes = {
                 mensaje: `${mentorNombre} agregó ${cantidadSlots} ${cantidadSlots === 1 ? 'horario' : 'horarios'} disponible${cantidadSlots === 1 ? '' : 's'} para el ${fechaFormateada}`,
             })
         );
+
 
         await Promise.all(notificaciones);
         console.log(`✅ ${seguidores.length} notificaciones enviadas`);

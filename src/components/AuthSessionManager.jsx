@@ -13,15 +13,13 @@ export default function AuthSessionManager() {
     useEffect(() => {
         // Listener para cambios de auth
         const { data: authListener } = supabase.auth.onAuthStateChange(async (event, session) => {
-            console.log('🔐 Auth event:', event);
+
 
             if (event === 'TOKEN_REFRESHED') {
-                console.log('✅ Token renovado exitosamente');
                 isRefreshingRef.current = false;
             }
 
             if (event === 'SIGNED_OUT') {
-                console.log('👋 Usuario deslogueado');
                 navigate('/login');
             }
 

@@ -1,12 +1,37 @@
-import { Resend } from 'resend';
 import {
     emailConfirmacionMentor,
     emailConfirmacionAlumno,
     emailRecordatorio24hMentor,
     emailRecordatorio1hAlumno
 } from '../templates/emailTemplates';
+import { supabase } from '../supabase';
 
-const resend = new Resend(import.meta.env.VITE_RESEND_API_KEY);
+/**
+ * Función helper para enviar emails via Edge Function
+ */
+async function enviarEmailViaEdgeFunction({ from, to, subject, html }) {
+    try {
+        const { data, error } = await supabase.functions.invoke('enviar-email', {
+            body: { from, to, subject, html }
+        });
+
+        if (error) {
+            console.error('❌ Error en Edge Function:', error);
+            return { success: false, error };
+        }
+
+        if (!data.success) {
+            console.error('❌ Error en respuesta:', data.error);
+            return { success: false, error: data.error };
+        }
+
+        console.log('✅ Email enviado:', data.data?.id);
+        return { success: true, data: data.data };
+    } catch (error) {
+        console.error('❌ Error general:', error);
+        return { success: false, error };
+    }
+}
 
 /**
  * Enviar email de confirmación al mentor cuando un alumno agenda
@@ -26,32 +51,26 @@ export async function enviarEmailConfirmacionMentor({
                                                         modalidad
                                                     }) {
     try {
-        const { data, error } = await resend.emails.send({
-            from: 'Kerana <onboarding@resend.dev>', // Cambiar cuando tengas dominio
-            to: mentorEmail,
-            subject: `Nueva mentoría agendada - ${materiaNombre}`,
-            html: emailConfirmacionMentor({
-                mentorNombre,
-                alumnoNombre,
-                alumnoEmail,
-                materiaNombre,
-                fecha,
-                hora,
-                duracion,
-                cantidadAlumnos,
-                emailsParticipantes,
-                descripcion,
-                modalidad
-            })
+        const htmlContent = emailConfirmacionMentor({
+            mentorNombre,
+            alumnoNombre,
+            alumnoEmail,
+            materiaNombre,
+            fecha,
+            hora,
+            duracion,
+            cantidadAlumnos,
+            emailsParticipantes,
+            descripcion,
+            modalidad
         });
 
-        if (error) {
-            console.error('Error enviando email al mentor:', error);
-            return { success: false, error };
-        }
-
-        console.log('Email enviado al mentor:', data);
-        return { success: true, data };
+        return await enviarEmailViaEdgeFunction({
+            from: 'Kerana <onboarding@resend.dev>',
+            to: mentorEmail,
+            subject: `Nueva mentoría agendada - ${materiaNombre}`,
+            html: htmlContent
+        });
     } catch (error) {
         console.error('Error en enviarEmailConfirmacionMentor:', error);
         return { success: false, error };
@@ -72,28 +91,22 @@ export async function enviarEmailConfirmacionAlumno({
                                                         modalidad
                                                     }) {
     try {
-        const { data, error } = await resend.emails.send({
+        const htmlContent = emailConfirmacionAlumno({
+            alumnoNombre,
+            mentorNombre,
+            materiaNombre,
+            fecha,
+            hora,
+            duracion,
+            modalidad
+        });
+
+        return await enviarEmailViaEdgeFunction({
             from: 'Kerana <onboarding@resend.dev>',
             to: alumnoEmail,
             subject: `Mentoría confirmada - ${materiaNombre}`,
-            html: emailConfirmacionAlumno({
-                alumnoNombre,
-                mentorNombre,
-                materiaNombre,
-                fecha,
-                hora,
-                duracion,
-                modalidad
-            })
+            html: htmlContent
         });
-
-        if (error) {
-            console.error('Error enviando email al alumno:', error);
-            return { success: false, error };
-        }
-
-        console.log('Email enviado al alumno:', data);
-        return { success: true, data };
     } catch (error) {
         console.error('Error en enviarEmailConfirmacionAlumno:', error);
         return { success: false, error };
@@ -165,27 +178,21 @@ export async function enviarRecordatorio24hMentor({
                                                       hora
                                                   }) {
     try {
-        const { data, error } = await resend.emails.send({
+        const htmlContent = emailRecordatorio24hMentor({
+            mentorNombre,
+            alumnoNombre,
+            alumnoEmail,
+            materiaNombre,
+            fecha,
+            hora
+        });
+
+        return await enviarEmailViaEdgeFunction({
             from: 'Kerana <onboarding@resend.dev>',
             to: mentorEmail,
             subject: `Recordatorio: Mentoría mañana - ${materiaNombre}`,
-            html: emailRecordatorio24hMentor({
-                mentorNombre,
-                alumnoNombre,
-                alumnoEmail,
-                materiaNombre,
-                fecha,
-                hora
-            })
+            html: htmlContent
         });
-
-        if (error) {
-            console.error('Error enviando recordatorio 24h al mentor:', error);
-            return { success: false, error };
-        }
-
-        console.log('Recordatorio 24h enviado al mentor:', data);
-        return { success: true, data };
     } catch (error) {
         console.error('Error en enviarRecordatorio24hMentor:', error);
         return { success: false, error };
@@ -204,26 +211,20 @@ export async function enviarRecordatorio1hAlumno({
                                                      hora
                                                  }) {
     try {
-        const { data, error } = await resend.emails.send({
+        const htmlContent = emailRecordatorio1hAlumno({
+            alumnoNombre,
+            mentorNombre,
+            materiaNombre,
+            fecha,
+            hora
+        });
+
+        return await enviarEmailViaEdgeFunction({
             from: 'Kerana <onboarding@resend.dev>',
             to: alumnoEmail,
             subject: `Tu clase comienza en 1 hora - ${materiaNombre}`,
-            html: emailRecordatorio1hAlumno({
-                alumnoNombre,
-                mentorNombre,
-                materiaNombre,
-                fecha,
-                hora
-            })
+            html: htmlContent
         });
-
-        if (error) {
-            console.error('Error enviando recordatorio 1h al alumno:', error);
-            return { success: false, error };
-        }
-
-        console.log('Recordatorio 1h enviado al alumno:', data);
-        return { success: true, data };
     } catch (error) {
         console.error('Error en enviarRecordatorio1hAlumno:', error);
         return { success: false, error };
