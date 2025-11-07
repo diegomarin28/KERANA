@@ -6,7 +6,7 @@ import { useNavigate } from 'react-router-dom';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faSearch, faGraduationCap, faFilter, faCalendarAlt, faChevronDown, faList, faCalendarDay } from '@fortawesome/free-solid-svg-icons';
 import MentorCalendarModal from '../components/MentorCalendarModal';
-import { slotsAPI } from '../api/slots.js'; // Importar slotsAPI correctamente
+import { slotsAPI } from '../api/slots.js';
 
 export default function Mentors() {
     const navigate = useNavigate();

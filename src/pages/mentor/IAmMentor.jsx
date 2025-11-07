@@ -64,11 +64,14 @@ export default function IAmMentor() {
     const [loadingSesiones, setLoadingSesiones] = useState(false);
     const [selectedSession, setSelectedSession] = useState(null);
     const [showSessionModal, setShowSessionModal] = useState(false);
+    const [errorModal, setErrorModal] = useState({ open: false, message: '' });
 
     const { isMentor, mentorData: mentorStatusData, loading: mentorLoading } = useMentorStatus();
     const { paymentData, hasPaymentConfigured, savePaymentData } = useMentorPayment();
 
     const mentorData = mentorStatusData?.[0] || null;
+    const [confirmRemoveMentorship, setConfirmRemoveMentorship] = useState(null);
+    const [isRemoving, setIsRemoving] = useState(false);
 
     const [configForm, setConfigForm] = useState({
         maxAlumnos: null,
@@ -80,7 +83,9 @@ export default function IAmMentor() {
     });
 
     const [pagoForm, setPagoForm] = useState({
-        mpEmail: ''
+        mpEmail: '',
+        mpCvu: '',
+        mpAlias: ''
     });
 
     const [saving, setSaving] = useState(false);
@@ -96,8 +101,12 @@ export default function IAmMentor() {
     }, [mentorData]);
 
     useEffect(() => {
-        if (paymentData?.mp_email) {
-            setPagoForm({ mpEmail: paymentData.mp_email });
+        if (paymentData) {
+            setPagoForm({
+                mpEmail: paymentData.mpEmail || '',
+                mpCvu: paymentData.mpCvu || '',
+                mpAlias: paymentData.mpAlias || ''
+            });
         }
     }, [paymentData]);
 
@@ -155,26 +164,25 @@ export default function IAmMentor() {
             const { data: sesiones, error: sesionesError } = await supabase
                 .from('mentor_sesion')
                 .select(`
-                        id_sesion,
-                        id_mentor,
-                        id_alumno,
-                        id_materia,
-                        fecha_hora,
-                        duracion_minutos,
-                        estado,
-                        precio,
-                        pagado,
-                        notas_alumno,
-                        notas_mentor,
-                        cantidad_alumnos,
-                        emails_participantes,
-                        descripcion_alumno
-                      `)
+        id_sesion,
+        id_mentor,
+        id_alumno,
+        id_materia,
+        fecha_hora,
+        duracion_minutos,
+        estado,
+        precio,
+        pagado,
+        notas_alumno,
+        notas_mentor,
+        cantidad_alumnos,
+        emails_participantes,
+        descripcion_alumno
+      `)
                 .eq('id_mentor', mentorData.id_mentor)
                 .eq('estado', 'confirmada')
                 .gte('fecha_hora', ahora.toISOString())
                 .order('fecha_hora', { ascending: true });
-
 
             if (sesionesError) throw sesionesError;
 
@@ -184,15 +192,10 @@ export default function IAmMentor() {
             }
 
             const alumnoIds = [...new Set(sesiones.map(s => s.id_alumno).filter(Boolean))];
-
-            const { data: alumnos, error: alumnosError } = await supabase
+            const { data: alumnos } = await supabase
                 .from('usuario')
                 .select('id_usuario, nombre, foto')
                 .in('id_usuario', alumnoIds);
-
-            if (alumnosError) {
-                console.error('Error cargando alumnos:', alumnosError);
-            }
 
             const materiaIds = [...new Set(sesiones.map(s => s.id_materia).filter(Boolean))];
             const { data: materias } = await supabase
@@ -219,16 +222,11 @@ export default function IAmMentor() {
                 const fecha = fechaHora.toISOString().split('T')[0];
                 const hora = fechaHora.toTimeString().slice(0, 5);
 
-                const slot = slots?.find(s =>
-                    s.fecha === fecha &&
-                    s.hora.slice(0, 5) === hora
-                );
-
+                const slot = slots?.find(s => s.fecha === fecha && s.hora.slice(0, 5) === hora);
                 const key = `${fecha}-${hora}`;
                 const maxAlumnos = slot?.max_alumnos || 1;
 
                 const reservasActuales = maxAlumnos === 1 ? 1 : (reservasPorFechaHora[key] || 1);
-
                 const alumnoEncontrado = alumnos?.find(a => a.id_usuario === sesion.id_alumno);
 
                 return {
@@ -247,7 +245,34 @@ export default function IAmMentor() {
                 };
             });
 
-            setProximasSesiones(sesionesCompletas);
+            const ahora2 = new Date();
+            const aCompletar = [];
+            const futuras = [];
+
+            for (const s of sesionesCompletas) {
+                const inicio = new Date(s.fecha_hora);
+                const durMin = s.slot_info?.duracion || s.duracion_minutos || 60;
+                const fin = new Date(inicio.getTime() + durMin * 60 * 1000);
+
+                if (s.estado === 'confirmada' && fin <= ahora2) {
+                    aCompletar.push(s.id_sesion);
+                } else {
+                    futuras.push(s);
+                }
+            }
+
+            if (aCompletar.length > 0) {
+                try {
+                    await supabase
+                        .from('mentor_sesion')
+                        .update({ estado: 'completada' })
+                        .in('id_sesion', aCompletar);
+                } catch (e) {
+                    console.error('No se pudo autocompletar sesiones:', e);
+                }
+            }
+
+            setProximasSesiones(futuras);
         } catch (err) {
             console.error('Error cargando sesiones:', err);
         } finally {
@@ -262,24 +287,78 @@ export default function IAmMentor() {
     }, [activeTab, mentorData]);
 
     const handleRemoveMentorship = async (mentorshipId, materiaName) => {
-        if (!confirm(`¿Estás seguro que querés dejar de ser mentor de ${materiaName}?`)) {
-            return;
-        }
-
         try {
-            const { error } = await supabase
+            setIsRemoving(true);
+
+            // 1. Verificar si tiene mentorías programadas en esta materia
+            const { data: sesionesActivas, error: sesionesError } = await supabase
+                .from('mentor_sesion')
+                .select('id_sesion')
+                .eq('id_mentor', mentorData.id_mentor)
+                .eq('id_materia', confirmRemoveMentorship.materiaId)
+                .eq('estado', 'confirmada')
+                .gte('fecha_hora', new Date().toISOString());
+
+            if (sesionesError) throw sesionesError;
+
+            if (sesionesActivas && sesionesActivas.length > 0) {
+                setErrorModal({
+                    open: true,
+                    message: `No podés darte de baja de ${materiaName} porque tenés ${sesionesActivas.length} mentoría(s) programada(s). Cancelá las sesiones primero.`
+                });
+                setConfirmRemoveMentorship(null);
+                setIsRemoving(false);
+                return;
+            }
+
+            // 2. Eliminar la relación mentor_materia
+            const { error: deleteError } = await supabase
                 .from('mentor_materia')
                 .delete()
                 .eq('id', mentorshipId);
 
-            if (error) throw error;
+            if (deleteError) throw deleteError;
 
-            setMentorships(prev => prev.filter(m => m.id !== mentorshipId));
-            setSuccessModal({ open: true, message: 'Te diste de baja exitosamente' });
+            // 3. Verificar si le quedan más materias
+            const { data: materiasRestantes, error: materiasError } = await supabase
+                .from('mentor_materia')
+                .select('id')
+                .eq('id_mentor', mentorData.id_mentor);
+
+            if (materiasError) throw materiasError;
+
+            // 4. Si no le quedan materias, eliminar de la tabla mentor
+            if (!materiasRestantes || materiasRestantes.length === 0) {
+                const { error: mentorDeleteError } = await supabase
+                    .from('mentor')
+                    .delete()
+                    .eq('id_mentor', mentorData.id_mentor);
+
+                if (mentorDeleteError) throw mentorDeleteError;
+
+                // Redirigir a home o página de mentores
+                setSuccessModal({
+                    open: true,
+                    message: 'Te diste de baja exitosamente. Ya no sos mentor.'
+                });
+
+                // Esperar 2 segundos y redirigir
+                setTimeout(() => {
+                    window.location.href = '/';
+                }, 2000);
+            } else {
+                // Solo actualizar la lista de materias
+                setMentorships(prev => prev.filter(m => m.id !== mentorshipId));
+                setSuccessModal({ open: true, message: 'Te diste de baja exitosamente' });
+            }
+
+            setConfirmRemoveMentorship(null);
 
         } catch (err) {
             console.error('Error eliminando mentoría:', err);
-            alert('Error al darte de baja');
+            setErrorModal({ open: true, message: 'Error al darte de baja de la materia' });
+        } finally {
+            setIsRemoving(false);
         }
     };
 
@@ -305,32 +384,66 @@ export default function IAmMentor() {
 
         } catch (err) {
             console.error('Error guardando config:', err);
-            alert('Error al guardar configuración');
+            setErrorModal({ open: true, message: 'Error al guardar la configuración' });
         } finally {
             setSaving(false);
         }
     };
 
     const handleSavePago = async () => {
+
+        // Validaciones
         if (!pagoForm.mpEmail.trim()) {
-            alert('Ingresá tu email de Mercado Pago');
+            setErrorModal({
+                open: true,
+                message: 'Ingresá tu email de Mercado Pago'
+            });
+            return;
+        }
+
+        if (!pagoForm.mpCvu || pagoForm.mpCvu.length !== 13) {
+            setErrorModal({
+                open: true,
+                message: 'El número de cuenta debe tener exactamente 13 dígitos'
+            });
+            return;
+        }
+
+        if (!pagoForm.mpAlias.trim()) {
+            setErrorModal({
+                open: true,
+                message: 'Ingresá tu alias de Mercado Pago'
+            });
             return;
         }
 
         try {
             setSaving(true);
 
-            const result = await savePaymentData({ mpEmail: pagoForm.mpEmail });
+            const result = await savePaymentData({
+                mpEmail: pagoForm.mpEmail,
+                mpCvu: pagoForm.mpCvu,
+                mpAlias: pagoForm.mpAlias
+            });
 
             if (result.success) {
-                setSuccessModal({ open: true, message: 'Método de pago configurado. ¡Ya podés recibir solicitudes de clases!' });
+                setSuccessModal({
+                    open: true,
+                    message: '¡Configuración de pago guardada! Ya podés recibir solicitudes de mentorías.'
+                });
             } else {
-                alert('Error al guardar método de pago: ' + result.error);
+                setErrorModal({
+                    open: true,
+                    message: result.error || 'Error al guardar la configuración'
+                });
             }
 
         } catch (err) {
             console.error('Error guardando pago:', err);
-            alert('Error al guardar método de pago');
+            setErrorModal({
+                open: true,
+                message: 'Error al guardar configuración de pago. Intentá nuevamente.'
+            });
         } finally {
             setSaving(false);
         }
@@ -355,12 +468,19 @@ export default function IAmMentor() {
         }
     };
 
+    const isFormValid = () => {
+        return pagoForm.mpEmail.trim() &&
+            pagoForm.mpCvu &&
+            pagoForm.mpCvu.length === 13 &&
+            pagoForm.mpAlias.trim();
+    };
+
     if (mentorLoading || loading) {
         return (
             <div style={pageStyle}>
                 <div style={centerStyle}>
                     <div style={spinnerStyle}></div>
-                    <p style={{ marginTop: 16, color: '#6B7280' }}>Cargando...</p>
+                    <p style={{ marginTop: 16, color: '#6B7280', fontFamily: 'Inter, sans-serif' }}>Cargando...</p>
                 </div>
             </div>
         );
@@ -371,9 +491,11 @@ export default function IAmMentor() {
             <div style={pageStyle}>
                 <div style={containerStyle}>
                     <Card style={{ padding: 40, textAlign: 'center' }}>
-                        <div style={{ fontSize: 48, marginBottom: 16 }}>📚</div>
-                        <h3 style={{ margin: '0 0 12px 0' }}>No sos mentor aún</h3>
-                        <p style={{ color: '#6b7280', margin: 0 }}>
+                        <div style={{ fontSize: 48, marginBottom: 16 }}>
+                            <FontAwesomeIcon icon={faBook} style={{ color: '#0d9488' }} />
+                        </div>
+                        <h3 style={{ margin: '0 0 12px 0', fontFamily: 'Inter, sans-serif' }}>No sos mentor aún</h3>
+                        <p style={{ color: '#6b7280', margin: 0, fontFamily: 'Inter, sans-serif' }}>
                             Postulate para ser mentor de alguna materia
                         </p>
                     </Card>
@@ -385,19 +507,55 @@ export default function IAmMentor() {
     return (
         <div style={pageStyle}>
             <div style={containerStyle}>
-                <div style={headerContainerStyle}>
-                    <div>
-                        <h1 style={titleStyle}>Panel de Mentor</h1>
-                        <p style={subtitleStyle}>Administrá tus mentorías y configuración</p>
+                {/* Header estilo Kerana */}
+                <header style={{
+                    marginBottom: 20,
+                    background: '#ffffff',
+                    padding: '20px',
+                    borderRadius: 16,
+                    border: '2px solid #f1f5f9',
+                    boxShadow: '0 2px 8px rgba(0,0,0,0.04)'
+                }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 6 }}>
+                        <div style={{
+                            width: 44,
+                            height: 44,
+                            borderRadius: 12,
+                            background: '#0d9488',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center'
+                        }}>
+                            <FontAwesomeIcon icon={faGraduationCap} style={{ fontSize: 18, color: '#fff' }} />
+                        </div>
+                        <h1 style={{
+                            margin: 0,
+                            fontSize: 26,
+                            fontWeight: 700,
+                            color: '#0d9488',
+                            fontFamily: 'Inter, sans-serif'
+                        }}>
+                            Panel de Mentor
+                        </h1>
                     </div>
-                </div>
+                    <p style={{
+                        margin: 0,
+                        fontSize: 14,
+                        fontWeight: 500,
+                        color: '#64748b',
+                        paddingLeft: 56,
+                        fontFamily: 'Inter, sans-serif'
+                    }}>
+                        Administrá tus mentorías y configuración
+                    </p>
+                </header>
 
                 {!hasPaymentConfigured && (
                     <div style={warningBannerStyle}>
                         <span style={{ fontSize: 20, color: '#f59e0b' }}>
                             <FontAwesomeIcon icon={faExclamationCircle} />
                         </span>
-                        <div>
+                        <div style={{ fontFamily: 'Inter, sans-serif' }}>
                             <strong>Configurá tu método de pago</strong>
                             <p style={{ margin: '4px 0 0 0', fontSize: 14 }}>
                                 No podés recibir solicitudes hasta que configures cómo recibir pagos
@@ -430,7 +588,8 @@ export default function IAmMentor() {
                         alignItems: 'center',
                         gap: 12,
                         fontWeight: 600,
-                        fontSize: 14
+                        fontSize: 14,
+                        fontFamily: 'Inter, sans-serif'
                     }}>
                         <span style={{ fontSize: 20, color: '#10b981' }}>
                             <FontAwesomeIcon icon={faCheckCircle} />
@@ -444,7 +603,7 @@ export default function IAmMentor() {
                         onClick={() => setActiveTab('materias')}
                         style={{
                             ...tabButtonStyle,
-                            background: activeTab === 'materias' ? '#10B981' : 'transparent',
+                            background: activeTab === 'materias' ? '#0d9488' : 'transparent',
                             color: activeTab === 'materias' ? 'white' : '#6B7280'
                         }}
                     >
@@ -455,7 +614,7 @@ export default function IAmMentor() {
                         onClick={() => setActiveTab('proximas')}
                         style={{
                             ...tabButtonStyle,
-                            background: activeTab === 'proximas' ? '#10B981' : 'transparent',
+                            background: activeTab === 'proximas' ? '#0d9488' : 'transparent',
                             color: activeTab === 'proximas' ? 'white' : '#6B7280'
                         }}
                     >
@@ -466,7 +625,7 @@ export default function IAmMentor() {
                         onClick={() => setActiveTab('config')}
                         style={{
                             ...tabButtonStyle,
-                            background: activeTab === 'config' ? '#10B981' : 'transparent',
+                            background: activeTab === 'config' ? '#0d9488' : 'transparent',
                             color: activeTab === 'config' ? 'white' : '#6B7280'
                         }}
                     >
@@ -477,7 +636,7 @@ export default function IAmMentor() {
                         onClick={() => setActiveTab('pago')}
                         style={{
                             ...tabButtonStyle,
-                            background: activeTab === 'pago' ? '#10B981' : 'transparent',
+                            background: activeTab === 'pago' ? '#0d9488' : 'transparent',
                             color: activeTab === 'pago' ? 'white' : '#6B7280'
                         }}
                     >
@@ -489,7 +648,7 @@ export default function IAmMentor() {
                         onClick={() => setActiveTab('terminos')}
                         style={{
                             ...tabButtonStyle,
-                            background: activeTab === 'terminos' ? '#10B981' : 'transparent',
+                            background: activeTab === 'terminos' ? '#0d9488' : 'transparent',
                             color: activeTab === 'terminos' ? 'white' : '#6B7280'
                         }}
                     >
@@ -501,16 +660,71 @@ export default function IAmMentor() {
                 <div style={{ marginTop: 24 }}>
                     {activeTab === 'materias' && (
                         <div>
-                            <h2 style={sectionTitleStyle}>Mis Materias</h2>
-                            <p style={sectionSubtitleStyle}>Materias en las que sos mentor actualmente</p>
+                            {/* Título mejorado con botón */}
+                            <div style={{ marginBottom: 20, display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                                <div>
+                                    <h2 style={{
+                                        margin: '0 0 6px 0',
+                                        fontSize: 22,
+                                        fontWeight: 700,
+                                        color: '#0d9488',
+                                        fontFamily: 'Inter, sans-serif'
+                                    }}>
+                                        Mis Materias
+                                    </h2>
+                                    <p style={{
+                                        margin: 0,
+                                        fontSize: 14,
+                                        fontWeight: 500,
+                                        color: '#64748b',
+                                        fontFamily: 'Inter, sans-serif'
+                                    }}>
+                                        Materias en las que sos mentor actualmente
+                                    </p>
+                                </div>
+
+                                <button
+                                    onClick={() => window.location.href = '/mentores/postular'}
+                                    style={{
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        gap: 8,
+                                        padding: '10px 18px',
+                                        background: '#0d9488',
+                                        color: '#fff',
+                                        border: 'none',
+                                        borderRadius: 10,
+                                        fontWeight: 700,
+                                        fontSize: 14,
+                                        cursor: 'pointer',
+                                        transition: 'all 0.2s ease',
+                                        fontFamily: 'Inter, sans-serif',
+                                        boxShadow: '0 2px 8px rgba(13, 148, 136, 0.2)',
+                                        whiteSpace: 'nowrap'
+                                    }}
+                                    onMouseEnter={(e) => {
+                                        e.target.style.background = '#14b8a6';
+                                        e.target.style.transform = 'translateY(-2px)';
+                                        e.target.style.boxShadow = '0 4px 12px rgba(13, 148, 136, 0.3)';
+                                    }}
+                                    onMouseLeave={(e) => {
+                                        e.target.style.background = '#0d9488';
+                                        e.target.style.transform = 'translateY(0)';
+                                        e.target.style.boxShadow = '0 2px 8px rgba(13, 148, 136, 0.2)';
+                                    }}
+                                >
+                                    <FontAwesomeIcon icon={faPlus} style={{ fontSize: 14 }} />
+                                    Agregar Materia
+                                </button>
+                            </div>
 
                             {mentorships.length === 0 ? (
                                 <Card style={{ padding: 40, textAlign: 'center', marginTop: 20 }}>
-                                    <div style={{ fontSize: 48, marginBottom: 16, color: '#0b7a72' }}>
+                                    <div style={{ fontSize: 48, marginBottom: 16, color: '#0d9488' }}>
                                         <FontAwesomeIcon icon={faBook} />
                                     </div>
-                                    <h3 style={{ margin: '0 0 12px 0' }}>No tenés materias asignadas</h3>
-                                    <p style={{ color: '#6b7280', margin: 0 }}>
+                                    <h3 style={{ margin: '0 0 12px 0', fontFamily: 'Inter, sans-serif' }}>No tenés materias asignadas</h3>
+                                    <p style={{ color: '#6b7280', margin: 0, fontFamily: 'Inter, sans-serif' }}>
                                         Contactá a soporte para agregar materias
                                     </p>
                                 </Card>
@@ -519,7 +733,7 @@ export default function IAmMentor() {
                                     {mentorships.map(mentorship => (
                                         <Card key={mentorship.id} style={{ padding: 20 }}>
                                             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                                                <div>
+                                                <div style={{ fontFamily: 'Inter, sans-serif' }}>
                                                     <h3 style={{ margin: '0 0 6px 0', fontSize: 18, fontWeight: 600 }}>
                                                         {mentorship.materia.nombre_materia}
                                                     </h3>
@@ -527,19 +741,42 @@ export default function IAmMentor() {
                                                         Semestre: {mentorship.materia.semestre}
                                                     </p>
                                                 </div>
-                                                <Button
+                                                <button
                                                     onClick={() => handleRemoveMentorship(
                                                         mentorship.id,
                                                         mentorship.materia.nombre_materia
                                                     )}
                                                     style={{
-                                                        background: '#dc2626',
-                                                        color: '#fff',
-                                                        border: 'none'
+                                                        display: 'flex',
+                                                        alignItems: 'center',
+                                                        gap: 6,
+                                                        padding: '8px 16px',
+                                                        background: '#fff',
+                                                        color: '#ef4444',
+                                                        border: '2px solid #ef4444',
+                                                        borderRadius: 8,
+                                                        fontWeight: 600,
+                                                        fontSize: 13,
+                                                        cursor: 'pointer',
+                                                        transition: 'all 0.2s ease',
+                                                        fontFamily: 'Inter, sans-serif'
+                                                    }}
+                                                    onMouseEnter={(e) => {
+                                                        e.target.style.background = '#ef4444';
+                                                        e.target.style.color = '#fff';
+                                                        e.target.style.transform = 'translateY(-1px)';
+                                                        e.target.style.boxShadow = '0 4px 12px rgba(239, 68, 68, 0.3)';
+                                                    }}
+                                                    onMouseLeave={(e) => {
+                                                        e.target.style.background = '#fff';
+                                                        e.target.style.color = '#ef4444';
+                                                        e.target.style.transform = 'translateY(0)';
+                                                        e.target.style.boxShadow = 'none';
                                                     }}
                                                 >
+                                                    <FontAwesomeIcon icon={faTrash} style={{ fontSize: 12 }} />
                                                     Darme de baja
-                                                </Button>
+                                                </button>
                                             </div>
                                         </Card>
                                     ))}
@@ -656,8 +893,8 @@ export default function IAmMentor() {
                                                             {sesion.modalidad === 'virtual' ? 'Virtual' : 'Presencial'}
                                                             {sesion.locacion && (
                                                                 <span style={{ fontWeight: 500, marginLeft: 6, fontSize: 13, color: '#64748b' }}>
-                        ({sesion.locacion === 'casa' ? 'Casa del mentor' : 'Facultad'})
-                      </span>
+                                                ({sesion.locacion === 'casa' ? 'Casa del mentor' : 'Facultad'})
+                                            </span>
                                                             )}
                                                         </p>
                                                     </div>
@@ -683,7 +920,7 @@ export default function IAmMentor() {
                                                     </div>
                                                 </div>
 
-                                                {/* Descripción del alumno */}
+                                                {/* Notas del alumno */}
                                                 {sesion.notas_alumno && (
                                                     <div style={{
                                                         background: '#f8fafc',
@@ -701,29 +938,26 @@ export default function IAmMentor() {
                                                         </p>
                                                     </div>
                                                 )}
+
                                                 {/* Emails de participantes */}
                                                 {sesion.emails_participantes && sesion.emails_participantes.length > 0 && (
-                                                    <div
-                                                        style={{
-                                                            background: '#fff',
-                                                            borderRadius: 12,
-                                                            padding: 16,
-                                                            marginBottom: 16,
-                                                            border: '2px solid #6ee7d8'
-                                                        }}
-                                                    >
-                                                        <div
-                                                            style={{
-                                                                display: 'flex',
-                                                                alignItems: 'center',
-                                                                gap: 8,
-                                                                marginBottom: 8
-                                                            }}
-                                                        >
+                                                    <div style={{
+                                                        background: '#f8fafc',
+                                                        borderRadius: 12,
+                                                        padding: 16,
+                                                        marginBottom: 16,
+                                                        border: '2px solid #f8fafc'
+                                                    }}>
+                                                        <div style={{
+                                                            display: 'flex',
+                                                            alignItems: 'center',
+                                                            gap: 8,
+                                                            marginBottom: 8
+                                                        }}>
                                                             <FontAwesomeIcon icon={faEnvelope} style={{ color: '#0d9488', fontSize: 14 }} />
                                                             <span style={{ fontSize: 13, fontWeight: 700, color: '#0d9488' }}>
-        Emails de participantes
-      </span>
+                                            Emails de participantes
+                                        </span>
                                                         </div>
                                                         <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
                                                             {sesion.emails_participantes.map((email, idx) => (
@@ -734,9 +968,9 @@ export default function IAmMentor() {
                                                                         fontWeight: 500,
                                                                         color: '#0f172a',
                                                                         padding: '6px 10px',
-                                                                        background: '#ccfbf1',
+                                                                        background: '#fff',
                                                                         borderRadius: 8,
-                                                                        border: '1px solid #99f6e4'
+                                                                        border: '1px solid #0d9488'
                                                                     }}
                                                                 >
                                                                     • {email}
@@ -746,115 +980,74 @@ export default function IAmMentor() {
                                                     </div>
                                                 )}
 
-
                                                 {/* Descripción del alumno */}
                                                 {sesion.descripcion_alumno && (
-                                                    <div
-                                                        style={{
-                                                            background: '#f8fafc',
-                                                            borderRadius: 12,
-                                                            padding: 16,
-                                                            marginBottom: 16,
-                                                            borderLeft: '3px solid #0d9488'
-                                                        }}
-                                                    >
+                                                    <div style={{
+                                                        background: '#f8fafc',
+                                                        borderRadius: 12,
+                                                        padding: 16,
+                                                        marginBottom: 16,
+                                                        borderLeft: '3px solid #0d9488'
+                                                    }}>
                                                         <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
                                                             <FontAwesomeIcon icon={faFileAlt} style={{ color: '#0d9488', fontSize: 14 }} />
                                                             <span style={{ fontSize: 13, fontWeight: 700, color: '#0f172a' }}>
-        Descripción del alumno
-      </span>
+                                            Descripción del alumno
+                                        </span>
                                                         </div>
-                                                        <p
-                                                            style={{
-                                                                margin: 0,
-                                                                fontSize: 14,
-                                                                fontWeight: 500,
-                                                                color: '#475569',
-                                                                lineHeight: 1.6
-                                                            }}
-                                                        >
+                                                        <p style={{
+                                                            margin: 0,
+                                                            fontSize: 14,
+                                                            fontWeight: 500,
+                                                            color: '#475569',
+                                                            lineHeight: 1.6
+                                                        }}>
                                                             {sesion.descripcion_alumno}
                                                         </p>
                                                     </div>
                                                 )}
 
-
                                                 {/* Botón cancelar (único) */}
-                                                <div style={{ display: 'flex', gap: 12 }}>
-                                                    <button
-                                                        style={{
-                                                            flex: 1,
-                                                            padding: '12px',
-                                                            background: '#fff',
-                                                            color: '#0d9488',
-                                                            border: '2px solid #0d9488',
-                                                            borderRadius: 10,
-                                                            fontWeight: 700,
-                                                            fontSize: 14,
-                                                            cursor: 'pointer',
-                                                            transition: 'all 0.2s ease',
-                                                            fontFamily: 'Inter, sans-serif'
-                                                        }}
-                                                        onMouseEnter={(e) => {
-                                                            e.target.style.background = '#0d9488';
-                                                            e.target.style.color = '#fff';
-                                                            e.target.style.transform = 'translateY(-1px)';
-                                                        }}
-                                                        onMouseLeave={(e) => {
-                                                            e.target.style.background = '#fff';
-                                                            e.target.style.color = '#0d9488';
-                                                            e.target.style.transform = 'translateY(0)';
-                                                        }}
-                                                    >
-                                                        <FontAwesomeIcon icon={faCheck} style={{ marginRight: 8 }} />
-                                                        Marcar como completada
-                                                    </button>
+                                                <button
+                                                    onClick={() => {
+                                                        const fechaSesion = new Date(sesion.fecha_hora);
+                                                        const ahora = new Date();
+                                                        const horasRestantes = (fechaSesion - ahora) / (1000 * 60 * 60);
 
-                                                    <button
-                                                        onClick={() => {
-                                                            const fechaSesion = new Date(sesion.fecha_hora);
-                                                            const ahora = new Date();
-                                                            const horasRestantes = (fechaSesion - ahora) / (1000 * 60 * 60);
-
-                                                            const fecha = fechaSesion.toISOString().split('T')[0];
-                                                            const hora = fechaSesion.toTimeString().slice(0, 5);
-
-
-                                                            setConfirmCancelSession({
-                                                                id: sesion.id_sesion,
-                                                                esMasDe36Horas: horasRestantes > 36,
-                                                                fecha: fechaSesion,
-                                                                materia: sesion.materia?.nombre_materia,
-                                                            });
-                                                        }}
-                                                        style={{
-                                                            flex: 1,
-                                                            padding: '12px',
-                                                            background: '#fff',
-                                                            color: '#ef4444',
-                                                            border: '2px solid #ef4444',
-                                                            borderRadius: 10,
-                                                            fontWeight: 700,
-                                                            fontSize: 14,
-                                                            cursor: 'pointer',
-                                                            transition: 'all 0.2s ease',
-                                                            fontFamily: 'Inter, sans-serif'
-                                                        }}
-                                                        onMouseEnter={(e) => {
-                                                            e.target.style.background = '#ef4444';
-                                                            e.target.style.color = '#fff';
-                                                            e.target.style.transform = 'translateY(-1px)';
-                                                        }}
-                                                        onMouseLeave={(e) => {
-                                                            e.target.style.background = '#fff';
-                                                            e.target.style.color = '#ef4444';
-                                                            e.target.style.transform = 'translateY(0)';
-                                                        }}
-                                                    >
-                                                        <FontAwesomeIcon icon={faTimes} style={{ marginRight: 8 }} />
-                                                        Cancelar mentoría
-                                                    </button>
-                                                </div>
+                                                        setConfirmCancelSession({
+                                                            id: sesion.id_sesion,
+                                                            esMasDe36Horas: horasRestantes > 36,
+                                                            fecha: fechaSesion,
+                                                            materia: sesion.materia?.nombre_materia,
+                                                        });
+                                                    }}
+                                                    style={{
+                                                        width: '100%',
+                                                        padding: '12px',
+                                                        background: '#fff',
+                                                        color: '#ef4444',
+                                                        border: '2px solid #ef4444',
+                                                        borderRadius: 10,
+                                                        fontWeight: 700,
+                                                        fontSize: 14,
+                                                        cursor: 'pointer',
+                                                        transition: 'all 0.2s ease',
+                                                        fontFamily: 'Inter, sans-serif'
+                                                    }}
+                                                    onMouseEnter={(e) => {
+                                                        e.target.style.background = '#ef4444';
+                                                        e.target.style.color = '#fff';
+                                                        e.target.style.transform = 'translateY(-1px)';
+                                                    }}
+                                                    onMouseLeave={(e) => {
+                                                        e.target.style.background = '#fff';
+                                                        e.target.style.color = '#ef4444';
+                                                        e.target.style.transform = 'translateY(0)';
+                                                    }}
+                                                >
+                                                    <FontAwesomeIcon icon={faTimes} style={{ marginRight: 8 }} />
+                                                    Cancelar mentoría
+                                                </button>
                                             </div>
                                         );
                                     })}
@@ -865,8 +1058,27 @@ export default function IAmMentor() {
 
                     {activeTab === 'config' && (
                         <div>
-                            <h2 style={sectionTitleStyle}>Configuración de Mentorías</h2>
-                            <p style={sectionSubtitleStyle}>Configurá cómo querés dar tus clases</p>
+                            {/* Título mejorado */}
+                            <div style={{ marginBottom: 20 }}>
+                                <h2 style={{
+                                    margin: '0 0 6px 0',
+                                    fontSize: 22,
+                                    fontWeight: 700,
+                                    color: '#0d9488',
+                                    fontFamily: 'Inter, sans-serif'
+                                }}>
+                                    Configuración de Mentorías
+                                </h2>
+                                <p style={{
+                                    margin: 0,
+                                    fontSize: 14,
+                                    fontWeight: 500,
+                                    color: '#64748b',
+                                    fontFamily: 'Inter, sans-serif'
+                                }}>
+                                    Configurá cómo querés dar tus clases
+                                </p>
+                            </div>
 
                             <Card style={{ padding: 24, marginTop: 20 }}>
                                 <div style={formStyle}>
@@ -879,7 +1091,7 @@ export default function IAmMentor() {
                                                     onClick={() => setConfigForm({ ...configForm, maxAlumnos: num })}
                                                     style={{
                                                         ...optionButtonStyle,
-                                                        background: configForm.maxAlumnos === num ? '#10B981' : 'white',
+                                                        background: configForm.maxAlumnos === num ? '#0d9488' : 'white',
                                                         color: configForm.maxAlumnos === num ? 'white' : '#374151'
                                                     }}
                                                 >
@@ -918,7 +1130,7 @@ export default function IAmMentor() {
                                                 checked={configForm.aceptaVirtual}
                                                 onChange={(e) => setConfigForm({ ...configForm, aceptaVirtual: e.target.checked })}
                                             />
-                                            Virtual - $400 UYU
+                                            Virtual - $430 UYU
                                         </label>
                                         <label style={checkboxLabelStyle}>
                                             <input
@@ -926,7 +1138,7 @@ export default function IAmMentor() {
                                                 checked={configForm.aceptaPresencial}
                                                 onChange={(e) => setConfigForm({ ...configForm, aceptaPresencial: e.target.checked })}
                                             />
-                                            Presencial - $600 UYU
+                                            Presencial - $630 UYU
                                         </label>
                                     </div>
 
@@ -958,7 +1170,7 @@ export default function IAmMentor() {
                                                         onChange={(e) => setConfigForm({ ...configForm, direccion: e.target.value })}
                                                         style={inputStyle}
                                                     />
-                                                    <small style={{ fontSize: 13, color: '#6B7280' }}>
+                                                    <small style={{ fontSize: 13, color: '#6B7280', fontFamily: 'Inter, sans-serif' }}>
                                                         Solo se comparte cuando el usuario paga y elige clase en tu casa
                                                     </small>
                                                 </div>
@@ -976,80 +1188,505 @@ export default function IAmMentor() {
 
                     {activeTab === 'pago' && (
                         <div>
-                            <h2 style={sectionTitleStyle}>Método de Pago</h2>
-                            <p style={sectionSubtitleStyle}>Configurá cómo querés recibir tus pagos</p>
+                            {/* Título */}
+                            <div style={{ marginBottom: 24 }}>
+                                <h2 style={{
+                                    margin: '0 0 8px 0',
+                                    fontSize: 28,
+                                    fontWeight: 800,
+                                    color: '#13346b',
+                                    fontFamily: 'Inter, sans-serif',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    gap: 12
+                                }}>
+                                    <FontAwesomeIcon icon={faCreditCard} style={{ color: '#2563eb' }} />
+                                    Configuración de Cobros
+                                </h2>
+                                <p style={{
+                                    margin: 0,
+                                    fontSize: 15,
+                                    fontWeight: 500,
+                                    color: '#64748b',
+                                    fontFamily: 'Inter, sans-serif'
+                                }}>
+                                    Configurá cómo querés recibir tus pagos por las mentorías
+                                </p>
+                            </div>
 
+                            {/* Banner de éxito si ya está configurado */}
                             {hasPaymentConfigured && (
-                                <div style={successBannerStyle}>
-                                    <span style={{ fontSize: 20, color: '#10b981' }}>
-                                        <FontAwesomeIcon icon={faCheckCircle} />
-                                    </span>
-                                    <div>
-                                        <strong>Método de pago configurado</strong>
-                                        <p style={{ margin: '4px 0 0 0', fontSize: 14 }}>
-                                            Ya podés recibir solicitudes de clases
+                                <div style={{
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    gap: 16,
+                                    padding: 20,
+                                    background: '#d1fae5',
+                                    border: '2px solid #10b981',
+                                    borderRadius: 12,
+                                    marginBottom: 24
+                                }}>
+                                    <FontAwesomeIcon
+                                        icon={faCheckCircle}
+                                        style={{ fontSize: 24, color: '#10b981' }}
+                                    />
+                                    <div style={{ fontFamily: 'Inter, sans-serif' }}>
+                                        <strong style={{ fontSize: 15, color: '#065f46' }}>
+                                            Método de pago configurado correctamente
+                                        </strong>
+                                        <p style={{ margin: '4px 0 0 0', fontSize: 14, color: '#047857' }}>
+                                            Ya podés recibir solicitudes de mentorías
                                         </p>
                                     </div>
                                 </div>
                             )}
 
-                            <Card style={{ padding: 24, marginTop: 20 }}>
+                            <Card style={{ padding: 32, marginTop: 20 }}>
                                 <div style={formStyle}>
-                                    <div style={infoBoxStyle}>
-                                        <h3 style={{ margin: '0 0 12px 0', fontSize: 16, fontWeight: 600 }}>
-                                            💰 Cómo funcionan los pagos
-                                        </h3>
-                                        <ul style={{ margin: 0, paddingLeft: 20, fontSize: 14, lineHeight: 1.8, color: '#4B5563' }}>
-                                            <li>El usuario paga a través de Mercado Pago</li>
-                                            <li>Retenemos el pago hasta 24 horas después de la clase</li>
-                                            <li>Si no hay inconvenientes, transferimos a tu cuenta de MP</li>
-                                            <li>Mercado Pago cobra ~6% de comisión por transacción</li>
-                                            <li>Tus datos no se comparten con los usuarios</li>
+                                    {/* Información sobre pagos */}
+                                    <div style={{
+                                        background: 'linear-gradient(135deg, #eff6ff 0%, #dbeafe 100%)',
+                                        border: '2px solid #bfdbfe',
+                                        borderRadius: 16,
+                                        padding: 24
+                                    }}>
+                                        <div style={{
+                                            display: 'flex',
+                                            alignItems: 'center',
+                                            gap: 12,
+                                            marginBottom: 16
+                                        }}>
+                                            <div style={{
+                                                width: 44,
+                                                height: 44,
+                                                background: '#2563eb',
+                                                borderRadius: 12,
+                                                display: 'flex',
+                                                alignItems: 'center',
+                                                justifyContent: 'center'
+                                            }}>
+                                                <FontAwesomeIcon
+                                                    icon={faDollarSign}
+                                                    style={{ fontSize: 20, color: '#fff' }}
+                                                />
+                                            </div>
+                                            <h3 style={{
+                                                margin: 0,
+                                                fontSize: 18,
+                                                fontWeight: 700,
+                                                color: '#1e40af',
+                                                fontFamily: 'Inter, sans-serif'
+                                            }}>
+                                                ¿Cómo funcionan los pagos?
+                                            </h3>
+                                        </div>
+                                        <ul style={{
+                                            margin: 0,
+                                            paddingLeft: 24,
+                                            fontSize: 14,
+                                            lineHeight: 2,
+                                            color: '#1e40af',
+                                            fontFamily: 'Inter, sans-serif',
+                                            fontWeight: 500
+                                        }}>
+                                            <li>Los alumnos pagan a través de Mercado Pago</li>
+                                            <li>Retenemos el pago hasta 24 horas después de la mentoría</li>
+                                            <li>Si todo sale bien, te transferimos a tu cuenta de Mercado Pago</li>
+                                            <li>Mercado Pago cobra aproximadamente 6% de comisión</li>
+                                            <li>Tus datos bancarios nunca se comparten con los alumnos</li>
                                         </ul>
                                     </div>
 
+                                    {/* Separador */}
+                                    <div style={{
+                                        height: 1,
+                                        background: 'linear-gradient(to right, transparent, #e5e7eb, transparent)',
+                                        margin: '8px 0'
+                                    }}></div>
+
+                                    {/* Título de sección */}
+                                    <div>
+                                        <h4 style={{
+                                            margin: '0 0 8px 0',
+                                            fontSize: 16,
+                                            fontWeight: 700,
+                                            color: '#0f172a',
+                                            fontFamily: 'Inter, sans-serif'
+                                        }}>
+                                            Datos de tu cuenta de Mercado Pago
+                                        </h4>
+                                        <p style={{
+                                            margin: 0,
+                                            fontSize: 13,
+                                            color: '#64748b',
+                                            fontFamily: 'Inter, sans-serif',
+                                            fontWeight: 500
+                                        }}>
+                                            Necesitamos estos datos para transferirte los pagos
+                                        </p>
+                                    </div>
+
+                                    {/* Email de Mercado Pago */}
                                     <div style={fieldStyle}>
-                                        <label style={labelStyle}>Email de Mercado Pago</label>
+                                        <label style={{
+                                            ...labelStyle,
+                                            display: 'flex',
+                                            alignItems: 'center',
+                                            gap: 8
+                                        }}>
+                                            <FontAwesomeIcon
+                                                icon={faEnvelope}
+                                                style={{ fontSize: 14, color: '#2563eb' }}
+                                            />
+                                            Email de Mercado Pago *
+                                        </label>
                                         <input
                                             type="email"
                                             placeholder="tu@email.com"
                                             value={pagoForm.mpEmail}
                                             onChange={(e) => setPagoForm({ ...pagoForm, mpEmail: e.target.value })}
-                                            style={inputStyle}
+                                            style={{
+                                                ...inputStyle,
+                                                borderColor: pagoForm.mpEmail ? '#10b981' : '#d1d5db'
+                                            }}
                                         />
-                                        <small style={{ fontSize: 13, color: '#6B7280' }}>
-                                            Ingresá el email asociado a tu cuenta de Mercado Pago
+                                        <small style={{
+                                            fontSize: 13,
+                                            color: '#64748b',
+                                            fontFamily: 'Inter, sans-serif',
+                                            fontWeight: 500
+                                        }}>
+                                            El email con el que te registraste en Mercado Pago
                                         </small>
                                     </div>
 
-                                    <div style={{ padding: 16, background: '#FEF3C7', border: '2px solid #F59E0B', borderRadius: 12 }}>
-                                        <p style={{ margin: 0, fontSize: 14, color: '#92400E' }}>
-                                            <FontAwesomeIcon icon={faExclamationCircle} style={{ marginRight: 6, color: '#f59e0b' }} />
-                                            <strong>Importante:</strong> Asegurate de tener una cuenta activa en Mercado Pago.
-                                            Si no tenés una, podés crearla en <a href="https://www.mercadopago.com.uy" target="_blank" style={{ color: '#10B981', fontWeight: 600 }}>mercadopago.com.uy</a>
-                                        </p>
+                                    {/* CVU */}
+                                    <div style={fieldStyle}>
+                                        <label style={{
+                                            ...labelStyle,
+                                            display: 'flex',
+                                            alignItems: 'center',
+                                            gap: 8
+                                        }}>
+                                            <FontAwesomeIcon
+                                                icon={faCreditCard}
+                                                style={{ fontSize: 14, color: '#2563eb' }}
+                                            />
+                                             Número de cuenta *
+                                        </label>
+                                        <input
+                                            type="text"
+                                            placeholder="1031001458901"
+                                            value={pagoForm.mpCvu || ''}
+                                            onChange={(e) => {
+                                                const value = e.target.value.replace(/\D/g, '').slice(0, 13);
+                                                setPagoForm({ ...pagoForm, mpCvu: value });
+                                            }}
+                                            maxLength={13}
+                                            style={{
+                                                ...inputStyle,
+                                                borderColor: pagoForm.mpCvu?.length === 13 ? '#10b981' : '#d1d5db',
+                                                fontFamily: 'monospace',
+                                                fontSize: 15
+                                            }}
+                                        />
+                                        <div style={{
+                                            display: 'flex',
+                                            justifyContent: 'space-between',
+                                            alignItems: 'center'
+                                        }}>
+                                            <small style={{
+                                                fontSize: 13,
+                                                color: '#64748b',
+                                                fontFamily: 'Inter, sans-serif',
+                                                fontWeight: 500
+                                            }}>
+                                                13 dígitos - Lo encontrás en tu app de Mercado Pago
+                                            </small>
+                                            {pagoForm.mpCvu && (
+                                                <small style={{
+                                                    fontSize: 12,
+                                                    fontWeight: 600,
+                                                    color: pagoForm.mpCvu.length === 13 ? '#10b981' : '#f59e0b',
+                                                    fontFamily: 'Inter, sans-serif'
+                                                }}>
+                                                    {pagoForm.mpCvu.length}/13
+                                                </small>
+                                            )}
+                                        </div>
                                     </div>
 
-                                    <button onClick={handleSavePago} disabled={saving} style={saveButtonStyle}>
-                                        {saving ? 'Guardando...' : 'Guardar Método de Pago'}
+                                    {/* Alias */}
+                                    <div style={fieldStyle}>
+                                        <label style={{
+                                            ...labelStyle,
+                                            display: 'flex',
+                                            alignItems: 'center',
+                                            gap: 8
+                                        }}>
+                                            <FontAwesomeIcon
+                                                icon={faUser}
+                                                style={{ fontSize: 14, color: '#2563eb' }}
+                                            />
+                                            Nombre completo de Mercado Pago *
+                                        </label>
+                                        <input
+                                            type="text"
+                                            placeholder="tucuenta.alias.mp"
+                                            value={pagoForm.mpAlias || ''}
+                                            onChange={(e) => {
+                                                const value = e.target.value.slice(0, 100);
+                                                setPagoForm({ ...pagoForm, mpAlias: value });
+                                            }}
+                                            maxLength={100}
+                                            style={{
+                                                ...inputStyle,
+                                                borderColor: pagoForm.mpAlias ? '#10b981' : '#d1d5db'
+                                            }}
+                                        />
+                                        <small style={{
+                                            fontSize: 13,
+                                            color: '#64748b',
+                                            fontFamily: 'Inter, sans-serif',
+                                            fontWeight: 500
+                                        }}>
+                                            Tu nombre completo
+                                        </small>
+                                    </div>
+
+                                    {/* Banner de ayuda */}
+                                    <div style={{
+                                        padding: 16,
+                                        background: '#fef3c7',
+                                        border: '2px solid #fbbf24',
+                                        borderRadius: 12,
+                                        fontFamily: 'Inter, sans-serif'
+                                    }}>
+                                        <div style={{
+                                            display: 'flex',
+                                            alignItems: 'flex-start',
+                                            gap: 12
+                                        }}>
+                                            <FontAwesomeIcon
+                                                icon={faExclamationCircle}
+                                                style={{ fontSize: 18, color: '#f59e0b', marginTop: 2 }}
+                                            />
+                                            <div>
+                                                <p style={{
+                                                    margin: '0 0 8px 0',
+                                                    fontSize: 14,
+                                                    color: '#92400e',
+                                                    fontWeight: 600
+                                                }}>
+                                                    <strong>¿Dónde encuentro mi número de cuenta?</strong>
+                                                </p>
+                                                <ol style={{
+                                                    margin: 0,
+                                                    paddingLeft: 20,
+                                                    fontSize: 13,
+                                                    color: '#92400e',
+                                                    lineHeight: 1.8,
+                                                    fontWeight: 500
+                                                }}>
+                                                    <li>Abrí la app de Mercado Pago</li>
+                                                    <li>Andá a "Tu dinero" y luego "Ingresar"</li>
+                                                    <li>Ahí encontrás tu número de cuenta (13 dígitos) y tu Nombre completo</li>
+                                                </ol>
+                                                <p style={{
+                                                    margin: '12px 0 0 0',
+                                                    fontSize: 13,
+                                                    color: '#92400e',
+                                                    fontWeight: 500
+                                                }}>
+                                                    Si no tenés cuenta de Mercado Pago, creá una en{' '}
+                                                    <a
+                                                        href="https://www.mercadopago.com.uy"
+                                                        target="_blank"
+                                                        rel="noopener noreferrer"
+                                                        style={{
+                                                            color: '#2563eb',
+                                                            fontWeight: 700,
+                                                            textDecoration: 'none'
+                                                        }}
+                                                    >
+                                                        mercadopago.com.uy
+                                                    </a>
+                                                </p>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    {/* Botón guardar */}
+                                    <button
+                                        onClick={handleSavePago}
+                                        disabled={saving || !isFormValid()}
+                                        style={{
+                                            padding: '14px 32px',
+                                            background: !isFormValid()
+                                                ? '#cbd5e1'  // Gris permanente cuando está deshabilitado
+                                                : '#2563eb',  // Azul cuando está habilitado
+                                            color: 'white',
+                                            border: 'none',
+                                            borderRadius: 12,
+                                            fontWeight: 700,
+                                            fontSize: 15,
+                                            cursor: !isFormValid() ? 'not-allowed' : 'pointer',
+                                            transition: 'background 0.3s ease, transform 0.2s ease, box-shadow 0.2s ease',
+                                            alignSelf: 'flex-start',
+                                            fontFamily: 'Inter, sans-serif',
+                                            display: 'flex',
+                                            alignItems: 'center',
+                                            gap: 10,
+                                            opacity: 1
+                                        }}
+                                        onMouseEnter={(e) => {
+                                            if (isFormValid() && !saving) {
+                                                e.currentTarget.style.background = '#1e40af';  // Azul oscuro al hover
+                                                e.currentTarget.style.transform = 'translateY(-2px)';
+                                                e.currentTarget.style.boxShadow = '0 8px 24px rgba(37, 99, 235, 0.3)';
+                                            }
+                                        }}
+                                        onMouseLeave={(e) => {
+                                            if (isFormValid() && !saving) {
+                                                e.currentTarget.style.background = '#2563eb';  // Vuelve a azul normal
+                                                e.currentTarget.style.transform = 'translateY(0)';
+                                                e.currentTarget.style.boxShadow = 'none';
+                                            }
+                                        }}
+                                    >
+                                        <FontAwesomeIcon icon={saving ? faClock : faCheck} />
+                                        {saving ? 'Guardando...' : 'Guardar Configuración de Pago'}
                                     </button>
+
+                                    {/* Texto requerido */}
+                                    <small style={{
+                                        fontSize: 12,
+                                        color: '#94a3b8',
+                                        fontFamily: 'Inter, sans-serif',
+                                        fontWeight: 500,
+                                        fontStyle: 'italic'
+                                    }}>
+                                        * Todos los campos son obligatorios
+                                    </small>
                                 </div>
                             </Card>
+                            {/* Modal de Error */}
+                            {errorModal.open && (
+                                <div style={{
+                                    position: 'fixed',
+                                    inset: 0,
+                                    background: 'rgba(0, 0, 0, 0.7)',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    justifyContent: 'center',
+                                    zIndex: 1000,
+                                    backdropFilter: 'blur(4px)'
+                                }} onClick={() => setErrorModal({ open: false, message: '' })}>
+                                    <div style={{
+                                        background: '#fff',
+                                        borderRadius: 16,
+                                        padding: 32,
+                                        maxWidth: 500,
+                                        width: '90%',
+                                        boxShadow: '0 20px 60px rgba(0, 0, 0, 0.3)'
+                                    }} onClick={(e) => e.stopPropagation()}>
+                                        <div style={{
+                                            display: 'flex',
+                                            alignItems: 'center',
+                                            gap: 16,
+                                            marginBottom: 20
+                                        }}>
+                                            <div style={{
+                                                width: 48,
+                                                height: 48,
+                                                borderRadius: 12,
+                                                background: '#fee2e2',
+                                                display: 'flex',
+                                                alignItems: 'center',
+                                                justifyContent: 'center'
+                                            }}>
+                                                <FontAwesomeIcon icon={faExclamationCircle} style={{ fontSize: 24, color: '#ef4444' }} />
+                                            </div>
+                                            <h3 style={{
+                                                margin: 0,
+                                                fontSize: 20,
+                                                fontWeight: 700,
+                                                color: '#0f172a',
+                                                fontFamily: 'Inter, sans-serif'
+                                            }}>
+                                                Error
+                                            </h3>
+                                        </div>
+                                        <p style={{
+                                            margin: '0 0 24px 0',
+                                            fontSize: 15,
+                                            color: '#64748b',
+                                            fontFamily: 'Inter, sans-serif',
+                                            lineHeight: 1.6
+                                        }}>
+                                            {errorModal.message}
+                                        </p>
+                                        <button
+                                            onClick={() => setErrorModal({ open: false, message: '' })}
+                                            style={{
+                                                width: '100%',
+                                                padding: '12px 24px',
+                                                background: '#ef4444',
+                                                color: '#fff',
+                                                border: 'none',
+                                                borderRadius: 10,
+                                                fontSize: 15,
+                                                fontWeight: 700,
+                                                cursor: 'pointer',
+                                                transition: 'all 0.2s ease',
+                                                fontFamily: 'Inter, sans-serif'
+                                            }}
+                                            onMouseEnter={(e) => {
+                                                e.currentTarget.style.background = '#dc2626';
+                                            }}
+                                            onMouseLeave={(e) => {
+                                                e.currentTarget.style.background = '#ef4444';
+                                            }}
+                                        >
+                                            Entendido
+                                        </button>
+                                    </div>
+                                </div>
+                            )}
                         </div>
                     )}
 
                     {activeTab === 'terminos' && (
                         <div>
-                            <h2 style={sectionTitleStyle}>Términos y Condiciones</h2>
-                            <p style={sectionSubtitleStyle}>Condiciones para ser mentor en Kerana</p>
+                            {/* Título mejorado */}
+                            <div style={{ marginBottom: 20 }}>
+                                <h2 style={{
+                                    margin: '0 0 6px 0',
+                                    fontSize: 22,
+                                    fontWeight: 700,
+                                    color: '#0d9488',
+                                    fontFamily: 'Inter, sans-serif'
+                                }}>
+                                    Términos y Condiciones
+                                </h2>
+                                <p style={{
+                                    margin: 0,
+                                    fontSize: 14,
+                                    fontWeight: 500,
+                                    color: '#64748b',
+                                    fontFamily: 'Inter, sans-serif'
+                                }}>
+                                    Condiciones para ser mentor en Kerana
+                                </p>
+                            </div>
 
                             <Card style={{ padding: 24, marginTop: 20 }}>
-                                <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
+                                <div style={{ display: 'flex', flexDirection: 'column', gap: 20, fontFamily: 'Inter, sans-serif' }}>
                                     <div style={infoBoxStyle}>
                                         <h3 style={subtitleTermsStyle}>💰 Precios y Pagos</h3>
                                         <ul style={listTermsStyle}>
-                                            <li><strong>Clases virtuales (Zoom):</strong> $400 UYU por sesión</li>
-                                            <li><strong>Clases presenciales:</strong> $600 UYU por sesión</li>
+                                            <li><strong>Clases virtuales (Zoom):</strong> $430 UYU por sesión</li>
+                                            <li><strong>Clases presenciales:</strong> $630 UYU por sesión</li>
                                             <li>Retenemos el pago 24 horas después de la clase</li>
                                             <li>Si no hay inconvenientes, transferimos a tu cuenta</li>
                                         </ul>
@@ -1088,7 +1725,7 @@ export default function IAmMentor() {
                                     </div>
 
                                     <div style={{ padding: 16, background: '#EFF6FF', border: '2px solid #BFDBFE', borderRadius: 12, textAlign: 'center' }}>
-                                        <p style={{ margin: 0, fontSize: 14, color: '#1E40AF' }}>
+                                        <p style={{ margin: 0, fontSize: 14, color: '#1E40AF', fontFamily: 'Inter, sans-serif' }}>
                                             📧 ¿Dudas o consultas? Escribinos a <strong>kerana.soporte@gmail.com</strong>
                                         </p>
                                     </div>
@@ -1105,8 +1742,13 @@ export default function IAmMentor() {
                 onClose={() => setSuccessModal({ open: false, message: '' })}
                 message={successModal.message}
             />
+            <SuccessModal
+                open={errorModal.open}
+                onClose={() => setErrorModal({ open: false, message: '' })}
+                message={errorModal.message}
+                isError={true}
+            />
 
-            {/* Modal de confirmación de cancelación */}
             {confirmCancelSession && (
                 <div style={{
                     position: 'fixed',
@@ -1121,7 +1763,8 @@ export default function IAmMentor() {
                     justifyContent: 'center',
                     zIndex: 9999,
                     padding: 20,
-                    animation: 'fadeIn 0.2s ease-out'
+                    animation: 'fadeIn 0.2s ease-out',
+                    fontFamily: 'Inter, sans-serif'
                 }}>
                     <style>
                         {`
@@ -1177,7 +1820,8 @@ export default function IAmMentor() {
                             margin: '0 0 12px 0',
                             fontSize: 22,
                             fontWeight: 700,
-                            color: '#DC2626'
+                            color: '#DC2626',
+                            fontFamily: 'Inter, sans-serif'
                         }}>
                             {confirmCancelSession.esMasDe36Horas
                                 ? '¿Estás seguro de cancelar esta clase?'
@@ -1188,7 +1832,8 @@ export default function IAmMentor() {
                             marginBottom: 24,
                             fontSize: 14,
                             lineHeight: 1.6,
-                            fontWeight: 500
+                            fontWeight: 500,
+                            fontFamily: 'Inter, sans-serif'
                         }}>
                             {confirmCancelSession.esMasDe36Horas
                                 ? 'Esta acción cancelará la sesión confirmada. El alumno recibirá una notificación y un reembolso completo.'
@@ -1208,7 +1853,8 @@ export default function IAmMentor() {
                                     margin: '0 0 12px 0',
                                     fontSize: 13,
                                     color: '#7f1d1d',
-                                    fontWeight: 600
+                                    fontWeight: 600,
+                                    fontFamily: 'Inter, sans-serif'
                                 }}>
                                     <strong>Recordá:</strong>
                                 </p>
@@ -1217,7 +1863,8 @@ export default function IAmMentor() {
                                     paddingLeft: 20,
                                     fontSize: 13,
                                     color: '#991b1b',
-                                    lineHeight: 1.6
+                                    lineHeight: 1.6,
+                                    fontFamily: 'Inter, sans-serif'
                                 }}>
                                     <li>Podés cancelar sin penalización hasta 36hs antes</li>
                                     <li>3 strikes = Baneo de 1 año como mentor</li>
@@ -1263,24 +1910,19 @@ export default function IAmMentor() {
                                 onClick={async () => {
                                     setIsCanceling(true);
                                     try {
-                                        // TODO: Implementar cancelación real con API
                                         console.log('Cancelar sesión:', confirmCancelSession);
-
-                                        // Simular llamada API
                                         await new Promise(resolve => setTimeout(resolve, 1000));
 
-                                        // Eliminar la sesión de la lista
                                         setProximasSesiones(prev =>
                                             prev.filter(s => s.id_sesion !== confirmCancelSession.id)
                                         );
 
-                                        // Mostrar mensaje de éxito
                                         setCancelSuccess(true);
                                         setTimeout(() => setCancelSuccess(false), 3000);
 
                                     } catch (error) {
                                         console.error('Error cancelando sesión:', error);
-                                        alert('Error al cancelar sesión');
+                                        setErrorModal({ open: true, message: 'Error al cancelar la sesión' });
                                     } finally {
                                         setIsCanceling(false);
                                         setConfirmCancelSession(null);
@@ -1322,7 +1964,6 @@ export default function IAmMentor() {
                 </div>
             )}
 
-            {/* Modal de detalle de sesión */}
             {showSessionModal && selectedSession && (
                 <div style={{
                     position: 'fixed',
@@ -1335,7 +1976,8 @@ export default function IAmMentor() {
                     alignItems: 'center',
                     justifyContent: 'center',
                     zIndex: 1000,
-                    padding: 20
+                    padding: 20,
+                    fontFamily: 'Inter, sans-serif'
                 }} onClick={() => setShowSessionModal(false)}>
                     <div style={{
                         background: '#fff',
@@ -1346,7 +1988,6 @@ export default function IAmMentor() {
                         overflow: 'auto',
                         boxShadow: '0 20px 60px rgba(0,0,0,0.3)'
                     }} onClick={e => e.stopPropagation()}>
-                        {/* Header del modal */}
                         <div style={{
                             padding: '24px 24px 20px',
                             borderBottom: '2px solid #f1f5f9',
@@ -1391,407 +2032,152 @@ export default function IAmMentor() {
                                 <FontAwesomeIcon icon={faTimes} />
                             </button>
                         </div>
-
-                        {/* Contenido del modal */}
                         <div style={{ padding: 24 }}>
-                            {/* Info del alumno */}
+                            <p style={{ fontFamily: 'Inter, sans-serif' }}>Modal de sesión detallada aquí...</p>
+                        </div>
+                        {/* Modal de confirmación para dar de baja */}
+                        {confirmRemoveMentorship && (
                             <div style={{
+                                position: 'fixed',
+                                top: 0,
+                                left: 0,
+                                right: 0,
+                                bottom: 0,
+                                background: 'rgba(0,0,0,0.7)',
+                                backdropFilter: 'blur(4px)',
                                 display: 'flex',
                                 alignItems: 'center',
-                                gap: 16,
-                                marginBottom: 24,
-                                padding: 16,
-                                background: '#f8fafc',
-                                borderRadius: 12,
-                                border: '2px solid #e2e8f0'
+                                justifyContent: 'center',
+                                zIndex: 9999,
+                                padding: 20,
+                                animation: 'fadeIn 0.2s ease-out',
+                                fontFamily: 'Inter, sans-serif'
                             }}>
                                 <div style={{
-                                    width: 64,
-                                    height: 64,
-                                    borderRadius: 12,
-                                    background: selectedSession.alumno?.foto
-                                        ? `url(${selectedSession.alumno.foto}) center/cover`
-                                        : '#0d9488',
-                                    display: 'flex',
-                                    alignItems: 'center',
-                                    justifyContent: 'center',
-                                    color: '#fff',
-                                    fontSize: 28,
-                                    fontWeight: 700,
-                                    flexShrink: 0
-                                }}>
-                                    {!selectedSession.alumno?.foto && (selectedSession.alumno?.nombre?.[0] || '?')}
-                                </div>
-                                <div style={{ flex: 1 }}>
-                                    <div style={{
-                                        fontSize: 18,
-                                        fontWeight: 700,
-                                        color: '#0f172a',
-                                        marginBottom: 4,
-                                        fontFamily: 'Inter, sans-serif'
-                                    }}>
-                                        {selectedSession.alumno?.nombre || 'Sin nombre'}
-                                    </div>
-                                    {selectedSession.alumno?.username && (
-                                        <div style={{
-                                            fontSize: 14,
-                                            color: '#64748b',
-                                            fontFamily: 'Inter, sans-serif',
-                                            display: 'flex',
-                                            alignItems: 'center',
-                                            gap: 6
-                                        }}>
-                                            <FontAwesomeIcon icon={faUser} style={{ fontSize: 12 }} />
-                                            @{selectedSession.alumno.username}
-                                        </div>
-                                    )}
-                                </div>
-                                <span style={{
-                                    padding: '6px 12px',
-                                    background: selectedSession.estado === 'confirmada' ? '#d1fae5' : '#fef3c7',
-                                    color: selectedSession.estado === 'confirmada' ? '#065f46' : '#92400e',
-                                    borderRadius: 8,
-                                    fontSize: 12,
-                                    fontWeight: 600,
-                                    fontFamily: 'Inter, sans-serif'
-                                }}>
-                                    {selectedSession.estado === 'confirmada' ? '✓ Confirmada' : '⏳ Pendiente'}
-                                </span>
-                            </div>
-
-                            {/* Detalles de la sesión */}
-                            <div style={{ display: 'grid', gap: 16, marginBottom: 24 }}>
-                                {/* Materia */}
-                                <div style={{
-                                    display: 'flex',
-                                    alignItems: 'center',
-                                    gap: 12,
-                                    padding: 12,
-                                    background: '#f8fafc',
-                                    borderRadius: 10,
-                                    border: '1px solid #e2e8f0'
-                                }}>
-                                    <div style={{
-                                        width: 40,
-                                        height: 40,
-                                        borderRadius: 8,
-                                        background: '#0d9488',
-                                        display: 'flex',
-                                        alignItems: 'center',
-                                        justifyContent: 'center',
-                                        color: '#fff',
-                                        fontSize: 16
-                                    }}>
-                                        <FontAwesomeIcon icon={faBook} />
-                                    </div>
-                                    <div style={{ flex: 1 }}>
-                                        <div style={{
-                                            fontSize: 12,
-                                            color: '#64748b',
-                                            marginBottom: 2,
-                                            fontFamily: 'Inter, sans-serif'
-                                        }}>
-                                            Materia
-                                        </div>
-                                        <div style={{
-                                            fontSize: 14,
-                                            fontWeight: 600,
-                                            color: '#0f172a',
-                                            fontFamily: 'Inter, sans-serif'
-                                        }}>
-                                            {selectedSession.materia?.nombre_materia || 'No especificada'}
-                                        </div>
-                                    </div>
-                                </div>
-
-                                {/* Fecha y hora */}
-                                <div style={{
-                                    display: 'flex',
-                                    alignItems: 'center',
-                                    gap: 12,
-                                    padding: 12,
-                                    background: '#f8fafc',
-                                    borderRadius: 10,
-                                    border: '1px solid #e2e8f0'
-                                }}>
-                                    <div style={{
-                                        width: 40,
-                                        height: 40,
-                                        borderRadius: 8,
-                                        background: '#2563eb',
-                                        display: 'flex',
-                                        alignItems: 'center',
-                                        justifyContent: 'center',
-                                        color: '#fff',
-                                        fontSize: 16
-                                    }}>
-                                        <FontAwesomeIcon icon={faCalendarAlt} />
-                                    </div>
-                                    <div style={{ flex: 1 }}>
-                                        <div style={{
-                                            fontSize: 12,
-                                            color: '#64748b',
-                                            marginBottom: 2,
-                                            fontFamily: 'Inter, sans-serif'
-                                        }}>
-                                            Fecha y hora
-                                        </div>
-                                        <div style={{
-                                            fontSize: 14,
-                                            fontWeight: 600,
-                                            color: '#0f172a',
-                                            fontFamily: 'Inter, sans-serif'
-                                        }}>
-                                            {new Date(selectedSession.fecha_hora).toLocaleDateString('es-UY', {
-                                                weekday: 'long',
-                                                day: 'numeric',
-                                                month: 'long',
-                                                year: 'numeric'
-                                            })} a las {new Date(selectedSession.fecha_hora).toLocaleTimeString('es-UY', {
-                                            hour: '2-digit',
-                                            minute: '2-digit'
-                                        })}
-                                        </div>
-                                        <div style={{
-                                            fontSize: 12,
-                                            color: '#64748b',
-                                            marginTop: 2,
-                                            fontFamily: 'Inter, sans-serif'
-                                        }}>
-                                            Duración: {selectedSession.duracion_minutos || 60} minutos
-                                        </div>
-                                    </div>
-                                </div>
-
-                                {/* Ubicación */}
-                                <div style={{
-                                    display: 'flex',
-                                    alignItems: 'center',
-                                    gap: 12,
-                                    padding: 12,
-                                    background: '#f8fafc',
-                                    borderRadius: 10,
-                                    border: '1px solid #e2e8f0'
-                                }}>
-                                    <div style={{
-                                        width: 40,
-                                        height: 40,
-                                        borderRadius: 8,
-                                        background: selectedSession.modalidad === 'virtual' ? '#8b5cf6' : '#10b981',
-                                        display: 'flex',
-                                        alignItems: 'center',
-                                        justifyContent: 'center',
-                                        color: '#fff',
-                                        fontSize: 16
-                                    }}>
-                                        <FontAwesomeIcon icon={selectedSession.modalidad === 'virtual' ? faUniversity : faHome} />
-                                    </div>
-                                    <div style={{ flex: 1 }}>
-                                        <div style={{
-                                            fontSize: 12,
-                                            color: '#64748b',
-                                            marginBottom: 2,
-                                            fontFamily: 'Inter, sans-serif'
-                                        }}>
-                                            Modalidad
-                                        </div>
-                                        <div style={{
-                                            fontSize: 14,
-                                            fontWeight: 600,
-                                            color: '#0f172a',
-                                            fontFamily: 'Inter, sans-serif'
-                                        }}>
-                                            {selectedSession.modalidad === 'virtual' ? 'Virtual (Teams)' : 'Presencial'}
-                                            {selectedSession.modalidad === 'presencial' && selectedSession.locacion && (
-                                                <span style={{ color: '#64748b', fontWeight: 500 }}>
-                                                    {' '}- {selectedSession.locacion === 'casa' ? 'Casa' : 'Facultad'}
-                                                </span>
-                                            )}
-                                        </div>
-                                    </div>
-                                </div>
-
-                                {/* Cantidad de participantes */}
-                                <div style={{
-                                    display: 'flex',
-                                    alignItems: 'center',
-                                    gap: 12,
-                                    padding: 12,
-                                    background: '#f8fafc',
-                                    borderRadius: 10,
-                                    border: '1px solid #e2e8f0'
-                                }}>
-                                    <div style={{
-                                        width: 40,
-                                        height: 40,
-                                        borderRadius: 8,
-                                        background: '#0d9488',
-                                        display: 'flex',
-                                        alignItems: 'center',
-                                        justifyContent: 'center',
-                                        color: '#fff',
-                                        fontSize: 16
-                                    }}>
-                                        <FontAwesomeIcon icon={faUsers} />
-                                    </div>
-                                    <div style={{ flex: 1 }}>
-                                        <div style={{
-                                            fontSize: 12,
-                                            color: '#64748b',
-                                            marginBottom: 2,
-                                            fontFamily: 'Inter, sans-serif'
-                                        }}>
-                                            Participantes
-                                        </div>
-                                        <div style={{
-                                            fontSize: 14,
-                                            fontWeight: 600,
-                                            color: '#0f172a',
-                                            fontFamily: 'Inter, sans-serif'
-                                        }}>
-                                            {selectedSession.cantidad_alumnos || 1} {selectedSession.cantidad_alumnos === 1 ? 'persona' : 'personas'}
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-
-                            {/* Emails de participantes */}
-                            {selectedSession.emails_participantes && selectedSession.emails_participantes.length > 0 && (
-                                <div style={{
-                                    marginBottom: 24,
-                                    padding: 16,
-                                    background: '#f0f9ff',
-                                    borderRadius: 12,
-                                    border: '2px solid #bae6fd'
-                                }}>
-                                    <div style={{
-                                        fontSize: 14,
-                                        fontWeight: 600,
-                                        color: '#0f172a',
-                                        marginBottom: 12,
-                                        fontFamily: 'Inter, sans-serif',
-                                        display: 'flex',
-                                        alignItems: 'center',
-                                        gap: 8
-                                    }}>
-                                        <FontAwesomeIcon icon={faEnvelope} style={{ color: '#0284c7' }} />
-                                        Emails de participantes:
-                                    </div>
-                                    <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-                                        {selectedSession.emails_participantes.map((email, idx) => (
-                                            <div key={idx} style={{
-                                                fontSize: 13,
-                                                color: '#0c4a6e',
-                                                fontFamily: 'Inter, sans-serif',
-                                                padding: '8px 12px',
-                                                background: '#e0f2fe',
-                                                borderRadius: 6,
-                                                display: 'flex',
-                                                alignItems: 'center',
-                                                gap: 8
-                                            }}>
-                                                <span style={{
-                                                    width: 24,
-                                                    height: 24,
-                                                    borderRadius: 6,
-                                                    background: '#0284c7',
-                                                    color: '#fff',
-                                                    display: 'flex',
-                                                    alignItems: 'center',
-                                                    justifyContent: 'center',
-                                                    fontSize: 11,
-                                                    fontWeight: 700
-                                                }}>
-                                                    {idx + 1}
-                                                </span>
-                                                {email}
-                                            </div>
-                                        ))}
-                                    </div>
-                                </div>
-                            )}
-
-                            {/* Descripción del alumno */}
-                            {selectedSession.descripcion_alumno && (
-                                <div style={{
-                                    marginBottom: 24,
-                                    padding: 16,
-                                    background: '#f0fdf4',
-                                    borderLeft: '4px solid #0d9488',
-                                    borderRadius: 8
-                                }}>
-                                    <div style={{
-                                        fontSize: 14,
-                                        fontWeight: 600,
-                                        color: '#0f172a',
-                                        marginBottom: 8,
-                                        fontFamily: 'Inter, sans-serif',
-                                        display: 'flex',
-                                        alignItems: 'center',
-                                        gap: 8
-                                    }}>
-                                        <FontAwesomeIcon icon={faComment} style={{ color: '#0d9488' }} />
-                                        Descripción de la sesión:
-                                    </div>
-                                    <p style={{
-                                        margin: 0,
-                                        fontSize: 14,
-                                        color: '#065f46',
-                                        lineHeight: 1.6,
-                                        fontFamily: 'Inter, sans-serif'
-                                    }}>
-                                        "{selectedSession.descripcion_alumno}"
-                                    </p>
-                                </div>
-                            )}
-
-                            {/* Botón cancelar */}
-                            <button
-                                onClick={() => {
-                                    const fechaSesion = new Date(selectedSession.fecha_hora);
-                                    const ahora = new Date();
-                                    const horasRestantes = (fechaSesion - ahora) / (1000 * 60 * 60);
-
-                                    setConfirmCancelSession({
-                                        id: selectedSession.id_sesion,
-                                        esMasDe36Horas: horasRestantes > 36,
-                                        fecha: fechaSesion,
-                                        materia: selectedSession.materia?.nombre_materia
-                                    });
-                                    setShowSessionModal(false);
-                                }}
-                                style={{
+                                    background: 'linear-gradient(135deg, #fff 0%, #fef2f2 100%)',
+                                    padding: 28,
+                                    borderRadius: 16,
+                                    textAlign: 'center',
                                     width: '100%',
-                                    padding: '12px',
-                                    background: '#fef2f2',
-                                    color: '#dc2626',
-                                    border: '2px solid #fecaca',
-                                    borderRadius: 10,
-                                    fontSize: 14,
-                                    fontWeight: 600,
-                                    cursor: 'pointer',
-                                    transition: 'all 0.2s ease',
-                                    fontFamily: 'Inter, sans-serif',
-                                    display: 'flex',
-                                    alignItems: 'center',
-                                    justifyContent: 'center',
-                                    gap: 8
-                                }}
-                                onMouseEnter={e => {
-                                    e.target.style.background = '#fee2e2';
-                                    e.target.style.transform = 'translateY(-1px)';
-                                    e.target.style.boxShadow = '0 4px 12px rgba(220, 38, 38, 0.2)';
-                                }}
-                                onMouseLeave={e => {
-                                    e.target.style.background = '#fef2f2';
-                                    e.target.style.transform = 'translateY(0)';
-                                    e.target.style.boxShadow = 'none';
-                                }}
-                            >
-                                <FontAwesomeIcon icon={faTimes} />
-                                Cancelar mentoría
-                            </button>
-                        </div>
+                                    maxWidth: 450,
+                                    boxShadow: '0 20px 60px rgba(0,0,0,0.3)',
+                                    border: '3px solid #fecaca',
+                                    animation: 'slideUp 0.3s ease-out'
+                                }}>
+                                    <div style={{
+                                        width: 64,
+                                        height: 64,
+                                        borderRadius: '50%',
+                                        background: 'linear-gradient(135deg, #fee2e2 0%, #fecaca 100%)',
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        justifyContent: 'center',
+                                        margin: '0 auto 20px',
+                                        boxShadow: '0 4px 12px rgba(239, 68, 68, 0.3)'
+                                    }}>
+                <span style={{ fontSize: 32, color: '#ef4444' }}>
+                    <FontAwesomeIcon icon={faExclamationCircle} />
+                </span>
+                                    </div>
+                                    <h3 style={{
+                                        margin: '0 0 12px 0',
+                                        fontSize: 22,
+                                        fontWeight: 700,
+                                        color: '#ef4444',
+                                        fontFamily: 'Inter, sans-serif'
+                                    }}>
+                                        ¿Estás seguro?
+                                    </h3>
+                                    <p style={{
+                                        color: '#991b1b',
+                                        marginBottom: 24,
+                                        fontSize: 14,
+                                        lineHeight: 1.6,
+                                        fontWeight: 500,
+                                        fontFamily: 'Inter, sans-serif'
+                                    }}>
+                                        ¿Querés dejar de ser mentor de <strong>{confirmRemoveMentorship.materia}</strong>?
+                                        <br />
+                                        Esta acción no se puede deshacer.
+                                    </p>
+
+                                    <div style={{ display: 'flex', gap: 12 }}>
+                                        <button
+                                            onClick={() => setConfirmRemoveMentorship({
+                                                id: mentorship.id,
+                                                materia: mentorship.materia.nombre_materia,
+                                                materiaId: mentorship.materia.id_materia
+                                            })}
+                                            disabled={isRemoving}
+                                            style={{
+                                                flex: 1,
+                                                background: '#f8fafc',
+                                                border: '2px solid #e2e8f0',
+                                                borderRadius: 10,
+                                                padding: '12px 20px',
+                                                cursor: isRemoving ? 'not-allowed' : 'pointer',
+                                                fontWeight: 600,
+                                                fontSize: 14,
+                                                color: '#0f172a',
+                                                transition: 'all 0.2s ease',
+                                                fontFamily: 'Inter, sans-serif',
+                                                opacity: isRemoving ? 0.5 : 1
+                                            }}
+                                            onMouseEnter={e => {
+                                                if (!isRemoving) {
+                                                    e.target.style.background = '#f1f5f9';
+                                                    e.target.style.transform = 'translateY(-1px)';
+                                                }
+                                            }}
+                                            onMouseLeave={e => {
+                                                if (!isRemoving) {
+                                                    e.target.style.background = '#f8fafc';
+                                                    e.target.style.transform = 'translateY(0)';
+                                                }
+                                            }}
+                                        >
+                                            Cancelar
+                                        </button>
+                                        <button
+                                            onClick={() => handleRemoveMentorship(
+                                                confirmRemoveMentorship.id,
+                                                confirmRemoveMentorship.materia
+                                            )}
+                                            disabled={isRemoving}
+                                            style={{
+                                                flex: 1,
+                                                background: 'linear-gradient(135deg, #ef4444 0%, #dc2626 100%)',
+                                                color: '#fff',
+                                                border: 'none',
+                                                borderRadius: 10,
+                                                padding: '12px 20px',
+                                                cursor: isRemoving ? 'not-allowed' : 'pointer',
+                                                fontWeight: 700,
+                                                fontSize: 14,
+                                                opacity: isRemoving ? 0.7 : 1,
+                                                transition: 'all 0.2s ease',
+                                                fontFamily: 'Inter, sans-serif',
+                                                boxShadow: '0 4px 12px rgba(239, 68, 68, 0.3)'
+                                            }}
+                                            onMouseEnter={e => {
+                                                if (!isRemoving) {
+                                                    e.target.style.transform = 'translateY(-2px)';
+                                                    e.target.style.boxShadow = '0 6px 20px rgba(239, 68, 68, 0.4)';
+                                                }
+                                            }}
+                                            onMouseLeave={e => {
+                                                if (!isRemoving) {
+                                                    e.target.style.transform = 'translateY(0)';
+                                                    e.target.style.boxShadow = '0 4px 12px rgba(239, 68, 68, 0.3)';
+                                                }
+                                            }}
+                                        >
+                                            {isRemoving ? 'Eliminando...' : 'Sí, darme de baja'}
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                        )}
                     </div>
                 </div>
             )}
@@ -1799,11 +2185,11 @@ export default function IAmMentor() {
     );
 }
 
-// Estilos
 const pageStyle = {
     minHeight: '100vh',
     background: '#F9FAFB',
-    paddingBottom: 40
+    paddingBottom: 40,
+    fontFamily: 'Inter, sans-serif'
 };
 
 const containerStyle = {
@@ -1824,26 +2210,9 @@ const spinnerStyle = {
     width: 40,
     height: 40,
     border: '3px solid #f3f4f6',
-    borderTop: '3px solid #10B981',
+    borderTop: '3px solid #0d9488',
     borderRadius: '50%',
     animation: 'spin 1s linear infinite'
-};
-
-const headerContainerStyle = {
-    marginBottom: 24
-};
-
-const titleStyle = {
-    margin: '0 0 8px 0',
-    fontSize: 28,
-    fontWeight: 700,
-    color: '#111827'
-};
-
-const subtitleStyle = {
-    margin: 0,
-    fontSize: 15,
-    color: '#6B7280'
 };
 
 const warningBannerStyle = {
@@ -1866,7 +2235,8 @@ const warningButtonStyle = {
     fontWeight: 600,
     fontSize: 14,
     cursor: 'pointer',
-    whiteSpace: 'nowrap'
+    whiteSpace: 'nowrap',
+    fontFamily: 'Inter, sans-serif'
 };
 
 const successBannerStyle = {
@@ -1885,7 +2255,8 @@ const errorCardStyle = {
     border: '1px solid #fecaca',
     color: '#dc2626',
     padding: 16,
-    marginBottom: 20
+    marginBottom: 20,
+    fontFamily: 'Inter, sans-serif'
 };
 
 const tabsContainerStyle = {
@@ -1910,7 +2281,8 @@ const tabButtonStyle = {
     display: 'flex',
     alignItems: 'center',
     gap: 6,
-    position: 'relative'
+    position: 'relative',
+    fontFamily: 'Inter, sans-serif'
 };
 
 const badgeStyle = {
@@ -1922,19 +2294,6 @@ const badgeStyle = {
     background: '#EF4444',
     borderRadius: '50%',
     border: '2px solid white'
-};
-
-const sectionTitleStyle = {
-    margin: '0 0 8px 0',
-    fontSize: 22,
-    fontWeight: 700,
-    color: '#111827'
-};
-
-const sectionSubtitleStyle = {
-    margin: 0,
-    fontSize: 14,
-    color: '#6B7280'
 };
 
 const formStyle = {
@@ -1952,7 +2311,8 @@ const fieldStyle = {
 const labelStyle = {
     fontSize: 14,
     fontWeight: 600,
-    color: '#111827'
+    color: '#111827',
+    fontFamily: 'Inter, sans-serif'
 };
 
 const inputStyle = {
@@ -1960,7 +2320,8 @@ const inputStyle = {
     border: '2px solid #D1D5DB',
     borderRadius: 8,
     fontSize: 14,
-    color: '#111827'
+    color: '#111827',
+    fontFamily: 'Inter, sans-serif'
 };
 
 const optionButtonStyle = {
@@ -1970,14 +2331,16 @@ const optionButtonStyle = {
     fontWeight: 600,
     fontSize: 14,
     cursor: 'pointer',
-    transition: 'all 0.2s ease'
+    transition: 'all 0.2s ease',
+    fontFamily: 'Inter, sans-serif'
 };
 
 const checkboxLabelStyle = {
     display: 'flex',
     alignItems: 'center',
     gap: 10,
-    fontSize: 14
+    fontSize: 14,
+    fontFamily: 'Inter, sans-serif'
 };
 
 const radioLabelStyle = {
@@ -1988,12 +2351,13 @@ const radioLabelStyle = {
     border: '2px solid #E5E7EB',
     borderRadius: 8,
     cursor: 'pointer',
-    fontSize: 14
+    fontSize: 14,
+    fontFamily: 'Inter, sans-serif'
 };
 
 const saveButtonStyle = {
     padding: '12px 24px',
-    background: '#10B981',
+    background: '#0d9488',
     color: 'white',
     border: 'none',
     borderRadius: 8,
@@ -2001,7 +2365,8 @@ const saveButtonStyle = {
     fontSize: 15,
     cursor: 'pointer',
     transition: 'all 0.2s ease',
-    alignSelf: 'flex-start'
+    alignSelf: 'flex-start',
+    fontFamily: 'Inter, sans-serif'
 };
 
 const infoBoxStyle = {
@@ -2015,7 +2380,8 @@ const subtitleTermsStyle = {
     margin: '0 0 12px 0',
     fontSize: 16,
     fontWeight: 600,
-    color: '#111827'
+    color: '#111827',
+    fontFamily: 'Inter, sans-serif'
 };
 
 const listTermsStyle = {
@@ -2023,5 +2389,21 @@ const listTermsStyle = {
     paddingLeft: 20,
     fontSize: 14,
     lineHeight: 1.8,
-    color: '#4B5563'
+    color: '#4B5563',
+    fontFamily: 'Inter, sans-serif'
+};
+const sectionTitleStyle = {
+    margin: '0 0 6px 0',
+    fontSize: 22,
+    fontWeight: 700,
+    color: '#0d9488',
+    fontFamily: 'Inter, sans-serif'
+};
+
+const sectionSubtitleStyle = {
+    margin: 0,
+    fontSize: 14,
+    fontWeight: 500,
+    color: '#64748b',
+    fontFamily: 'Inter, sans-serif'
 };

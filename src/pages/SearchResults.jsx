@@ -25,7 +25,6 @@ export default function SearchResults() {
     const params = new URLSearchParams(search);
     const q = (params.get("q") || "").trim();
 
-    // Normalización singular → plural
     const _raw = (params.get("type") || "todos").toLowerCase();
     const _map = {
         todos: "todos",
@@ -67,9 +66,7 @@ export default function SearchResults() {
             setMentors(data?.mentores ?? []);
             setUsers(data?.usuarios ?? []);
 
-            // 🎯 Cargar todas las materias de cada profesor
             const profs = data?.profesores ?? [];
-            console.log("📋 Profesores antes:", profs); // 👈 AGREGÁ
 
             if (profs.length > 0) {
                 const profesorIds = profs.map(p => p.id_profesor);
@@ -78,8 +75,6 @@ export default function SearchResults() {
                     .from('imparte')
                     .select('id_profesor, materia(nombre_materia)')
                     .in('id_profesor', profesorIds);
-
-                console.log("📚 Imparte data:", imparteData); // 👈 AGREGÁ
 
                 const materiasMap = {};
                 imparteData?.forEach(item => {
@@ -91,14 +86,10 @@ export default function SearchResults() {
                     }
                 });
 
-                console.log("🗺️ Materias map:", materiasMap); // 👈 AGREGÁ
-
                 const profsConMaterias = profs.map(p => ({
                     ...p,
                     materias: materiasMap[p.id_profesor] || []
                 }));
-
-                console.log("✅ Profesores CON materias:", profsConMaterias); // 👈 AGREGÁ
 
                 setProfessors(profsConMaterias);
             } else {
@@ -185,7 +176,6 @@ export default function SearchResults() {
         usuarios: filtered.users.length,
     };
 
-    // Configuración de tabs
     const tabsConfig = [
         { key: "todos", label: "Todos", icon: faHome },
         { key: "materias", label: "Materias", icon: faBookOpen },
@@ -195,9 +185,14 @@ export default function SearchResults() {
         { key: "usuarios", label: "Usuarios", icon: faUser },
     ];
 
-    // Configuración de secciones para "Todos" (orden personalizado)
     const sectionsConfig = [
-        { key: "materias", label: "Materias", icon: faBookOpen, data: filtered.subjects, Component: CourseCard, getProps: (m) => ({
+        {
+            key: "materias",
+            label: "Materias",
+            icon: faBookOpen,
+            data: filtered.subjects,
+            Component: CourseCard,
+            getProps: (m) => ({
                 course: {
                     tipo: 'materia',
                     id: m.id_materia,
@@ -209,10 +204,35 @@ export default function SearchResults() {
                         mentores: m.total_mentores ?? 0
                     }
                 }
-            })},
-        { key: "apuntes", label: "Apuntes", icon: faFileAlt, data: filtered.notes, Component: ApunteCard, getProps: (a) => ({ note: a })},
-        { key: "mentores", label: "Mentores", icon: faGraduationCap, data: filtered.mentors, Component: MentorCard, getProps: (m) => ({ mentor: m })},
-        { key: "usuarios", label: "Usuarios", icon: faUser, data: filtered.users, Component: UserCard, getProps: (u) => ({ usuario: u })},
+            })
+        },
+        {
+            key: "apuntes",
+            label: "Apuntes",
+            icon: faFileAlt,
+            data: filtered.notes,
+            Component: ApunteCard,
+            getProps: (a) => ({
+                note: a,
+                currentUserId: currentUserId
+            })
+        },
+        {
+            key: "mentores",
+            label: "Mentores",
+            icon: faGraduationCap,
+            data: filtered.mentors,
+            Component: MentorCard,
+            getProps: (m) => ({ mentor: m })
+        },
+        {
+            key: "usuarios",
+            label: "Usuarios",
+            icon: faUser,
+            data: filtered.users,
+            Component: UserCard,
+            getProps: (u) => ({ usuario: u })
+        },
         {
             key: "profesores",
             label: "Profesores",
@@ -350,7 +370,6 @@ export default function SearchResults() {
                         ))}
                     </div>
                 ) : total === 0 ? (
-                    // Empty state profesional (sin resultados totales)
                     <div
                         style={{
                             textAlign: "center",
@@ -401,7 +420,6 @@ export default function SearchResults() {
                     </div>
                 ) : (
                     <>
-                        {/* Banner sutil cuando no hay resultados en categoría específica */}
                         {tab !== "todos" && counts[tab] === 0 && (
                             <div style={{
                                 background: '#FEF3C7',
@@ -432,15 +450,13 @@ export default function SearchResults() {
                             </div>
                         )}
 
-                        {/* Layout por secciones (solo en "Todos") */}
                         {tab === "todos" ? (
                             <div style={{ display: 'flex', flexDirection: 'column', gap: 40 }}>
                                 {sectionsConfig.map((section) => {
                                     if (section.data.length === 0) return null;
 
                                     return (
-                                        <div key={section.key}>
-                                            {/* Título de sección */}
+                                        <div key={section.key} style={{ marginBottom: 48 }}>
                                             <div style={{
                                                 display: 'flex',
                                                 alignItems: 'center',
@@ -478,7 +494,6 @@ export default function SearchResults() {
                                                 </span>
                                             </div>
 
-                                            {/* Grid de resultados */}
                                             <div
                                                 style={{
                                                     display: "grid",
@@ -502,15 +517,14 @@ export default function SearchResults() {
                                 })}
                             </div>
                         ) : (
-                            // Layout normal (grid simple cuando NO es "Todos")
                             <div
                                 style={{
                                     display: "grid",
                                     gap: 16,
                                     gridTemplateColumns: "repeat(auto-fill, minmax(280px, 1fr))",
+                                    marginBottom: 48
                                 }}
                             >
-                                {/* Materias */}
                                 {show("materias") &&
                                     filtered.subjects.map((m) => (
                                         <CourseCard
@@ -529,7 +543,6 @@ export default function SearchResults() {
                                         />
                                     ))}
 
-                                {/* Profesores */}
                                 {show("profesores") &&
                                     filtered.professors.map((p, index) => (
                                         <ProfessorCard
@@ -538,13 +551,12 @@ export default function SearchResults() {
                                         />
                                     ))}
 
-                                {/* Apuntes */}
+                                {/* ✅ ACTUALIZADO: Ahora pasa currentUserId */}
                                 {show("apuntes") &&
                                     filtered.notes.map((a, index) => (
-                                        <ApunteCard key={`apunte-${a.id_apunte}-${index}`} note={a} />
+                                        <ApunteCard key={a.id_apunte} note={a} currentUserId={currentUserId} />
                                     ))}
 
-                                {/* Usuarios */}
                                 {show("usuarios") &&
                                     filtered.users.map((user, index) => (
                                         <UserCard
@@ -553,7 +565,6 @@ export default function SearchResults() {
                                         />
                                     ))}
 
-                                {/* Mentores */}
                                 {show("mentores") &&
                                     filtered.mentors.map((m, index) => (
                                         <MentorCard

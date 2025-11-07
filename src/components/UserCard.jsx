@@ -10,7 +10,6 @@ export const UserCard = ({ usuario }) => {
     const navigate = useNavigate();
     const { seguirUsuario, dejarDeSeguir } = useSeguidores();
 
-    // ❌ ELIMINADO: useEffect que verificaba si seguías (ya no es necesario)
 
     const manejarSeguir = async (e) => {
         e.stopPropagation();
@@ -125,7 +124,7 @@ export const UserCard = ({ usuario }) => {
                                 fontSize: 12,
                                 color: "#6B7280"
                             }}>
-                                {usuario.seguidores_count || 0} seguidores
+                                {usuario.seguidores_count || 0} seguidores &nbsp; {usuario.apuntes_count || 0} apuntes
                             </span>
                             {usuario.es_mentor && (
                                 <span style={{

@@ -1,3 +1,6 @@
+import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
+import { faCheckCircle } from '@fortawesome/free-solid-svg-icons';
+
 export function SuccessModal({ open, onClose, message = "Operación exitosa" }) {
     if (!open) return null;
 
@@ -40,11 +43,16 @@ export function SuccessModal({ open, onClose, message = "Operación exitosa" }) 
                         alignItems: 'center',
                         justifyContent: 'center',
                         margin: '0 auto 24px',
-                        fontSize: 40,
                         boxShadow: '0 10px 30px rgba(16, 185, 129, 0.3)'
                     }}
                 >
-                    ✅
+                    <FontAwesomeIcon
+                        icon={faCheckCircle}
+                        style={{
+                            fontSize: 40,
+                            color: '#fff'
+                        }}
+                    />
                 </div>
                 <h2
                     style={{
@@ -54,7 +62,8 @@ export function SuccessModal({ open, onClose, message = "Operación exitosa" }) 
                         background: 'linear-gradient(135deg, #10B981 0%, #059669 100%)',
                         WebkitBackgroundClip: 'text',
                         WebkitTextFillColor: 'transparent',
-                        backgroundClip: 'text'
+                        backgroundClip: 'text',
+                        fontFamily: 'Inter, sans-serif'
                     }}
                 >
                     ¡Éxito!
@@ -64,7 +73,8 @@ export function SuccessModal({ open, onClose, message = "Operación exitosa" }) 
                         color: '#6b7280',
                         fontSize: 16,
                         lineHeight: 1.6,
-                        marginBottom: 32
+                        marginBottom: 32,
+                        fontFamily: 'Inter, sans-serif'
                     }}
                 >
                     {message}
@@ -82,7 +92,8 @@ export function SuccessModal({ open, onClose, message = "Operación exitosa" }) 
                         fontSize: 16,
                         width: '100%',
                         boxShadow: '0 4px 14px rgba(16, 185, 129, 0.4)',
-                        transition: 'all 0.2s'
+                        transition: 'all 0.2s',
+                        fontFamily: 'Inter, sans-serif'
                     }}
                     onMouseEnter={(e) => {
                         e.currentTarget.style.transform = 'scale(1.02)';

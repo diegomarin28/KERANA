@@ -34,10 +34,10 @@ export function useMentorPayment() {
                 return;
             }
 
-            // Obtener mentor
+            // Obtener mentor con datos de Mercado Pago
             const { data: mentorData, error: mentorError } = await supabase
                 .from('mentor')
-                .select('id_mentor, puede_recibir_clases')
+                .select('id_mentor, puede_recibir_clases, mercadopago_email, mercadopago_cvu, mercadopago_alias')
                 .eq('id_usuario', usuarioData.id_usuario)
                 .maybeSingle();
 
@@ -47,7 +47,7 @@ export function useMentorPayment() {
                 return;
             }
 
-            // Obtener datos de pago - usar maybeSingle() en lugar de single()
+            // Obtener datos de pago
             const { data: pagoData, error: pagoError } = await supabase
                 .from('mentor_pago')
                 .select('*')
@@ -59,11 +59,26 @@ export function useMentorPayment() {
             }
 
             if (pagoData) {
-                setPaymentData(pagoData);
+                setPaymentData({
+                    ...pagoData,
+                    mpEmail: mentorData.mercadopago_email || pagoData.mp_email,
+                    mpCvu: mentorData.mercadopago_cvu,
+                    mpAlias: mentorData.mercadopago_alias
+                });
                 setHasPaymentConfigured(pagoData.configurado || false);
             } else {
-                setPaymentData(null);
-                setHasPaymentConfigured(false);
+                // Si no hay registro en mentor_pago pero tiene datos de MP en mentor
+                if (mentorData.mercadopago_email) {
+                    setPaymentData({
+                        mpEmail: mentorData.mercadopago_email,
+                        mpCvu: mentorData.mercadopago_cvu,
+                        mpAlias: mentorData.mercadopago_alias
+                    });
+                    setHasPaymentConfigured(true);
+                } else {
+                    setPaymentData(null);
+                    setHasPaymentConfigured(false);
+                }
             }
 
             setLoading(false);
@@ -102,7 +117,7 @@ export function useMentorPayment() {
                 return { success: false, error: 'No eres mentor' };
             }
 
-            // Verificar si ya existe registro - usar maybeSingle()
+            // Verificar si ya existe registro
             const { data: existingPayment, error: checkError } = await supabase
                 .from('mentor_pago')
                 .select('id')
@@ -136,6 +151,21 @@ export function useMentorPayment() {
             }
 
             if (result.error) throw result.error;
+
+            // Actualizar datos de Mercado Pago en la tabla mentor
+            const { error: updateMentorMPError } = await supabase
+                .from('mentor')
+                .update({
+                    mercadopago_email: data.mpEmail,
+                    mercadopago_cvu: data.mpCvu,
+                    mercadopago_alias: data.mpAlias
+                })
+                .eq('id_mentor', mentorData.id_mentor);
+
+            if (updateMentorMPError) {
+                console.error('Error actualizando datos de MP en mentor:', updateMentorMPError);
+                throw updateMentorMPError;
+            }
 
             // Actualizar mentor.puede_recibir_clases
             const { error: updateMentorError } = await supabase

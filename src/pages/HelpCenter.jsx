@@ -1,12 +1,9 @@
 import { useState, useMemo } from 'react';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import {
-    faHome,
     faUser,
     faCoins,
-    faBook,
     faGraduationCap,
-    faWrench,
     faUserPlus,
     faCreditCard,
     faGem,
@@ -14,29 +11,13 @@ import {
     faBullseye,
     faGift,
     faChartLine,
-    faClock,
-    faSync,
-    faExclamationTriangle,
-    faTrophy,
-    faLock,
-    faKey,
-    faCamera,
-    faShieldAlt,
-    faTrash,
-    faFileAlt,
-    faShoppingCart,
-    faDownload,
-    faBell,
-    faStar,
-    faCalendar,
-    faClipboardList,
-    faDiamond,
-    faMobileAlt,
-    faCog,
     faBug,
     faCheckCircle,
     faDollarSign,
-    faMoneyBillWave
+    faMoneyBillWave,
+    faHome,
+    faWrench,
+    faBook
 } from '@fortawesome/free-solid-svg-icons';
 
 export default function HelpCenter() {
@@ -44,266 +25,307 @@ export default function HelpCenter() {
     const [searchQuery, setSearchQuery] = useState('');
     const [openFAQs, setOpenFAQs] = useState(new Set());
 
-    // Base de datos de FAQ
+    // Reemplazar SOLO la definición de faqDatabase por esta:
     const faqDatabase = {
         general: [
             {
                 id: 'gen-1',
                 question: '¿Qué es KERANA?',
-                answer: 'KERANA es una plataforma educativa colaborativa donde estudiantes pueden compartir y comprar apuntes, conectarse con mentores, y acceder a recursos académicos de calidad verificados por la comunidad.',
+                answer:
+                    'KERANA es una plataforma académica creada por y para estudiantes. Reúne en un solo lugar apuntes en PDF, mentorías por materia (virtuales por Microsoft Teams o presenciales) y reseñas que ayudan a decidir mejor. Todo se integra con un sistema de créditos que incentiva la colaboración.',
                 icon: faGraduationCap,
                 color: '#2563eb'
             },
             {
                 id: 'gen-2',
                 question: '¿Cómo creo una cuenta?',
-                answer: 'Hacer clic en "Crear cuenta" en el menú principal. Podés registrarte con tu email o mediante Google. Te recomendamos usar tu email institucional (@correo.um.edu.uy) para verificación automática.',
+                answer:
+                    'Hacé clic en “Crear cuenta”. Podés registrarte con correo y contraseña o con tu cuenta de Google. En ambos casos aceptás los términos y condiciones. Al finalizar, verás un modal para completar avatar, nombre de usuario, descripción y, si querés, un enlace a tu perfil profesional.',
                 icon: faUserPlus,
                 color: '#2563eb'
             },
             {
                 id: 'gen-3',
                 question: '¿Es gratis usar KERANA?',
-                answer: 'Sí, crear una cuenta y navegar el contenido es completamente gratis. Solo pagás cuando decidís comprar los créditos de la plataforma o cuándo decidís tener una clase particular con un mentor.',
-                icon: faCheckCircle,
+                answer:
+                    'Sí. Crear una cuenta y navegar es gratis. Para desbloquear apuntes usás créditos (que ganás subiendo apuntes o escribiendo reseñas, o comprás en paquetes). Las mentorías se abonan en pesos según modalidad (virtual o presencial).',
+                icon: faHome,
                 color: '#2563eb'
             },
             {
                 id: 'gen-4',
                 question: '¿Cómo funciona el sistema de créditos?',
-                answer: 'Los créditos son la moneda de KERANA. 1 crédito = 2 pesos Uruguayos. Podés comprarlos en packs, ganarlos subiendo contenido popular, o realizando reseñas a profesores.',
+                answer:
+                    'Los créditos son la moneda de KERANA para desbloquear apuntes. El precio se calcula por páginas (10 créditos por página) con multiplicadores por escasez (1,5× si hay pocos apuntes; 2× si no hay). Ganás créditos al subir apuntes válidos, escribir reseñas (10 por reseña, hasta 10 por semestre) y por bonos de hitos.',
                 icon: faCoins,
                 color: '#2563eb'
             }
         ],
+
         creditos: [
             {
                 id: 'cre-1',
                 question: '¿Qué son los créditos de KERANA?',
-                answer: 'Los créditos son la moneda virtual de KERANA. Los usás para comprar apuntes, acceder a contenido premium, y realizar transacciones dentro de la plataforma. Podés ganarlos subiendo contenido de calidad o comprarlos en packs.',
-                icon: faGem,
+                answer:
+                    'Son la moneda virtual para desbloquear apuntes y acceder a beneficios. Se obtienen subiendo apuntes válidos, escribiendo reseñas y mediante bonos por hitos. También se pueden comprar en paquetes.',
+                icon: faCoins,
                 color: '#f59e0b'
             },
             {
                 id: 'cre-2',
                 question: '¿Cómo gano créditos subiendo apuntes?',
-                answer: 'Cuando subís un apunte válido, recibís la mayoría de su valor en créditos de forma inmediata. Una porción menor se distribuye en bonificaciones que desbloqueás al alcanzar hitos de participación. El valor se calcula según el número de páginas y la escasez de contenido en esa materia.',
+                answer:
+                    'Al subir un apunte en PDF válido recibís créditos según su extensión y la escasez de la materia. Regla base: 10 créditos por página. Multiplicadores: 1,5× si hay menos de 5 apuntes; 2× si no hay apuntes previos. Mínimo 3 páginas. El autor recibe un adelanto del 80 % al validar el apunte.',
                 icon: faUpload,
                 color: '#f59e0b'
             },
             {
                 id: 'cre-3',
                 question: '¿Qué son los bonos por hitos?',
-                answer: 'Son recompensas que recibís al alcanzar objetivos específicos: subir una cantidad determinada de apuntes, tener ventas exitosas, recibir buenas reseñas, o aparecer en el ranking mensual. Estos bonos se acumulan automáticamente y te ayudan a ganar más créditos mientras participás activamente.',
-                icon: faBullseye,
+                answer:
+                    'Son recompensas extra por constancia y calidad: hitos por cantidad de apuntes subidos, por “me gusta” recibidos, por ventas acumuladas (5 % de los créditos gastados en tus apuntes en cada hito, con tope por bono) y por compras realizadas.',
+                icon: faGift,
                 color: '#f59e0b'
             },
             {
                 id: 'cre-4',
                 question: '¿Qué bonos están disponibles?',
-                answer: 'Tenemos varios tipos: Bonos de bienvenida al crear tu cuenta y subir tu primer apunte, bonos por alcanzar hitos de participación (cierta cantidad de apuntes subidos), bonos por calidad cuando tus apuntes reciben buenas reseñas, bonos por ventas cuando tu contenido alcanza objetivos de popularidad, premios del top mensual para los apuntes más vendidos, y bonos por compras cuando alcanzás ciertos niveles de adquisiciones.',
-                icon: faGift,
+                answer:
+                    'Bonos de bienvenida y constancia (por 10, 25, 50, 100, 250, 500 y 1.000 apuntes subidos), bonos por “me gusta” (25, 50, 100, 250, 500, 1.000), bonos por ventas (5 % con tope por hito) y bonos por compras (10, 25, 50, 100 apuntes comprados).',
+                icon: faBullseye,
                 color: '#f59e0b'
             },
             {
                 id: 'cre-5',
                 question: '¿Cómo funciona el multiplicador por escasez?',
-                answer: 'Si subís apuntes de materias con poco contenido disponible, tu apunte vale más créditos. Esto incentiva a los usuarios a compartir material de materias menos populares y ayuda a equilibrar el catálogo de la plataforma.',
+                answer:
+                    'El precio en créditos aumenta si hay poco material en la materia: 1,5× cuando hay menos de 5 apuntes; 2× cuando aún no hay apuntes. Esto incentiva a cubrir vacíos reales de contenido.',
                 icon: faChartLine,
                 color: '#f59e0b'
             },
             {
                 id: 'cre-6',
                 question: '¿Cómo compro créditos?',
-                answer: 'Podés comprar packs de créditos desde tu perfil o la sección de créditos. Ofrecemos diferentes packs con descuentos progresivos: cuanto más grande el pack, mejor el precio por crédito. Aceptamos pagos a través de Mercado Pago.',
+                answer:
+                    'Podés comprar paquetes de créditos en pesos uruguayos. Los precios se publican en la sección de compra y pueden actualizarse. Las compras de créditos son definitivas y no reembolsables.',
                 icon: faCreditCard,
                 color: '#f59e0b'
             },
             {
                 id: 'cre-7',
                 question: '¿Los créditos vencen?',
-                answer: 'No, los créditos que ganás o comprás no tienen fecha de vencimiento. Podés usarlos cuando quieras sin preocuparte por perderlos.',
-                icon: faClock,
+                answer:
+                    'No, los créditos no vencen. Pueden ajustarse reglas o montos en el tiempo, pero los créditos disponibles en tu cuenta se mantienen.',
+                icon: faGem,
                 color: '#f59e0b'
             },
             {
                 id: 'cre-8',
                 question: '¿Puedo convertir mis créditos en dinero?',
-                answer: 'No, los créditos son solo para usar dentro de KERANA. No se pueden canjear por dinero ni transferir a otras plataformas. Sin embargo, podés usar tus créditos para acceder a todo el contenido y servicios de la plataforma.',
-                icon: faSync,
+                answer:
+                    'No. Los créditos no se convierten en dinero. Son para uso dentro de la plataforma.',
+                icon: faMoneyBillWave,
                 color: '#f59e0b'
             },
             {
                 id: 'cre-9',
                 question: '¿Qué pasa si mi apunte es reportado?',
-                answer: 'Si tu apunte es reportado por múltiples usuarios y se verifica que no cumple con las normas, los créditos ganados por ese apunte serán retirados y devueltos a quienes lo compraron. Contenido basura o fraudulento puede resultar en suspensión temporal de privilegios.',
-                icon: faExclamationTriangle,
+                answer:
+                    'Solo pueden reportar usuarios que hayan desbloqueado ese apunte. Con 5 o más reportes pasa a revisión. Si se confirma contenido basura o infracción: se retiran créditos ganados, se devuelve a quienes lo compraron, el apunte se elimina y pueden aplicarse sanciones (incluida suspensión temporal).',
+                icon: faWrench,
                 color: '#f59e0b'
             },
             {
                 id: 'cre-10',
                 question: '¿Cómo aparezco en el top mensual?',
-                answer: 'El top mensual muestra los apuntes más vendidos del mes. Si tu contenido es de calidad y muchos estudiantes lo encuentran útil, podés entrar en el ranking y ganar créditos adicionales. El ranking se resetea cada mes, dándote nuevas oportunidades.',
-                icon: faTrophy,
+                answer:
+                    'Cada mes se publica el Top 10 de apuntes más comprados (mínimo 10 ventas por apunte). Si un usuario aparece varias veces, se considera solo la posición más alta. Cada posición otorga créditos adicionales.',
+                icon: faGem,
                 color: '#f59e0b'
             },
             {
                 id: 'cre-11',
                 question: '¿Puedo pagar las mentorías con créditos?',
-                answer: 'No, las mentorías solo se pagan con dinero real a través de Mercado Pago. Esto asegura que los mentores reciban su compensación de manera justa y directa por su tiempo y conocimiento.',
-                icon: faGraduationCap,
+                answer:
+                    'No. Las mentorías se pagan en pesos uruguayos. Los créditos se usan para desbloquear apuntes.',
+                icon: faDollarSign,
                 color: '#f59e0b'
             },
             {
                 id: 'cre-12',
                 question: '¿Los créditos comprados son reembolsables?',
-                answer: 'No, los créditos comprados con dinero real no son reembolsables bajo ninguna circunstancia. Te recomendamos empezar con packs más pequeños si estás probando la plataforma por primera vez.',
-                icon: faMoneyBillWave,
+                answer:
+                    'No. Las compras de paquetes de créditos son definitivas y no reembolsables.',
+                icon: faCreditCard,
                 color: '#f59e0b'
             }
         ],
+
         cuenta: [
             {
                 id: 'acc-1',
                 question: '¿Cómo cambio mi contraseña?',
-                answer: 'Ve a Mi perfil > Editar Perfil > Contraseña. Ingresá tu contraseña actual y la nueva. Si olvidaste tu contraseña, usá la opción "Olvidé mi contraseña" en el login.',
-                icon: faLock,
-                color: '#8e44ad'
+                answer:
+                    'Ir a Mi perfil > Editar perfil > Contraseña. Si la olvidaste, usá “Olvidé mi contraseña” y seguí las indicaciones enviadas a tu correo.',
+                icon: faUser,
+                color: '#111827'
             },
             {
                 id: 'acc-2',
                 question: '¿Puedo cambiar mi nombre de usuario?',
-                answer: 'Sí, podés cambiar tu username una vez cada 30 días desde Ajustes > Cuenta. El username debe ser único y tener entre 3-50 caracteres (solo minúsculas, números, puntos y guiones bajos).',
+                answer:
+                    'Sí. Podés cambiar tu nombre de usuario desde Ajustes > Cuenta. Debe ser único y cumplir las reglas de formato (minúsculas, números, puntos y guiones bajos).',
                 icon: faUser,
-                color: '#8e44ad'
+                color: '#111827'
             },
             {
                 id: 'acc-3',
                 question: '¿Cómo cambio mi foto de perfil?',
-                answer: 'Ve a Mi perfil > Editar Perfil > Información Personal, ahí haces click en "Seleccionar archivo" y elegís la foto de perfil de tu conveniencia. Promovemos el uso de imágenes formales aptas para la formalidad de la plataforma. Podés subir imágenes JPG, PNG o WEBP de hasta 5MB.',
-                icon: faCamera,
-                color: '#8e44ad'
+                answer:
+                    'Ir a Mi perfil > Editar perfil > Información personal. Podés cambiar el avatar hasta 2 veces por semana. Formatos permitidos: JPG, PNG o WEBP (hasta 5 MB).',
+                icon: faUser,
+                color: '#111827'
             },
             {
                 id: 'acc-4',
                 question: '¿Cómo hago mi perfil privado?',
-                answer: 'Ve a Ajustes > Privacidad y desactivá "Perfil público". Tu perfil solo será visible para tus seguidores aprobados.',
-                icon: faShieldAlt,
-                color: '#8e44ad'
+                answer:
+                    'Ajustes > Privacidad > desactivar “Perfil público”. Tu perfil será visible solo para quienes apruebes.',
+                icon: faUser,
+                color: '#111827'
             },
             {
                 id: 'acc-5',
                 question: '¿Cómo elimino mi cuenta?',
-                answer: 'Ve a Ajustes > Cuenta > Gestión de Datos > Eliminar cuenta. Esto es permanente y eliminará todos tus datos, compras y contenido subido.',
-                icon: faTrash,
-                color: '#8e44ad'
+                answer:
+                    'Ajustes > Cuenta > Gestión de datos > Eliminar cuenta. Se eliminarán tus datos personales y contenidos, salvo lo necesario para trazabilidad de operaciones ya realizadas.',
+                icon: faUser,
+                color: '#111827'
             }
         ],
+
         apuntes: [
             {
                 id: 'apt-1',
                 question: '¿Cómo subo apuntes?',
-                answer: 'Hacé clic en "Subir Apuntes" en el menú principal. Completá la información (asignatura, profesor, descripción), y cargá tus archivos PDF. Si está no cumple con las normas requeridas, se eliminará el apunte y con ello todos los créditos obtenidos por el mismo.',
-                icon: faUpload,
-                color: '#10b981'
+                answer:
+                    'Desde “Subir apunte”, elegí el archivo PDF, asigná materia, poné título y una descripción (opcional). Al validar, se publica y recibís créditos según reglas vigentes.',
+                icon: faBook,
+                color: '#0ea5e9'
             },
             {
                 id: 'apt-2',
                 question: '¿Qué formatos acepta la plataforma?',
-                answer: 'Aceptamos PDF. Tamaño máximo: 20MB por archivo. Para videos, podés incluir enlaces de YouTube/Vimeo.',
-                icon: faFileAlt,
-                color: '#10b981'
+                answer:
+                    'Por ahora solo PDF, para estandarizar la experiencia y permitir vista previa consistente.',
+                icon: faBook,
+                color: '#0ea5e9'
             },
             {
                 id: 'apt-3',
                 question: '¿Cuánto gano por vender apuntes?',
-                answer: 'Recibís el 100% del precio de venta en créditos. Por ejemplo, si vendés un apunte a 10 créditos, ganás 10 créditos de manera inmediata. KERANA retiene 30% por mantenimiento de la plataforma. Además, podes recibir bonuses dependiendo si cumplís ciertos objetivos.',
-                icon: faDollarSign,
-                color: '#10b981'
+                answer:
+                    'Recibís créditos al validar el apunte (10 por página con multiplicadores por escasez). Además, sumás bonos por “me gusta” y por ventas acumuladas en cada hito (5 % con tope por bono).',
+                icon: faBook,
+                color: '#0ea5e9'
             },
             {
                 id: 'apt-4',
                 question: '¿Cómo compro apuntes?',
-                answer: 'Navegá por asignaturas o buscá contenido específico. Hacé clic en "Comprar" y confirmá con tus créditos. El material estará disponible inmediatamente en "Descargas".',
-                icon: faShoppingCart,
-                color: '#10b981'
+                answer:
+                    'Desbloqueás con créditos. Una vez comprado, queda en tu sección “Comprados” con acceso permanente y descargas ilimitadas.',
+                icon: faBook,
+                color: '#0ea5e9'
             },
             {
                 id: 'apt-5',
                 question: '¿Puedo descargar apuntes sin conexión?',
-                answer: 'Sí, una vez que compraste el material, lo podés descargar todas las veces que quieras desde tu sección "Descargas" y guardarlo offline.',
-                icon: faDownload,
-                color: '#10b981'
+                answer:
+                    'Sí. Podés descargar tantas veces como quieras desde tu sección “Comprados”.',
+                icon: faBook,
+                color: '#0ea5e9'
             },
             {
                 id: 'apt-6',
                 question: '¿Qué pasa si el contenido tiene errores?',
-                answer: 'Podés reportar contenido de baja calidad o con errores. Si se verifica, recibís un reembolso completo. Los vendedores con múltiples reportes pierden privilegios de subida.',
-                icon: faExclamationTriangle,
-                color: '#10b981'
+                answer:
+                    'Usá las reseñas para comentar mejoras. Si el apunte es irrelevante, duplicado o inapropiado, podés reportarlo. Con 5 reportes pasa a revisión; si se confirma, se devuelve en créditos a quienes lo compraron y el apunte se elimina.',
+                icon: faBook,
+                color: '#0ea5e9'
             }
         ],
+
         mentores: [
             {
                 id: 'men-1',
                 question: '¿Cómo me convierto en mentor?',
-                answer: 'Hacé clic en "¡Quiero ser Mentor!" en el header. Completá el formulario con tu experiencia académica, materias en las que podés ayudar, y disponibilidad. El equipo revisará tu aplicación en 3-5 días hábiles.',
-                icon: faStar,
-                color: '#0d9488'
+                answer:
+                    'Desde el botón “Quiero ser mentor”. Completás la solicitud con materias, motivación y nota obtenida (mínimo 9/12) y adjuntás comprobante. El equipo revisa y, si se aprueba, tu perfil queda habilitado como mentor.',
+                icon: faGraduationCap,
+                color: '#10b981'
             },
             {
                 id: 'men-2',
                 question: '¿Cuáles son los requisitos para ser mentor?',
-                answer: 'Necesitás: 1) Estar cursando 3er año o superior (o graduado), 2) Promedio mínimo de 7/12, 3) Buenas referencias de profesores o estudiantes, 4) Compromiso de 2+ horas semanales.',
-                icon: faClipboardList,
-                color: '#0d9488'
+                answer:
+                    'Nota mínima 9/12 en la materia, motivación clara, buen comportamiento en la plataforma y verificación manual. Si ofrecés presencial, debés indicar la dirección donde das clase o usar aulas de la facultad.',
+                icon: faGraduationCap,
+                color: '#10b981'
             },
             {
                 id: 'men-3',
                 question: '¿Los mentores cobran por sus servicios?',
-                answer: 'Cada mentor establece sus propias tarifas (en créditos) por sesión. Las consultas rápidas (< 15 min) suelen ser gratuitas. Sesiones largas van desde 5 a 20 créditos/hora según experiencia.',
-                icon: faMoneyBillWave,
-                color: '#0d9488'
+                answer:
+                    'Sí. Precio vigente: virtual $430 (Microsoft Teams) y presencial $630. Para grupos: descuento de $50 por persona agregada (2 personas: −$50 c/u; 3 personas: −$100 c/u).',
+                icon: faGraduationCap,
+                color: '#10b981'
             },
             {
                 id: 'men-4',
                 question: '¿Cómo programo una sesión con un mentor?',
-                answer: 'Ve al perfil del mentor, mirá su disponibilidad, y hacé clic en "Reservar sesión". Elegí fecha/hora, pagá con créditos, y recibirás un link de videollamada 15 minutos antes.',
-                icon: faCalendar,
-                color: '#0d9488'
+                answer:
+                    'Elegí materia, mentor y horario disponible desde el calendario global o el perfil del mentor. Al reservar, se envían correos de confirmación. En presencial hay recordatorio 24 horas antes (mentor) y 1 hora antes (estudiante). En virtual, el mentor crea el enlace de Teams y se notifica por correo.',
+                icon: faGraduationCap,
+                color: '#10b981'
             }
         ],
+
         tecnico: [
             {
                 id: 'tec-1',
                 question: '¿La plataforma funciona en móviles?',
-                answer: 'Sí, KERANA es completamente responsive. Funciona en iOS, Android, tablets y computadoras. Recomendamos usar Chrome, Safari o Firefox actualizados.',
-                icon: faMobileAlt,
-                color: '#ef4444'
+                answer:
+                    'Sí. KERANA es adaptable a dispositivos móviles, tabletas y computadoras. Recomendamos usar navegadores actualizados.',
+                icon: faWrench,
+                color: '#6b7280'
             },
             {
                 id: 'tec-2',
                 question: '¿Por qué no puedo subir un archivo?',
-                answer: 'Verificá: 1) Tamaño < 50MB, 2) Formato permitido (PDF, DOC, DOCX, PPT, PNG, JPG), 3) Nombre sin caracteres especiales, 4) Conexión estable. Si persiste, probá con otro navegador.',
-                icon: faCog,
-                color: '#ef4444'
+                answer:
+                    'Verificá que sea PDF, que no supere el tamaño máximo y que no sea un duplicado. Revisá tu conexión y volvé a intentar.',
+                icon: faWrench,
+                color: '#6b7280'
             },
             {
                 id: 'tec-3',
-                question: '¿Cómo reporto un bug o error?',
-                answer: 'Hacé clic en "Ayuda" > "Contactar Soporte" y describí el problema. Incluí: 1) Qué estabas haciendo, 2) Mensaje de error (si apareció), 3) Navegador/dispositivo, 4) Capturas de pantalla si es posible.',
+                question: '¿Cómo reporto un error?',
+                answer:
+                    'Desde el Centro de ayuda o el formulario de contacto. Indicá qué estabas haciendo, el mensaje de error (si apareció) y, si podés, una captura.',
                 icon: faBug,
-                color: '#ef4444'
+                color: '#6b7280'
             },
             {
                 id: 'tec-4',
                 question: '¿Mis datos están seguros?',
-                answer: 'Sí. Usamos encriptación SSL/TLS, almacenamiento seguro en Supabase, y no compartimos datos con terceros. Podés exportar o eliminar tus datos en cualquier momento desde Ajustes.',
-                icon: faShieldAlt,
-                color: '#ef4444'
+                answer:
+                    'Sí. Usamos medidas de seguridad y políticas de acceso por filas en la base de datos. Cumplimos con la Ley N.º 18.331 de protección de datos personales.',
+                icon: faCheckCircle,
+                color: '#6b7280'
             }
         ]
     };
+
 
     const filteredFAQs = useMemo(() => {
         if (!searchQuery.trim()) {

@@ -4,7 +4,9 @@ import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import {
     faCalendar, faChevronLeft, faChevronRight, faClock,
     faCheck, faTimes, faTrash, faExclamationCircle,
-    faCheckCircle, faSave, faCalendarDay, faInfoCircle
+    faCheckCircle, faSave, faCalendarDay, faInfoCircle,
+    faExclamationTriangle, faCalendarAlt, faUsers,
+    faLaptop, faBuilding, faHome, faGraduationCap, faUser
 } from '@fortawesome/free-solid-svg-icons';
 import {useEffect, useState} from "react";
 import { notificationTypes } from '../../api/notificationTypes';
@@ -42,10 +44,11 @@ export default function MyCalendar() {
     ];
 
     const durationOptions = [60, 90, 120, 150, 180];
+    const capacidadOptions = [1, 2, 3];
 
     const months = ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio',
         'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'];
-    const daysOfWeek = ['DOM', 'LUN', 'MAR', 'MIÉ', 'JUE', 'VIE', 'SÁB'];
+    const daysOfWeek = ['DOM', 'LUN', 'MAR', 'MIE', 'JUE', 'VIE', 'SAB'];
 
     const calculateEndTime = (startTime, durationMinutes) => {
         const [hours, minutes] = startTime.split(':').map(Number);
@@ -276,6 +279,12 @@ export default function MyCalendar() {
                         [slotKey]: getDefaultModalidad()
                     }));
                 }
+                if (!slotMaxAlumnos[slotKey]) {
+                    setSlotMaxAlumnos(prev => ({
+                        ...prev,
+                        [slotKey]: mentorInfo.max_alumnos
+                    }));
+                }
             });
         }
     };
@@ -341,6 +350,11 @@ export default function MyCalendar() {
                     delete newLoc[slotKey];
                     return newLoc;
                 });
+                setSlotMaxAlumnos(prevMax => {
+                    const newMax = { ...prevMax };
+                    delete newMax[slotKey];
+                    return newMax;
+                });
                 return { ...prev, [dateKey]: newSlots };
             }
 
@@ -360,6 +374,11 @@ export default function MyCalendar() {
             setSlotLocaciones(prevLoc => ({
                 ...prevLoc,
                 [slotKey]: defaultModalidad === 'presencial' ? 'casa' : null
+            }));
+
+            setSlotMaxAlumnos(prevMax => ({
+                ...prevMax,
+                [slotKey]: mentorInfo.max_alumnos
             }));
 
             const overlaps = checkOverlap(dateKey, newSlots);
@@ -421,6 +440,14 @@ export default function MyCalendar() {
         }
     };
 
+    const updateSlotMaxAlumnos = (dateKey, hour, maxAlumnos) => {
+        const slotKey = `${dateKey}-${hour}`;
+        setSlotMaxAlumnos(prev => ({
+            ...prev,
+            [slotKey]: maxAlumnos
+        }));
+    };
+
     const saveManualSlots = async () => {
         if (!selectedDate || !currentMentorId) return;
         const dateKey = formatDateKey(selectedDate);
@@ -445,13 +472,14 @@ export default function MyCalendar() {
                 const duracion = slotDurations[slotKey] || mentoriaDuration;
                 const modalidad = slotModalidades[slotKey] || getDefaultModalidad();
                 const locacion = slotLocaciones[slotKey] || null;
+                const maxAlumnos = slotMaxAlumnos[slotKey] || mentorInfo.max_alumnos;
 
                 return {
                     hora,
                     duracion,
                     modalidad,
                     locacion,
-                    max_alumnos: mentorInfo.max_alumnos
+                    max_alumnos: maxAlumnos
                 };
             });
 
@@ -480,7 +508,6 @@ export default function MyCalendar() {
         }
 
         try {
-            // Obtener datos del mentor
             const { data: mentorData } = await supabase
                 .from('mentor')
                 .select('id_usuario')
@@ -506,7 +533,6 @@ export default function MyCalendar() {
             }
         } catch (notifError) {
             console.error('Error enviando notificaciones:', notifError);
-            // No mostrar error al usuario, los horarios ya se guardaron
         }
     };
 
@@ -550,13 +576,10 @@ export default function MyCalendar() {
         return (savedSlots[dateKey] || []).length;
     };
 
-    // Escuchar cancelaciones desde IAmMentor
     useEffect(() => {
         const handleSlotCanceled = (event) => {
             const { fecha, hora } = event.detail;
             console.log('🔔 Slot cancelado desde IAmMentor:', fecha, hora);
-
-            // Recargar slots para actualizar la UI
             loadSavedSlots();
         };
 
@@ -582,7 +605,6 @@ export default function MyCalendar() {
             Cargando calendario...
         </div>
     );
-
 
     const days = getDaysInMonth();
 
@@ -637,7 +659,7 @@ export default function MyCalendar() {
                             margin: '0 auto 16px',
                             boxShadow: '0 4px 12px rgba(251, 191, 36, 0.3)'
                         }}>
-                            <FontAwesomeIcon icon={faExclamationCircle} style={{ fontSize: 32, color: '#f59e0b' }} />
+                            <FontAwesomeIcon icon={faExclamationTriangle} style={{ fontSize: 32, color: '#f59e0b' }} />
                         </div>
                         <h3 style={{
                             margin: '0 0 12px 0',
@@ -645,7 +667,7 @@ export default function MyCalendar() {
                             fontWeight: 700,
                             color: '#92400e'
                         }}>
-                            ⚠️ Hay horarios reservados
+                            Hay horarios reservados
                         </h3>
                         <p style={{
                             color: '#78350f',
@@ -655,8 +677,9 @@ export default function MyCalendar() {
                             fontWeight: 500
                         }}>
                             Esta fecha tiene sesiones confirmadas. Para cancelarlas, ve a la sección
-                            <strong style={{ display: 'block', marginTop: 8, color: '#92400e' }}>
-                                📅 "Próximas Mentorías"
+                            <strong style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, marginTop: 8, color: '#92400e' }}>
+                                <FontAwesomeIcon icon={faCalendarAlt} style={{ fontSize: 14 }} />
+                                Próximas Mentorías
                             </strong>
                             en Soy Mentor.
                         </p>
@@ -729,7 +752,7 @@ export default function MyCalendar() {
                             <FontAwesomeIcon icon={faExclamationCircle} style={{ fontSize: 28, color: '#dc2626' }} />
                         </div>
                         <h3 style={{
-                            margin: '0 0 12px 0',
+                            margin: '0 012px 0',
                             fontSize: 'clamp(18px, 3vw, 22px)',
                             fontWeight: 700,
                             color: '#0f172a'
@@ -1164,36 +1187,12 @@ export default function MyCalendar() {
                                         </h4>
                                     </div>
 
-                                    <div style={{
-                                        background: '#fff',
-                                        padding: '10px 12px',
-                                        borderRadius: 8,
-                                        border: '2px solid #e2e8f0',
-                                        marginBottom: 12,
-                                        display: 'flex',
-                                        alignItems: 'center',
-                                        gap: 8
-                                    }}>
-                                        <span style={{ fontSize: 13, fontWeight: 600, color: '#64748b' }}>
-                                            👥 Capacidad máxima:
-                                        </span>
-                                        <span style={{
-                                            background: 'linear-gradient(135deg, #dbeafe 0%, #bfdbfe 100%)',
-                                            color: '#1e40af',
-                                            padding: '4px 10px',
-                                            borderRadius: 6,
-                                            fontSize: 12,
-                                            fontWeight: 700
-                                        }}>
-                                            {mentorInfo.max_alumnos} {mentorInfo.max_alumnos === 1 ? 'alumno' : 'alumnos'}
-                                        </span>
-                                    </div>
-
                                     <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
                                         {(selectedSlots[formatDateKey(selectedDate)] || []).map(hour => {
                                             const dateKey = formatDateKey(selectedDate);
                                             const currentDuration = slotDurations[`${dateKey}-${hour}`] || mentoriaDuration;
                                             const currentModalidad = slotModalidades[`${dateKey}-${hour}`] || getDefaultModalidad();
+                                            const currentMaxAlumnos = slotMaxAlumnos[`${dateKey}-${hour}`] || mentorInfo.max_alumnos;
 
                                             return (
                                                 <div key={hour} style={{
@@ -1206,37 +1205,67 @@ export default function MyCalendar() {
                                                         display: 'flex',
                                                         alignItems: 'center',
                                                         justifyContent: 'space-between',
-                                                        marginBottom: 8
+                                                        marginBottom: 8,
+                                                        gap: 8
                                                     }}>
                                                         <span style={{
                                                             fontSize: 13,
                                                             fontWeight: 700,
-                                                            color: '#0f172a'
+                                                            color: '#0f172a',
+                                                            display: 'flex',
+                                                            alignItems: 'center',
+                                                            gap: 6
                                                         }}>
-                                                            <FontAwesomeIcon icon={faClock} style={{ marginRight: 8, color: '#64748b' }} />
+                                                            <FontAwesomeIcon icon={faClock} style={{ color: '#64748b', fontSize: 11 }} />
                                                             {hour}
                                                         </span>
-                                                        <select
-                                                            value={currentDuration}
-                                                            onChange={(e) => updateSlotDuration(dateKey, hour, Number(e.target.value))}
-                                                            style={{
-                                                                padding: '6px 10px',
-                                                                borderRadius: 8,
-                                                                border: '2px solid #e2e8f0',
-                                                                fontSize: 12,
-                                                                fontWeight: 600,
-                                                                cursor: 'pointer',
-                                                                background: '#fff',
-                                                                color: '#0f172a',
-                                                                outline: 'none',
-                                                                transition: 'all 0.2s ease',
-                                                                fontFamily: 'Inter, sans-serif'
-                                                            }}
-                                                        >
-                                                            {durationOptions.map(dur => (
-                                                                <option key={dur} value={dur}>{dur} min</option>
-                                                            ))}
-                                                        </select>
+                                                        <div style={{ display: 'flex', gap: 6 }}>
+                                                            <select
+                                                                value={currentDuration}
+                                                                onChange={(e) => updateSlotDuration(dateKey, hour, Number(e.target.value))}
+                                                                style={{
+                                                                    padding: '6px 8px',
+                                                                    borderRadius: 6,
+                                                                    border: '2px solid #e2e8f0',
+                                                                    fontSize: 11,
+                                                                    fontWeight: 600,
+                                                                    cursor: 'pointer',
+                                                                    background: '#fff',
+                                                                    color: '#0f172a',
+                                                                    outline: 'none',
+                                                                    transition: 'all 0.2s ease',
+                                                                    fontFamily: 'Inter, sans-serif'
+                                                                }}
+                                                            >
+                                                                {durationOptions.map(dur => (
+                                                                    <option key={dur} value={dur}>{dur} min</option>
+                                                                ))}
+                                                            </select>
+                                                            <select
+                                                                value={currentMaxAlumnos}
+                                                                onChange={(e) => updateSlotMaxAlumnos(dateKey, hour, Number(e.target.value))}
+                                                                style={{
+                                                                    padding: '6px 8px',
+                                                                    borderRadius: 6,
+                                                                    border: '2px solid #e2e8f0',
+                                                                    fontSize: 11,
+                                                                    fontWeight: 600,
+                                                                    cursor: 'pointer',
+                                                                    background: '#fff',
+                                                                    color: '#0f172a',
+                                                                    outline: 'none',
+                                                                    transition: 'all 0.2s ease',
+                                                                    fontFamily: 'Inter, sans-serif',
+                                                                    display: 'flex',
+                                                                    alignItems: 'center',
+                                                                    gap: 4
+                                                                }}
+                                                            >
+                                                                {capacidadOptions.map(cap => (
+                                                                    <option key={cap} value={cap}>{cap} persona(s)</option>
+                                                                ))}
+                                                            </select>
+                                                        </div>
                                                     </div>
 
                                                     <div style={{
@@ -1260,10 +1289,15 @@ export default function MyCalendar() {
                                                                     fontWeight: 700,
                                                                     cursor: 'pointer',
                                                                     transition: 'all 0.2s ease',
-                                                                    fontFamily: 'Inter, sans-serif'
+                                                                    fontFamily: 'Inter, sans-serif',
+                                                                    display: 'flex',
+                                                                    alignItems: 'center',
+                                                                    justifyContent: 'center',
+                                                                    gap: 4
                                                                 }}
                                                             >
-                                                                💻 Virtual
+                                                                <FontAwesomeIcon icon={faLaptop} style={{ fontSize: 9 }} />
+                                                                Virtual
                                                             </button>
                                                         )}
                                                         {mentorInfo.acepta_presencial && (
@@ -1282,10 +1316,15 @@ export default function MyCalendar() {
                                                                     fontWeight: 700,
                                                                     cursor: 'pointer',
                                                                     transition: 'all 0.2s ease',
-                                                                    fontFamily: 'Inter, sans-serif'
+                                                                    fontFamily: 'Inter, sans-serif',
+                                                                    display: 'flex',
+                                                                    alignItems: 'center',
+                                                                    justifyContent: 'center',
+                                                                    gap: 4
                                                                 }}
                                                             >
-                                                                🏢 Presencial
+                                                                <FontAwesomeIcon icon={faBuilding} style={{ fontSize: 9 }} />
+                                                                Presencial
                                                             </button>
                                                         )}
                                                     </div>
@@ -1317,10 +1356,15 @@ export default function MyCalendar() {
                                                                     fontWeight: 700,
                                                                     cursor: 'pointer',
                                                                     transition: 'all 0.2s ease',
-                                                                    fontFamily: 'Inter, sans-serif'
+                                                                    fontFamily: 'Inter, sans-serif',
+                                                                    display: 'flex',
+                                                                    alignItems: 'center',
+                                                                    justifyContent: 'center',
+                                                                    gap: 4
                                                                 }}
                                                             >
-                                                                🏠 Casa
+                                                                <FontAwesomeIcon icon={faHome} style={{ fontSize: 9 }} />
+                                                                Casa
                                                             </button>
                                                             <button
                                                                 onClick={() => updateSlotLocacion(dateKey, hour, 'facultad')}
@@ -1341,10 +1385,15 @@ export default function MyCalendar() {
                                                                     fontWeight: 700,
                                                                     cursor: 'pointer',
                                                                     transition: 'all 0.2s ease',
-                                                                    fontFamily: 'Inter, sans-serif'
+                                                                    fontFamily: 'Inter, sans-serif',
+                                                                    display: 'flex',
+                                                                    alignItems: 'center',
+                                                                    justifyContent: 'center',
+                                                                    gap: 4
                                                                 }}
                                                             >
-                                                                🎓 Facultad
+                                                                <FontAwesomeIcon icon={faGraduationCap} style={{ fontSize: 9 }} />
+                                                                Facultad
                                                             </button>
                                                         </div>
                                                     )}
@@ -1374,8 +1423,7 @@ export default function MyCalendar() {
                                         transition: 'all 0.2s ease',
                                         fontFamily: 'Inter, sans-serif'
                                     }}
-                                    onMouseEnter={e => {
-                                        e.target.style.background = '#f1f5f9';
+                                    onMouseEnter={e => {e.target.style.background = '#f1f5f9';
                                         e.target.style.transform = 'translateY(-1px)';
                                     }}
                                     onMouseLeave={e => {
@@ -1540,7 +1588,6 @@ export default function MyCalendar() {
                                                                 const locacion = slotLocaciones[slotKey];
                                                                 const disponible = slotDisponibilidad[slotKey] !== false;
 
-                                                                const modalidadIcon = modalidad === 'virtual' ? '💻' : '🏢';
                                                                 const modalidadColor = !disponible
                                                                     ? '#fef3c7'
                                                                     : modalidad === 'virtual'
@@ -1598,11 +1645,18 @@ export default function MyCalendar() {
                                                                             justifyContent: 'space-between',
                                                                             gap: 6
                                                                         }}>
-                                                                            <span>
-                                                                                {modalidadIcon} {modalidad.charAt(0).toUpperCase() + modalidad.slice(1)}
+                                                                            <span style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                                                                                <FontAwesomeIcon
+                                                                                    icon={modalidad === 'virtual' ? faLaptop : faBuilding}
+                                                                                    style={{ fontSize: 9 }}
+                                                                                />
+                                                                                {modalidad.charAt(0).toUpperCase() + modalidad.slice(1)}
                                                                                 {modalidad === 'presencial' && locacion && (
                                                                                     <span style={{ marginLeft: 4 }}>
-                                                                                        • {locacion === 'casa' ? '🏠 Casa' : '🎓 Facultad'}
+                                                                                        • <FontAwesomeIcon
+                                                                                        icon={locacion === 'casa' ? faHome : faGraduationCap}
+                                                                                        style={{ fontSize: 8 }}
+                                                                                    /> {locacion === 'casa' ? 'Casa' : 'Facultad'}
                                                                                     </span>
                                                                                 )}
                                                                             </span>
@@ -1610,9 +1664,13 @@ export default function MyCalendar() {
                                                                                 background: 'rgba(255,255,255,0.5)',
                                                                                 padding: '2px 6px',
                                                                                 borderRadius: 4,
-                                                                                fontWeight: 700
+                                                                                fontWeight: 700,
+                                                                                display: 'flex',
+                                                                                alignItems: 'center',
+                                                                                gap: 3
                                                                             }}>
-                                                                                👤 {slotMaxAlumnos[slotKey] || mentorInfo.max_alumnos}
+                                                                                <FontAwesomeIcon icon={faUser} style={{ fontSize: 8 }} />
+                                                                                {slotMaxAlumnos[slotKey] || mentorInfo.max_alumnos}
                                                                             </span>
                                                                         </div>
                                                                     </div>

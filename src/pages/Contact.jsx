@@ -1,5 +1,12 @@
 import { useRef, useState, useEffect } from "react";
 import emailjs from "@emailjs/browser";
+import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
+import {
+    faEnvelope,
+    faCheckCircle,
+    faExclamationCircle,
+    faCheck
+} from '@fortawesome/free-solid-svg-icons';
 import { Button } from "../components/UI/Button";
 import { Card } from "../components/UI/Card";
 import { supabase } from "../supabase";
@@ -69,21 +76,29 @@ export default function Contact() {
                 minHeight: "100dvh",
                 display: "grid",
                 placeItems: "center",
-                padding: "0px 20px 0px",
-                background: "#fafafa",
-                fontFamily: "-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif",
+                padding: "40px 20px",
+                background: "#f8fafc",
+                fontFamily: "Inter, sans-serif",
             }}
         >
             <div style={{ width: "100%", maxWidth: 960 }}>
                 {/* Header */}
                 <div style={{ textAlign: "center", marginBottom: 28 }}>
-                    {/* Emoji arriba */}
+                    {/* Icono arriba */}
                     <div style={{
-                        fontSize: 36,
-                        marginBottom: 16,
-                        lineHeight: 1,
+                        width: 80,
+                        height: 80,
+                        borderRadius: '50%',
+                        background: '#2563eb',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        margin: '0 auto 20px',
                     }}>
-                        ✉️
+                        <FontAwesomeIcon
+                            icon={faEnvelope}
+                            style={{ fontSize: 32, color: '#fff' }}
+                        />
                     </div>
 
                     <div
@@ -93,8 +108,8 @@ export default function Contact() {
                             gap: 8,
                             padding: "6px 14px",
                             borderRadius: 999,
-                            background: "#f5f5f5",
-                            color: "#8e8e8e",
+                            background: "#eff6ff",
+                            color: "#2563eb",
                             fontWeight: 600,
                             fontSize: 12,
                             letterSpacing: 0.5,
@@ -111,14 +126,14 @@ export default function Contact() {
                             fontSize: 32,
                             lineHeight: 1.2,
                             letterSpacing: "-0.5px",
-                            color: "#262626",
+                            color: "#13346b",
                             fontWeight: 700,
                         }}
                     >
                         ¿Tenés alguna consulta?
                     </h1>
 
-                    <p style={{ margin: 0, color: "#8e8e8e", fontSize: 15 }}>
+                    <p style={{ margin: 0, color: "#64748b", fontSize: 15, fontWeight: 500 }}>
                         Escribinos y te respondemos a la brevedad
                     </p>
                 </div>
@@ -133,7 +148,7 @@ export default function Contact() {
                     {/* Formulario */}
                     <Card
                         style={{
-                            border: "1px solid #dbdbdb",
+                            border: "2px solid #f1f5f9",
                             background: "white",
                             boxShadow: "0 2px 12px rgba(0,0,0,0.04)",
                         }}
@@ -150,7 +165,7 @@ export default function Contact() {
                             <div style={{ display: "grid", gap: 8 }}>
                                 <label
                                     htmlFor="name"
-                                    style={{ fontSize: 14, color: "#262626", fontWeight: 600 }}
+                                    style={{ fontSize: 14, color: "#0f172a", fontWeight: 600 }}
                                 >
                                     Nombre
                                 </label>
@@ -168,9 +183,9 @@ export default function Contact() {
                             <div style={{ display: "grid", gap: 8 }}>
                                 <label
                                     htmlFor="email"
-                                    style={{ fontSize: 14, color: "#262626", fontWeight: 600 }}
+                                    style={{ fontSize: 14, color: "#0f172a", fontWeight: 600 }}
                                 >
-                                    Email <span style={{ color: "#8e8e8e", fontWeight: 400 }}>(opcional)</span>
+                                    Email <span style={{ color: "#64748b", fontWeight: 400 }}>(opcional)</span>
                                 </label>
                                 <input
                                     id="email"
@@ -180,7 +195,7 @@ export default function Contact() {
                                     placeholder="tu@email.com"
                                     style={inputStyle}
                                 />
-                                <small style={{ fontSize: 12, color: "#8e8e8e" }}>
+                                <small style={{ fontSize: 12, color: "#64748b" }}>
                                     Solo si querés que te contactemos sobre tu mensaje
                                 </small>
                             </div>
@@ -188,7 +203,7 @@ export default function Contact() {
                             <div style={{ display: "grid", gap: 8 }}>
                                 <label
                                     htmlFor="message"
-                                    style={{ fontSize: 14, color: "#262626", fontWeight: 600 }}
+                                    style={{ fontSize: 14, color: "#0f172a", fontWeight: 600 }}
                                 >
                                     Mensaje
                                 </label>
@@ -198,7 +213,7 @@ export default function Contact() {
                                     rows={5}
                                     required
                                     placeholder="Ej: Falta el profesor John Doe en la materia..."
-                                    style={{ ...inputStyle, resize: "vertical", lineHeight: 1.5, fontFamily: 'inherit' }}
+                                    style={{ ...inputStyle, resize: "vertical", lineHeight: 1.5, fontFamily: 'Inter, sans-serif' }}
                                 />
                             </div>
 
@@ -218,19 +233,19 @@ export default function Contact() {
                                         padding: "10px 24px",
                                         borderRadius: 8,
                                         border: "none",
-                                        background: sending ? "#b3b3b3" : "#0095f6",
+                                        background: sending ? "#94a3b8" : "#2563eb",
                                         color: "white",
                                         fontWeight: 600,
                                         fontSize: 14,
                                         cursor: sending ? "not-allowed" : "pointer",
                                         transition: "all 0.2s ease",
-                                        fontFamily: 'inherit',
+                                        fontFamily: 'Inter, sans-serif',
                                     }}
                                     onMouseEnter={(e) => {
-                                        if (!sending) e.target.style.background = "#1877f2";
+                                        if (!sending) e.target.style.background = "#1e40af";
                                     }}
                                     onMouseLeave={(e) => {
-                                        if (!sending) e.target.style.background = "#0095f6";
+                                        if (!sending) e.target.style.background = "#2563eb";
                                     }}
                                 >
                                     {sending ? "Enviando..." : "Enviar mensaje"}
@@ -240,30 +255,38 @@ export default function Contact() {
                                     <span
                                         style={{
                                             fontSize: 13,
-                                            color: "#00a400",
-                                            background: "#d4edda",
-                                            border: "1px solid #c3e6cb",
+                                            color: "#065f46",
+                                            background: "#d1fae5",
+                                            border: "1px solid #10b981",
                                             padding: "6px 12px",
                                             borderRadius: 6,
-                                            fontWeight: 500,
+                                            fontWeight: 600,
+                                            display: 'flex',
+                                            alignItems: 'center',
+                                            gap: 6
                                         }}
                                     >
-                                        ✓ Mensaje enviado
+                                        <FontAwesomeIcon icon={faCheckCircle} />
+                                        Mensaje enviado
                                     </span>
                                 )}
                                 {status === "err" && (
                                     <span
                                         style={{
                                             fontSize: 13,
-                                            color: "#ed4956",
-                                            background: "#ffe0e3",
-                                            border: "1px solid #ffccd5",
+                                            color: "#991b1b",
+                                            background: "#fee2e2",
+                                            border: "1px solid #ef4444",
                                             padding: "6px 12px",
                                             borderRadius: 6,
-                                            fontWeight: 500,
+                                            fontWeight: 600,
+                                            display: 'flex',
+                                            alignItems: 'center',
+                                            gap: 6
                                         }}
                                     >
-                                        ✗ Ocurrió un error
+                                        <FontAwesomeIcon icon={faExclamationCircle} />
+                                        Ocurrió un error
                                     </span>
                                 )}
                             </div>
@@ -273,13 +296,13 @@ export default function Contact() {
                     {/* Sidebar */}
                     <Card
                         style={{
-                            border: "1px solid #dbdbdb",
+                            border: "2px solid #f1f5f9",
                             padding: 20,
                             background: "white",
                         }}
                     >
                         <div style={{ display: "grid", gap: 20 }}>
-                            <h3 style={{ margin: 0, fontSize: 18, color: "#262626", fontWeight: 600, letterSpacing: "-0.3px" }}>
+                            <h3 style={{ margin: 0, fontSize: 18, color: "#13346b", fontWeight: 600, letterSpacing: "-0.3px" }}>
                                 ¿Por qué contactarnos?
                             </h3>
 
@@ -301,15 +324,15 @@ export default function Contact() {
                                     marginTop: 8,
                                     padding: 16,
                                     borderRadius: 8,
-                                    background: "#f5f5f5",
-                                    border: "1px solid #efefef",
+                                    background: "#eff6ff",
+                                    border: "1px solid #bfdbfe",
                                 }}
                             >
-                                <p style={{ margin: 0, fontSize: 13, color: "#262626", lineHeight: 1.5 }}>
+                                <p style={{ margin: 0, fontSize: 13, color: "#0f172a", lineHeight: 1.5, fontWeight: 500 }}>
                                     También podés escribirnos a{" "}
-                                    <strong style={{ color: "#0095f6" }}>kerana.soporte@gmail.com</strong>
+                                    <strong style={{ color: "#2563eb" }}>kerana.soporte@gmail.com</strong>
                                     <br />
-                                    <span style={{ color: "#8e8e8e", fontSize: 12 }}>Respondemos en 24-48 hs</span>
+                                    <span style={{ color: "#64748b", fontSize: 12 }}>Respondemos en 24-48 hs</span>
                                 </p>
                             </div>
                         </div>
@@ -328,7 +351,7 @@ function Feature({ title, desc }) {
                     width: 28,
                     height: 28,
                     borderRadius: "50%",
-                    background: "#f5f5f5",
+                    background: "#eff6ff",
                     display: "flex",
                     alignItems: "center",
                     justifyContent: "center",
@@ -336,22 +359,23 @@ function Feature({ title, desc }) {
                     marginTop: 2,
                 }}
             >
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#0095f6" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
-                    <polyline points="20 6 9 17 4 12" />
-                </svg>
+                <FontAwesomeIcon
+                    icon={faCheck}
+                    style={{ fontSize: 12, color: '#2563eb' }}
+                />
             </div>
             <div style={{ flex: 1 }}>
                 <div
                     style={{
                         fontWeight: 600,
                         fontSize: 14,
-                        color: "#262626",
+                        color: "#0f172a",
                         marginBottom: 4,
                     }}
                 >
                     {title}
                 </div>
-                <p style={{ margin: 0, fontSize: 13, color: "#8e8e8e", lineHeight: 1.5 }}>{desc}</p>
+                <p style={{ margin: 0, fontSize: 13, color: "#64748b", lineHeight: 1.5, fontWeight: 500 }}>{desc}</p>
             </div>
         </div>
     );
@@ -360,14 +384,15 @@ function Feature({ title, desc }) {
 const inputStyle = {
     appearance: "none",
     outline: "none",
-    border: "1px solid #dbdbdb",
+    border: "2px solid #e2e8f0",
     background: "white",
     padding: "10px 12px",
-    borderRadius: 6,
+    borderRadius: 8,
     fontSize: 14,
-    color: "#262626",
+    color: "#0f172a",
     transition: "border-color 0.2s ease",
-    fontFamily: "inherit",
+    fontFamily: "Inter, sans-serif",
     width: "100%",
     boxSizing: "border-box",
+    fontWeight: 500
 };

@@ -1,5 +1,7 @@
 // Supabase Edge Function: enviar-recordatorios-1h
-// Ejecutar cada 10 minutos con Cron
+// Ejecutar cada 10 minutos con cron
+
+//@ts-nocheck
 
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
@@ -10,17 +12,17 @@ const corsHeaders = {
     'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 }
 
-serve(async (req) => {
+serve(async (req: any): Promise<Response> => {
     // Handle CORS preflight
     if (req.method === 'OPTIONS') {
         return new Response('ok', { headers: corsHeaders })
     }
 
     try {
-        console.log('🔔 Iniciando envío de recordatorios 1h...')
+        console.log('⏰ Iniciando envío de recordatorios 1h...')
 
         // Configurar Supabase client
-        const supabaseClient = createClient(
+        const supabaseClient: any = createClient(
             Deno.env.get('SUPABASE_URL') ?? '',
             Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
         )
@@ -28,7 +30,7 @@ serve(async (req) => {
         // Configurar Resend
         const resend = new Resend(Deno.env.get('RESEND_API_KEY') ?? '')
 
-        // Calcular rango de tiempo (1 hora +/- 5 minutos)
+        // Calcular rango de tiempo (1 hora +/- 5 minutos para margen)
         const ahora = new Date()
         const en1hora = new Date(ahora.getTime() + 60 * 60 * 1000)
         const rangoInicio = new Date(en1hora.getTime() - 5 * 60 * 1000)  // -5 min
@@ -36,11 +38,7 @@ serve(async (req) => {
 
         console.log(`📅 Buscando sesiones entre ${rangoInicio.toISOString()} y ${rangoFin.toISOString()}`)
 
-        // Buscar sesiones virtuales que:
-        // 1. Están confirmadas
-        // 2. Son en 1 hora (aproximadamente)
-        // 3. NO se cancelaron
-        // 4. NO se les envió el recordatorio aún
+        // Buscar sesiones PRESENCIALES confirmadas en la próxima hora que NO hayan recibido recordatorio
         const { data: sesiones, error: sesionesError } = await supabaseClient
             .from('mentor_sesion')
             .select(`
@@ -48,157 +46,176 @@ serve(async (req) => {
         fecha_hora,
         duracion_minutos,
         estado,
+        modalidad,
         recordatorio_1h_enviado,
-        materia:id_materia(nombre_materia),
+        id_mentor,
+        id_alumno,
+        id_materia,
         mentor:id_mentor(
-          usuario:id_usuario(nombre)
+          id_usuario,
+          usuario:id_usuario(nombre, correo)
         ),
-        alumno:id_alumno(nombre, correo)
+        alumno:id_alumno(nombre, correo),
+        materia:id_materia(nombre_materia)
       `)
             .eq('estado', 'confirmada')
+            .eq('modalidad', 'presencial')  // ← SOLO PRESENCIAL
             .eq('recordatorio_1h_enviado', false)
             .gte('fecha_hora', rangoInicio.toISOString())
             .lte('fecha_hora', rangoFin.toISOString())
 
         if (sesionesError) {
-            console.error('❌ Error obteniendo sesiones:', sesionesError)
+            console.error('❌ Error buscando sesiones:', sesionesError)
             throw sesionesError
         }
 
-        console.log(`📊 Encontradas ${sesiones?.length || 0} sesiones`)
+        console.log(`📊 Encontradas ${sesiones?.length || 0} sesiones PRESENCIALES para recordatorio 1h`)
 
         if (!sesiones || sesiones.length === 0) {
             return new Response(
                 JSON.stringify({
-                    message: 'No hay sesiones para enviar recordatorios',
-                    count: 0
+                    success: true,
+                    message: 'No hay sesiones presenciales pendientes de recordatorio 1h'
                 }),
                 { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
             )
         }
 
-        let emailsEnviados = 0
-        let errores = 0
-
-        // Enviar email a cada alumno
+        // Enviar recordatorios
+        const resultados = []
         for (const sesion of sesiones) {
             try {
-                const horaFormateada = new Date(sesion.fecha_hora).toLocaleTimeString('es-UY', {
-                    hour: '2-digit',
-                    minute: '2-digit'
-                })
-
-                // Template del email (simplificado)
-                const htmlEmail = `
-          <!DOCTYPE html>
-          <html>
-          <head>
-            <meta charset="utf-8">
-            <style>
-              body { font-family: 'Inter', sans-serif; background: #f8fafc; padding: 20px; }
-              .container { max-width: 600px; margin: 0 auto; background: white; border-radius: 16px; overflow: hidden; box-shadow: 0 4px 12px rgba(0,0,0,0.1); }
-              .header { background: linear-gradient(135deg, #13346b 0%, #2563eb 60%, #0ea5a3 100%); padding: 32px 24px; text-align: center; }
-              .header h1 { margin: 0; color: white; font-size: 28px; }
-              .content { padding: 32px 24px; }
-              .info-box { background: #f8fafc; border-radius: 12px; padding: 20px; margin: 24px 0; }
-              .blue-box { background: #eff6ff; border-left: 4px solid #2563eb; padding: 20px; border-radius: 8px; margin: 24px 0; }
-              .warning { background: #fef3c7; border-left: 4px solid #f59e0b; padding: 20px; border-radius: 8px; margin: 24px 0; }
-            </style>
-          </head>
-          <body>
-            <div class="container">
-              <div class="header">
-                <h1>Kerana</h1>
-                <p style="margin: 8px 0 0 0; color: #e0f2fe;">Tu clase comienza pronto</p>
-              </div>
-              <div class="content">
-                <h2 style="color: #0f172a;">🔔 Tu clase comienza en 1 hora</h2>
-                <p>Hola <strong>${sesion.alumno?.nombre || 'Alumno'}</strong>,</p>
-                <p>Te recordamos que tu mentoría comienza hoy a las <strong>${horaFormateada}</strong>:</p>
-                
-                <div class="info-box">
-                  <p><strong>👨‍🏫 Mentor:</strong> ${sesion.mentor?.usuario?.nombre || 'Mentor'}</p>
-                  <p><strong>📚 Materia:</strong> ${sesion.materia?.nombre_materia || 'Materia'}</p>
-                  <p><strong>📅 Hora:</strong> ${horaFormateada}</p>
-                </div>
-
-                <div class="blue-box">
-                  <h3 style="color: #1e40af; margin: 0 0 12px 0;">📱 ¿Cómo unirme a la clase?</h3>
-                  <ol style="color: #1e40af; line-height: 1.8;">
-                    <li>Revisá tu correo institucional</li>
-                    <li>Buscá el email de "Microsoft Teams"</li>
-                    <li>Hacé click en "Unirse"</li>
-                    <li>Si es tu primera vez, Teams se abrirá automáticamente</li>
-                  </ol>
-                  <p style="color: #1e40af; font-size: 13px; margin: 16px 0 0 0;">
-                    💡 <strong>Tip:</strong> Probá el link 5 minutos antes para asegurarte que todo funcione.
-                  </p>
-                </div>
-
-                <div class="warning">
-                  <h3 style="color: #92400e; margin: 0 0 12px 0;">⚠️ ¿Problemas técnicos?</h3>
-                  <ul style="color: #92400e; line-height: 1.8;">
-                    <li>Probá desde el navegador (teams.microsoft.com)</li>
-                    <li>O abrí Teams → Llamadas → buscar al mentor</li>
-                  </ul>
-                  <p style="color: #92400e; font-size: 13px; margin: 16px 0 0 0;">
-                    <strong>¿No encontrás el email?</strong> Revisá spam o contactá a tu mentor.
-                  </p>
-                </div>
-              </div>
-            </div>
-          </body>
-          </html>
-        `
-
-                const { data, error } = await resend.emails.send({
-                    from: 'Kerana <onboarding@resend.dev>',
-                    to: sesion.alumno?.correo || '',
-                    subject: `Tu clase comienza en 1 hora - ${sesion.materia?.nombre_materia || 'Materia'}`,
-                    html: htmlEmail
-                })
-
-                if (error) {
-                    console.error(`❌ Error enviando email a ${sesion.alumno?.correo}:`, error)
-                    errores++
-                } else {
-                    console.log(`✅ Email enviado a ${sesion.alumno?.correo}`)
-
-                    // Marcar como enviado
-                    await supabaseClient
-                        .from('mentor_sesion')
-                        .update({ recordatorio_1h_enviado: true })
-                        .eq('id_sesion', sesion.id_sesion)
-
-                    emailsEnviados++
+                // Validar que tengamos todos los datos
+                if (!sesion.alumno?.correo) {
+                    console.error(`⚠️ Sesión ${sesion.id_sesion}: Falta email del alumno`)
+                    continue
                 }
-            } catch (error) {
+
+                // Formatear hora
+                const fechaSesion = new Date(sesion.fecha_hora)
+                const horaFormateada = fechaSesion.toLocaleTimeString('es-UY', {
+                    hour: '2-digit',
+                    minute: '2-digit',
+                    hour12: false
+                })
+
+                // Template del email
+                const emailHTML = crearTemplateRecordatorio1h({
+                    alumnoNombre: sesion.alumno.nombre,
+                    mentorNombre: sesion.mentor.usuario.nombre,
+                    materiaNombre: sesion.materia.nombre_materia,
+                    hora: horaFormateada
+                })
+
+                // Enviar email
+                const { data: emailData, error: emailError } = await resend.emails.send({
+                    from: 'Kerana <onboarding@resend.dev>',
+                    to: sesion.alumno.correo,
+                    subject: `🔔 ¡Tu clase comienza en 1 hora! - ${sesion.materia.nombre_materia}`,
+                    html: emailHTML
+                })
+
+                if (emailError) {
+                    console.error(`❌ Error enviando email sesión ${sesion.id_sesion}:`, emailError)
+                    resultados.push({ id_sesion: sesion.id_sesion, success: false, error: emailError })
+                    continue
+                }
+
+                console.log(`✅ Email enviado para sesión ${sesion.id_sesion}:`, emailData.id)
+
+                // Marcar como enviado
+                await supabaseClient
+                    .from('mentor_sesion')
+                    .update({ recordatorio_1h_enviado: true })
+                    .eq('id_sesion', sesion.id_sesion)
+
+                resultados.push({ id_sesion: sesion.id_sesion, success: true, emailId: emailData.id })
+
+            } catch (error: any) {
                 console.error(`❌ Error procesando sesión ${sesion.id_sesion}:`, error)
-                errores++
+                resultados.push({ id_sesion: sesion.id_sesion, success: false, error: error.message })
             }
         }
 
-        console.log(`✅ Proceso completado: ${emailsEnviados} emails enviados, ${errores} errores`)
+        console.log(`📧 Recordatorios enviados: ${resultados.filter(r => r.success).length}/${resultados.length}`)
 
         return new Response(
-            JSON.stringify({
-                success: true,
-                message: `Recordatorios 1h enviados`,
-                emailsEnviados,
-                errores,
-                totalSesiones: sesiones.length
-            }),
+            JSON.stringify({ success: true, resultados }),
             { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
         )
 
-    } catch (error) {
+    } catch (error: any) {
         console.error('❌ Error general:', error)
         return new Response(
-            JSON.stringify({ error: error.message }),
-            {
-                status: 500,
-                headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-            }
+            JSON.stringify({ success: false, error: error.message }),
+            { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
         )
     }
 })
+
+// Template del recordatorio 1h
+function crearTemplateRecordatorio1h({ alumnoNombre, mentorNombre, materiaNombre, hora }: any) {
+    return `
+    <!DOCTYPE html>
+    <html>
+    <head>
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    </head>
+    <body style="font-family: 'Inter', sans-serif; margin: 0; padding: 20px; background: #f8fafc;">
+      <div style="max-width: 600px; margin: 0 auto; background: #fff; border-radius: 16px; overflow: hidden; box-shadow: 0 4px 12px rgba(0,0,0,0.1);">
+        
+        <!-- Header -->
+        <div style="background: linear-gradient(135deg, #13346b 0%, #2563eb 60%, #0ea5a3 100%); padding: 32px 24px; text-align: center;">
+          <h1 style="margin: 0; color: #fff; font-size: 28px; font-weight: 700;">Kerana</h1>
+          <p style="margin: 8px 0 0 0; color: #e0f2fe; font-size: 16px;">Tu clase comienza pronto</p>
+        </div>
+
+        <!-- Content -->
+        <div style="padding: 32px 24px;">
+          <h2 style="margin: 0 0 24px 0; color: #0f172a; font-size: 24px; font-weight: 700;">
+            🔔 ¡Tu clase comienza en 1 hora!
+          </h2>
+
+          <p style="margin: 0 0 24px 0; color: #475569; font-size: 15px; line-height: 1.6;">
+            Hola <strong>${alumnoNombre}</strong>,
+          </p>
+
+          <p style="margin: 0 0 24px 0; color: #475569; font-size: 15px; line-height: 1.6;">
+            Te recordamos que tu mentoría presencial comienza hoy a las <strong>${hora}</strong>:
+          </p>
+
+          <div style="background: #f8fafc; border-radius: 12px; padding: 20px; margin: 24px 0;">
+            <p style="margin: 0 0 12px 0; color: #64748b; font-size: 13px;">
+              👨‍🏫 Mentor: <strong style="color: #0f172a;">${mentorNombre}</strong>
+            </p>
+            <p style="margin: 0 0 12px 0; color: #64748b; font-size: 13px;">
+              📚 Materia: <strong style="color: #0f172a;">${materiaNombre}</strong>
+            </p>
+            <p style="margin: 0; color: #64748b; font-size: 13px;">
+              📅 Hora: <strong style="color: #0f172a;">${hora}</strong>
+            </p>
+          </div>
+
+          <div style="background: #fef3c7; border-left: 4px solid #f59e0b; border-radius: 8px; padding: 20px; margin: 24px 0;">
+            <h3 style="margin: 0 0 12px 0; color: #92400e; font-size: 16px; font-weight: 700;">
+              ⚠️ No olvides
+            </h3>
+            <ul style="margin: 0; padding-left: 20px; color: #92400e; font-size: 14px; line-height: 1.8;">
+              <li>Llevar todo el material necesario</li>
+              <li>Llegar puntual al punto de encuentro</li>
+              <li>Tener a mano el email del mentor por si surge algún imprevisto</li>
+            </ul>
+          </div>
+        </div>
+
+        <!-- Footer -->
+        <div style="padding: 24px; background: #f8fafc; text-align: center; border-top: 2px solid #e2e8f0;">
+          <p style="margin: 0 0 8px 0; color: #64748b; font-size: 13px;">© 2025 Kerana - Plataforma de Mentorías</p>
+          <p style="margin: 0; color: #94a3b8; font-size: 12px;">Montevideo, Uruguay</p>
+        </div>
+      </div>
+    </body>
+    </html>
+  `
+}
