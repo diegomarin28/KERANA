@@ -819,12 +819,13 @@ export default function IAmMentor() {
                                                             const fecha = fechaSesion.toISOString().split('T')[0];
                                                             const hora = fechaSesion.toTimeString().slice(0, 5);
 
-
                                                             setConfirmCancelSession({
                                                                 id: sesion.id_sesion,
                                                                 esMasDe36Horas: horasRestantes > 36,
                                                                 fecha: fechaSesion,
                                                                 materia: sesion.materia?.nombre_materia,
+                                                                dateKey: fecha,
+                                                                hora: hora
                                                             });
                                                         }}
                                                         style={{
@@ -1063,8 +1064,8 @@ export default function IAmMentor() {
                                         <ul style={listTermsStyle}>
                                             <li><strong>Cancelación del estudiante:</strong>
                                                 <ul style={{ marginTop: 8 }}>
-                                                    <li><span style={{ color: '#10b981' }}>✓</span> Más de 12 horas antes: Reembolso completo</li>
-                                                    <li><span style={{ color: '#f59e0b' }}>!</span> Menos de 12 horas: Se te acredita 25%</li>
+                                                    <li><span style={{ color: '#10b981' }}>✓</span> Más de 12 horas antes: Reembolso completo al estudiante</li>
+                                                    <li><span style={{ color: '#f59e0b' }}>!</span> Menos de 12 horas: Se te acredita 50%</li>
                                                 </ul>
                                             </li>
                                             <li><strong>Cancelación tuya:</strong>
@@ -1262,25 +1263,75 @@ export default function IAmMentor() {
                             <button
                                 onClick={async () => {
                                     setIsCanceling(true);
+
+                                    const sessionId = confirmCancelSession.id;
+                                    const mentorId = mentorData.id_mentor;
+                                    const fecha = confirmCancelSession.dateKey; // Formato: 'YYYY-MM-DD'
+                                    const hora = confirmCancelSession.hora + ':00'; // Formato: 'HH:MM:00'
+
+                                    console.log('🔴 CANCELANDO:', { sessionId, mentorId, fecha, hora });
+
                                     try {
-                                        // TODO: Implementar cancelación real con API
-                                        console.log('Cancelar sesión:', confirmCancelSession);
+                                        // PASO 1: Eliminar sesión de mentor_sesion
+                                        const { data: deletedSession, error: sessionError } = await supabase
+                                            .from('mentor_sesion')
+                                            .delete()
+                                            .eq('id_sesion', sessionId)
+                                            .select();
 
-                                        // Simular llamada API
-                                        await new Promise(resolve => setTimeout(resolve, 1000));
+                                        console.log('📋 DELETE mentor_sesion:', { deletedSession, sessionError });
 
-                                        // Eliminar la sesión de la lista
+                                        if (sessionError) {
+                                            console.error('❌ Error borrando sesión:', sessionError);
+                                            throw new Error(`Error al eliminar sesión: ${sessionError.message}`);
+                                        }
+
+                                        if (!deletedSession || deletedSession.length === 0) {
+                                            console.warn('⚠️ No se encontró la sesión para eliminar');
+                                        } else {
+                                            console.log('✅ Sesión eliminada:', deletedSession[0]);
+                                        }
+
+                                        // PASO 2: Eliminar slot de slots_disponibles
+                                        const { data: deletedSlot, error: slotError } = await supabase
+                                            .from('slots_disponibles')
+                                            .delete()
+                                            .eq('id_mentor', mentorId)
+                                            .eq('fecha', fecha)
+                                            .eq('hora', hora)
+                                            .select();
+
+                                        console.log('📋 DELETE slots_disponibles:', { deletedSlot, slotError });
+
+                                        if (slotError) {
+                                            console.error('❌ Error borrando slot:', slotError);
+                                            // No lanzamos error aquí porque la sesión ya se eliminó
+                                        }
+
+                                        if (!deletedSlot || deletedSlot.length === 0) {
+                                            console.warn('⚠️ No se encontró el slot para eliminar (puede que ya no exista)');
+                                        } else {
+                                            console.log('✅ Slot eliminado:', deletedSlot[0]);
+                                        }
+
+                                        // PASO 3: Actualizar UI local
                                         setProximasSesiones(prev =>
-                                            prev.filter(s => s.id_sesion !== confirmCancelSession.id)
+                                            prev.filter(s => s.id_sesion !== sessionId)
                                         );
 
-                                        // Mostrar mensaje de éxito
+                                        // PASO 4: Notificar a MyCalendar
+                                        window.dispatchEvent(new CustomEvent('slotCanceled', {
+                                            detail: { fecha, hora: hora.slice(0, 5) }
+                                        }));
+
+                                        console.log('✅ CANCELACIÓN COMPLETADA');
+
                                         setCancelSuccess(true);
                                         setTimeout(() => setCancelSuccess(false), 3000);
 
                                     } catch (error) {
-                                        console.error('Error cancelando sesión:', error);
-                                        alert('Error al cancelar sesión');
+                                        console.error('🔥 ERROR TOTAL:', error);
+                                        alert(`Error al cancelar: ${error.message}\n\nRevisa la consola para más detalles.`);
                                     } finally {
                                         setIsCanceling(false);
                                         setConfirmCancelSession(null);

@@ -160,7 +160,7 @@ export default function MyCalendar() {
         }
     };
 
-    const loadSavedSlots = async () => {
+    const loadSavedSlots = async (forceReload = false) => {
         if (!currentMentorId) return;
 
         const now = new Date();
@@ -173,6 +173,7 @@ export default function MyCalendar() {
         );
 
         console.log('🔍 DEBUG loadSavedSlots - Datos recibidos:', data);
+        console.log('🔍 Force reload:', forceReload);
 
         if (data) {
             const slotsByDate = {};
@@ -197,7 +198,9 @@ export default function MyCalendar() {
                     seFiltra: slotDateTime < now && slot.disponible !== false
                 });
 
-                if (slotDateTime < now && slot.disponible !== false) {
+                // Si forceReload es true, no filtrar slots pasados
+                // Esto permite que se actualice correctamente después de cancelaciones
+                if (!forceReload && slotDateTime < now && slot.disponible !== false) {
                     console.log('❌ Slot filtrado (pasado y disponible)');
                     return;
                 }
@@ -552,12 +555,64 @@ export default function MyCalendar() {
 
     // Escuchar cancelaciones desde IAmMentor
     useEffect(() => {
-        const handleSlotCanceled = (event) => {
+        const handleSlotCanceled = async (event) => {
             const { fecha, hora } = event.detail;
             console.log('🔔 Slot cancelado desde IAmMentor:', fecha, hora);
 
-            // Recargar slots para actualizar la UI
-            loadSavedSlots();
+            // Limpiar el slot específico del estado local inmediatamente
+            const slotKey = `${fecha}-${hora}`;
+
+            setSavedSlots(prev => {
+                const newSlots = { ...prev };
+                if (newSlots[fecha]) {
+                    newSlots[fecha] = newSlots[fecha].filter(h => h !== hora);
+                    // Si no quedan slots en esa fecha, eliminar la fecha
+                    if (newSlots[fecha].length === 0) {
+                        delete newSlots[fecha];
+                    }
+                }
+                return newSlots;
+            });
+
+            // Limpiar estados relacionados
+            setSlotDurations(prev => {
+                const newDurations = { ...prev };
+                delete newDurations[slotKey];
+                return newDurations;
+            });
+
+            setSlotModalidades(prev => {
+                const newModalidades = { ...prev };
+                delete newModalidades[slotKey];
+                return newModalidades;
+            });
+
+            setSlotLocaciones(prev => {
+                const newLocaciones = { ...prev };
+                delete newLocaciones[slotKey];
+                return newLocaciones;
+            });
+
+            setSlotMaxAlumnos(prev => {
+                const newMaxAlumnos = { ...prev };
+                delete newMaxAlumnos[slotKey];
+                return newMaxAlumnos;
+            });
+
+            setSlotDisponibilidad(prev => {
+                const newDisponibilidad = { ...prev };
+                delete newDisponibilidad[slotKey];
+                return newDisponibilidad;
+            });
+
+            // Recargar desde el servidor después de un delay
+            setTimeout(() => {
+                loadSavedSlots(true); // Forzar recarga completa
+            }, 500);
+
+            // Mostrar mensaje de éxito
+            setSuccess('Slot eliminado correctamente');
+            setTimeout(() => setSuccess(''), 3000);
         };
 
         window.addEventListener('slotCanceled', handleSlotCanceled);
@@ -566,22 +621,6 @@ export default function MyCalendar() {
             window.removeEventListener('slotCanceled', handleSlotCanceled);
         };
     }, [currentMentorId]);
-
-    if (loading) return (
-        <div style={{
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            minHeight: '60vh',
-            fontFamily: 'Inter, sans-serif',
-            fontSize: 'clamp(14px, 2vw, 16px)',
-            fontWeight: 500,
-            color: '#64748b'
-        }}>
-            <FontAwesomeIcon icon={faClock} spin style={{ marginRight: 12, color: '#2563eb' }} />
-            Cargando calendario...
-        </div>
-    );
 
 
     const days = getDaysInMonth();
