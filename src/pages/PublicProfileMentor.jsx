@@ -9,6 +9,28 @@ import AuthModal_HacerResenia from '../components/AuthModal_HacerResenia';
 import ReviewsSection from '../components/ReviewsSection';
 import MentorCalendarModal from '../components/MentorCalendarModal';
 import {slotsAPI} from "../api/slots.js";
+import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
+import {
+    faUserPlus,
+    faUserCheck,
+    faShareNodes,
+    faChevronLeft,
+    faChevronRight,
+    faFilter,
+    faArrowLeft,
+    faGraduationCap,
+    faStar,
+    faRocket,
+    faBook,
+    faTrophy,
+    faFaceFrown,
+    faSearch,
+    faCalendarCheck,
+    faBookmark,
+    faEnvelope,
+    faCalendar
+} from '@fortawesome/free-solid-svg-icons';
+import { faLinkedin } from '@fortawesome/free-brands-svg-icons';
 
 export default function PublicProfileMentor() {
     const { username } = useParams();
@@ -21,6 +43,7 @@ export default function PublicProfileMentor() {
     const [tab, setTab] = useState('mentorias');
     const [avatarOk, setAvatarOk] = useState(true);
     const [showShareTooltip, setShowShareTooltip] = useState(false);
+    const [showFullImage, setShowFullImage] = useState(false);
 
     const [showAllNotes, setShowAllNotes] = useState(false);
     const [allNotes, setAllNotes] = useState([]);
@@ -422,9 +445,9 @@ export default function PublicProfileMentor() {
         const badges = [];
         const memberDate = new Date(profile.fecha_creado);
         const monthsAgo = (new Date() - memberDate) / (1000 * 60 * 60 * 24 * 30);
-        if (monthsAgo >= 6) badges.push({ icon: '🚀', label: 'Early Adopter', color: '#10B981' });
-        if (stats.apuntes >= 10) badges.push({ icon: '📚', label: 'Bookworm', color: '#10B981' });
-        if (stats.apuntes >= 20) badges.push({ icon: '🥇', label: 'Top Contributor', color: '#F59E0B' });
+        if (monthsAgo >= 6) badges.push({ icon: faRocket, label: 'Early Adopter', color: '#10B981' });
+        if (stats.apuntes >= 10) badges.push({ icon: faBook, label: 'Bookworm', color: '#10B981' });
+        if (stats.apuntes >= 20) badges.push({ icon: faTrophy, label: 'Top Contributor', color: '#F59E0B' });
         return badges;
     };
 
@@ -449,10 +472,13 @@ export default function PublicProfileMentor() {
         return (
             <div style={pageStyle}>
                 <div style={centerStyle}>
-                    <div style={{ fontSize: '4rem', marginBottom: 20 }}>😕</div>
+                    <FontAwesomeIcon icon={faFaceFrown} style={{ fontSize: 64, color: '#94a3b8', marginBottom: 20 }} />
                     <h2 style={{ margin: '0 0 12px 0', fontSize: 24, color: '#111827' }}>Mentor no encontrado</h2>
                     <p style={{ margin: '0 0 20px 0', color: '#6B7280' }}>Este perfil no existe o es privado</p>
-                    <button onClick={() => navigate(-1)} style={backButtonStyle}>← Volver</button>
+                    <button onClick={() => navigate(-1)} style={backButtonStyle}>
+                        <FontAwesomeIcon icon={faArrowLeft} style={{ marginRight: 8 }} />
+                        Volver
+                    </button>
                 </div>
             </div>
         );
@@ -474,7 +500,24 @@ export default function PublicProfileMentor() {
                 <div style={coverContainerStyle}>
                     <div style={coverPhotoStyle}></div>
                     <div style={profileHeaderWrapperStyle}>
-                        <div style={avatarWrapperStyle}>
+                        <div
+                            onClick={() => avatarSrc && setShowFullImage(true)}
+                            style={{
+                                ...avatarWrapperStyle,
+                                cursor: avatarSrc ? 'pointer' : 'default',
+                                transition: 'all 0.2s ease'
+                            }}
+                            onMouseEnter={(e) => {
+                                if (avatarSrc) {
+                                    e.currentTarget.style.transform = 'scale(1.05)';
+                                    e.currentTarget.style.boxShadow = '0 6px 16px rgba(16, 185, 129, 0.35)';
+                                }
+                            }}
+                            onMouseLeave={(e) => {
+                                e.currentTarget.style.transform = 'scale(1)';
+                                e.currentTarget.style.boxShadow = '0 4px 12px rgba(16, 185, 129, 0.3)';
+                            }}
+                        >
                             {avatarSrc && avatarOk ? (
                                 <img src={avatarSrc} alt={profile.nombre} onError={() => setAvatarOk(false)} style={avatarImageStyle} />
                             ) : (
@@ -486,7 +529,7 @@ export default function PublicProfileMentor() {
                                 <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap', marginBottom: 8 }}>
                                     <h1 style={nameStyle}>{profile.nombre}</h1>
                                     <span style={mentorVerifiedBadgeStyle}>
-                                        <span style={{ fontSize: 16 }}>🎓</span> Mentor Verificado
+                                        <FontAwesomeIcon icon={faGraduationCap} style={{ fontSize: 16 }} /> Mentor Verificado
                                     </span>
                                 </div>
                                 <p style={usernameStyle}>@{profile.username}</p>
@@ -494,15 +537,34 @@ export default function PublicProfileMentor() {
                                     <div style={badgesContainerStyle}>
                                         {badges.map((badge, idx) => (
                                             <div key={idx} style={{ ...badgeStyle, borderColor: badge.color }}>
-                                                <span style={{ fontSize: 14 }}>{badge.icon}</span>
+                                                <FontAwesomeIcon icon={badge.icon} style={{ fontSize: 14 }} />
                                                 <span style={{ color: badge.color }}>{badge.label}</span>
                                             </div>
                                         ))}
                                     </div>
-                                )}
+                                )}{/* LINKEDIN BUTTON */}
+                                {profile.linkedin && (
+                                    <a
+                                        href={profile.linkedin}
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                        style={linkedinButtonStyle}
+                                        onMouseEnter={(e) => {
+                                        e.currentTarget.style.background = '#0a66c2';
+                                        e.currentTarget.style.color = 'white';
+                                        }}
+                                        onMouseLeave={(e) => {
+                                        e.currentTarget.style.background = 'white';
+                                        e.currentTarget.style.color = '#0a66c2';
+                                        }}
+                                    >
+                                        <FontAwesomeIcon icon={faLinkedin} style={{ fontSize: 16 }} />
+                                        Ver LinkedIn
+                                    </a>
+                                    )}
                                 {mentorInfo?.estrellas_mentor && (
                                     <div style={mentorRatingInlineStyle}>
-                                        <span style={{ fontSize: 20 }}>⭐</span>
+                                        <FontAwesomeIcon icon={faStar} style={{ fontSize: 20, color: '#F59E0B' }} />
                                         <span style={{ fontSize: 18, fontWeight: 700, color: '#10B981' }}>{mentorInfo.estrellas_mentor.toFixed(1)}</span>
                                         <span style={{ fontSize: 14, color: '#666' }}>/ 5.0 · {mentorInfo.materias?.length || 0} materias</span>
                                     </div>
@@ -524,10 +586,7 @@ export default function PublicProfileMentor() {
                                 </div>
                                 {profile.mostrar_email && (
                                     <div style={emailContainerStyle}>
-                                        <svg style={{ width: 14, height: 14 }} fill="currentColor" viewBox="0 0 20 20">
-                                            <path d="M2.003 5.884L10 9.882l7.997-3.998A2 2 0 0016 4H4a2 2 0 00-1.997 1.884z"></path>
-                                            <path d="M18 8.118l-8 4-8-4V14a2 2 0 002 2h12a2 2 0 002-2V8.118z"></path>
-                                        </svg>
+                                        <FontAwesomeIcon icon={faEnvelope} style={{ fontSize: 14 }} />
                                         {profile.correo}
                                     </div>
                                 )}
@@ -540,10 +599,15 @@ export default function PublicProfileMentor() {
                             <div style={actionButtonsStyle}>
                                 <button onClick={handleSeguir} disabled={loadingFollow} style={{ ...followButtonStyle, background: siguiendo ? '#F3F4F6' : '#10B981', color: siguiendo ? '#111827' : 'white', border: siguiendo ? '2px solid #D1D5DB' : '2px solid #10B981' }}>
                                     {loadingFollow ? <div style={buttonSpinnerStyle}></div> : siguiendo ? (
-                                        <><svg style={{ width: 16, height: 16, marginRight: 6 }} fill="currentColor" viewBox="0 0 20 20"><path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd"></path></svg>Siguiendo</>
+                                        <>
+                                            <FontAwesomeIcon icon={faUserCheck} style={{ width: 16, height: 16, marginRight: 6 }} />
+                                            Siguiendo
+                                        </>
                                     ) : (
-                                        <><svg style={{ width: 16, height: 16, marginRight: 6 }} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-                                        </svg>Seguir</>
+                                        <>
+                                            <FontAwesomeIcon icon={faUserPlus} style={{ width: 16, height: 16, marginRight: 6 }} />
+                                            Seguir
+                                        </>
                                     )}
                                 </button>
 
@@ -568,23 +632,17 @@ export default function PublicProfileMentor() {
                                     onMouseEnter={(e) => !loadingFavorite && (e.currentTarget.style.transform = 'scale(1.05)')}
                                     onMouseLeave={(e) => !loadingFavorite && (e.currentTarget.style.transform = 'scale(1)')}
                                 >
-                                    <svg
-                                        width="20"
-                                        height="20"
-                                        viewBox="0 0 24 24"
-                                        fill={isFavoriteMentor ? '#10B981' : 'none'}
-                                        stroke="#10B981"
-                                        strokeWidth="2"
-                                        strokeLinecap="round"
-                                        strokeLinejoin="round"
-                                    >
-                                        <path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z" />
-                                    </svg>
+                                    <FontAwesomeIcon
+                                        icon={faBookmark}
+                                        style={{
+                                            fontSize: 20,
+                                            color: isFavoriteMentor ? '#10B981' : '#D1D5DB'
+                                        }}
+                                    />
                                 </button>
-
                                 <div style={{ position: 'relative' }}>
                                     <button onClick={handleShare} style={shareButtonStyle} title="Compartir perfil">
-                                        <svg style={{ width: 18, height: 18 }} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.368 2.684 3 3 0 00-5.368-2.684z" /></svg>
+                                        <FontAwesomeIcon icon={faShareNodes} style={{ width: 18, height: 18 }} />
                                     </button>
                                     {showShareTooltip && <div style={tooltipStyle}>¡Link copiado!</div>}
                                 </div>
@@ -605,9 +663,9 @@ export default function PublicProfileMentor() {
                                 borderBottom: tab === t ? '3px solid #10B981' : '3px solid transparent'
                             }}
                         >
-                            {t === 'mentorias' && `🎓 Mentorías`}
-                            {t === 'resenas' && `⭐ Reseñas`}
-                            {t === 'apuntes' && `📚 Apuntes`}
+                            {t === 'mentorias' && <><FontAwesomeIcon icon={faGraduationCap} style={{ marginRight: 6 }} /> Mentorías</>}
+                            {t === 'resenas' && <><FontAwesomeIcon icon={faStar} style={{ marginRight: 6 }} /> Reseñas</>}
+                            {t === 'apuntes' && <><FontAwesomeIcon icon={faBook} style={{ marginRight: 6 }} /> Apuntes</>}
                         </button>
                     ))}
                 </div>
@@ -634,7 +692,10 @@ export default function PublicProfileMentor() {
                                     cursor: 'pointer',
                                     fontSize: 16,
                                     boxShadow: '0 4px 12px rgba(16, 185, 129, 0.25)',
-                                    transition: 'all 0.2s ease-in-out'
+                                    transition: 'all 0.2s ease-in-out',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    gap: 8
                                 }}
                                 onMouseEnter={(e) => {
                                     e.currentTarget.style.background = '#059669';
@@ -647,14 +708,15 @@ export default function PublicProfileMentor() {
                                     e.currentTarget.style.boxShadow = '0 4px 12px rgba(16, 185, 129, 0.25)';
                                 }}
                             >
-                                📅 Agendar Mentoría
+                                <FontAwesomeIcon icon={faCalendarCheck} />
+                                Agendar Mentoría
                             </button>
                         </div>
 
                         <div style={mentorCardStyle}>
                             {mentorInfo.estrellas_mentor && (
                                 <div style={mentorRatingCardStyle}>
-                                    <span style={{ fontSize: 32 }}>⭐</span>
+                                    <FontAwesomeIcon icon={faStar} style={{ fontSize: 32, color: '#F59E0B' }} />
                                     <div>
                                         <div style={{ fontSize: 36, fontWeight: 800, color: '#10B981' }}>
                                             {mentorInfo.estrellas_mentor.toFixed(1)}
@@ -668,7 +730,9 @@ export default function PublicProfileMentor() {
                             <div style={mentorMateriasGridStyle}>
                                 {mentorInfo.materias?.map((m) => (
                                     <div key={m.id_materia} style={mentorMateriaCardStyle}>
-                                        <div style={mentorMateriaIconStyle}>📚</div>
+                                        <div style={mentorMateriaIconStyle}>
+                                            <FontAwesomeIcon icon={faGraduationCap} />
+                                        </div>
                                         <div>
                                             <div style={mentorMateriaTitleStyle}>
                                                 {m.materia.nombre_materia}
@@ -698,14 +762,16 @@ export default function PublicProfileMentor() {
                                     {stats?.apuntes > 4 && (
                                         <button onClick={handleVerTodos} style={verMasButtonStyle}>
                                             Ver todos ({stats.apuntes})
-                                            <svg style={{ width: 16, height: 16, marginLeft: 6 }} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" /></svg>
+                                            <FontAwesomeIcon icon={faChevronRight} style={{ marginLeft: 6 }} />
                                         </button>
                                     )}
                                 </div>
                                 {recentNotes.length > 0 ? (
                                     <div style={carouselWrapperStyle}>
                                         {recentNotes.length > 3 && (
-                                            <button onClick={() => scrollCarousel('left')} style={{ ...carouselArrowStyle, left: -20 }} onMouseEnter={(e) => e.target.style.transform = 'translateY(-50%) scale(1.1)'} onMouseLeave={(e) => e.target.style.transform = 'translateY(-50%) scale(1)'}>‹</button>
+                                            <button onClick={() => scrollCarousel('left')} style={{ ...carouselArrowStyle, left: -20 }} onMouseEnter={(e) => e.target.style.transform = 'translateY(-50%) scale(1.1)'} onMouseLeave={(e) => e.target.style.transform = 'translateY(-50%) scale(1)'}>
+                                                <FontAwesomeIcon icon={faChevronLeft} />
+                                            </button>
                                         )}
                                         <div ref={carouselRef} style={carouselContainerStyle}>
                                             {recentNotes.map(note => (
@@ -720,12 +786,14 @@ export default function PublicProfileMentor() {
                                             ))}
                                         </div>
                                         {recentNotes.length > 3 && (
-                                            <button onClick={() => scrollCarousel('right')} style={{ ...carouselArrowStyle, right: -20 }} onMouseEnter={(e) => e.target.style.transform = 'translateY(-50%) scale(1.1)'} onMouseLeave={(e) => e.target.style.transform = 'translateY(-50%) scale(1)'}>›</button>
+                                            <button onClick={() => scrollCarousel('right')} style={{ ...carouselArrowStyle, right: -20 }} onMouseEnter={(e) => e.target.style.transform = 'translateY(-50%) scale(1.1)'} onMouseLeave={(e) => e.target.style.transform = 'translateY(-50%) scale(1)'}>
+                                                <FontAwesomeIcon icon={faChevronRight} />
+                                            </button>
                                         )}
                                     </div>
                                 ) : (
                                     <div style={emptyStateStyle}>
-                                        <div style={emptyIconStyle}>📚</div>
+                                        <FontAwesomeIcon icon={faBook} style={emptyIconStyle} />
                                         <h3 style={emptyTitleStyle}>Sin apuntes aún</h3>
                                         <p style={emptyDescStyle}>{profile.nombre.split(' ')[0]} aún no ha compartido apuntes.</p>
                                     </div>
@@ -739,14 +807,14 @@ export default function PublicProfileMentor() {
                                         <p style={sectionSubtitleStyle}>{allNotes.length} {allNotes.length === 1 ? 'apunte' : 'apuntes'} en total</p>
                                     </div>
                                     <button onClick={() => setShowAllNotes(false)} style={backToRecentButtonStyle}>
-                                        <svg style={{ width: 16, height: 16, marginRight: 6 }} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" /></svg>
+                                        <FontAwesomeIcon icon={faChevronLeft} style={{ marginRight: 6 }} />
                                         Volver
                                     </button>
                                 </div>
                                 {userSubjects.length > 0 && (
                                     <div style={filtersContainerStyle}>
                                         <span style={filterLabelStyle}>
-                                            <svg style={{ width: 16, height: 16, marginRight: 6 }} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z" /></svg>
+                                            <FontAwesomeIcon icon={faFilter} style={{ marginRight: 6 }} />
                                             Filtrar por materia:
                                         </span>
                                         <button onClick={() => handleFilterBySubject(null)} style={{ ...filterChipStyle, background: selectedSubject === null ? '#10B981' : 'white', color: selectedSubject === null ? 'white' : '#666', border: selectedSubject === null ? '2px solid #10B981' : '2px solid #E5E7EB' }}>Todas</button>
@@ -771,7 +839,7 @@ export default function PublicProfileMentor() {
                                     </div>
                                 ) : (
                                     <div style={emptyStateStyle}>
-                                        <div style={emptyIconStyle}>🔍</div>
+                                        <FontAwesomeIcon icon={faSearch} style={emptyIconStyle} />
                                         <h3 style={emptyTitleStyle}>No se encontraron apuntes</h3>
                                         <p style={emptyDescStyle}>{selectedSubject ? 'No hay apuntes para esta materia.' : 'Este mentor no tiene apuntes.'}</p>
                                     </div>
@@ -878,7 +946,68 @@ export default function PublicProfileMentor() {
                         currentUserId={profile.id_usuario}
                     />
                 )}
-
+                {/* Modal Avatar Grande */}
+                {showFullImage && avatarSrc && (
+                    <div
+                        onClick={() => setShowFullImage(false)}
+                        style={{
+                            position: "fixed",
+                            inset: 0,
+                            background: "rgba(0, 0, 0, 0.9)",
+                            backdropFilter: "blur(8px)",
+                            zIndex: 9999,
+                            display: "grid",
+                            placeItems: "center",
+                            padding: 20,
+                            cursor: "pointer",
+                        }}
+                    >
+                        <div
+                            onClick={(e) => e.stopPropagation()}
+                            style={{
+                                position: "relative",
+                                maxWidth: "90vw",
+                                maxHeight: "90vh",
+                                cursor: "default",
+                            }}
+                        >
+                            <button
+                                onClick={() => setShowFullImage(false)}
+                                style={{
+                                    position: "absolute",
+                                    top: -50,
+                                    right: 0,
+                                    background: "rgba(255, 255, 255, 0.2)",
+                                    border: "none",
+                                    borderRadius: "50%",
+                                    width: 40,
+                                    height: 40,
+                                    color: "#fff",
+                                    fontSize: 24,
+                                    cursor: "pointer",
+                                    display: "grid",
+                                    placeItems: "center",
+                                    transition: "all 0.2s ease",
+                                    fontWeight: 'bold',
+                                }}
+                                onMouseEnter={(e) => e.target.style.background = "rgba(255, 255, 255, 0.3)"}
+                                onMouseLeave={(e) => e.target.style.background = "rgba(255, 255, 255, 0.2)"}
+                            >
+                                ✕
+                            </button>
+                            <img
+                                src={avatarSrc}
+                                alt="Avatar"
+                                style={{
+                                    maxWidth: "100%",
+                                    maxHeight: "90vh",
+                                    borderRadius: 16,
+                                    boxShadow: "0 20px 60px rgba(0, 0, 0, 0.5)",
+                                }}
+                            />
+                        </div>
+                    </div>
+                )}
             </div>
         </div>
     );
@@ -956,3 +1085,19 @@ const modalTitleStyle = { margin: '0 0 24px 0', fontSize: 18, fontWeight: 600, c
 const modalButtonsStyle = { display: 'flex', flexDirection: 'column', gap: 10 };
 const modalConfirmButtonStyle = { padding: '12px 24px', background: '#EF4444', color: 'white', border: 'none', borderRadius: 8, fontWeight: 700, fontSize: 14, cursor: 'pointer', transition: 'all 0.2s ease' };
 const modalCancelButtonStyle = { padding: '12px 24px', background: 'transparent', color: '#6B7280', border: 'none', borderRadius: 8, fontWeight: 600, fontSize: 14, cursor: 'pointer', transition: 'all 0.2s ease' };
+const linkedinButtonStyle = {
+    display: 'inline-flex',
+    alignItems: 'center',
+    gap: 6,
+    padding: '6px 16px',
+    background: 'white',
+    color: '#0a66c2',
+    border: '2px solid #0a66c2',
+    borderRadius: 6,
+    fontSize: 14,
+    fontWeight: 600,
+    textDecoration: 'none',
+    transition: 'all 0.2s ease',
+    marginBottom: 12,
+    boxShadow: '0 1px 3px rgba(0,0,0,0.08)',
+};

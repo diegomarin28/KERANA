@@ -28,33 +28,28 @@ export default function Terms() {
                         </p>
                         <ul style={listStyle}>
                             <li>Compartir y vender apuntes, materiales de estudio y recursos educativos</li>
-                            <li>Ofrecer y contratar servicios de mentoría académica</li>
-                            <li>Comprar y vender cursos especializados</li>
-                            <li>Conectar con otros estudiantes y profesionales de la educación</li>
+                            <li>Acceder a reseñas sobre profesores y experiencias académicas</li>
+                            <li>Conectarse con mentores para clases virtuales o presenciales</li>
+                            <li>Gestionar su perfil, seguidores y notificaciones</li>
                         </ul>
                     </div>
 
                     <div style={sectionStyle}>
                         <h2 style={sectionTitleStyle}>3. Registro y Cuenta</h2>
                         <p style={textStyle}>
-                            Para utilizar ciertas funcionalidades de KERANA, debes registrarte creando una cuenta.
-                            Te comprometes a:
+                            Para utilizar ciertas funciones, debes registrarte con un correo electrónico válido.
+                            Serás responsable de mantener la confidencialidad de tu cuenta y contraseña, y de todas
+                            las actividades que ocurran bajo tu cuenta.
                         </p>
-                        <ul style={listStyle}>
-                            <li>Proporcionar información veraz, exacta y completa</li>
-                            <li>Mantener la confidencialidad de tu contraseña</li>
-                            <li>Notificarnos inmediatamente cualquier uso no autorizado de tu cuenta</li>
-                            <li>Ser mayor de 13 años o contar con autorización parental si eres menor</li>
-                        </ul>
                     </div>
 
                     <div style={sectionStyle}>
-                        <h2 style={sectionTitleStyle}>4. Contenido del Usuario</h2>
+                        <h2 style={sectionTitleStyle}>4. Contenido de Usuario</h2>
                         <p style={textStyle}>
-                            Eres responsable del contenido que publicas en KERANA. Al subir contenido, garantizas que:
+                            Eres responsable del contenido que subes. Al subir contenido, confirmas que:
                         </p>
                         <ul style={listStyle}>
-                            <li>Eres el autor o tienes los derechos necesarios para distribuirlo</li>
+                            <li>Tienes los derechos necesarios para compartir dicho contenido</li>
                             <li>El contenido no infringe derechos de autor ni propiedad intelectual</li>
                             <li>El contenido es educativo y apropiado para la plataforma</li>
                             <li>No contiene material ofensivo, ilegal o que viole estos términos</li>
@@ -67,9 +62,11 @@ export default function Terms() {
                             KERANA utiliza un sistema de créditos para las transacciones:
                         </p>
                         <ul style={listStyle}>
-                            <li>Los créditos comprados no son reembolsables</li>
-                            <li>Las transacciones entre usuarios son finales</li>
-                            <li>Los precios pueden cambiar sin previo aviso</li>
+                            <li>Las compras de paquetes de créditos son definitivas y no reembolsables</li>
+                            <li>Las transacciones dentro de la plataforma son finales</li>
+                            <li>Las mentorías se abonan según precio y modalidad vigente (virtual o presencial)</li>
+                            <li>Los reembolsos de mentorías aplican solo si la clase no se realizó o existe un reclamo validado conforme las reglas publicadas</li>
+                            <li>Los precios y tarifas pueden cambiar y se aplican hacia adelante</li>
                         </ul>
                     </div>
 
@@ -80,37 +77,31 @@ export default function Terms() {
                             dentro de la plataforma. Al participar en KERANA, aceptas las siguientes condiciones:
                         </p>
                         <ul style={listStyle}>
-                            <li>Al subir contenido educativo válido, recibirás una porción mayoritaria de créditos de forma inmediata</li>
-                            <li>Una porción menor del valor se distribuye en forma de bonificaciones por hitos de participación y calidad del contenido</li>
-                            <li>Existen bonos adicionales por bienvenida, calidad del contenido, ventas, participación activa y rankings</li>
+                            <li>Al subir contenido educativo válido, recibirás créditos según las reglas vigentes</li>
+                            <li>Recibirás una porción mayoritaria de créditos de forma inmediata</li>
+                            <li>Una porción menor del valor se destina a bonificaciones por hitos de participación y calidad del contenido</li>
+                            <li>Existen bonos adicionales por valoración de la comunidad, calidad del contenido, ventas, participación activa y rankings</li>
                             <li>Los créditos comprados con dinero real no son reembolsables bajo ninguna circunstancia</li>
-                            <li>KERANA se reserva el derecho de ajustar valores, porcentajes y condiciones del sistema de créditos con previo aviso</li>
-                            <li>Los bonos y créditos pueden ser revocados en caso de detectarse fraude, contenido inapropiado o violación de estos términos</li>
-                            <li>El contenido reportado y verificado como inapropiado resultará en la devolución de créditos a los compradores y penalización al autor</li>
-                            <li>Para detalles completos sobre el funcionamiento del sistema de créditos y bonificaciones, consulta nuestra sección de Ayuda</li>
+                            <li>KERANA se reserva el derecho de ajustar los porcentajes y condiciones del sistema de créditos con previo aviso</li>
                         </ul>
                     </div>
 
                     <div style={sectionStyle}>
-                        <h2 style={sectionTitleStyle}>6. Propiedad Intelectual</h2>
+                        <h2 style={sectionTitleStyle}>6. Normas de Conducta</h2>
                         <p style={textStyle}>
-                            Los usuarios mantienen los derechos de autor sobre el contenido que suben.
-                            Al publicar en KERANA, nos otorgas una licencia no exclusiva para distribuir
-                            y mostrar dicho contenido dentro de la plataforma.
+                            No está permitido usar KERANA para actividades fraudulentas, acosar a otros usuarios,
+                            enviar spam o cualquier comportamiento que afecte negativamente la experiencia de la comunidad.
                         </p>
                     </div>
 
                     <div style={sectionStyle}>
                         <h2 style={sectionTitleStyle}>7. Limitación de Responsabilidad</h2>
                         <p style={textStyle}>
-                            KERANA actúa como intermediario entre usuarios. No somos responsables por:
+                            KERANA no será responsable por daños indirectos, incidentales o consecuentes derivados del uso
+                            de la plataforma. El uso del contenido compartido es responsabilidad del usuario. KERANA no es
+                            responsable por interrupciones ajenas a su control (servicios de terceros, conexión a internet,
+                            plataformas externas utilizadas para clases virtuales).
                         </p>
-                        <ul style={listStyle}>
-                            <li>La calidad, exactitud o legalidad del contenido publicado</li>
-                            <li>Disputas entre usuarios</li>
-                            <li>Daños o pérdidas resultantes del uso de la plataforma</li>
-                            <li>Interrupciones temporales del servicio</li>
-                        </ul>
                     </div>
 
                     <div style={sectionStyle}>
@@ -126,19 +117,25 @@ export default function Terms() {
                     <div style={sectionStyle}>
                         <h2 style={sectionTitleStyle}>9. Terminación</h2>
                         <p style={textStyle}>
-                            Podemos suspender o terminar tu acceso a KERANA si violas estos términos o
-                            realizas actividades que consideremos perjudiciales para la comunidad.
-                            Al eliminar tu cuenta, todos tus datos personales y contenido son eliminados permanentemente.
-                            Tu dirección de email permanece en nuestros sistemas de autenticación por seguridad,
-                            pero no está asociada a ningún dato personal ni puede ser utilizada para identificarte.
+                            Podemos suspender o terminar tu acceso a KERANA si violas estos términos o realizas actividades
+                            que perjudiquen a la comunidad o al funcionamiento del servicio.
                         </p>
                     </div>
 
                     <div style={sectionStyle}>
-                        <h2 style={sectionTitleStyle}>10. Contacto</h2>
+                        <h2 style={sectionTitleStyle}>10. Propiedad Intelectual</h2>
                         <p style={textStyle}>
-                            Para preguntas sobre estos términos, contáctanos a través de nuestra
-                            página de contacto o envía un email a kerana.soporte@gmail.com
+                            Todos los derechos, títulos e intereses en y para KERANA, incluyendo el contenido visual,
+                            interactivo, diseño de usuario, software, código, son propiedad de KERANA o se usan
+                            bajo licencia de los propietarios correspondientes.
+                        </p>
+                    </div>
+
+                    <div style={sectionStyle}>
+                        <h2 style={sectionTitleStyle}>11. Contacto</h2>
+                        <p style={textStyle}>
+                            Si tienes preguntas o inquietudes sobre estos términos, por favor ponte en contacto
+                            con nosotros a través del Centro de ayuda o del formulario de contacto publicado en el sitio.
                         </p>
                     </div>
                 </Card>
@@ -149,9 +146,10 @@ export default function Terms() {
 
 // Estilos
 const pageStyle = {
+    backgroundColor: '#f8fafc',
     minHeight: '100vh',
-    background: '#f8fafc',
-    padding: '20px 16px',
+    padding: '2rem',
+    fontFamily: 'Inter, sans-serif',
 };
 
 const headerStyle = {
@@ -160,45 +158,40 @@ const headerStyle = {
 };
 
 const titleStyle = {
-    fontSize: '2.5rem',
-    fontWeight: '800',
-    color: '#0b1e3a',
-    margin: '0 0 0.5rem 0',
+    fontSize: '2rem',
+    color: '#1e293b',
+    margin: 0,
 };
 
 const subtitleStyle = {
-    fontSize: '1rem',
     color: '#64748b',
-    margin: '0',
+    marginTop: '0.5rem',
 };
 
 const contentStyle = {
-    padding: '2.5rem',
-    lineHeight: '1.7',
+    padding: '1.5rem',
+    background: '#ffffff',
+    borderRadius: '10px',
+    boxShadow: '0 4px 12px rgba(0, 0, 0, 0.05)',
 };
 
 const sectionStyle = {
-    marginBottom: '2.5rem',
+    marginBottom: '1.5rem',
 };
 
 const sectionTitleStyle = {
     fontSize: '1.25rem',
-    fontWeight: '700',
-    color: '#0b1e3a',
-    margin: '0 0 1rem 0',
+    color: '#0f172a',
+    marginBottom: '0.5rem',
 };
 
 const textStyle = {
-    color: '#475569',
-    margin: '0 0 1rem 0',
+    color: '#334155',
+    lineHeight: 1.7,
 };
 
 const listStyle = {
-    color: '#475569',
-    paddingLeft: '1.5rem',
-    margin: '1rem 0',
-};
-
-const listItemStyle = {
-    marginBottom: '0.5rem',
+    color: '#334155',
+    paddingLeft: '1.2rem',
+    lineHeight: 1.7,
 };

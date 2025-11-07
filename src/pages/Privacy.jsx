@@ -1,3 +1,5 @@
+import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
+import { faShieldAlt, faUser } from '@fortawesome/free-solid-svg-icons';
 import { Card } from '../components/UI/Card';
 
 export default function Privacy() {
@@ -5,6 +7,21 @@ export default function Privacy() {
         <div style={pageStyle}>
             <div style={{ maxWidth: '800px', margin: '0 auto' }}>
                 <header style={headerStyle}>
+                    <div style={{
+                        width: 80,
+                        height: 80,
+                        borderRadius: '50%',
+                        background: '#2563eb',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        margin: '0 auto 20px'
+                    }}>
+                        <FontAwesomeIcon
+                            icon={faShieldAlt}
+                            style={{ fontSize: 36, color: '#fff' }}
+                        />
+                    </div>
                     <h1 style={titleStyle}>Política de Privacidad</h1>
                     <p style={subtitleStyle}>
                         De acuerdo con la Ley N° 18.331 de Uruguay - Última actualización: {new Date().toLocaleDateString()}
@@ -14,7 +31,10 @@ export default function Privacy() {
                 <Card style={contentStyle}>
                     {/* Sección específica de Uruguay */}
                     <div style={sectionStyle}>
-                        <h2 style={sectionTitleStyle}>👤 Tus Derechos según la Ley Uruguaya</h2>
+                        <h2 style={sectionTitleStyle}>
+                            <FontAwesomeIcon icon={faUser} style={{ marginRight: 8, color: '#2563eb' }} />
+                            Tus Derechos según la Ley Uruguaya
+                        </h2>
                         <div style={rightsGridStyle}>
                             <div style={rightItemStyle}>
                                 <strong>Acceso</strong>
@@ -22,7 +42,7 @@ export default function Privacy() {
                             </div>
                             <div style={rightItemStyle}>
                                 <strong>Rectificación</strong>
-                                <p>Podés corregir datos incorrectos desde tu perfil</p>
+                                <p>Podés pedir que actualicemos o corrijamos tu información personal</p>
                             </div>
                             <div style={rightItemStyle}>
                                 <strong>Cancelación</strong>
@@ -42,7 +62,7 @@ export default function Privacy() {
                         </p>
                         <ul style={listStyle}>
                             <li>
-                                <strong>Información personal:</strong> Nombre, email, información de perfil
+                                <strong>Información personal:</strong> Nombre, correo, información de perfil
                             </li>
                             <li>
                                 <strong>Información académica:</strong> Materias de interés, cursos tomados
@@ -51,46 +71,40 @@ export default function Privacy() {
                                 <strong>Contenido generado:</strong> Apuntes, comentarios, reseñas
                             </li>
                             <li>
-                                <strong>Datos técnicos:</strong> Dirección IP, tipo de dispositivo, logs de uso
+                                <strong>Datos técnicos:</strong> Dirección IP, tipo de dispositivo, registros de uso mínimos necesarios para el funcionamiento
                             </li>
                         </ul>
                     </div>
 
                     <div style={sectionStyle}>
-                        <h2 style={sectionTitleStyle}>2. Uso de la Información</h2>
+                        <h2 style={sectionTitleStyle}>2. Cómo Usamos tu Información</h2>
                         <p style={textStyle}>
-                            Utilizamos tu información para:
+                            Usamos tus datos para:
                         </p>
                         <ul style={listStyle}>
-                            <li>Proporcionar y mantener nuestros servicios</li>
-                            <li>Personalizar tu experiencia educativa</li>
-                            <li>Procesar transacciones y gestionar créditos</li>
-                            <li>Comunicarnos contigo sobre actualizaciones</li>
-                            <li>Garantizar la seguridad de la plataforma</li>
+                            <li>Brindar acceso a funcionalidades (cuenta, apuntes, reseñas y mentorías)</li>
+                            <li>Mejorar la plataforma y la experiencia de uso</li>
+                            <li>Prevenir abusos, garantizar seguridad y moderar contenidos</li>
                         </ul>
                     </div>
 
                     <div style={sectionStyle}>
-                        <h2 style={sectionTitleStyle}>3. Seguridad de los Datos</h2>
+                        <h2 style={sectionTitleStyle}>3. Compartir Información con Terceros</h2>
                         <p style={textStyle}>
-                            Implementamos medidas de seguridad para proteger tu información:
+                            Solo compartimos datos estrictamente necesarios con prestadores esenciales para operar KERANA
+                            (por ejemplo, alojamiento, base de datos, pasarela de pago y autenticación). Estos terceros
+                            deben cumplir medidas de seguridad y confidencialidad.
                         </p>
-                        <ul style={listStyle}>
-                            <li>Encriptación de datos sensibles</li>
-                            <li>Accesos controlados y autenticación</li>
-                            <li>Monitoreo continuo de seguridad</li>
-                            <li>Copias de seguridad regulares</li>
-                        </ul>
                     </div>
 
                     <div style={sectionStyle}>
-                        <h2 style={sectionTitleStyle}>4. Ejercicio de Derechos</h2>
+                        <h2 style={sectionTitleStyle}>4. Tus Derechos y Control</h2>
                         <p style={textStyle}>
                             Para ejercer tus derechos según la Ley 18.331:
                         </p>
                         <div style={contactBoxStyle}>
-                            <strong>Email:</strong> kerana.soporte@gmail.com<br/>
-                            <strong>Respuesta:</strong> En un plazo máximo de 10 días hábiles
+                            <strong>Correo:</strong> kerana.soporte@gmail.com<br/>
+                            <strong>Respuesta:</strong> En un plazo de hasta 10 días hábiles
                         </div>
                         <p style={textStyle}>
                             También podés eliminar tu cuenta directamente desde la configuración de tu perfil.
@@ -104,6 +118,13 @@ export default function Privacy() {
                             cambios significativos a través de la plataforma.
                         </p>
                     </div>
+
+                    <div style={sectionStyle}>
+                        <h2 style={sectionTitleStyle}>6. Alcance y Personas Usuarias</h2>
+                        <p style={textStyle}>
+                            KERANA está dirigido exclusivamente a personas mayores de edad.
+                        </p>
+                    </div>
                 </Card>
             </div>
         </div>
@@ -115,72 +136,72 @@ const pageStyle = {
     minHeight: '100vh',
     background: '#f8fafc',
     padding: '20px 16px',
+    fontFamily: 'Inter, sans-serif'
 };
 
 const headerStyle = {
     textAlign: 'center',
-    marginBottom: '2rem',
+    marginBottom: '1.5rem'
 };
 
 const titleStyle = {
-    fontSize: '2.5rem',
-    fontWeight: '800',
-    color: '#0b1e3a',
-    margin: '0 0 0.5rem 0',
+    fontSize: '2rem',
+    color: '#1f2937',
+    marginBottom: '0.25rem'
 };
 
 const subtitleStyle = {
-    fontSize: '1rem',
-    color: '#64748b',
-    margin: '0',
+    color: '#6b7280',
+    fontSize: '0.95rem'
 };
 
 const contentStyle = {
-    padding: '2.5rem',
-    lineHeight: '1.7',
+    borderRadius: '10px',
+    background: '#fff',
+    padding: '1.5rem',
+    boxShadow: '0 4px 12px rgba(0,0,0,0.06)'
 };
 
 const sectionStyle = {
-    marginBottom: '2.5rem',
+    marginBottom: '1.5rem'
 };
 
 const sectionTitleStyle = {
     fontSize: '1.25rem',
-    fontWeight: '700',
-    color: '#0b1e3a',
-    margin: '0 0 1rem 0',
+    color: '#111827',
+    display: 'flex',
+    alignItems: 'center'
 };
 
 const textStyle = {
-    color: '#475569',
-    margin: '0 0 1rem 0',
+    color: '#374151',
+    lineHeight: 1.7
 };
 
 const listStyle = {
-    color: '#475569',
-    paddingLeft: '1.5rem',
-    margin: '1rem 0',
+    color: '#374151',
+    paddingLeft: '1.2rem',
+    lineHeight: 1.7
 };
 
-// Nuevos estilos para la sección uruguaya
 const rightsGridStyle = {
     display: 'grid',
-    gridTemplateColumns: '1fr 1fr',
-    gap: '16px',
-    margin: '1rem 0',
+    gridTemplateColumns: 'repeat(2, minmax(0, 1fr))',
+    gap: '0.75rem',
+    marginTop: '0.75rem'
 };
 
 const rightItemStyle = {
     padding: '16px',
-    background: '#f0f9ff',
+    background: '#eff6ff',
     borderRadius: '8px',
-    border: '1px solid #bae6fd',
+    border: '1px solid #bfdbfe',
 };
 
 const contactBoxStyle = {
     padding: '16px',
-    background: '#f0f9ff',
+    background: '#eff6ff',
     borderRadius: '8px',
-    border: '1px solid #bae6fd',
+    border: '1px solid #bfdbfe',
     margin: '1rem 0',
 };

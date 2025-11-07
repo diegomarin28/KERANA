@@ -1,6 +1,8 @@
 import {
-    emailConfirmacionMentor,
-    emailConfirmacionAlumno,
+    emailConfirmacionMentorVirtual,
+    emailConfirmacionAlumnoVirtual,
+    emailConfirmacionMentorPresencial,
+    emailConfirmacionAlumnoPresencial,
     emailRecordatorio24hMentor,
     emailRecordatorio1hAlumno
 } from '../templates/emailTemplates';
@@ -34,7 +36,7 @@ async function enviarEmailViaEdgeFunction({ from, to, subject, html }) {
 }
 
 /**
- * Enviar email de confirmación al mentor cuando un alumno agenda
+ * Enviar email de confirmación al mentor (según modalidad)
  */
 export async function enviarEmailConfirmacionMentor({
                                                         mentorEmail,
@@ -51,7 +53,12 @@ export async function enviarEmailConfirmacionMentor({
                                                         modalidad
                                                     }) {
     try {
-        const htmlContent = emailConfirmacionMentor({
+        // Seleccionar template según modalidad
+        const templateFunction = modalidad === 'virtual'
+            ? emailConfirmacionMentorVirtual
+            : emailConfirmacionMentorPresencial;
+
+        const htmlContent = templateFunction({
             mentorNombre,
             alumnoNombre,
             alumnoEmail,
@@ -61,14 +68,13 @@ export async function enviarEmailConfirmacionMentor({
             duracion,
             cantidadAlumnos,
             emailsParticipantes,
-            descripcion,
-            modalidad
+            descripcion
         });
 
         return await enviarEmailViaEdgeFunction({
             from: 'Kerana <onboarding@resend.dev>',
             to: mentorEmail,
-            subject: `Nueva mentoría agendada - ${materiaNombre}`,
+            subject: `Nueva mentoría ${modalidad === 'virtual' ? 'virtual' : 'presencial'} agendada - ${materiaNombre}`,
             html: htmlContent
         });
     } catch (error) {
@@ -78,7 +84,7 @@ export async function enviarEmailConfirmacionMentor({
 }
 
 /**
- * Enviar email de confirmación al alumno
+ * Enviar email de confirmación al alumno (según modalidad)
  */
 export async function enviarEmailConfirmacionAlumno({
                                                         alumnoEmail,
@@ -91,20 +97,24 @@ export async function enviarEmailConfirmacionAlumno({
                                                         modalidad
                                                     }) {
     try {
-        const htmlContent = emailConfirmacionAlumno({
+        // Seleccionar template según modalidad
+        const templateFunction = modalidad === 'virtual'
+            ? emailConfirmacionAlumnoVirtual
+            : emailConfirmacionAlumnoPresencial;
+
+        const htmlContent = templateFunction({
             alumnoNombre,
             mentorNombre,
             materiaNombre,
             fecha,
             hora,
-            duracion,
-            modalidad
+            duracion
         });
 
         return await enviarEmailViaEdgeFunction({
             from: 'Kerana <onboarding@resend.dev>',
             to: alumnoEmail,
-            subject: `Mentoría confirmada - ${materiaNombre}`,
+            subject: `Mentoría ${modalidad === 'virtual' ? 'virtual' : 'presencial'} confirmada - ${materiaNombre}`,
             html: htmlContent
         });
     } catch (error) {
@@ -115,6 +125,7 @@ export async function enviarEmailConfirmacionAlumno({
 
 /**
  * Enviar emails de confirmación (mentor + alumno) en una sola función
+ * SIEMPRE SE ENVÍAN (tanto virtual como presencial)
  */
 export async function enviarEmailsConfirmacion({
                                                    mentorEmail,
@@ -130,6 +141,8 @@ export async function enviarEmailsConfirmacion({
                                                    descripcion,
                                                    modalidad
                                                }) {
+    console.log(`📧 Enviando emails de confirmación (modalidad: ${modalidad})...`);
+
     // Enviar ambos emails en paralelo
     const [resultadoMentor, resultadoAlumno] = await Promise.all([
         enviarEmailConfirmacionMentor({
@@ -166,7 +179,8 @@ export async function enviarEmailsConfirmacion({
 }
 
 /**
- * Recordatorio 24h antes al mentor
+ * Recordatorio 24h antes al mentor (SOLO PRESENCIAL)
+ * Esta función es llamada por la Edge Function de recordatorios
  */
 export async function enviarRecordatorio24hMentor({
                                                       mentorEmail,
@@ -190,7 +204,7 @@ export async function enviarRecordatorio24hMentor({
         return await enviarEmailViaEdgeFunction({
             from: 'Kerana <onboarding@resend.dev>',
             to: mentorEmail,
-            subject: `Recordatorio: Mentoría mañana - ${materiaNombre}`,
+            subject: `🔔 Faltan 24 horas para tu mentoría - ${materiaNombre}`,
             html: htmlContent
         });
     } catch (error) {
@@ -200,7 +214,8 @@ export async function enviarRecordatorio24hMentor({
 }
 
 /**
- * Recordatorio 1h antes al alumno
+ * Recordatorio 1h antes al alumno (SOLO PRESENCIAL)
+ * Esta función es llamada por la Edge Function de recordatorios
  */
 export async function enviarRecordatorio1hAlumno({
                                                      alumnoEmail,
@@ -222,7 +237,7 @@ export async function enviarRecordatorio1hAlumno({
         return await enviarEmailViaEdgeFunction({
             from: 'Kerana <onboarding@resend.dev>',
             to: alumnoEmail,
-            subject: `Tu clase comienza en 1 hora - ${materiaNombre}`,
+            subject: `🔔 ¡Tu clase comienza en 1 hora! - ${materiaNombre}`,
             html: htmlContent
         });
     } catch (error) {

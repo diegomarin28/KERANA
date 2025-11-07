@@ -75,7 +75,7 @@ export default function Home() {
 
                 const likesPromises = data.map(note => notesAPI.getLikesCount(note.apunte_id));
                 const likesResults = await Promise.all(likesPromises);
-                console.log('🔍 Likes obtenidos:', likesResults);
+
                 const likesMap = new Map(
                     data.map((note, idx) => [note.apunte_id, likesResults[idx].data])
                 );

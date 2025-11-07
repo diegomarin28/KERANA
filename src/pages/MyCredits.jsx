@@ -19,7 +19,9 @@ import {
     faTimes,
     faCreditCard,
     faHistory,
-    faShieldAlt
+    faShieldAlt,
+    faBullseye,
+    faMoneyBill
 } from '@fortawesome/free-solid-svg-icons';
 
 export default function MyCredits() {
@@ -384,7 +386,7 @@ export default function MyCredits() {
 
     const getTransactionIcon = (tipo) => {
         if (tipo.includes('apunte_subido') || tipo.includes('venta')) return faFileAlt;
-        if (tipo.includes('compra')) return faShoppingCart;
+        if (tipo.includes('compra')) return faMoneyBill;
         if (tipo.includes('resena')) return faStar;
         if (tipo.includes('bono') || tipo.includes('hito')) return faGift;
         return faCoins;
@@ -397,17 +399,21 @@ export default function MyCredits() {
     };
 
     const getBonusLabel = (tipo) => {
-        if (tipo === 'bienvenida') return '🎉 Bono de bienvenida';
-        if (tipo === 'primer_apunte') return '🎯 Primer apunte';
+        if (tipo === 'bienvenida') {
+            return { icon: faGift, text: 'Bono de bienvenida' };
+        }
+        if (tipo === 'primer_apunte') {
+            return { icon: faBullseye, text: 'Primer apunte' };
+        }
         if (tipo.startsWith('hito_')) {
             const num = tipo.replace('hito_', '');
-            return `🏆 ${num} apuntes subidos`;
+            return { icon: faTrophy, text: `${num} apuntes subidos` };
         }
         if (tipo.startsWith('compras_')) {
             const num = tipo.replace('compras_', '');
-            return `🛒 ${num} apuntes comprados`;
+            return { icon: faTrophy, text: `${num} apuntes comprados` };
         }
-        return tipo;
+        return { icon: faGift, text: tipo };
     };
 
     if (loading) {
@@ -736,7 +742,7 @@ export default function MyCredits() {
                                         alignItems: 'center',
                                         gap: 8
                                     }}>
-                                        <FontAwesomeIcon icon={faShoppingCart} style={{ color: '#10b981' }} />
+                                        <FontAwesomeIcon icon={faTrophy} style={{ color: '#10b981' }} />
                                         <span style={{ fontSize: 15, fontWeight: 600, color: '#0f172a' }}>
                                             Comprar {milestones.purchase.next} apuntes
                                         </span>
@@ -925,62 +931,65 @@ export default function MyCredits() {
                                     <div style={{ fontSize: 14 }}>No hay bonos todavía</div>
                                 </div>
                             ) : (
-                                bonuses.map((bonus, index) => (
-                                    <div
-                                        key={bonus.id_bono}
-                                        style={{
-                                            display: 'flex',
-                                            alignItems: 'center',
-                                            gap: 12,
-                                            padding: '12px 0',
-                                            borderBottom: index < bonuses.length - 1 ? '1px solid #f1f5f9' : 'none'
-                                        }}
-                                    >
-                                        <div style={{
-                                            width: 36,
-                                            height: 36,
-                                            borderRadius: 8,
-                                            background: '#d1fae5',
-                                            display: 'flex',
-                                            alignItems: 'center',
-                                            justifyContent: 'center',
-                                            flexShrink: 0
-                                        }}>
-                                            <FontAwesomeIcon
-                                                icon={faCheckCircle}
+                                 bonuses.map((bonus, index) => {
+                                        const bonusInfo = getBonusLabel(bonus.tipo_bono);
+                                        return (
+                                            <div
+                                                key={bonus.id_bono}
                                                 style={{
-                                                    fontSize: 14,
-                                                    color: '#10b981'
+                                                    display: 'flex',
+                                                    alignItems: 'center',
+                                                    gap: 12,
+                                                    padding: '12px 0',
+                                                    borderBottom: index < bonuses.length - 1 ? '1px solid #f1f5f9' : 'none'
                                                 }}
-                                            />
-                                        </div>
-                                        <div style={{ flex: 1, minWidth: 0 }}>
-                                            <div style={{
-                                                fontSize: 14,
-                                                fontWeight: 600,
-                                                color: '#0f172a',
-                                                marginBottom: 2
-                                            }}>
-                                                {getBonusLabel(bonus.tipo_bono)}
+                                            >
+                                                <div style={{
+                                                    width: 36,
+                                                    height: 36,
+                                                    borderRadius: 8,
+                                                    background: '#d1fae5',
+                                                    display: 'flex',
+                                                    alignItems: 'center',
+                                                    justifyContent: 'center',
+                                                    flexShrink: 0
+                                                }}>
+                                                    <FontAwesomeIcon
+                                                        icon={bonusInfo.icon}
+                                                        style={{
+                                                            fontSize: 14,
+                                                            color: '#10b981'
+                                                        }}
+                                                    />
+                                                </div>
+                                                <div style={{ flex: 1, minWidth: 0 }}>
+                                                    <div style={{
+                                                        fontSize: 14,
+                                                        fontWeight: 600,
+                                                        color: '#0f172a',
+                                                        marginBottom: 2
+                                                    }}>
+                                                        {bonusInfo.text}
+                                                    </div>
+                                                    <div style={{
+                                                        fontSize: 12,
+                                                        color: '#94a3b8'
+                                                    }}>
+                                                        {formatDate(bonus.otorgado_en)}
+                                                    </div>
+                                                </div>
+                                                <div style={{
+                                                    fontSize: 16,
+                                                    fontWeight: 700,
+                                                    color: '#10b981',
+                                                    fontFamily: 'Inter, sans-serif',
+                                                    flexShrink: 0
+                                                }}>
+                                                    +{bonus.cantidad_creditos}
+                                                </div>
                                             </div>
-                                            <div style={{
-                                                fontSize: 12,
-                                                color: '#94a3b8'
-                                            }}>
-                                                {formatDate(bonus.otorgado_en)}
-                                            </div>
-                                        </div>
-                                        <div style={{
-                                            fontSize: 16,
-                                            fontWeight: 700,
-                                            color: '#10b981',
-                                            fontFamily: 'Inter, sans-serif',
-                                            flexShrink: 0
-                                        }}>
-                                            +{bonus.cantidad_creditos}
-                                        </div>
-                                    </div>
-                                ))
+                                        );
+                                    })
                             )}
                         </div>
                     </div>

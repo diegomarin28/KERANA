@@ -426,7 +426,7 @@ async function searchUsers(term) {
             return noEsMiUsuario && noEsMentor;
         });
 
-        // ✨ NUEVO: Obtener quiénes estoy siguiendo
+
         let siguiendoSet = new Set();
         if (miId && usuariosFiltrados.length > 0) {
             const userIds = usuariosFiltrados.map(u => u.id_usuario);
@@ -440,6 +440,22 @@ async function searchUsers(term) {
             siguiendoSet = new Set(seguimientos?.map(s => s.seguido_id) || []);
         }
 
+        // ✨ NUEVO: Obtener cantidad de apuntes por usuario
+        let apuntesCountMap = new Map();
+        if (usuariosFiltrados.length > 0) {
+            const userIds = usuariosFiltrados.map(u => u.id_usuario);
+            const { data: apuntesCounts } = await supabase
+                .from('apunte')
+                .select('id_usuario')
+                .in('id_usuario', userIds);
+
+            // Contar apuntes por usuario
+            apuntesCounts?.forEach(apunte => {
+                const count = apuntesCountMap.get(apunte.id_usuario) || 0;
+                apuntesCountMap.set(apunte.id_usuario, count + 1);
+            });
+        }
+
         const transformed = usuariosFiltrados.map(usuario => ({
             id: usuario.id_usuario,
             id_usuario: usuario.id_usuario,
@@ -448,7 +464,8 @@ async function searchUsers(term) {
             username: usuario.username,
             tipo: 'usuario',
             label: usuario.nombre,
-            siguiendo: siguiendoSet.has(usuario.id_usuario)
+            siguiendo: siguiendoSet.has(usuario.id_usuario),
+            apuntes_count: apuntesCountMap.get(usuario.id_usuario) || 0  // ← AGREGAR ESTO
         }));
 
         return { data: transformed, error: null };

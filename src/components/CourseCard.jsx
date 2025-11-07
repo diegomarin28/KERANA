@@ -240,7 +240,7 @@ export default function CourseCard({ course, onFav = null }) {
                                     icon={faGraduationCap}
                                     style={{
                                         fontSize: '11px',
-                                        color: '#10b981'
+                                        color: '#0d9488'
                                     }}
                                 />
                                 <span style={{ color: '#64748b' }}>Mentores:</span>

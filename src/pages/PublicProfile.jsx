@@ -198,19 +198,21 @@ export default function PublicProfile() {
         const monthsAgo = (new Date() - memberDate) / (1000 * 60 * 60 * 24 * 30);
 
         if (monthsAgo >= 6) {
-            badges.push({ icon: faRocket, label: 'Early Adopter', color: '#8B5CF6' });
+            badges.push({ icon: faRocket, label: 'Pionero', color: '#8B5CF6' });
         }
 
         if (stats.apuntes >= 10) {
-            badges.push({ icon: faBook, label: 'Bookworm', color: '#10B981' });
+            badges.push({ icon: faTrophy, label: 'Colaborador Destacado', color: '#9F1239' });
         }
 
-        if (stats.apuntes >= 20) {
-            badges.push({ icon: faTrophy, label: 'Top Contributor', color: '#F59E0B' });
+        if (stats.apuntes >= 100) {
+            badges.push({ icon: faBook, label: 'Ratón de Biblioteca', color: '#F59E0B' });
         }
+
+
 
         if (mentorInfo) {
-            badges.push({ icon: faGraduationCap, label: 'Mentor Verificado', color: '#10B981' });
+            badges.push({ icon: faGraduationCap, label: 'Mentor Verificado', color: '#0d9488' });
         }
 
         return badges;
@@ -1053,8 +1055,9 @@ const carouselContainerStyle = {
 };
 
 const carouselItemStyle = {
-    minWidth: 360,
+    minWidth: 295,
     flexShrink: 0,
+    height: 'auto',
 };
 
 const carouselArrowStyle = {
@@ -1112,8 +1115,8 @@ const filterChipStyle = {
 
 const notesGridStyle = {
     display: 'grid',
+    gridTemplateColumns: "repeat(auto-fill, minmax(280px, 1fr))",
     gap: 16,
-    gridTemplateColumns: 'repeat(auto-fill, minmax(360px, 1fr))',
 };
 
 const emptyStateStyle = {

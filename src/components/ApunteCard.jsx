@@ -110,7 +110,10 @@ export default function ApunteCard({ note, currentUserId }) {
                 cursor: 'pointer',
                 transition: 'transform 0.2s, box-shadow 0.2s',
                 overflow: 'hidden',
-                fontFamily: 'Inter, sans-serif'
+                fontFamily: 'Inter, sans-serif',
+                display: 'flex',
+                flexDirection: 'column',
+                minHeight: 350,
             }}
             onClick={handleClick}
             onMouseEnter={(e) => {

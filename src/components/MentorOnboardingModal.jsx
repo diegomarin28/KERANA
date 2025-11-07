@@ -1,4 +1,17 @@
 import { useState } from 'react';
+import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
+import {
+    faGraduationCap,
+    faDollarSign,
+    faShieldAlt,
+    faCalendarTimes,
+    faBolt,
+    faCog,
+    faCheckCircle,
+    faVideo,
+    faHome,
+    faUniversity
+} from '@fortawesome/free-solid-svg-icons';
 
 const LOCALIDADES = {
     montevideo: [
@@ -18,7 +31,7 @@ const LOCALIDADES = {
 };
 
 export function MentorOnboardingModal({ open, onComplete }) {
-    const [step, setStep] = useState(1); // 1: términos, 2: formulario
+    const [step, setStep] = useState(1);
     const [acceptedTerms, setAcceptedTerms] = useState(false);
     const [formData, setFormData] = useState({
         maxAlumnos: null,
@@ -94,7 +107,22 @@ export function MentorOnboardingModal({ open, onComplete }) {
                 {step === 1 ? (
                     <>
                         <div style={headerStyle}>
-                            <span style={emojiStyle}>🎓</span>
+                            <div style={{
+                                width: 80,
+                                height: 80,
+                                background: 'linear-gradient(135deg, #2563eb 0%, #1e40af 100%)',
+                                borderRadius: '50%',
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                margin: '0 auto 16px',
+                                boxShadow: '0 8px 24px rgba(37, 99, 235, 0.3)'
+                            }}>
+                                <FontAwesomeIcon
+                                    icon={faGraduationCap}
+                                    style={{ fontSize: 36, color: '#fff' }}
+                                />
+                            </div>
                             <h2 style={titleStyle}>¡Bienvenido como Mentor de Kerana!</h2>
                         </div>
 
@@ -105,18 +133,24 @@ export function MentorOnboardingModal({ open, onComplete }) {
                             </p>
 
                             <div style={infoBoxStyle}>
-                                <h3 style={subtitleStyle}>💰 Precios y Pagos</h3>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 12 }}>
+                                    <FontAwesomeIcon icon={faDollarSign} style={{ fontSize: 20, color: '#10b981' }} />
+                                    <h3 style={subtitleStyle}>Precios y Pagos</h3>
+                                </div>
                                 <ul style={listStyle}>
-                                    <li><strong>Clases virtuales (Zoom):</strong> $400 UYU por sesión</li>
-                                    <li><strong>Clases presenciales:</strong> $600 UYU por sesión</li>
-                                    <li>Creamos el link de Zoom automáticamente cuando el usuario paga</li>
+                                    <li><strong>Clases virtuales (Teams):</strong> $430 UYU por sesión</li>
+                                    <li><strong>Clases presenciales:</strong> $630 UYU por sesión</li>
                                     <li>Retenemos el pago 24 horas después de la clase</li>
                                     <li>Si no hay inconvenientes, transferimos a tu cuenta de Mercado Pago</li>
+                                    <li>Mercado Pago cobra aproximadamente 6% de comisión sobre el monto</li>
                                 </ul>
                             </div>
 
                             <div style={infoBoxStyle}>
-                                <h3 style={subtitleStyle}>🏠 Privacidad de Datos</h3>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 12 }}>
+                                    <FontAwesomeIcon icon={faShieldAlt} style={{ fontSize: 20, color: '#2563eb' }} />
+                                    <h3 style={subtitleStyle}>Privacidad de Datos</h3>
+                                </div>
                                 <ul style={listStyle}>
                                     <li><strong>Público:</strong> Tu localidad (ej: Pocitos, Buceo)</li>
                                     <li><strong>Privado:</strong> Tu dirección exacta</li>
@@ -126,30 +160,41 @@ export function MentorOnboardingModal({ open, onComplete }) {
                             </div>
 
                             <div style={infoBoxStyle}>
-                                <h3 style={subtitleStyle}>📅 Política de Cancelaciones</h3>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 12 }}>
+                                    <FontAwesomeIcon icon={faCalendarTimes} style={{ fontSize: 20, color: '#f59e0b' }} />
+                                    <h3 style={subtitleStyle}>Política de Cancelaciones</h3>
+                                </div>
                                 <ul style={listStyle}>
                                     <li><strong>Cancelación del estudiante:</strong>
                                         <ul style={{ marginTop: 8 }}>
-                                            <li>✅ Más de 12 horas antes: Reembolso completo al usuario</li>
-                                            <li>⚠️ Menos de 12 horas: Se te acredita 25% aunque no des la clase</li>
+                                            <li>Más de 12 horas antes: Reembolso completo al usuario</li>
+                                            <li>Menos de 12 horas: Se te acredita 25% aunque no des la clase</li>
                                         </ul>
                                     </li>
                                     <li><strong>Cancelación del mentor:</strong>
                                         <ul style={{ marginTop: 8 }}>
-                                            <li>✅ Más de 36 horas antes: Sin penalización</li>
-                                            <li>❌ Menos de 36 horas: Recibes 1 strike</li>
-                                            <li>⛔ 3 strikes = Baneo de 1 año</li>
+                                            <li>Más de 36 horas antes: Sin penalización</li>
+                                            <li>Menos de 36 horas: Recibís 1 strike</li>
+                                            <li>3 strikes = Baneo de 1 año</li>
                                         </ul>
                                     </li>
                                 </ul>
                             </div>
 
                             <div style={infoBoxStyle}>
-                                <h3 style={subtitleStyle}>⚡ Responsabilidades del Mentor</h3>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 12 }}>
+                                    <FontAwesomeIcon icon={faBolt} style={{ fontSize: 20, color: '#ef4444' }} />
+                                    <h3 style={subtitleStyle}>Responsabilidades del Mentor</h3>
+                                </div>
                                 <ul style={listStyle}>
+                                    <li><strong>Clases virtuales:</strong> Crear la reunión de Microsoft Teams siguiendo los pasos del video enviado por correo cuando te agenden una clase</li>
+                                    <li><strong>Clases presenciales:</strong> Estar en el lugar acordado por lo menos 10 minutos antes del horario (obligatorio)</li>
                                     <li>Responder solicitudes en tiempo y forma</li>
-                                    <li>Cumplir con los horarios acordados</li>
+                                    <li>Cumplir con los horarios acordados puntualmente</li>
                                     <li>Mantener un ambiente de respeto y profesionalismo</li>
+                                    <li>Estar disponible y con buena actitud durante toda la clase</li>
+                                    <li>Entregar lo máximo de vos en cada sesión para que el alumno aprenda</li>
+                                    <li>Mantener comunicación fluida con el estudiante antes y después de la clase</li>
                                     <li>Reportar cualquier inconveniente a: <strong>kerana.soporte@gmail.com</strong></li>
                                 </ul>
                             </div>
@@ -161,7 +206,7 @@ export function MentorOnboardingModal({ open, onComplete }) {
                                     onChange={(e) => setAcceptedTerms(e.target.checked)}
                                     style={checkboxStyle}
                                 />
-                                <span style={{ fontSize: 14 }}>
+                                <span style={{ fontSize: 14, fontFamily: 'Inter, sans-serif', fontWeight: 500 }}>
                                     He leído y acepto los términos y condiciones como mentor de Kerana
                                 </span>
                             </label>
@@ -177,14 +222,29 @@ export function MentorOnboardingModal({ open, onComplete }) {
                                 }}
                                 disabled={!acceptedTerms}
                             >
-                                Continuar →
+                                <span>Continuar</span>
                             </button>
                         </div>
                     </>
                 ) : (
                     <>
                         <div style={headerStyle}>
-                            <span style={emojiStyle}>⚙️</span>
+                            <div style={{
+                                width: 80,
+                                height: 80,
+                                background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
+                                borderRadius: '50%',
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                margin: '0 auto 16px',
+                                boxShadow: '0 8px 24px rgba(16, 185, 129, 0.3)'
+                            }}>
+                                <FontAwesomeIcon
+                                    icon={faCog}
+                                    style={{ fontSize: 36, color: '#fff' }}
+                                />
+                            </div>
                             <h2 style={titleStyle}>Configurá tu perfil de mentor</h2>
                         </div>
 
@@ -258,7 +318,8 @@ export function MentorOnboardingModal({ open, onComplete }) {
                                         onChange={(e) => setFormData({ ...formData, aceptaZoom: e.target.checked })}
                                         style={checkboxStyle}
                                     />
-                                    <span>Zoom (virtual) - $400 UYU</span>
+                                    <FontAwesomeIcon icon={faVideo} style={{ color: '#2563eb', fontSize: 16 }} />
+                                    <span>Virtual (Teams) - $430 UYU</span>
                                 </label>
 
                                 <label style={checkboxLabelStyle}>
@@ -273,7 +334,8 @@ export function MentorOnboardingModal({ open, onComplete }) {
                                         })}
                                         style={checkboxStyle}
                                     />
-                                    <span>Presencial - $600 UYU</span>
+                                    <FontAwesomeIcon icon={faHome} style={{ color: '#10b981', fontSize: 16 }} />
+                                    <span>Presencial - $630 UYU</span>
                                 </label>
 
                                 {errors.tipoClase && <span style={errorStyle}>{errors.tipoClase}</span>}
@@ -286,9 +348,9 @@ export function MentorOnboardingModal({ open, onComplete }) {
                                         <label style={labelStyle}>4. ¿Dónde das clases presenciales?</label>
                                         <div style={optionsColumnStyle}>
                                             {[
-                                                { value: 'casa_mentor', label: 'En mi casa' },
-                                                { value: 'facultad', label: 'En la facultad' },
-                                                { value: 'ambas', label: 'Ambas opciones' }
+                                                { value: 'casa_mentor', label: 'En mi casa', icon: faHome },
+                                                { value: 'facultad', label: 'En la facultad', icon: faUniversity },
+                                                { value: 'ambas', label: 'Ambas opciones', icon: faCheckCircle }
                                             ].map(option => (
                                                 <label key={option.value} style={radioLabelStyle}>
                                                     <input
@@ -299,6 +361,7 @@ export function MentorOnboardingModal({ open, onComplete }) {
                                                         onChange={(e) => setFormData({ ...formData, lugarPresencial: e.target.value })}
                                                         style={radioStyle}
                                                     />
+                                                    <FontAwesomeIcon icon={option.icon} style={{ color: '#6b7280', fontSize: 16 }} />
                                                     <span>{option.label}</span>
                                                 </label>
                                             ))}
@@ -331,7 +394,7 @@ export function MentorOnboardingModal({ open, onComplete }) {
 
                         <div style={footerStyle}>
                             <button onClick={() => setStep(1)} style={secondaryButtonStyle} disabled={submitting}>
-                                ← Volver
+                                Volver
                             </button>
                             <button onClick={handleSubmit} style={primaryButtonStyle} disabled={submitting}>
                                 {submitting ? 'Guardando...' : 'Guardar y continuar'}
@@ -367,7 +430,8 @@ const modalStyle = {
     width: '100%',
     maxHeight: '90vh',
     overflow: 'auto',
-    boxShadow: '0 20px 60px rgba(0,0,0,0.3)'
+    boxShadow: '0 20px 60px rgba(0,0,0,0.3)',
+    fontFamily: 'Inter, sans-serif'
 };
 
 const headerStyle = {
@@ -376,17 +440,12 @@ const headerStyle = {
     borderBottom: '1px solid #E5E7EB'
 };
 
-const emojiStyle = {
-    fontSize: 48,
-    display: 'block',
-    marginBottom: 16
-};
-
 const titleStyle = {
     margin: 0,
     fontSize: 24,
     fontWeight: 700,
-    color: '#111827'
+    color: '#111827',
+    fontFamily: 'Inter, sans-serif'
 };
 
 const contentStyle = {
@@ -400,7 +459,8 @@ const textStyle = {
     margin: 0,
     fontSize: 15,
     lineHeight: 1.6,
-    color: '#374151'
+    color: '#374151',
+    fontFamily: 'Inter, sans-serif'
 };
 
 const infoBoxStyle = {
@@ -411,10 +471,11 @@ const infoBoxStyle = {
 };
 
 const subtitleStyle = {
-    margin: '0 0 12px 0',
+    margin: 0,
     fontSize: 16,
     fontWeight: 600,
-    color: '#111827'
+    color: '#111827',
+    fontFamily: 'Inter, sans-serif'
 };
 
 const listStyle = {
@@ -422,7 +483,8 @@ const listStyle = {
     paddingLeft: 20,
     fontSize: 14,
     lineHeight: 1.8,
-    color: '#4B5563'
+    color: '#4B5563',
+    fontFamily: 'Inter, sans-serif'
 };
 
 const checkboxContainerStyle = {
@@ -445,7 +507,8 @@ const questionStyle = {
 const labelStyle = {
     fontSize: 15,
     fontWeight: 600,
-    color: '#111827'
+    color: '#111827',
+    fontFamily: 'Inter, sans-serif'
 };
 
 const optionsRowStyle = {
@@ -469,7 +532,8 @@ const optionButtonStyle = {
     fontWeight: 600,
     fontSize: 14,
     cursor: 'pointer',
-    transition: 'all 0.2s ease'
+    transition: 'all 0.2s ease',
+    fontFamily: 'Inter, sans-serif'
 };
 
 const selectStyle = {
@@ -479,7 +543,8 @@ const selectStyle = {
     fontSize: 14,
     color: '#111827',
     background: 'white',
-    cursor: 'pointer'
+    cursor: 'pointer',
+    fontFamily: 'Inter, sans-serif'
 };
 
 const inputStyle = {
@@ -487,7 +552,8 @@ const inputStyle = {
     border: '2px solid #D1D5DB',
     borderRadius: 8,
     fontSize: 14,
-    color: '#111827'
+    color: '#111827',
+    fontFamily: 'Inter, sans-serif'
 };
 
 const checkboxLabelStyle = {
@@ -499,7 +565,8 @@ const checkboxLabelStyle = {
     borderRadius: 8,
     cursor: 'pointer',
     fontSize: 15,
-    transition: 'all 0.2s ease'
+    transition: 'all 0.2s ease',
+    fontFamily: 'Inter, sans-serif'
 };
 
 const checkboxStyle = {
@@ -517,7 +584,8 @@ const radioLabelStyle = {
     borderRadius: 8,
     cursor: 'pointer',
     fontSize: 15,
-    transition: 'all 0.2s ease'
+    transition: 'all 0.2s ease',
+    fontFamily: 'Inter, sans-serif'
 };
 
 const radioStyle = {
@@ -529,7 +597,8 @@ const radioStyle = {
 const errorStyle = {
     color: '#EF4444',
     fontSize: 13,
-    fontWeight: 600
+    fontWeight: 600,
+    fontFamily: 'Inter, sans-serif'
 };
 
 const footerStyle = {
@@ -549,7 +618,8 @@ const primaryButtonStyle = {
     fontWeight: 700,
     fontSize: 15,
     cursor: 'pointer',
-    transition: 'all 0.2s ease'
+    transition: 'all 0.2s ease',
+    fontFamily: 'Inter, sans-serif'
 };
 
 const secondaryButtonStyle = {
@@ -561,5 +631,6 @@ const secondaryButtonStyle = {
     fontWeight: 600,
     fontSize: 15,
     cursor: 'pointer',
-    transition: 'all 0.2s ease'
+    transition: 'all 0.2s ease',
+    fontFamily: 'Inter, sans-serif'
 };
