@@ -774,16 +774,20 @@ export const ApunteView = () => {
 
             <h1 style={{
                 textAlign: 'center',
-                margin: '0 0 32px 0',
-                fontSize: 32,
+                margin: '0 0 24px 0',
+                fontSize: window.innerWidth <= 375 ? 24 : 32,
                 fontWeight: 700,
                 fontFamily: 'Inter, sans-serif',
-                color: '#0f172a'
+                color: '#0f172a',
+                padding: '0 10px'
             }}>
                 {apunte.titulo}
             </h1>
 
-            <Card style={{ padding: 32, position: 'relative' }}>
+            <Card style={{
+                padding: window.innerWidth <= 375 ? 16 : 32,
+                position: 'relative'
+            }}>
                 {/* Bookmark - Solo visible si NO es owner */}
                 {!isOwner && (
                     <button
@@ -813,23 +817,38 @@ export const ApunteView = () => {
                     </button>
                 )}
 
-                <div style={{ display: 'flex', gap: 32, marginBottom: 24 }}>
-                    <div style={{ flexShrink: 0 }}>
+                <div style={{
+                    display: 'flex',
+                    flexDirection: window.innerWidth <= 375 ? 'column' : 'row',
+                    gap: window.innerWidth <= 375 ? 20 : 32,
+                    marginBottom: 24,
+                    alignItems: window.innerWidth <= 375 ? 'center' : 'flex-start'
+                }}>
+                    <div style={{
+                        flexShrink: 0,
+                        width: window.innerWidth <= 375 ? '100%' : 'auto',
+                        display: 'flex',
+                        justifyContent: 'center'
+                    }}>
                         <PDFThumbnail
                             url={signedUrl}
                             thumbnailPath={apunte?.thumbnail_path}
-                            width={250}
-                            height={350}
+                            width={window.innerWidth <= 375 ? 200 : 250}
+                            height={window.innerWidth <= 375 ? 280 : 350}
                         />
                     </div>
 
-                    <div style={{ flex: 1 }}>
+                    <div style={{
+                        flex: 1,
+                        width: window.innerWidth <= 375 ? '100%' : 'auto'
+                    }}>
                         <div style={{
                             display: 'flex',
                             gap: 12,
                             alignItems: 'center',
                             marginBottom: 16,
-                            flexWrap: 'wrap'
+                            flexWrap: 'wrap',
+                            justifyContent: window.innerWidth <= 375 ? 'center' : 'flex-start'
                         }}>
                             {apunte.materia?.nombre_materia && (
                                 <span style={{
@@ -1030,12 +1049,13 @@ export const ApunteView = () => {
                                     onClick={handlePurchase}
                                     disabled={purchasing || isOwner}
                                     style={{
-                                        padding: '14px 28px',
+                                        padding: window.innerWidth <= 375 ? '16px 24px' : '14px 28px',
                                         fontSize: 16,
                                         fontWeight: 600,
                                         width: '100%',
                                         fontFamily: 'Inter, sans-serif'
                                     }}
+
                                 >
                                     {purchasing ? 'Procesando compra...' :
                                         isOwner ? 'Es tu apunte' :
@@ -1047,7 +1067,7 @@ export const ApunteView = () => {
                                         variant="primary"
                                         onClick={handleDownload}
                                         style={{
-                                            padding: '14px 28px',
+                                            padding: window.innerWidth <= 375 ? '16px 24px' : '14px 28px',
                                             fontSize: 16,
                                             fontWeight: 600,
                                             width: '100%',
@@ -1196,7 +1216,8 @@ export const ApunteView = () => {
                 }}>
                     <Card style={{
                         maxWidth: 450,
-                        padding: 40,
+                        width: window.innerWidth <= 375 ? '90%' : 'auto',
+                        padding: window.innerWidth <= 375 ? 24 : 40,
                         textAlign: 'center',
                         background: '#fff',
                         boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)',
@@ -1284,7 +1305,8 @@ export const ApunteView = () => {
                 }}>
                     <Card style={{
                         maxWidth: 450,
-                        padding: 40,
+                        width: window.innerWidth <= 375 ? '90%' : 'auto',
+                        padding: window.innerWidth <= 375 ? 24 : 40,
                         textAlign: 'center',
                         background: '#fff',
                         boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)',
@@ -1413,9 +1435,9 @@ export const ApunteView = () => {
                     fontFamily: 'Inter, sans-serif'
                 }}>
                     <Card style={{
-                        maxWidth: 500,
-                        width: '90%',
-                        padding: 32,
+                        maxWidth: 450,
+                        width: window.innerWidth <= 375 ? '90%' : 'auto',
+                        padding: window.innerWidth <= 375 ? 24 : 40,
                         background: '#fff',
                         boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1)',
                         maxHeight: '90vh',
@@ -1611,8 +1633,9 @@ export const ApunteView = () => {
                     fontFamily: 'Inter, sans-serif'
                 }}>
                     <Card style={{
-                        maxWidth: 500,
-                        padding: 48,
+                        maxWidth: 450,
+                        width: window.innerWidth <= 375 ? '90%' : 'auto',
+                        padding: window.innerWidth <= 375 ? 24 : 40,
                         textAlign: 'center',
                         background: '#fff',
                         boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1)',
