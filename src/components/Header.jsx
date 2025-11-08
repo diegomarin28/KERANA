@@ -20,6 +20,7 @@ import {
     faCreditCard,
     faQuestionCircle,
     faCog,
+    faBell,
 } from '@fortawesome/free-solid-svg-icons';
 
 export default function Header() {
@@ -47,9 +48,35 @@ export default function Header() {
     const { credits, seguidores, siguiendo, apuntes } = useSidebarStats();
     const headerStats = useSidebarStats();
     const { isMentor, loading: mentorLoading } = useMentorStatus(true);
+    const [isMobile, setIsMobile] = useState(false);
+    const [isVerySmall, setIsVerySmall] = useState(false);
 
     const openAuthModal = () => setAuthOpen(true);
     const closeAuthModal = () => setAuthOpen(false);
+
+    // Detectar mobile y pantallas muy pequeñas
+    useEffect(() => {
+        const checkMobile = () => {
+            const width = window.innerWidth;
+            setIsMobile(width <= 640);
+            setIsVerySmall(width <= 375);
+        };
+        checkMobile();
+        window.addEventListener('resize', checkMobile);
+        return () => window.removeEventListener('resize', checkMobile);
+    }, []);
+
+    // Prevenir scroll cuando el menú de avatar está abierto en móvil
+    useEffect(() => {
+        if (avatarMenuOpen && isMobile) {
+            document.body.style.overflow = 'hidden';
+        } else {
+            document.body.style.overflow = '';
+        }
+        return () => {
+            document.body.style.overflow = '';
+        };
+    }, [avatarMenuOpen, isMobile]);
 
     useEffect(() => {
         const onStorage = (e) => {
@@ -151,10 +178,9 @@ export default function Header() {
         };
     }, []);
 
-    // Listener para actualización de créditos en tiempo real
     useEffect(() => {
         const handleCreditsUpdate = () => {
-            loadUserProfile(); // Recarga el perfil para actualizar créditos
+            loadUserProfile();
         };
 
         window.addEventListener('creditsUpdated', handleCreditsUpdate);
@@ -264,16 +290,16 @@ export default function Header() {
             signBorder: "#e5e7eb",
         }
         : {
-            headerBg: "#f8fbff",           // ❄️ Azul hielo muy claro
-            headerText: "#0f172a",          // Texto oscuro
-            border: "#d4e4f7",              // Borde azul hielo
-            pillBg: "#ffffff",              // Pills blancos
-            pillText: "#13346b",            // Texto azul oscuro
-            pillBorder: "#13346b",          // Borde azul oscuro
-            signBg: "#ffffff",              // Botón blanco
-            signText: "#13346b",            // Texto azul oscuro
-            signBorder: "#13346b",          // Borde azul oscuro
-            boxShadow: "0 2px 12px rgba(19, 52, 107, 0.08)",  // Sombra azulada sutil
+            headerBg: "#f8fbff",
+            headerText: "#0f172a",
+            border: "#d4e4f7",
+            pillBg: "#ffffff",
+            pillText: "#13346b",
+            pillBorder: "#13346b",
+            signBg: "#ffffff",
+            signText: "#13346b",
+            signBorder: "#13346b",
+            boxShadow: "0 2px 12px rgba(19, 52, 107, 0.08)",
         };
 
     const pillReset = { all: "unset", display: "inline-block", cursor: "pointer" };
@@ -281,7 +307,7 @@ export default function Header() {
         display: "inline-flex",
         alignItems: "center",
         justifyContent: "center",
-        padding: "10px 18px",
+        padding: isVerySmall ? "8px 8px" : (isMobile ? "9px 12px" : "10px 18px"),
         borderRadius: 9999,
         background: TOKENS.pillBg,
         border: `1px solid ${TOKENS.pillBorder}`,
@@ -290,14 +316,16 @@ export default function Header() {
         fontFamily: 'Inter, sans-serif',
         textDecoration: "none",
         whiteSpace: "nowrap",
-        minWidth: 125,
-        height: 23,
+        minWidth: isVerySmall ? 'auto' : (isMobile ? 90 : 125),
+        height: isVerySmall ? 20 : (isMobile ? 22 : 36), // ← CAMBIAR DE 23 a 36
         cursor: "pointer",
         appearance: "none",
         WebkitAppearance: "none",
         lineHeight: 1,
         transition: "all 0.3s ease",
         transform: "translateY(0px)",
+        fontSize: isVerySmall ? 9 : (isMobile ? 11 : 14),
+        flexShrink: 0,
     };
 
     const handleMouseEnter = (e) => {
@@ -402,7 +430,6 @@ export default function Header() {
 
     const iconButtonStyle = inHero
         ? {
-            // EN HERO (azul oscuro)
             width: 40,
             height: 40,
             display: "grid",
@@ -417,7 +444,6 @@ export default function Header() {
             transition: "all 0.2s ease",
         }
         : {
-            // AL SCROLLEAR (hielo)
             width: 40,
             height: 40,
             display: "grid",
@@ -451,17 +477,19 @@ export default function Header() {
                 <div
                     className="header-container"
                     style={{
-                        display: "grid",
+                        display: "flex",
                         alignItems: "center",
-                        gridTemplateColumns: "1fr auto 1fr",
-                        gap: 16,
+                        justifyContent: "space-between",
+                        gap: isVerySmall ? 4 : (isMobile ? 8 : 16),
                         height: 64,
-                        padding: "0 20px",
+                        padding: isVerySmall ? "0 10px" : (isMobile ? "0 16px" : "0 20px"),
                         maxWidth: 1400,
                         margin: "0 auto",
+                        overflow: "hidden",
                     }}
                 >
-                    <div style={{ display: "flex", alignItems: "center", gap: 16, minWidth: 0 }}>
+                    {/* LEFT SECTION */}
+                    <div style={{ display: "flex", alignItems: "center", gap: isVerySmall ? 12 : (isMobile ? 16 : 20), minWidth: 0, flexShrink: 0 }}>
                         <HamburgerButton open={menuOpen} onToggle={() => setMenuOpen((o) => !o)} />
                         <button
                             onClick={() => navigate("/")}
@@ -470,17 +498,21 @@ export default function Header() {
                                 border: "none",
                                 cursor: "pointer",
                                 fontWeight: 800,
-                                fontSize: 20,
+                                fontSize: isVerySmall ? 15 : (isMobile ? 17 : 20),
                                 color: TOKENS.headerText,
                                 letterSpacing: "0.5px",
                                 fontFamily: 'Inter, sans-serif',
+                                whiteSpace: "nowrap",
+                                padding: 0,
+                                margin: 0,
+                                userSelect: "none",
                             }}
                             aria-label="Ir al inicio"
                         >
                             KERANA
                         </button>
 
-                        {user && userProfile && (
+                        {user && userProfile && !isMobile && (
                             <button
                                 onClick={() => navigate("/mis-creditos")}
                                 style={{
@@ -521,12 +553,16 @@ export default function Header() {
                         )}
                     </div>
 
+                    {/* CENTER SECTION - Pills */}
                     <nav style={{
                         display: "flex",
                         alignItems: "center",
-                        gap: 12,
+                        gap: isVerySmall ? 3 : (isMobile ? 5 : 12),
                         justifyContent: "center",
-                        flexWrap: "wrap",
+                        flexWrap: "nowrap",
+                        flex: isMobile ? 1 : "initial",
+                        overflow: "visible",
+                        minWidth: 0,
                     }}>
                         {mentorLoading ? (
                             <>
@@ -539,7 +575,7 @@ export default function Header() {
                                     pointerEvents: 'none',
                                     border: '1px solid #13346b'
                                 }}>
-                                    Subir Apuntes
+                                    {isMobile ? 'Subir' : 'Subir Apuntes'}
                                 </span>
                                 <span style={{
                                     ...pillBox,
@@ -550,7 +586,7 @@ export default function Header() {
                                     pointerEvents: 'none',
                                     border: '1px solid #13346b'
                                 }}>
-                                    ¡Quiero ser Mentor!
+                                    {isMobile ? 'Mentor' : '¡Quiero ser Mentor!'}
                                 </span>
                                 <span style={{
                                     ...pillBox,
@@ -561,61 +597,64 @@ export default function Header() {
                                     pointerEvents: 'none',
                                     border: '1px solid #13346b'
                                 }}>
-                                    ¡Hacé tu reseña!
+                                    {isMobile ? 'Reseñar' : '¡Hacé tu reseña!'}
                                 </span>
                             </>
                         ) : (
                             <>
-                                <PillLink to="/upload">Subir Apuntes</PillLink>
+                                <PillLink to="/upload">{isMobile ? 'Subir' : 'Subir Apuntes'}</PillLink>
 
                                 {isMentor ? (
                                     <PillButton onClick={() => navigate("/mentor/courses")}>
-                                        Mis Mentorías
+                                        {isMobile ? 'Mentorías' : 'Mis Mentorías'}
                                     </PillButton>
                                 ) : (
                                     <PillButton onClick={() => navigate("/mentores/postular")}>
-                                        ¡Quiero ser Mentor!
+                                        {isMobile ? 'Mentor' : '¡Quiero ser Mentor!'}
                                     </PillButton>
                                 )}
 
                                 <PillButton onClick={handleReseniaClick}>
-                                    ¡Hacé tu reseña!
+                                    {isMobile ? 'Reseñar' : '¡Hacé tu reseña!'}
                                 </PillButton>
                             </>
                         )}
                     </nav>
 
-                    <div style={{ display: "flex", alignItems: "center", gap: 12, justifyContent: "flex-end" }}>
+                    {/* RIGHT SECTION */}
+                    <div style={{ display: "flex", alignItems: "center", gap: 12, justifyContent: "flex-end", flexShrink: 0 }}>
                         {!user ? (
                             <HeaderAuthButtons />
                         ) : (
                             <>
-                                <button
-                                    onClick={() => navigate("/favorites")}
-                                    aria-label="Favoritos"
-                                    style={iconButtonStyle}
-                                    onMouseEnter={(e) => {
-                                        if (inHero) {
-                                            e.currentTarget.style.background = "rgba(255,255,255,0.15)";
-                                            e.currentTarget.style.borderColor = "rgba(255,255,255,0.3)";
-                                        } else {
-                                            e.currentTarget.style.background = "#f8fafc";
-                                            e.currentTarget.style.borderColor = "#2563eb";
-                                        }
-                                        e.currentTarget.style.transform = "scale(1.05)";
-                                    }}
-                                    onMouseLeave={(e) => {
-                                        e.currentTarget.style.background = iconButtonStyle.background;
-                                        e.currentTarget.style.borderColor = inHero ? "rgba(255,255,255,0.2)" : "#13346b";
-                                        e.currentTarget.style.transform = "scale(1)";
-                                    }}
-                                >
-                                    <FontAwesomeIcon icon={faBookmark} style={{ fontSize: 16 }} />
-                                </button>
+                                {!isMobile && (
+                                    <button
+                                        onClick={() => navigate("/favorites")}
+                                        aria-label="Favoritos"
+                                        style={iconButtonStyle}
+                                        onMouseEnter={(e) => {
+                                            if (inHero) {
+                                                e.currentTarget.style.background = "rgba(255,255,255,0.15)";
+                                                e.currentTarget.style.borderColor = "rgba(255,255,255,0.3)";
+                                            } else {
+                                                e.currentTarget.style.background = "#f8fafc";
+                                                e.currentTarget.style.borderColor = "#2563eb";
+                                            }
+                                            e.currentTarget.style.transform = "scale(1.05)";
+                                        }}
+                                        onMouseLeave={(e) => {
+                                            e.currentTarget.style.background = iconButtonStyle.background;
+                                            e.currentTarget.style.borderColor = inHero ? "rgba(255,255,255,0.2)" : "#13346b";
+                                            e.currentTarget.style.transform = "scale(1)";
+                                        }}
+                                    >
+                                        <FontAwesomeIcon icon={faBookmark} style={{ fontSize: 16 }} />
+                                    </button>
+                                )}
 
-                                <NotificationBadge inHero={inHero} />
+                                {!isMobile && <NotificationBadge inHero={inHero} />}
 
-                                <div style={{ position: "relative" }}>
+                                <div style={{ position: "relative", flexShrink: 0 }}>
                                     <button
                                         ref={avatarBtnRef}
                                         onClick={() => setAvatarMenuOpen((o) => !o)}
@@ -692,10 +731,12 @@ export default function Header() {
                                             ref={avatarMenuRef}
                                             role="menu"
                                             style={{
-                                                position: "absolute",
-                                                right: 0,
-                                                top: "calc(100% + 12px)",
-                                                width: 320,
+                                                position: isMobile ? "fixed" : "absolute",
+                                                right: isMobile ? 10 : 0,
+                                                left: isMobile ? 10 : "auto",
+                                                top: isMobile ? 70 : "calc(100% + 12px)",
+                                                width: isMobile ? "calc(100vw - 20px)" : 320,
+                                                maxWidth: isMobile ? 400 : 320,
                                                 background: "#ffffff",
                                                 color: "#0f172a",
                                                 border: "1px solid #e2e8f0",
@@ -707,26 +748,28 @@ export default function Header() {
                                                 animation: "dropdownSlide 0.2s cubic-bezier(0.16, 1, 0.3, 1) forwards",
                                             }}
                                         >
-                                            {/* Triangulito */}
-                                            <div
-                                                style={{
-                                                    position: "absolute",
-                                                    right: 14,
-                                                    top: -6,
-                                                    width: 12,
-                                                    height: 12,
-                                                    background: "#fff",
-                                                    borderLeft: "1px solid #e2e8f0",
-                                                    borderTop: "1px solid #e2e8f0",
-                                                    transform: "rotate(45deg)",
-                                                    zIndex: -1,
-                                                }}
-                                            />
+                                            {/* Triangulito - solo en desktop */}
+                                            {!isMobile && (
+                                                <div
+                                                    style={{
+                                                        position: "absolute",
+                                                        right: 14,
+                                                        top: -6,
+                                                        width: 12,
+                                                        height: 12,
+                                                        background: "#fff",
+                                                        borderLeft: "1px solid #e2e8f0",
+                                                        borderTop: "1px solid #e2e8f0",
+                                                        transform: "rotate(45deg)",
+                                                        zIndex: -1,
+                                                    }}
+                                                />
+                                            )}
 
                                             {/* Header mejorado */}
                                             <div style={{
                                                 background: "#f8fafc",
-                                                padding: "20px",
+                                                padding: isMobile ? "16px" : "20px",
                                                 borderBottom: "1px solid #e2e8f0",
                                             }}>
                                                 <div style={{
@@ -850,6 +893,14 @@ export default function Header() {
 
                                             {/* Menu items */}
                                             <div style={{ padding: "8px" }}>
+                                                {isMobile && (
+                                                    <MenuItem
+                                                        icon={<FontAwesomeIcon icon={faBell} />}
+                                                        label="Notificaciones"
+                                                        onClick={() => go("/notifications")}
+                                                    />
+                                                )}
+
                                                 <MenuItem
                                                     icon={<FontAwesomeIcon icon={faUser} />}
                                                     label="Mi perfil"
@@ -938,6 +989,7 @@ export default function Header() {
                 </div>
             </header>
 
+
             <div style={{ height: 64 }} />
 
             <Sidebar
@@ -963,6 +1015,23 @@ export default function Header() {
                 onGo={(path) => navigate(path)}
                 onOpenAuth={openAuthModal}
             />
+
+            {/* Overlay para cerrar el menú del avatar en móvil */}
+            {avatarMenuOpen && isMobile && (
+                <div
+                    onClick={() => setAvatarMenuOpen(false)}
+                    style={{
+                        position: "fixed",
+                        top: 0,
+                        left: 0,
+                        right: 0,
+                        bottom: 0,
+                        background: "transparent",
+                        zIndex: 9998,
+                    }}
+                />
+            )}
+
             <AuthModal_SignIn open={authOpen} onClose={closeAuthModal} onSignedIn={handleSignedIn} />
             <AuthModal_HacerResenia
                 open={reseniaOpen}
