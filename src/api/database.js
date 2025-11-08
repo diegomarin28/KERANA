@@ -1270,6 +1270,43 @@ export const ratingsAPI = {
 
         return {data, error};
     },
+    async checkExistingRating(tipo, refId, materiaId) {
+        try {
+            const { data: { user } } = await supabase.auth.getUser();
+            if (!user) return { data: null, error: 'No hay usuario logueado' };
+
+            const { data: usuarioData, error: usuarioError } = await supabase
+                .from('usuario')
+                .select('id_usuario')
+                .eq('auth_id', user.id)
+                .single();
+
+            if (usuarioError || !usuarioData) {
+                return { data: null, error: 'Usuario no encontrado' };
+            }
+
+            // Buscar si ya existe una reseña del mismo usuario, mismo profesor/mentor, misma materia
+            const { data, error } = await supabase
+                .from('rating')
+                .select('id')
+                .eq('tipo', tipo)
+                .eq('ref_id', refId)
+                .eq('materia_id', materiaId)
+                .eq('user_id', usuarioData.id_usuario)
+                .maybeSingle();
+
+            if (error) {
+                console.error('Error verificando reseña existente:', error);
+                return { data: null, error };
+            }
+
+            // Retorna true si ya existe una reseña
+            return { data: !!data, error: null };
+        } catch (error) {
+            console.error('Error en checkExistingRating:', error);
+            return { data: null, error };
+        }
+    },
 
     async listByMateria(materiaId) {
         return await supabase
@@ -1292,7 +1329,7 @@ export const ratingsAPI = {
     async listByMentor(mentorId) {
         return await supabase
             .from('rating')
-            .select('id, estrellas, comentario, workload, materia_id, user_id, created_at, tags')
+            .select('id, estrellas, comentario, workload, materia_id, user_id, created_at, tags, tipo')
             .eq('tipo', 'mentor')
             .eq('ref_id', mentorId)
             .order('created_at', { ascending: false });

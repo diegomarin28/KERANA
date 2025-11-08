@@ -615,12 +615,12 @@ export default function AuthModal_HacerResenia({
 
         try {
             if (isEditing && initialData?.ratingId) {
-                // Modo edición
+                // Modo edición (sin cambios, mantener como está)
                 if (onSave) {
                     await onSave({
                         rating: form.rating,
                         texto: form.texto,
-                        workload: form.workload,
+                        workload: form.tipo === 'profesor' ? form.workload : null, // ✅ Solo para profesores
                         selectedTags: form.selectedTags,
                         selectedMateria: form.selectedMateria
                     });
@@ -642,14 +642,39 @@ export default function AuthModal_HacerResenia({
                     onClose();
                 }, 1500);
             } else {
-                // Modo creación (código original)
+                // ✅ NUEVO: Modo creación - Verificar duplicados
+                const { data: existeReseña, error: checkError } = await ratingsAPI.checkExistingRating(
+                    form.tipo,
+                    form.selectedEntity.id,
+                    form.selectedMateria.id
+                );
+
+                if (checkError) {
+                    setToast({
+                        message: 'Error al verificar reseñas existentes',
+                        type: 'error'
+                    });
+                    setIsSubmitting(false);
+                    return;
+                }
+
+                if (existeReseña) {
+                    setToast({
+                        message: `Ya dejaste una reseña para este ${form.tipo} en esta materia`,
+                        type: 'error'
+                    });
+                    setIsSubmitting(false);
+                    return;
+                }
+
+                // Continuar con la creación normal
                 const { data, error } = await ratingsAPI.createRating(
                     form.tipo,
                     form.selectedEntity.id,
                     form.rating,
                     form.texto,
                     {
-                        workload: form.workload,
+                        workload: form.tipo === 'profesor' ? form.workload : null, // ✅ Solo para profesores
                         materia_id: form.selectedMateria.id,
                         tags: form.selectedTags
                     }
@@ -1289,16 +1314,18 @@ export default function AuthModal_HacerResenia({
                                 </div>
                             </label>
 
-                            {/* Carga de trabajo */}
-                            <label style={{ display: "grid", gap: 10 }}>
-                                <span style={{ fontWeight: 600, fontSize: 14, color: "#0f172a" }}>
-                                    Carga de trabajo
-                                </span>
-                                <WorkloadSlider
-                                    value={form.workload}
-                                    onChange={(value) => setForm({...form, workload: value})}
-                                />
-                            </label>
+                            {/* Carga de trabajo - Solo para profesores */}
+                            {form.tipo === 'profesor' && (
+                                <label style={{ display: "grid", gap: 10 }}>
+                                    <span style={{ fontWeight: 600, fontSize: 14, color: "#0f172a" }}>
+                                        Carga de trabajo
+                                    </span>
+                                    <WorkloadSlider
+                                        value={form.workload}
+                                        onChange={(value) => setForm({...form, workload: value})}
+                                    />
+                                </label>
+                            )}
 
                             {/* Tips */}
                             <div style={{

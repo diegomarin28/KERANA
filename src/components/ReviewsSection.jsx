@@ -582,8 +582,8 @@ export default function ReviewsSection({
                                 </p>
                             )}
 
-                            {/* Workload */}
-                            {review.workload && (
+                            {/* Workload - Solo mostrar para profesores */}
+                            {review.workload && review.tipo === 'profesor' && (
                                 <div style={{
                                     fontSize: 14,
                                     color: '#64748b',
