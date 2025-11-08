@@ -14,8 +14,10 @@ export default function ApunteCard({ note, currentUserId }) {
     const [loading, setLoading] = useState(false);
     const [hasPurchased, setHasPurchased] = useState(false);
 
-    useEffect(() => {
+    // Detectar móvil
+    const isMobile = window.innerWidth <= 375;
 
+    useEffect(() => {
         setLikesCount(note.likes_count || 0);
 
         const checkLikedAndPurchased = async () => {
@@ -113,34 +115,41 @@ export default function ApunteCard({ note, currentUserId }) {
                 fontFamily: 'Inter, sans-serif',
                 display: 'flex',
                 flexDirection: 'column',
-                minHeight: 350,
+                minHeight: isMobile ? 'auto' : 350,
+                width: '100%',
+                maxWidth: '100%',
             }}
             onClick={handleClick}
             onMouseEnter={(e) => {
-                e.currentTarget.style.transform = 'translateY(-4px)';
-                e.currentTarget.style.boxShadow = '0 8px 16px rgba(0,0,0,0.1)';
+                if (!isMobile) {
+                    e.currentTarget.style.transform = 'translateY(-4px)';
+                    e.currentTarget.style.boxShadow = '0 8px 16px rgba(0,0,0,0.1)';
+                }
             }}
             onMouseLeave={(e) => {
-                e.currentTarget.style.transform = 'translateY(0)';
-                e.currentTarget.style.boxShadow = 'none';
+                if (!isMobile) {
+                    e.currentTarget.style.transform = 'translateY(0)';
+                    e.currentTarget.style.boxShadow = 'none';
+                }
             }}
         >
             {/* Vista previa del PDF */}
             <PDFThumbnail
                 url={note.signedUrl || null}
                 thumbnailPath={note.thumbnail_path}
-                width={280}
-                height={160}
+                width={isMobile ? "100%" : 280}
+                height={isMobile ? 180 : 160}
             />
 
             {/* Contenido de la card */}
-            <div style={{ padding: 16 }}>
+            <div style={{ padding: isMobile ? 14 : 16 }}>
                 <h3 style={{
                     margin: '0 0 8px 0',
-                    fontSize: 16,
+                    fontSize: isMobile ? 15 : 16,
                     fontWeight: 600,
                     fontFamily: 'Inter, sans-serif',
-                    color: '#0f172a'
+                    color: '#0f172a',
+                    lineHeight: 1.3,
                 }}>
                     {note.titulo}
                 </h3>
@@ -156,7 +165,7 @@ export default function ApunteCard({ note, currentUserId }) {
                         background: '#dbeafe',
                         color: '#1e40af',
                         borderRadius: 12,
-                        fontSize: 12,
+                        fontSize: isMobile ? 11 : 12,
                         fontWeight: 600,
                         fontFamily: 'Inter, sans-serif'
                     }}>
@@ -179,12 +188,12 @@ export default function ApunteCard({ note, currentUserId }) {
                                 opacity: (loading || !hasPurchased) ? 0.4 : 1
                             }}
                             onMouseEnter={(e) => {
-                                if (!loading && hasPurchased) {
+                                if (!loading && hasPurchased && !isMobile) {
                                     e.currentTarget.style.background = '#f8fafc';
                                 }
                             }}
                             onMouseLeave={(e) => {
-                                if (!loading && hasPurchased) {
+                                if (!loading && hasPurchased && !isMobile) {
                                     e.currentTarget.style.background = 'transparent';
                                 }
                             }}
@@ -192,14 +201,14 @@ export default function ApunteCard({ note, currentUserId }) {
                             <FontAwesomeIcon
                                 icon={faHeart}
                                 style={{
-                                    fontSize: 14,
+                                    fontSize: isMobile ? 13 : 14,
                                     color: liked ? '#f59e0b' : '#cbd5e1',
                                     transition: 'all 0.2s ease'
                                 }}
                             />
                             <span style={{
                                 color: liked ? '#f59e0b' : '#64748b',
-                                fontSize: 14,
+                                fontSize: isMobile ? 13 : 14,
                                 fontWeight: 600,
                                 fontFamily: 'Inter, sans-serif',
                                 transition: 'all 0.2s ease'
@@ -213,14 +222,14 @@ export default function ApunteCard({ note, currentUserId }) {
                 {note.descripcion && (
                     <p style={{
                         color: '#6b7280',
-                        fontSize: 14,
+                        fontSize: isMobile ? 13 : 14,
                         marginBottom: 12,
                         lineHeight: 1.4,
                         fontFamily: 'Inter, sans-serif',
                         fontWeight: 500
                     }}>
-                        {note.descripcion.length > 80
-                            ? note.descripcion.substring(0, 80) + '...'
+                        {note.descripcion.length > (isMobile ? 60 : 80)
+                            ? note.descripcion.substring(0, isMobile ? 60 : 80) + '...'
                             : note.descripcion}
                     </p>
                 )}
@@ -233,7 +242,7 @@ export default function ApunteCard({ note, currentUserId }) {
                     borderTop: '1px solid #e5e7eb'
                 }}>
                     <span style={{
-                        fontSize: 13,
+                        fontSize: isMobile ? 12 : 13,
                         color: '#6b7280',
                         fontFamily: 'Inter, sans-serif',
                         fontWeight: 500
@@ -248,7 +257,7 @@ export default function ApunteCard({ note, currentUserId }) {
                         background: '#eff6ff',
                         color: '#1e40af',
                         borderRadius: 12,
-                        fontSize: 12,
+                        fontSize: isMobile ? 11 : 12,
                         fontWeight: 600,
                         display: 'flex',
                         alignItems: 'center',
@@ -258,7 +267,7 @@ export default function ApunteCard({ note, currentUserId }) {
                         <FontAwesomeIcon
                             icon={faCoins}
                             style={{
-                                fontSize: 12,
+                                fontSize: isMobile ? 11 : 12,
                                 color: '#f59e0b'
                             }}
                         />
