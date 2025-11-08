@@ -67,7 +67,7 @@ export function useMentorOnboarding() {
                 .update({
                     max_alumnos: formData.maxAlumnos,
                     localidad: formData.localidad,
-                    acepta_zoom: formData.aceptaZoom,
+                    acepta_virtual: formData.aceptaVirtual,
                     acepta_presencial: formData.aceptaPresencial,
                     lugar_presencial: formData.lugarPresencial,
                     direccion: formData.direccion,

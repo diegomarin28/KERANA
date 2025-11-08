@@ -73,6 +73,26 @@ export default function PublicProfileMentor() {
     const [editingReview, setEditingReview] = useState(null);
     const [materiasNamesForReviews, setMateriasNamesForReviews] = useState({});
 
+    const [currentAuthUserId, setCurrentAuthUserId] = useState(null);
+
+    useEffect(() => {
+        const fetchCurrentUser = async () => {
+            const { data: { user } } = await supabase.auth.getUser();
+            if (user) {
+                const { data: usuarioData } = await supabase
+                    .from('usuario')
+                    .select('id_usuario')
+                    .eq('auth_id', user.id)
+                    .single();
+
+                if (usuarioData) {
+                    setCurrentAuthUserId(usuarioData.id_usuario);
+                }
+            }
+        };
+        fetchCurrentUser();
+    }, []);
+
     useEffect(() => {
         fetchProfileData();
     }, [username]);
@@ -943,7 +963,7 @@ export default function PublicProfileMentor() {
                         })) || []}
                         supabase={supabase}
                         slotsAPI={slotsAPI}
-                        currentUserId={profile.id_usuario}
+                        currentUserId={currentAuthUserId}
                     />
                 )}
                 {/* Modal Avatar Grande */}

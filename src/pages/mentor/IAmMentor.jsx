@@ -286,7 +286,7 @@ export default function IAmMentor() {
         }
     }, [activeTab, mentorData]);
 
-    const handleRemoveMentorship = async (mentorshipId, materiaName) => {
+    const handleRemoveMentorship = async (mentorshipId, materiaName, materiaId) => {
         try {
             setIsRemoving(true);
 
@@ -295,7 +295,7 @@ export default function IAmMentor() {
                 .from('mentor_sesion')
                 .select('id_sesion')
                 .eq('id_mentor', mentorData.id_mentor)
-                .eq('id_materia', confirmRemoveMentorship.materiaId)
+                .eq('id_materia', materiaId) // Usar el materiaId pasado como parámetro
                 .eq('estado', 'confirmada')
                 .gte('fecha_hora', new Date().toISOString());
 
@@ -336,7 +336,6 @@ export default function IAmMentor() {
 
                 if (mentorDeleteError) throw mentorDeleteError;
 
-                // Redirigir a home o página de mentores
                 setSuccessModal({
                     open: true,
                     message: 'Te diste de baja exitosamente. Ya no sos mentor.'
@@ -744,7 +743,8 @@ export default function IAmMentor() {
                                                 <button
                                                     onClick={() => handleRemoveMentorship(
                                                         mentorship.id,
-                                                        mentorship.materia.nombre_materia
+                                                        mentorship.materia.nombre_materia,
+                                                        mentorship.materia.id_materia  // ← AGREGAR ESTE PARÁMETRO
                                                     )}
                                                     style={{
                                                         display: 'flex',
@@ -2106,7 +2106,7 @@ export default function IAmMentor() {
                                             onClick={() => setConfirmRemoveMentorship({
                                                 id: mentorship.id,
                                                 materia: mentorship.materia.nombre_materia,
-                                                materiaId: mentorship.materia.id_materia
+                                                materiaId: mentorship.materia.id_materia  // ← AGREGAR ESTA LÍNEA
                                             })}
                                             disabled={isRemoving}
                                             style={{
@@ -2141,7 +2141,8 @@ export default function IAmMentor() {
                                         <button
                                             onClick={() => handleRemoveMentorship(
                                                 confirmRemoveMentorship.id,
-                                                confirmRemoveMentorship.materia
+                                                confirmRemoveMentorship.materia,
+                                                confirmRemoveMentorship.materiaId  // ← AGREGAR ESTE PARÁMETRO
                                             )}
                                             disabled={isRemoving}
                                             style={{
