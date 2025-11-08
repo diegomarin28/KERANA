@@ -322,7 +322,8 @@ export default function SearchBar() {
             ref={wrapRef}
             style={{
                 position: "relative",
-                width: "min(780px, 92vw)",
+                width: window.innerWidth <= 375 ? "calc(100vw - 32px)" : "min(780px, 92vw)",
+                maxWidth: "100%",
                 margin: "0 auto",
             }}
         >
@@ -334,7 +335,7 @@ export default function SearchBar() {
                     gap: 10,
                     background: "#fff",
                     borderRadius: open ? "32px 32px 0 0" : "32px",
-                    padding: "8px 10px 8px 24px",
+                    padding: window.innerWidth <= 375 ? "6px 8px 6px 14px" : "8px 10px 8px 24px",
                     boxShadow: open
                         ? "0 20px 60px rgba(0,0,0,0.15)"
                         : "0 10px 40px rgba(0,0,0,0.12)",
@@ -355,11 +356,11 @@ export default function SearchBar() {
                     onFocus={() => setOpen(true)}
                     value={q}
                     onChange={(e) => setQ(e.target.value)}
-                    placeholder="Buscar profesores, cursos, mentores, apuntes..."
+                    placeholder={window.innerWidth <= 375 ? "Buscar..." : "Buscar profesores, cursos, mentores, apuntes..."}
                     style={{
                         border: "none",
                         outline: "none",
-                        padding: "14px 12px",
+                        padding: window.innerWidth <= 375 ? "12px 8px" : "14px 12px",
                         flex: 1,
                         fontSize: 15,
                         color: '#0f172a',
@@ -402,14 +403,14 @@ export default function SearchBar() {
                 <button
                     type="submit"
                     style={{
-                        padding: "12px 24px",
-                        height: 48,
-                        borderRadius: 24,
+                        padding: window.innerWidth <= 375 ? "10px 14px" : "12px 24px",
+                        height: window.innerWidth <= 375 ? 40 : 48,
+                        borderRadius: window.innerWidth <= 375 ? 20 : 24,
+                        fontSize: window.innerWidth <= 375 ? 12 : 14,
                         border: "none",
                         background: "#2563eb",
                         color: "#fff",
                         fontWeight: 600,
-                        fontSize: 14,
                         cursor: "pointer",
                         transition: "all 0.2s ease",
                     }}
