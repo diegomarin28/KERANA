@@ -52,6 +52,16 @@ body { background: var(--bg); color: var(--fg); /* esta en rojo pq intelij no la
     border-color: var(--accent);
     box-shadow: 0 0 0 3px rgba(37,99,235,.15);
 }
+html, body, #root {
+    max-width: 100vw;
+    overflow-x: hidden;
+    margin: 0;
+    padding: 0;
+}
+
+* {
+    box-sizing: border-box;
+}
 
 /* ===== Botón primario (píldora) ===== */
 .btn-primary{
