@@ -86,6 +86,7 @@ export default function Home() {
                     return {
                         ...note,
                         usuario: apunte?.usuario || { nombre: 'Anónimo' },
+                        descripcion: apunte?.descripcion || '',
                         signedUrl: urls[note.apunte_id] || null,
                         thumbnail_path: apunte?.thumbnail_path || null,
                         likes_count: likesMap.get(note.apunte_id) || 0

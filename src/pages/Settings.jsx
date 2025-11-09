@@ -188,54 +188,7 @@ function AccountTab({ navigate }) {
                 <ActionButton onClick={() => navigate('/edit-profile')} label="Editar perfil" />
             </Card>
 
-            <Card title="Seguridad" icon={faLock} color="#ef4444">
-                {!changePasswordOpen ? (
-                    <ActionButton onClick={() => setChangePasswordOpen(true)} label="Cambiar contraseña" />
-                ) : (
-                    <div style={{ marginTop: 12 }}>
-                        <input
-                            type="password"
-                            placeholder="Nueva contraseña"
-                            value={newPassword}
-                            onChange={(e) => setNewPassword(e.target.value)}
-                            style={inputStyle}
-                        />
-                        <input
-                            type="password"
-                            placeholder="Confirmar contraseña"
-                            value={confirmPassword}
-                            onChange={(e) => setConfirmPassword(e.target.value)}
-                            style={inputStyle}
-                        />
-                        {message && (
-                            <MessageBanner
-                                message={message}
-                                type={message.includes('correctamente') ? 'success' : 'error'}
-                            />
-                        )}
-                        <div style={{ display: 'flex', gap: 8, marginTop: 12 }}>
-                            <button
-                                onClick={handleChangePassword}
-                                disabled={loading}
-                                style={{ ...primaryButtonStyle, flex: 1, opacity: loading ? 0.5 : 1 }}
-                            >
-                                {loading ? 'Cambiando...' : 'Cambiar'}
-                            </button>
-                            <button
-                                onClick={() => {
-                                    setChangePasswordOpen(false);
-                                    setMessage('');
-                                    setNewPassword('');
-                                    setConfirmPassword('');
-                                }}
-                                style={{ ...secondaryButtonStyle, flex: 1 }}
-                            >
-                                Cancelar
-                            </button>
-                        </div>
-                    </div>
-                )}
-            </Card>
+
 
             <Card title="Gestión de Datos" icon={faChartBar} color="#8b5cf6">
                 <DataManagementSection />
@@ -873,15 +826,6 @@ function AppearanceTab() {
                 </select>
             </Card>
 
-            <Card title="Visualización" icon={faMobileAlt} color="#8b5cf6">
-                <SettingToggle
-                    label="Modo compacto"
-                    description="Reduce el espaciado de los elementos"
-                    checked={compactMode}
-                    onChange={() => setCompactMode(!compactMode)}
-                    color="#8b5cf6"
-                />
-            </Card>
         </>
     );
 }

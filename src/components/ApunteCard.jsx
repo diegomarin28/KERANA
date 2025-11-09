@@ -113,7 +113,7 @@ export default function ApunteCard({ note, currentUserId }) {
                 fontFamily: 'Inter, sans-serif',
                 display: 'flex',
                 flexDirection: 'column',
-                minHeight: 350,
+                minHeight: 400,
             }}
             onClick={handleClick}
             onMouseEnter={(e) => {

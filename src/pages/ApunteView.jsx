@@ -1240,7 +1240,7 @@ export const ApunteView = () => {
                             fontFamily: 'Inter, sans-serif',
                             fontWeight: 500
                         }}>
-                            Ya podés descargar el apunte. También aparece en tu sección de <strong style={{ color: '#374151' }}>Mis compras</strong>. 📥
+                            Ya podés descargar el apunte. También aparece en tu sección de <strong style={{ color: '#374151' }}>Mis Compras</strong>.
                         </p>
                         <Button
                             onClick={() => setShowSuccessModal(false)}

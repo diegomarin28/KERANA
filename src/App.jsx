@@ -26,7 +26,6 @@ const MentorApply = lazy(() => import("./pages/MentorApply"));
 const UserDashboard = lazy(() => import("./components/UserDashboard"));
 const CourseSearch = lazy(() => import("./components/CourseSearch"));
 const MisionVision = lazy(() => import("./pages/MisionVision"));
-const MyMentorships = lazy(() => import("./pages/MyMentorships"));
 const MyCalendar = lazy(() => import('./pages/mentor/MyCalendar'));
 const IAmMentor = lazy(() => import('./pages/mentor/IAmMentor'));
 const MyStudents = lazy(() => import('./pages/mentor/MyStudents'));
@@ -55,6 +54,7 @@ const Credits = lazy(() => import("./pages/Credits"));
 const MyCredits = lazy(() => import("./pages/MyCredits"));
 const CreateProfile = lazy(() => import("./pages/CreateProfile"));
 const ResetPassword = lazy(() => import("./pages/ResetPassword"));
+
 
 
 
@@ -174,10 +174,10 @@ function AppRoutes() {
                     <Route path="/mentor/calendar" element={<MyCalendar />} />
                     <Route path="/mentor/courses" element={<AuthGuard requireAuth={true}><IAmMentor /></AuthGuard>} />
                     <Route path="/mentor/students" element={<MyStudents />} />
-                    <Route path="/mentor/my-mentorships" element={<AuthGuard requireAuth={true}><MyMentorships /></AuthGuard>} />
+
 
                     {/* Detalles */}
-                    <Route path="/profesores/:id" element={<ProfessorDetail />} />
+                    <Route path="/profesores/:id" element={<AuthGuard requireAuth={true}><ProfessorDetail /></AuthGuard>} />
                     <Route path="/materias/:id" element={<SubjectDetail />} />
                     {/* Redirigir /cursos/:id a /materias/:id si es necesario */}
                     <Route path="/cursos/:id" element={<RedirectToMaterias />} />

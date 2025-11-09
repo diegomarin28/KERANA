@@ -20,40 +20,51 @@ export function useMentorOnboarding() {
             }
 
             // Obtener id_usuario desde la tabla usuario
-            const { data: usuarioData } = await supabase
+            const { data: usuarioData, error: usuarioError } = await supabase
                 .from('usuario')
                 .select('id_usuario')
                 .eq('auth_id', user.id)
-                .single();
+                .maybeSingle();
 
-            if (!usuarioData) {
+            if (usuarioError || !usuarioData) {
+                console.log('❌ No se encontró usuario en la tabla');
                 setLoading(false);
                 return;
             }
 
-            // Verificar si es mentor y si completó onboarding (solo campos necesarios)
-            const { data: mentor, error } = await supabase
+            // Verificar si es mentor y si completó onboarding
+            const { data: mentor, error: mentorError } = await supabase
                 .from('mentor')
                 .select('id_mentor, onboarding_completado')
                 .eq('id_usuario', usuarioData.id_usuario)
                 .maybeSingle();
 
-            if (error || !mentor) {
-                // No es mentor
+            if (mentorError) {
+                console.error('Error consultando mentor:', mentorError);
+                setLoading(false);
+                return;
+            }
+
+            // Si mentor es NULL → No es mentor → NO mostrar modal
+            if (!mentor) {
+                console.log('✅ Usuario NO es mentor');
                 setLoading(false);
                 return;
             }
 
             // Si es mentor pero NO completó onboarding → Mostrar modal
             if (!mentor.onboarding_completado) {
+                console.log('📋 Mentor sin onboarding completado → Mostrando modal');
                 setMentorData(mentor);
                 setShowModal(true);
+            } else {
+                console.log('✅ Mentor con onboarding completado');
             }
 
             setLoading(false);
 
         } catch (error) {
-            console.error('Error verificando onboarding de mentor:', error);
+            console.error('❌ Error verificando onboarding de mentor:', error);
             setLoading(false);
         }
     };
@@ -67,7 +78,7 @@ export function useMentorOnboarding() {
                 .update({
                     max_alumnos: formData.maxAlumnos,
                     localidad: formData.localidad,
-                    acepta_zoom: formData.aceptaZoom,
+                    acepta_virtual: formData.aceptaZoom,  // ← CAMBIO: acepta_zoom → acepta_virtual
                     acepta_presencial: formData.aceptaPresencial,
                     lugar_presencial: formData.lugarPresencial,
                     direccion: formData.direccion,
