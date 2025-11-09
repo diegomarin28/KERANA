@@ -238,7 +238,8 @@ export default function Favorites() {
             icon: faFileAlt,
             data: notesFavorites,
             Component: ApunteCard,
-            getProps: (item) => ({ note: item.note })
+            getProps: (item) => ({ note: item.note }),
+            route: '/notes'
         },
         {
             key: 'mentor',
@@ -246,7 +247,8 @@ export default function Favorites() {
             icon: faGraduationCap,
             data: mentorsFavorites,
             Component: MentorCard,
-            getProps: (item) => ({ mentor: item.mentor })
+            getProps: (item) => ({ mentor: item.mentor }),
+            route: '/mentors'
         }
     ];
 
@@ -503,7 +505,12 @@ export default function Favorites() {
                     </p>
                     <Button
                         variant="primary"
-                        onClick={() => window.location.href = `/${activeFilter === 'all' ? 'apuntes' : activeFilter === 'note' ? 'apuntes' : 'mentores'}`}
+                        onClick={() => window.location.href = activeFilter === 'all'
+                            ? '/notes'
+                            : activeFilter === 'note'
+                                ? '/notes'
+                                : '/mentors'
+                        }
                         style={{
                             padding: '12px 24px',
                             fontSize: 15,
@@ -518,48 +525,100 @@ export default function Favorites() {
                     {/* Vista "Todos" con secciones separadas */}
                     {activeFilter === 'all' ? (
                         <div style={{ display: 'flex', flexDirection: 'column', gap: 40 }}>
-                            {sectionsConfig.map((section) => {
-                                if (section.data.length === 0) return null;
-
-                                return (
-                                    <div key={section.key} style={{ marginBottom: 48 }}>
-                                        <div style={{
-                                            display: 'flex',
-                                            alignItems: 'center',
-                                            gap: 12,
-                                            marginBottom: 16,
-                                            paddingBottom: 12,
-                                            borderBottom: '2px solid #E5E7EB'
-                                        }}>
-                                            <FontAwesomeIcon
-                                                icon={section.icon}
-                                                style={{
-                                                    fontSize: 20,
-                                                    color: '#13346b'
-                                                }}
-                                            />
-                                            <h2 style={{
-                                                margin: 0,
+                            {sectionsConfig.map((section) => (
+                                <div key={section.key} style={{ marginBottom: 48 }}>
+                                    <div style={{
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        gap: 12,
+                                        marginBottom: 16,
+                                        paddingBottom: 12,
+                                        borderBottom: '2px solid #E5E7EB'
+                                    }}>
+                                        <FontAwesomeIcon
+                                            icon={section.icon}
+                                            style={{
                                                 fontSize: 20,
-                                                fontWeight: 700,
-                                                color: '#13346b',
-                                                fontFamily: 'Inter, sans-serif'
-                                            }}>
-                                                {section.label}
-                                            </h2>
-                                            <span style={{
-                                                background: '#EFF6FF',
-                                                color: '#1E40AF',
-                                                padding: '4px 12px',
-                                                borderRadius: 12,
-                                                fontSize: 13,
-                                                fontWeight: 700,
-                                                fontFamily: 'Inter, sans-serif'
-                                            }}>
-                                                {section.data.length}
-                                            </span>
-                                        </div>
+                                                color: '#13346b'
+                                            }}
+                                        />
+                                        <h2 style={{
+                                            margin: 0,
+                                            fontSize: 20,
+                                            fontWeight: 700,
+                                            color: '#13346b',
+                                            fontFamily: 'Inter, sans-serif'
+                                        }}>
+                                            {section.label}
+                                        </h2>
+                                        <span style={{
+                                            background: '#EFF6FF',
+                                            color: '#1E40AF',
+                                            padding: '4px 12px',
+                                            borderRadius: 12,
+                                            fontSize: 13,
+                                            fontWeight: 700,
+                                            fontFamily: 'Inter, sans-serif'
+                                        }}>
+                                            {section.data.length}
+                                        </span>
+                                    </div>
 
+                                    {section.data.length === 0 ? (
+                                        <Card style={{
+                                            textAlign: 'center',
+                                            padding: '40px 20px',
+                                            background: '#ffffff',
+                                            border: '2px solid #f1f5f9'
+                                        }}>
+                                            <div style={{
+                                                width: 64,
+                                                height: 64,
+                                                borderRadius: '16px',
+                                                background: '#f1f5f9',
+                                                display: 'flex',
+                                                alignItems: 'center',
+                                                justifyContent: 'center',
+                                                margin: '0 auto 16px'
+                                            }}>
+                                                <FontAwesomeIcon
+                                                    icon={section.icon}
+                                                    style={{
+                                                        fontSize: 28,
+                                                        color: '#94a3b8'
+                                                    }}
+                                                />
+                                            </div>
+                                            <h3 style={{
+                                                margin: '0 0 8px 0',
+                                                color: '#64748b',
+                                                fontSize: 16,
+                                                fontWeight: 600,
+                                                fontFamily: 'Inter, sans-serif'
+                                            }}>
+                                                No tenés {section.label.toLowerCase()} favoritos
+                                            </h3>
+                                            <p style={{
+                                                color: '#94a3b8',
+                                                margin: '0 0 20px 0',
+                                                fontSize: 14,
+                                                fontWeight: 500
+                                            }}>
+                                                Explorá y guardá {section.label.toLowerCase()} que te interesen
+                                            </p>
+                                            <Button
+                                                variant="primary"
+                                                onClick={() => window.location.href = section.route}
+                                                style={{
+                                                    padding: '10px 20px',
+                                                    fontSize: 14,
+                                                    fontWeight: 600
+                                                }}
+                                            >
+                                                Explorar {section.label}
+                                            </Button>
+                                        </Card>
+                                    ) : (
                                         <div style={{
                                             display: 'grid',
                                             gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))',
@@ -576,9 +635,9 @@ export default function Favorites() {
                                                 );
                                             })}
                                         </div>
-                                    </div>
-                                );
-                            })}
+                                    )}
+                                </div>
+                            ))}
                         </div>
                     ) : (
                         /* Vista filtrada (solo un tipo) */

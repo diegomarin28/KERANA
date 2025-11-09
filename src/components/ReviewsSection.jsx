@@ -26,6 +26,7 @@ import {
     faExclamationTriangle,
     faClipboardCheck
 } from '@fortawesome/free-solid-svg-icons';
+import {useMentorStatus} from "../hooks/useMentorStatus.js";
 
 // Tags disponibles
 const AVAILABLE_TAGS = [
@@ -60,6 +61,7 @@ export default function ReviewsSection({
     const [deleteModalOpen, setDeleteModalOpen] = useState(false);
     const [reviewToDelete, setReviewToDelete] = useState(null);
     const [deleting, setDeleting] = useState(false);
+    const { isMentor, loading: mentorLoading } = useMentorStatus(true);
 
     useEffect(() => {
         loadMateriasNames();
@@ -181,10 +183,11 @@ export default function ReviewsSection({
                 gap: 16
             }}>
                 <h2 style={{
-                    fontSize: 24,
-                    fontWeight: 800,
+                    fontSize: 22,
+                    fontWeight: 700,
                     margin: 0,
-                    color: '#13346b',
+                    color: '#000000E6',
+                    letterSpacing: '-0.3px',
                     display: 'flex',
                     alignItems: 'center',
                     gap: 12
@@ -196,7 +199,7 @@ export default function ReviewsSection({
                     onClick={onAddReview}
                     style={{
                         padding: '12px 24px',
-                        background: '#2563eb',
+                        background: isMentor ? '#0d9488' : '#2563eb',
                         color: '#fff',
                         border: 'none',
                         borderRadius: 12,
@@ -360,7 +363,7 @@ export default function ReviewsSection({
                             onClick={onAddReview}
                             style={{
                                 padding: '12px 24px',
-                                background: '#2563eb',
+                                background: isMentor ? '#0d9488' : '#2563eb',
                                 color: '#fff',
                                 border: 'none',
                                 borderRadius: 12,
@@ -374,7 +377,7 @@ export default function ReviewsSection({
                                 gap: 8
                             }}
                             onMouseEnter={(e) => {
-                                e.target.style.background = '#1e40af';
+                                e.target.style.background = isMentor ? '#14b8a6' : '#1e40af';
                                 e.target.style.transform = 'translateY(-2px)';
                                 e.target.style.boxShadow = '0 8px 20px rgba(37, 99, 235, 0.3)';
                             }}
