@@ -309,7 +309,7 @@ export function MentorCard({ mentor }) {
                         flexWrap: 'wrap',
                         gap: '6px',
                         justifyContent: 'center',
-                        marginBottom: '0px'
+                        marginBottom: '20px'
                     }}>
                         {rating.topTags.map((tagId) => {
                             const tag = AVAILABLE_TAGS.find(t => t.id === tagId);

@@ -706,6 +706,7 @@ export default function MentorCalendarModal({
                                                         }
                                                     }}
                                                 >
+                                                    {/* Hora */}
                                                     <div style={{
                                                         fontSize: 14,
                                                         fontWeight: 700,
@@ -714,24 +715,40 @@ export default function MentorCalendarModal({
                                                         <FontAwesomeIcon icon={faClock} style={{ marginRight: 6, fontSize: 12 }} />
                                                         {formatTimeRange(slot.hora, slot.duracion)}
                                                     </div>
+
+                                                    {/* Modalidad */}
                                                     <div style={{
                                                         fontSize: 11,
                                                         fontWeight: 600,
-                                                        color: slot.disponible ? modalidadText : '#94a3b8'
+                                                        color: slot.disponible ? modalidadText : '#94a3b8',
+                                                        display: 'flex',
+                                                        alignItems: 'center',
+                                                        gap: 4
                                                     }}>
-                                                        {slot.modalidad === 'virtual' ? '💻 Virtual' : '🏢 Presencial'}
+                                                        <FontAwesomeIcon
+                                                            icon={slot.modalidad === 'virtual' ? faVideo : faBuilding}
+                                                            style={{ fontSize: 11 }}
+                                                        />
+                                                        {slot.modalidad === 'virtual' ? 'Virtual' : 'Presencial'}
                                                         {slot.modalidad === 'presencial' && slot.locacion && (
-                                                            <span style={{ marginLeft: 4 }}>
-                                                                {slot.locacion === 'casa' ? '🏠' : '🎓'}
-                                                            </span>
+                                                            <FontAwesomeIcon
+                                                                icon={slot.locacion === 'casa' ? faHome : faUniversity}
+                                                                style={{ fontSize: 10, marginLeft: 2 }}
+                                                            />
                                                         )}
                                                     </div>
+
+                                                    {/* Materia */}
                                                     <div style={{
                                                         fontSize: 10,
                                                         fontWeight: 600,
-                                                        color: slot.disponible ? modalidadText : '#94a3b8'
+                                                        color: slot.disponible ? modalidadText : '#94a3b8',
+                                                        display: 'flex',
+                                                        alignItems: 'center',
+                                                        gap: 4
                                                     }}>
-                                                        📚 {slot.materia_nombre}
+                                                        <FontAwesomeIcon icon={faBook} style={{ fontSize: 10 }} />
+                                                        {slot.materia_nombre}
                                                     </div>
                                                 </button>
                                             );

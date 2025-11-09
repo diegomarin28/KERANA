@@ -10,6 +10,7 @@ import {
 } from '@fortawesome/free-solid-svg-icons';
 import {useEffect, useState} from "react";
 import { notificationTypes } from '../../api/notificationTypes';
+import { TimeRangePicker } from '../../components/TimeRangePicker';
 
 
 export default function MyCalendar() {
@@ -19,6 +20,7 @@ export default function MyCalendar() {
     const [confirmDelete, setConfirmDelete] = useState(null);
     const [isDeleting, setIsDeleting] = useState(false);
     const [showReservedWarning, setShowReservedWarning] = useState(false);
+    const [editingSlotKey, setEditingSlotKey] = useState(null);
 
     const [currentDate, setCurrentDate] = useState(new Date());
     const [selectedDate, setSelectedDate] = useState(null);
@@ -38,6 +40,9 @@ export default function MyCalendar() {
     const [slotLocaciones, setSlotLocaciones] = useState({});
     const [slotModalidades, setSlotModalidades] = useState({});
     const [isEditingExisting, setIsEditingExisting] = useState(false);
+    const [slotHoraFin, setSlotHoraFin] = useState({});
+    const [rangoHoraInicio, setRangoHoraInicio] = useState('18:00');
+    const [rangoHoraFin, setRangoHoraFin] = useState('19:00');
 
     const availableHours = [
         '07:00' ,'08:00', '09:00', '10:00', '11:00', '12:00', '13:00',
@@ -62,6 +67,18 @@ export default function MyCalendar() {
     const formatTimeRange = (startTime, durationMinutes) => {
         const endTime = calculateEndTime(startTime, durationMinutes);
         return `${startTime.slice(0, 5)} - ${endTime}`;
+    };
+
+    const timeToMinutes = (timeStr) => {
+        if (!timeStr) return 0;
+        const [hours, minutes] = timeStr.split(':').map(Number);
+        return hours * 60 + minutes;
+    };
+
+    const minutesToTime = (totalMinutes) => {
+        const hours = Math.floor(totalMinutes / 60);
+        const minutes = totalMinutes % 60;
+        return `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}`;
     };
 
     useEffect(() => {
@@ -185,6 +202,7 @@ export default function MyCalendar() {
             const locacionesBySlot = {};
             const maxAlumnosBySlot = {};
             const disponibilidadBySlot = {};
+            const horaFinBySlot = {};
 
             data.forEach(slot => {
                 const horaOriginal = slot.hora;
@@ -217,6 +235,11 @@ export default function MyCalendar() {
                 locacionesBySlot[slotKey] = slot.locacion || null;
                 maxAlumnosBySlot[slotKey] = slot.max_alumnos || mentorInfo.max_alumnos;
                 disponibilidadBySlot[slotKey] = slot.disponible;
+
+                // ✅ ARREGLO: Normalizar hora_fin
+                if (slot.hora_fin) {
+                    horaFinBySlot[slotKey] = slot.hora_fin.slice(0, 5);
+                }
             });
 
             console.log('📊 Resultado final slotsByDate:', slotsByDate);
@@ -228,6 +251,7 @@ export default function MyCalendar() {
             setSlotLocaciones(locacionesBySlot);
             setSlotMaxAlumnos(maxAlumnosBySlot);
             setSlotDisponibilidad(disponibilidadBySlot);
+            setSlotHoraFin(horaFinBySlot);
         }
     };
 
@@ -260,44 +284,63 @@ export default function MyCalendar() {
         setIsEditingExisting(false);
         const dateKey = formatDateKey(date);
 
+        // ✅ RESETEAR a valores por defecto
+        setRangoHoraInicio('18:00');
+        setRangoHoraFin('19:00');
+
         setSelectedSlots(prev => ({
             ...prev,
             [dateKey]: []
         }));
     };
+
+    // ✅ ARREGLADO: handleEditExisting ahora carga correctamente el slot
     const handleEditExisting = () => {
         setIsEditingExisting(true);
         const dateKey = formatDateKey(selectedDate);
         const existingSlots = savedSlots[dateKey] || [];
+
+        // Si hay slots, cargar el primero para editar
+        if (existingSlots.length > 0) {
+            const primerSlot = existingSlots[0];
+            const slotKey = `${dateKey}-${primerSlot}`;
+
+            // Cargar hora inicio y fin del primer slot
+            const horaInicio = primerSlot;
+            const horaFin = slotHoraFin[slotKey];
+
+            if (horaInicio) setRangoHoraInicio(horaInicio);
+            if (horaFin) setRangoHoraFin(horaFin);
+
+            // Cargar configuraciones
+            const modalidad = slotModalidades[slotKey] || getDefaultModalidad();
+            const locacion = slotLocaciones[slotKey];
+            const maxAlumnos = slotMaxAlumnos[slotKey] || mentorInfo.max_alumnos;
+
+            // Actualizar states
+            setSlotModalidades(prev => ({
+                ...prev,
+                [slotKey]: modalidad
+            }));
+
+            if (modalidad === 'presencial' && locacion) {
+                setSlotLocaciones(prev => ({
+                    ...prev,
+                    [slotKey]: locacion
+                }));
+            }
+
+            setSlotMaxAlumnos(prev => ({
+                ...prev,
+                [slotKey]: maxAlumnos
+            }));
+        }
 
         // Cargar slots existentes para editar
         setSelectedSlots(prev => ({
             ...prev,
             [dateKey]: [...existingSlots]
         }));
-
-        // Cargar configuraciones de cada slot
-        existingSlots.forEach(hour => {
-            const slotKey = `${dateKey}-${hour}`;
-            if (!slotDurations[slotKey]) {
-                setSlotDurations(prev => ({
-                    ...prev,
-                    [slotKey]: mentoriaDuration
-                }));
-            }
-            if (!slotModalidades[slotKey]) {
-                setSlotModalidades(prev => ({
-                    ...prev,
-                    [slotKey]: getDefaultModalidad()
-                }));
-            }
-            if (!slotMaxAlumnos[slotKey]) {
-                setSlotMaxAlumnos(prev => ({
-                    ...prev,
-                    [slotKey]: mentorInfo.max_alumnos
-                }));
-            }
-        });
     };
 
     const parseTime = (timeStr) => {
@@ -329,87 +372,169 @@ export default function MyCalendar() {
         return overlaps;
     };
 
+    const verificarSolapamientoConHoraFin = (fecha, horaInicio, horaFin) => {
+        const slotsExistentes = savedSlots[fecha] || [];
+
+        for (const hora of slotsExistentes) {
+            const slotKey = `${fecha}-${hora}`;
+
+            // Obtener hora_fin del slot existente
+            let horaFinExistente = slotHoraFin[slotKey];
+
+            if (!horaFinExistente) {
+                // Si no tiene hora_fin guardada, calcular desde duración
+                const duracionExistente = slotDurations[slotKey] || mentoriaDuration;
+                horaFinExistente = minutesToTime(timeToMinutes(hora) + duracionExistente);
+            }
+
+            const existeInicio = timeToMinutes(hora);
+            const existeFin = timeToMinutes(horaFinExistente);
+            const nuevoInicio = timeToMinutes(horaInicio);
+            const nuevoFin = timeToMinutes(horaFin);
+
+            // Verificar solapamiento
+            if (
+                (nuevoInicio >= existeInicio && nuevoInicio < existeFin) ||
+                (nuevoFin > existeInicio && nuevoFin <= existeFin) ||
+                (nuevoInicio <= existeInicio && nuevoFin >= existeFin)
+            ) {
+                return {
+                    solapa: true,
+                    slotConflicto: {
+                        hora: hora,
+                        hora_fin: horaFinExistente
+                    }
+                };
+            }
+        }
+
+        return { solapa: false };
+    };
+
+    const validarUbicacionPresencial = (fecha, horaInicio, modalidad, locacion) => {
+        if (modalidad !== 'presencial') return { valido: true };
+        if (!locacion) return { valido: true };
+
+        const slotsDelDia = savedSlots[fecha] || [];
+
+        for (const hora of slotsDelDia) {
+            const slotKey = `${fecha}-${hora}`;
+            const slotModalidad = slotModalidades[slotKey];
+            const slotLocacion = slotLocaciones[slotKey];
+
+            // Solo verificar slots presenciales
+            if (slotModalidad !== 'presencial') continue;
+
+            // Si es la misma ubicación, está OK
+            if (slotLocacion === locacion) continue;
+
+            // Calcular hora_fin del slot existente
+            let horaFinExistente = slotHoraFin[slotKey];
+            if (!horaFinExistente) {
+                const duracion = slotDurations[slotKey] || mentoriaDuration;
+                horaFinExistente = minutesToTime(timeToMinutes(hora) + duracion);
+            }
+
+            const finExistente = timeToMinutes(horaFinExistente);
+            const inicioNuevo = timeToMinutes(horaInicio);
+            const diferencia = inicioNuevo - finExistente;
+
+            // Si hay menos de 30 min entre ubicaciones diferentes
+            if (diferencia >= 0 && diferencia < 30) {
+                const ubicacionAnterior = slotLocacion === 'casa' ? 'Casa del mentor' : 'Facultad';
+                const ubicacionNueva = locacion === 'casa' ? 'Casa del mentor' : 'Facultad';
+
+                return {
+                    valido: false,
+                    mensaje: `No hay tiempo suficiente para cambiar de ubicación.\nSe necesitan mínimo 30 minutos entre ${ubicacionAnterior} y ${ubicacionNueva}.`
+                };
+            }
+        }
+
+        return { valido: true };
+    };
 
     const toggleSlot = (hour) => {
         if (!selectedDate) return;
         const dateKey = formatDateKey(selectedDate);
         const slotKey = `${dateKey}-${hour}`;
-            setSelectedSlots(prev => {
-                const dateSlots = prev[dateKey] || [];
 
-                if (dateSlots.includes(hour)) {
-                    const estaReservado = slotDisponibilidad[slotKey] === false;
+        setSelectedSlots(prev => {
+            const dateSlots = prev[dateKey] || [];
 
-                    if (estaReservado) {
-                        setShowReservedWarning(true);
-                        return prev;
-                    }
+            if (dateSlots.includes(hour)) {
+                const estaReservado = slotDisponibilidad[slotKey] === false;
 
-                    const newSlots = dateSlots.filter(h => h !== hour).sort();
-                    setSlotDurations(prevDur => {
-                        const newDur = { ...prevDur };
-                        delete newDur[slotKey];
-                        return newDur;
-                    });
-                    setSlotModalidades(prevMod => {
-                        const newMod = { ...prevMod };
-                        delete newMod[slotKey];
-                        return newMod;
-                    });
-                    setSlotLocaciones(prevLoc => {
-                        const newLoc = { ...prevLoc };
-                        delete newLoc[slotKey];
-                        return newLoc;
-                    });
-                    setSlotMaxAlumnos(prevMax => {
-                        const newMax = { ...prevMax };
-                        delete newMax[slotKey];
-                        return newMax;
-                    });
-                    return { ...prev, [dateKey]: newSlots };
+                if (estaReservado) {
+                    setShowReservedWarning(true);
+                    return prev;
                 }
 
-                const newSlots = [...dateSlots, hour].sort();
-
-                setSlotDurations(prevDur => ({
-                    ...prevDur,
-                    [slotKey]: mentoriaDuration
-                }));
-
-                const defaultModalidad = getDefaultModalidad();
-                setSlotModalidades(prevMod => ({
-                    ...prevMod,
-                    [slotKey]: defaultModalidad
-                }));
-
-                setSlotLocaciones(prevLoc => ({
-                    ...prevLoc,
-                    [slotKey]: defaultModalidad === 'presencial' ? 'casa' : null
-                }));
-
-                setSlotMaxAlumnos(prevMax => ({
-                    ...prevMax,
-                    [slotKey]: mentorInfo.max_alumnos
-                }));
-
-                // ✅ CAMBIO: Validar con TODOS los slots (nuevos + existentes si NO está editando)
-                let slotsToCheck = newSlots;
-                if (!isEditingExisting) {
-                    const existingSlots = savedSlots[dateKey] || [];
-                    slotsToCheck = [...new Set([...existingSlots, ...newSlots])].sort();
-                }
-
-                const overlaps = checkOverlap(dateKey, slotsToCheck);
-                if (overlaps.length > 0) {
-                    const overlap = overlaps[0];
-                    setError(`Solapamiento: El slot de ${overlap.hour1} (${overlap.duration} min) se solapa con ${overlap.hour2}`);
-                    setTimeout(() => setError(''), 5000);
-                    return prev; // ✅ NO agregar el slot si hay solapamiento
-                }
-
+                const newSlots = dateSlots.filter(h => h !== hour).sort();
+                setSlotDurations(prevDur => {
+                    const newDur = { ...prevDur };
+                    delete newDur[slotKey];
+                    return newDur;
+                });
+                setSlotModalidades(prevMod => {
+                    const newMod = { ...prevMod };
+                    delete newMod[slotKey];
+                    return newMod;
+                });
+                setSlotLocaciones(prevLoc => {
+                    const newLoc = { ...prevLoc };
+                    delete newLoc[slotKey];
+                    return newLoc;
+                });
+                setSlotMaxAlumnos(prevMax => {
+                    const newMax = { ...prevMax };
+                    delete newMax[slotKey];
+                    return newMax;
+                });
                 return { ...prev, [dateKey]: newSlots };
-            });
-        };
+            }
+
+            const newSlots = [...dateSlots, hour].sort();
+
+            setSlotDurations(prevDur => ({
+                ...prevDur,
+                [slotKey]: mentoriaDuration
+            }));
+
+            const defaultModalidad = getDefaultModalidad();
+            setSlotModalidades(prevMod => ({
+                ...prevMod,
+                [slotKey]: defaultModalidad
+            }));
+
+            setSlotLocaciones(prevLoc => ({
+                ...prevLoc,
+                [slotKey]: defaultModalidad === 'presencial' ? 'casa' : null
+            }));
+
+            setSlotMaxAlumnos(prevMax => ({
+                ...prevMax,
+                [slotKey]: mentorInfo.max_alumnos
+            }));
+
+            // ✅ Validar con TODOS los slots (nuevos + existentes si NO está editando)
+            let slotsToCheck = newSlots;
+            if (!isEditingExisting) {
+                const existingSlots = savedSlots[dateKey] || [];
+                slotsToCheck = [...new Set([...existingSlots, ...newSlots])].sort();
+            }
+
+            const overlaps = checkOverlap(dateKey, slotsToCheck);
+            if (overlaps.length > 0) {
+                const overlap = overlaps[0];
+                setError(`Solapamiento: El slot de ${overlap.hour1} (${overlap.duration} min) se solapa con ${overlap.hour2}`);
+                setTimeout(() => setError(''), 5000);
+                return prev;
+            }
+
+            return { ...prev, [dateKey]: newSlots };
+        });
+    };
 
     const updateSlotLocacion = (dateKey, hour, locacion) => {
         const slotKey = `${dateKey}-${hour}`;
@@ -464,6 +589,46 @@ export default function MyCalendar() {
             }));
         }
     };
+    const handleEditSlot = (dateKey, hora) => {
+        const slotKey = `${dateKey}-${hora}`;
+        setEditingSlotKey(slotKey);
+
+        // Cargar hora inicio y fin del slot
+        const horaInicio = hora;
+        const horaFin = slotHoraFin[slotKey];
+
+        if (horaInicio) setRangoHoraInicio(horaInicio);
+        if (horaFin) setRangoHoraFin(horaFin);
+
+        // Cargar configuraciones
+        const modalidad = slotModalidades[slotKey] || getDefaultModalidad();
+        const locacion = slotLocaciones[slotKey];
+        const maxAlumnos = slotMaxAlumnos[slotKey] || mentorInfo.max_alumnos;
+
+        // Actualizar states
+        setSlotModalidades(prev => ({
+            ...prev,
+            [slotKey]: modalidad
+        }));
+
+        if (modalidad === 'presencial' && locacion) {
+            setSlotLocaciones(prev => ({
+                ...prev,
+                [slotKey]: locacion
+            }));
+        }
+
+        setSlotMaxAlumnos(prev => ({
+            ...prev,
+            [slotKey]: maxAlumnos
+        }));
+
+        // Abrir selector con fecha ya seleccionada
+        const date = new Date(dateKey + 'T00:00:00');
+        setSelectedDate(date);
+        setShowTimeSelector(true);
+        setIsEditingExisting(true);
+    };
 
     const updateSlotMaxAlumnos = (dateKey, hour, maxAlumnos) => {
         const slotKey = `${dateKey}-${hour}`;
@@ -476,100 +641,160 @@ export default function MyCalendar() {
     const saveManualSlots = async () => {
         if (!selectedDate || !currentMentorId) return;
         const dateKey = formatDateKey(selectedDate);
-        let slots = selectedSlots[dateKey] || [];
 
-        if (slots.length === 0 && isEditingExisting) {
-            setError('Debes seleccionar al menos un horario');
+        // Validar que se eligió rango de horas
+        if (!rangoHoraInicio || !rangoHoraFin) {
+            setError('Debes seleccionar un rango de horario');
             setTimeout(() => setError(''), 3000);
             return;
         }
 
-        // Si NO está editando, combinar con existentes (sin duplicados)
-        if (!isEditingExisting) {
-            const existingSlots = savedSlots[dateKey] || [];
-            slots = [...new Set([...existingSlots, ...slots])].sort();
-        }
+        const duracionRango = timeToMinutes(rangoHoraFin) - timeToMinutes(rangoHoraInicio);
 
-        if (slots.length === 0) {
-            setError('Debes seleccionar al menos un horario');
+        // Validar duración mínima
+        if (duracionRango < 60) {
+            setError('El rango debe ser de al menos 60 minutos');
             setTimeout(() => setError(''), 3000);
             return;
         }
 
-        const overlaps = checkOverlap(dateKey, slots);
-        if (overlaps.length > 0) {
-            setError('No se pueden guardar horarios solapados');
-            setTimeout(() => setError(''), 4000);
+        // Validar solapamiento con slots existentes
+        const resultadoSolapa = verificarSolapamientoConHoraFin(
+            dateKey,
+            rangoHoraInicio,
+            rangoHoraFin
+        );
+
+        if (resultadoSolapa.solapa) {
+            const conflicto = resultadoSolapa.slotConflicto;
+            setError(
+                `El horario se solapa con un slot existente (${conflicto.hora}-${conflicto.hora_fin})`
+            );
+            setTimeout(() => setError(''), 5000);
             return;
         }
 
-        try {
-            const slotsConDuracion = slots.map(hora => {
-                const slotKey = `${dateKey}-${hora}`;
-                const duracion = slotDurations[slotKey] || mentoriaDuration;
-                const modalidad = slotModalidades[slotKey] || getDefaultModalidad();
-                const locacion = slotLocaciones[slotKey] || null;
-                const maxAlumnos = slotMaxAlumnos[slotKey] || mentorInfo.max_alumnos;
+        // Obtener modalidad y locación elegidas (o defaults)
+        const slotKey = `${dateKey}-${rangoHoraInicio}`;
+        const modalidadElegida = slotModalidades[slotKey] || getDefaultModalidad();
+        const locacionElegida = slotLocaciones[slotKey] || (modalidadElegida === 'presencial' ? 'casa' : null);
 
-                return {
-                    hora,
-                    duracion,
-                    modalidad,
-                    locacion,
-                    max_alumnos: maxAlumnos
-                };
-            });
-
-            const { error } = await slotsAPI.guardarSlotsManual(
-                currentMentorId,
+        // Validar ubicación presencial (R5)
+        if (modalidadElegida === 'presencial') {
+            const validacionUbicacion = validarUbicacionPresencial(
                 dateKey,
-                slotsConDuracion,
-                mentoriaDuration
+                rangoHoraInicio,
+                modalidadElegida,
+                locacionElegida
             );
 
-            if (error) {
-                setError('Error guardando horarios: ' + error.message);
-                setTimeout(() => setError(''), 4000);
-            } else {
-                setSavedSlots(prev => ({ ...prev, [dateKey]: slots }));
-                setSuccess(`${slots.length} ${slots.length === 1 ? 'horario guardado' : 'horarios guardados'} correctamente`);
-                setTimeout(() => setSuccess(''), 3000);
-                setShowTimeSelector(false);
-                setSelectedDate(null);
-                loadSavedSlots();
+            if (!validacionUbicacion.valido) {
+                setError(validacionUbicacion.mensaje);
+                setTimeout(() => setError(''), 5000);
+                return;
             }
-        } catch (err) {
-            console.error('❌ Error guardando slots:', err);
-            setError('Error inesperado guardando horarios');
-            setTimeout(() => setError(''), 4000);
         }
 
         try {
-            const { data: mentorData } = await supabase
-                .from('mentor')
-                .select('id_usuario')
-                .eq('id_mentor', currentMentorId)
-                .single();
+            // Preparar datos del slot
+            const slotData = {
+                hora: rangoHoraInicio,
+                hora_fin: rangoHoraFin,
+                duracion: duracionRango,
+                modalidad: modalidadElegida,
+                locacion: locacionElegida,
+                max_alumnos: slotMaxAlumnos[slotKey] || mentorInfo.max_alumnos
+            };
 
-            if (mentorData) {
-                const { data: usuarioData } = await supabase
-                    .from('usuario')
-                    .select('nombre')
-                    .eq('id_usuario', mentorData.id_usuario)
+            console.log('💾 Guardando slot:', slotData);
+
+            // Guardar en BD usando API
+            const { error: apiError } = await slotsAPI.guardarSlotsManual(
+                currentMentorId,
+                dateKey,
+                [slotData],
+                duracionRango
+            );
+
+            if (apiError) {
+                setError('Error guardando horario: ' + apiError.message);
+                setTimeout(() => setError(''), 4000);
+                return;
+            }
+
+            // Actualizar estado local
+            setSavedSlots(prev => ({
+                ...prev,
+                [dateKey]: [...(prev[dateKey] || []), rangoHoraInicio].sort()
+            }));
+
+            setSlotHoraFin(prev => ({
+                ...prev,
+                [slotKey]: rangoHoraFin
+            }));
+
+            setSlotDurations(prev => ({
+                ...prev,
+                [slotKey]: duracionRango
+            }));
+
+            setSlotModalidades(prev => ({
+                ...prev,
+                [slotKey]: modalidadElegida
+            }));
+
+            if (modalidadElegida === 'presencial') {
+                setSlotLocaciones(prev => ({
+                    ...prev,
+                    [slotKey]: locacionElegida
+                }));
+            }
+
+            setSlotMaxAlumnos(prev => ({
+                ...prev,
+                [slotKey]: slotData.max_alumnos
+            }));
+
+            setSuccess('Horario guardado correctamente ✅');
+            setTimeout(() => setSuccess(''), 3000);
+            setShowTimeSelector(false);
+            setSelectedDate(null);
+
+            // Recargar slots
+            loadSavedSlots();
+
+            // Enviar notificación
+            try {
+                const { data: mentorData } = await supabase
+                    .from('mentor')
+                    .select('id_usuario')
+                    .eq('id_mentor', currentMentorId)
                     .single();
 
-                if (usuarioData) {
-                    await notificationTypes.mentorNuevasHorasDisponibles(
-                        mentorData.id_usuario,
-                        usuarioData.nombre,
-                        dateKey,
-                        slots.length,
-                        currentMentorId
-                    );
+                if (mentorData) {
+                    const { data: usuarioData } = await supabase
+                        .from('usuario')
+                        .select('nombre')
+                        .eq('id_usuario', mentorData.id_usuario)
+                        .single();
+
+                    if (usuarioData) {
+                        await notificationTypes.mentorNuevasHorasDisponibles(
+                            mentorData.id_usuario,
+                            usuarioData.nombre,
+                            dateKey,
+                            1, // 1 slot creado
+                            currentMentorId
+                        );
+                    }
                 }
+            } catch (notifError) {
+                console.error('Error enviando notificaciones:', notifError);
             }
-        } catch (notifError) {
-            console.error('Error enviando notificaciones:', notifError);
+
+        } catch (err) {
+            console.error('❌ Error guardando slot:', err);setError('Error inesperado guardando horario');
+            setTimeout(() => setError(''), 4000);
         }
     };
 
@@ -677,7 +902,7 @@ export default function MyCalendar() {
             `}
                     </style>
                     <div style={{
-                        background: 'linear-gradient(135deg, #fff 0%, #fefce8 100%)',
+                        background: '#fffbeb',
                         padding: 24,
                         borderRadius: 16,
                         boxShadow: '0 20px 60px rgba(0,0,0,0.3)',
@@ -689,7 +914,7 @@ export default function MyCalendar() {
                             width: 64,
                             height: 64,
                             borderRadius: '50%',
-                            background: 'linear-gradient(135deg, #fef3c7 0%, #fde68a 100%)',
+                            background: '#fef3c7',
                             display: 'flex',
                             alignItems: 'center',
                             justifyContent: 'center',
@@ -724,7 +949,7 @@ export default function MyCalendar() {
                             onClick={() => setShowReservedWarning(false)}
                             style={{
                                 width: '100%',
-                                background: 'linear-gradient(135deg, #fbbf24 0%, #f59e0b 100%)',
+                                background: '#fbbf24',
                                 color: '#fff',
                                 border: 'none',
                                 borderRadius: 10,
@@ -780,7 +1005,7 @@ export default function MyCalendar() {
                             width: 56,
                             height: 56,
                             borderRadius: '50%',
-                            background: 'linear-gradient(135deg, #fee2e2 0%, #fecaca 100%)',
+                            background: '#fee2e2',
                             display: 'flex',
                             alignItems: 'center',
                             justifyContent: 'center',
@@ -838,7 +1063,7 @@ export default function MyCalendar() {
                                 disabled={isDeleting}
                                 style={{
                                     flex: 1,
-                                    background: 'linear-gradient(135deg, #ef4444 0%, #dc2626 100%)',
+                                    background: '#ef4444',
                                     color: '#fff',
                                     border: 'none',
                                     borderRadius: 10,
@@ -943,7 +1168,7 @@ export default function MyCalendar() {
                         <button
                             onClick={() => setCurrentDate(new Date(currentDate.getFullYear(), currentDate.getMonth() - 1))}
                             style={{
-                                background: 'linear-gradient(135deg, #2563eb 0%, #1e40af 100%)',
+                                background: '#2563eb',
                                 color: '#fff',
                                 border: 'none',
                                 borderRadius: 10,
@@ -969,7 +1194,7 @@ export default function MyCalendar() {
                         <button
                             onClick={() => setCurrentDate(new Date(currentDate.getFullYear(), currentDate.getMonth() + 1))}
                             style={{
-                                background: 'linear-gradient(135deg, #2563eb 0%, #1e40af 100%)',
+                                background: '#2563eb',
                                 color: '#fff',
                                 border: 'none',
                                 borderRadius: 10,
@@ -1023,8 +1248,8 @@ export default function MyCalendar() {
                                         borderRadius: 10,
                                         cursor: isDisabled ? 'not-allowed' : 'pointer',
                                         background: isDisabled ? '#f9fafb' :
-                                            slotCount > 0 ? 'linear-gradient(135deg, #d1fae5 0%, #a7f3d0 100%)' :
-                                                today ? 'linear-gradient(135deg, #dbeafe 0%, #bfdbfe 100%)' : '#fff',
+                                            slotCount > 0 ? '#d1fae5' :
+                                                today ? '#dbeafe' : '#fff',
                                         border: isSelected ? '3px solid #6366f1' :
                                             today ? '2px solid #2563eb' : '2px solid #f1f5f9',
                                         opacity: isDisabled ? 0.5 : 1,
@@ -1055,7 +1280,7 @@ export default function MyCalendar() {
                                             position: 'absolute',
                                             bottom: 4,
                                             fontSize: 10,
-                                            background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
+                                            background: '#10b981',
                                             color: '#fff',
                                             borderRadius: 12,
                                             padding: '2px 6px',
@@ -1074,7 +1299,7 @@ export default function MyCalendar() {
                             <div style={{
                                 width: 16,
                                 height: 16,
-                                background: 'linear-gradient(135deg, #d1fae5 0%, #a7f3d0 100%)',
+                                background: '#d1fae5',
                                 borderRadius: 4,
                                 border: '2px solid #6ee7b7'
                             }} />
@@ -1084,7 +1309,7 @@ export default function MyCalendar() {
                             <div style={{
                                 width: 16,
                                 height: 16,
-                                background: 'linear-gradient(135deg, #dbeafe 0%, #bfdbfe 100%)',
+                                background: '#dbeafe',
                                 border: '2px solid #2563eb',
                                 borderRadius: 4
                             }} />
@@ -1094,6 +1319,7 @@ export default function MyCalendar() {
                 </div>
 
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
+
                     {showTimeSelector && selectedDate ? (
                         <div style={{
                             background: '#fff',
@@ -1116,7 +1342,7 @@ export default function MyCalendar() {
                                     width: 40,
                                     height: 40,
                                     borderRadius: 10,
-                                    background: 'linear-gradient(135deg, #2563eb 0%, #1e40af 100%)',
+                                    background: '#2563eb',
                                     display: 'flex',
                                     alignItems: 'center',
                                     justifyContent: 'center'
@@ -1130,7 +1356,7 @@ export default function MyCalendar() {
                                         fontWeight: 700,
                                         color: '#0f172a'
                                     }}>
-                                        Seleccionar horarios
+                                        Configurar Disponibilidad
                                     </h3>
                                     <p style={{
                                         color: '#64748b',
@@ -1147,7 +1373,7 @@ export default function MyCalendar() {
                             {savedSlots[formatDateKey(selectedDate)]?.length > 0 && !isEditingExisting && (
                                 <>
                                     <div style={{
-                                        background: 'linear-gradient(135deg, #ecfdf5 0%, #d1fae5 100%)',
+                                        background: '#ecfdf5',
                                         borderRadius: 12,
                                         padding: 16,
                                         marginBottom: 16,
@@ -1175,7 +1401,7 @@ export default function MyCalendar() {
                                                 onClick={handleEditExisting}
                                                 style={{
                                                     padding: '6px 12px',
-                                                    background: 'linear-gradient(135deg, #2563eb 0%, #1e40af 100%)',
+                                                    background: '#2563eb',
                                                     color: '#fff',
                                                     border: 'none',
                                                     borderRadius: 8,
@@ -1210,6 +1436,7 @@ export default function MyCalendar() {
                                                 const maxAlumnos = slotMaxAlumnos[slotKey] || 1;
                                                 const locacion = slotLocaciones[slotKey];
                                                 const disponible = slotDisponibilidad[slotKey] !== false;
+                                                const horaFin = slotHoraFin[slotKey];
 
                                                 return (
                                                     <div key={hora} style={{
@@ -1227,7 +1454,7 @@ export default function MyCalendar() {
                                                                 position: 'absolute',
                                                                 top: -6,
                                                                 right: -6,
-                                                                background: 'linear-gradient(135deg, #fbbf24 0%, #f59e0b 100%)',
+                                                                background: '#fbbf24',
                                                                 color: 'white',
                                                                 padding: '2px 6px',
                                                                 borderRadius: 4,
@@ -1241,27 +1468,30 @@ export default function MyCalendar() {
                                                         )}
                                                         <div style={{ display: 'flex', alignItems: 'center', gap: 4, marginBottom: 4 }}>
                                                             <FontAwesomeIcon icon={faClock} style={{ fontSize: 10 }} />
-                                                            {formatTimeRange(hora, duracion)}
+                                                            {horaFin
+                                                                ? `${hora} - ${horaFin.slice(0, 5)}`
+                                                                : formatTimeRange(hora, duracion)
+                                                            }
                                                         </div>
                                                         <div style={{ fontSize: 10, display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
-                                <span style={{ display: 'flex', alignItems: 'center', gap: 3 }}>
-                                    <FontAwesomeIcon icon={modalidad === 'virtual' ? faLaptop : faBuilding} style={{ fontSize: 9 }} />
-                                    {modalidad.charAt(0).toUpperCase() + modalidad.slice(1)}
-                                </span>
+                                            <span style={{ display: 'flex', alignItems: 'center', gap: 3 }}>
+                                                <FontAwesomeIcon icon={modalidad === 'virtual' ? faLaptop : faBuilding} style={{ fontSize: 9 }} />
+                                                {modalidad.charAt(0).toUpperCase() + modalidad.slice(1)}
+                                            </span>
                                                             {modalidad === 'presencial' && locacion && (
                                                                 <>
                                                                     <span>•</span>
                                                                     <span style={{ display: 'flex', alignItems: 'center', gap: 3 }}>
-                                            <FontAwesomeIcon icon={locacion === 'casa' ? faHome : faGraduationCap} style={{ fontSize: 8 }} />
+                                                        <FontAwesomeIcon icon={locacion === 'casa' ? faHome : faGraduationCap} style={{ fontSize: 8 }} />
                                                                         {locacion === 'casa' ? 'Casa' : 'Facultad'}
-                                        </span>
+                                                    </span>
                                                                 </>
                                                             )}
                                                             <span>•</span>
                                                             <span style={{ display: 'flex', alignItems: 'center', gap: 3 }}>
-                                    <FontAwesomeIcon icon={faUser} style={{ fontSize: 9 }} />
+                                                <FontAwesomeIcon icon={faUser} style={{ fontSize: 9 }} />
                                                                 {maxAlumnos}
-                                </span>
+                                            </span>
                                                         </div>
                                                     </div>
                                                 );
@@ -1281,309 +1511,307 @@ export default function MyCalendar() {
                                     }}>
                                         <div style={{ flex: 1, height: 1, background: '#e2e8f0' }} />
                                         <FontAwesomeIcon icon={faUsers} style={{ fontSize: 12 }} />
-                                        <span>Agregar más horarios</span>
+                                        <span>Agregar nuevo horario</span>
                                         <div style={{ flex: 1, height: 1, background: '#e2e8f0' }} />
                                     </div>
                                 </>
                             )}
 
-                            <div style={{
-                                display: 'grid',
-                                gridTemplateColumns: 'repeat(auto-fill, minmax(90px, 1fr))',
-                                gap: 8,
-                                marginBottom: 20,
-                                maxHeight: '240px',
-                                overflowY: 'auto',
-                                padding: '4px',
-                                borderRadius: 8
-                            }}>
-                                {availableHours.map(hour => {
-                                    const dateKey = formatDateKey(selectedDate);
-                                    const isSelected = (selectedSlots[dateKey] || []).includes(hour);
+                            {/* TimeRangePicker - Selector de rango con flechitas */}
+                            <TimeRangePicker
+                                startTime={rangoHoraInicio}
+                                endTime={rangoHoraFin}
+                                onStartChange={(newStart) => {
+                                    setRangoHoraInicio(newStart);
+                                    const slotKey = `${formatDateKey(selectedDate)}-${newStart}`;
+                                    if (!slotModalidades[slotKey]) {
+                                        setSlotModalidades(prev => ({
+                                            ...prev,
+                                            [slotKey]: getDefaultModalidad()
+                                        }));
+                                    }
+                                }}
+                                onEndChange={(newFin) => setRangoHoraFin(newFin)}
+                                modalidad={slotModalidades[`${formatDateKey(selectedDate)}-${rangoHoraInicio}`] || getDefaultModalidad()}
+                                minDuration={60}
+                                disabled={false}
+                            />
 
-                                    return (
+                            {/* Selector de Modalidad */}
+                            <div style={{ marginBottom: '16px' }}>
+                                <label style={{
+                                    fontSize: '13px',
+                                    fontWeight: 600,
+                                    color: '#64748b',
+                                    display: 'block',
+                                    marginBottom: '8px',
+                                    fontFamily: 'Inter, -apple-system, sans-serif'
+                                }}>
+                                    Modalidad de la Sesión:
+                                </label>
+                                <div style={{ display: 'flex', gap: '12px' }}>
+                                    {mentorInfo.acepta_virtual && (
                                         <button
-                                            key={hour}
-                                            onClick={() => toggleSlot(hour)}
+                                            type="button"
+                                            onClick={() => {
+                                                const slotKey = `${formatDateKey(selectedDate)}-${rangoHoraInicio}`;
+                                                setSlotModalidades(prev => ({
+                                                    ...prev,
+                                                    [slotKey]: 'virtual'
+                                                }));
+                                                setSlotLocaciones(prev => ({
+                                                    ...prev,
+                                                    [slotKey]: null
+                                                }));
+                                            }}
                                             style={{
-                                                padding: '12px 8px',
-                                                background: isSelected
-                                                    ? 'linear-gradient(135deg, #2563eb 0%, #1e40af 100%)'
+                                                flex: 1,
+                                                padding: '12px',
+                                                background: (slotModalidades[`${formatDateKey(selectedDate)}-${rangoHoraInicio}`] || getDefaultModalidad()) === 'virtual'
+                                                    ? '#2563eb'
                                                     : '#f8fafc',
-                                                color: isSelected ? '#fff' : '#0f172a',
-                                                border: isSelected ? 'none' : '2px solid #e2e8f0',
-                                                borderRadius: 10,
+                                                color: (slotModalidades[`${formatDateKey(selectedDate)}-${rangoHoraInicio}`] || getDefaultModalidad()) === 'virtual'
+                                                    ? '#fff'
+                                                    : '#64748b',
+                                                border: (slotModalidades[`${formatDateKey(selectedDate)}-${rangoHoraInicio}`] || getDefaultModalidad()) === 'virtual'
+                                                    ? 'none'
+                                                    : '2px solid #e2e8f0',
+                                                borderRadius: '10px',
+                                                fontSize: '14px',
                                                 fontWeight: 600,
                                                 cursor: 'pointer',
-                                                fontSize: 14,
                                                 transition: 'all 0.2s ease',
-                                                fontFamily: 'Inter, sans-serif'
+                                                fontFamily: 'Inter, sans-serif',
+                                                display: 'flex',
+                                                alignItems: 'center',
+                                                justifyContent: 'center',
+                                                gap: '8px'
                                             }}
                                             onMouseEnter={e => {
-                                                if (!isSelected) {
+                                                if ((slotModalidades[`${formatDateKey(selectedDate)}-${rangoHoraInicio}`] || getDefaultModalidad()) !== 'virtual') {
                                                     e.target.style.background = '#f1f5f9';
-                                                    e.target.style.borderColor = '#cbd5e1';
                                                 }
-                                                e.target.style.transform = 'translateY(-2px)';
                                             }}
                                             onMouseLeave={e => {
-                                                if (!isSelected) {
+                                                if ((slotModalidades[`${formatDateKey(selectedDate)}-${rangoHoraInicio}`] || getDefaultModalidad()) !== 'virtual') {
                                                     e.target.style.background = '#f8fafc';
-                                                    e.target.style.borderColor = '#e2e8f0';
                                                 }
-                                                e.target.style.transform = 'translateY(0)';
                                             }}
                                         >
-                                            <FontAwesomeIcon icon={faClock} style={{ marginRight: 6, fontSize: 12 }} />
-                                            {hour}
+                                            <FontAwesomeIcon icon={faLaptop} style={{ fontSize: '16px' }} />
+                                            Virtual
                                         </button>
-                                    );
-                                })}
+                                    )}
+                                    {mentorInfo.acepta_presencial && (
+                                        <button
+                                            type="button"
+                                            onClick={() => {
+                                                const slotKey = `${formatDateKey(selectedDate)}-${rangoHoraInicio}`;
+                                                setSlotModalidades(prev => ({
+                                                    ...prev,
+                                                    [slotKey]: 'presencial'
+                                                }));
+                                                setSlotLocaciones(prev => ({
+                                                    ...prev,
+                                                    [slotKey]: 'casa'
+                                                }));
+                                            }}
+                                            style={{
+                                                flex: 1,
+                                                padding: '12px',
+                                                background: (slotModalidades[`${formatDateKey(selectedDate)}-${rangoHoraInicio}`] || getDefaultModalidad()) === 'presencial'
+                                                    ? '#10b981'
+                                                    : '#f8fafc',
+                                                color: (slotModalidades[`${formatDateKey(selectedDate)}-${rangoHoraInicio}`] || getDefaultModalidad()) === 'presencial'
+                                                    ? '#fff'
+                                                    : '#64748b',
+                                                border: (slotModalidades[`${formatDateKey(selectedDate)}-${rangoHoraInicio}`] || getDefaultModalidad()) === 'presencial'
+                                                    ? 'none'
+                                                    : '2px solid #e2e8f0',
+                                                borderRadius: '10px',
+                                                fontSize: '14px',
+                                                fontWeight: 600,
+                                                cursor: 'pointer',
+                                                transition: 'all 0.2s ease',
+                                                fontFamily: 'Inter, sans-serif',
+                                                display: 'flex',
+                                                alignItems: 'center',
+                                                justifyContent: 'center',
+                                                gap: '8px'
+                                            }}
+                                            onMouseEnter={e => {
+                                                if ((slotModalidades[`${formatDateKey(selectedDate)}-${rangoHoraInicio}`] || getDefaultModalidad()) !== 'presencial') {
+                                                    e.target.style.background = '#f1f5f9';
+                                                }
+                                            }}
+                                            onMouseLeave={e => {
+                                                if ((slotModalidades[`${formatDateKey(selectedDate)}-${rangoHoraInicio}`] || getDefaultModalidad()) !== 'presencial') {
+                                                    e.target.style.background = '#f8fafc';
+                                                }
+                                            }}
+                                        >
+                                            <FontAwesomeIcon icon={faBuilding} style={{ fontSize: '16px' }} />
+                                            Presencial
+                                        </button>
+                                    )}
+                                </div>
                             </div>
 
-                            {selectedDate && (selectedSlots[formatDateKey(selectedDate)] || []).length > 0 && (
-                                <div style={{
-                                    background: '#f8fafc',
-                                    borderRadius: 12,
-                                    padding: 16,
-                                    marginBottom: 20,
-                                    border: '2px solid #f1f5f9',
-                                    maxHeight: '300px',
-                                    overflowY: 'auto'
-                                }}>
-                                    <div style={{
-                                        display: 'flex',
-                                        alignItems: 'center',
-                                        gap: 8,
-                                        marginBottom: 12
+                            {/* Selector de Ubicación (solo si es presencial) */}
+                            {(slotModalidades[`${formatDateKey(selectedDate)}-${rangoHoraInicio}`] || getDefaultModalidad()) === 'presencial' && (
+                                <div style={{ marginBottom: '16px' }}>
+                                    <label style={{
+                                        fontSize: '13px',
+                                        fontWeight: 600,
+                                        color: '#64748b',
+                                        display: 'block',
+                                        marginBottom: '8px',
+                                        fontFamily: 'Inter, -apple-system, sans-serif'
                                     }}>
-                                        <FontAwesomeIcon icon={faInfoCircle} style={{ color: '#2563eb', fontSize: 14 }} />
-                                        <h4 style={{
-                                            margin: 0,
-                                            fontSize: 14,
-                                            fontWeight: 700,
-                                            color: '#0f172a'
-                                        }}>
-                                            Configuración por horario
-                                        </h4>
-                                    </div>
-
-                                    <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-                                        {(selectedSlots[formatDateKey(selectedDate)] || []).map(hour => {
-                                            const dateKey = formatDateKey(selectedDate);
-                                            const currentDuration = slotDurations[`${dateKey}-${hour}`] || mentoriaDuration;
-                                            const currentModalidad = slotModalidades[`${dateKey}-${hour}`] || getDefaultModalidad();
-                                            const currentMaxAlumnos = slotMaxAlumnos[`${dateKey}-${hour}`] || mentorInfo.max_alumnos;
-
-                                            return (
-                                                <div key={hour} style={{
-                                                    background: '#fff',
-                                                    padding: '12px',
-                                                    borderRadius: 8,
-                                                    border: '2px solid #e2e8f0'
-                                                }}>
-                                                    <div style={{
-                                                        display: 'flex',
-                                                        alignItems: 'center',
-                                                        justifyContent: 'space-between',
-                                                        marginBottom: 8,
-                                                        gap: 8
-                                                    }}>
-                                                        <span style={{
-                                                            fontSize: 13,
-                                                            fontWeight: 700,
-                                                            color: '#0f172a',
-                                                            display: 'flex',
-                                                            alignItems: 'center',
-                                                            gap: 6
-                                                        }}>
-                                                            <FontAwesomeIcon icon={faClock} style={{ color: '#64748b', fontSize: 11 }} />
-                                                            {hour}
-                                                        </span>
-                                                        <div style={{ display: 'flex', gap: 6 }}>
-                                                            <select
-                                                                value={currentDuration}
-                                                                onChange={(e) => updateSlotDuration(dateKey, hour, Number(e.target.value))}
-                                                                style={{
-                                                                    padding: '6px 8px',
-                                                                    borderRadius: 6,
-                                                                    border: '2px solid #e2e8f0',
-                                                                    fontSize: 11,
-                                                                    fontWeight: 600,
-                                                                    cursor: 'pointer',
-                                                                    background: '#fff',
-                                                                    color: '#0f172a',
-                                                                    outline: 'none',
-                                                                    transition: 'all 0.2s ease',
-                                                                    fontFamily: 'Inter, sans-serif'
-                                                                }}
-                                                            >
-                                                                {durationOptions.map(dur => (
-                                                                    <option key={dur} value={dur}>{dur} min</option>
-                                                                ))}
-                                                            </select>
-                                                            <select
-                                                                value={currentMaxAlumnos}
-                                                                onChange={(e) => updateSlotMaxAlumnos(dateKey, hour, Number(e.target.value))}
-                                                                style={{
-                                                                    padding: '6px 8px',
-                                                                    borderRadius: 6,
-                                                                    border: '2px solid #e2e8f0',
-                                                                    fontSize: 11,
-                                                                    fontWeight: 600,
-                                                                    cursor: 'pointer',
-                                                                    background: '#fff',
-                                                                    color: '#0f172a',
-                                                                    outline: 'none',
-                                                                    transition: 'all 0.2s ease',
-                                                                    fontFamily: 'Inter, sans-serif',
-                                                                    display: 'flex',
-                                                                    alignItems: 'center',
-                                                                    gap: 4
-                                                                }}
-                                                            >
-                                                                {capacidadOptions.map(cap => (
-                                                                    <option key={cap} value={cap}>{cap} persona(s)</option>
-                                                                ))}
-                                                            </select>
-                                                        </div>
-                                                    </div>
-
-                                                    <div style={{
-                                                        display: 'flex',
-                                                        gap: 6,
-                                                        marginTop: 8
-                                                    }}>
-                                                        {mentorInfo.acepta_virtual && (
-                                                            <button
-                                                                onClick={() => updateSlotModalidad(dateKey, hour, 'virtual')}
-                                                                style={{
-                                                                    flex: 1,
-                                                                    padding: '6px 10px',
-                                                                    borderRadius: 6,
-                                                                    border: currentModalidad === 'virtual' ? '2px solid #2563eb' : '2px solid #e2e8f0',
-                                                                    background: currentModalidad === 'virtual'
-                                                                        ? 'linear-gradient(135deg, #dbeafe 0%, #bfdbfe 100%)'
-                                                                        : '#fff',
-                                                                    color: currentModalidad === 'virtual' ? '#1e40af' : '#64748b',
-                                                                    fontSize: 11,
-                                                                    fontWeight: 700,
-                                                                    cursor: 'pointer',
-                                                                    transition: 'all 0.2s ease',
-                                                                    fontFamily: 'Inter, sans-serif',
-                                                                    display: 'flex',
-                                                                    alignItems: 'center',
-                                                                    justifyContent: 'center',
-                                                                    gap: 4
-                                                                }}
-                                                            >
-                                                                <FontAwesomeIcon icon={faLaptop} style={{ fontSize: 9 }} />
-                                                                Virtual
-                                                            </button>
-                                                        )}
-                                                        {mentorInfo.acepta_presencial && (
-                                                            <button
-                                                                onClick={() => updateSlotModalidad(dateKey, hour, 'presencial')}
-                                                                style={{
-                                                                    flex: 1,
-                                                                    padding: '6px 10px',
-                                                                    borderRadius: 6,
-                                                                    border: currentModalidad === 'presencial' ? '2px solid #059669' : '2px solid #e2e8f0',
-                                                                    background: currentModalidad === 'presencial'
-                                                                        ? 'linear-gradient(135deg, #d1fae5 0%, #a7f3d0 100%)'
-                                                                        : '#fff',
-                                                                    color: currentModalidad === 'presencial' ? '#065f46' : '#64748b',
-                                                                    fontSize: 11,
-                                                                    fontWeight: 700,
-                                                                    cursor: 'pointer',
-                                                                    transition: 'all 0.2s ease',
-                                                                    fontFamily: 'Inter, sans-serif',
-                                                                    display: 'flex',
-                                                                    alignItems: 'center',
-                                                                    justifyContent: 'center',
-                                                                    gap: 4
-                                                                }}
-                                                            >
-                                                                <FontAwesomeIcon icon={faBuilding} style={{ fontSize: 9 }} />
-                                                                Presencial
-                                                            </button>
-                                                        )}
-                                                    </div>
-
-                                                    {currentModalidad === 'presencial' && (
-                                                        <div style={{
-                                                            display: 'flex',
-                                                            gap: 6,
-                                                            marginTop: 6,
-                                                            paddingTop: 6,
-                                                            borderTop: '1px solid #e2e8f0'
-                                                        }}>
-                                                            <button
-                                                                onClick={() => updateSlotLocacion(dateKey, hour, 'casa')}
-                                                                style={{
-                                                                    flex: 1,
-                                                                    padding: '6px 10px',
-                                                                    borderRadius: 6,
-                                                                    border: (slotLocaciones[`${dateKey}-${hour}`] || 'casa') === 'casa'
-                                                                        ? '2px solid #059669'
-                                                                        : '2px solid #e2e8f0',
-                                                                    background: (slotLocaciones[`${dateKey}-${hour}`] || 'casa') === 'casa'
-                                                                        ? 'linear-gradient(135deg, #d1fae5 0%, #a7f3d0 100%)'
-                                                                        : '#fff',
-                                                                    color: (slotLocaciones[`${dateKey}-${hour}`] || 'casa') === 'casa'
-                                                                        ? '#065f46'
-                                                                        : '#64748b',
-                                                                    fontSize: 11,
-                                                                    fontWeight: 700,
-                                                                    cursor: 'pointer',
-                                                                    transition: 'all 0.2s ease',
-                                                                    fontFamily: 'Inter, sans-serif',
-                                                                    display: 'flex',
-                                                                    alignItems: 'center',
-                                                                    justifyContent: 'center',
-                                                                    gap: 4
-                                                                }}
-                                                            >
-                                                                <FontAwesomeIcon icon={faHome} style={{ fontSize: 9 }} />
-                                                                Casa
-                                                            </button>
-                                                            <button
-                                                                onClick={() => updateSlotLocacion(dateKey, hour, 'facultad')}
-                                                                style={{
-                                                                    flex: 1,
-                                                                    padding: '6px 10px',
-                                                                    borderRadius: 6,
-                                                                    border: slotLocaciones[`${dateKey}-${hour}`] === 'facultad'
-                                                                        ? '2px solid #059669'
-                                                                        : '2px solid #e2e8f0',
-                                                                    background: slotLocaciones[`${dateKey}-${hour}`] === 'facultad'
-                                                                        ? 'linear-gradient(135deg, #d1fae5 0%, #a7f3d0 100%)'
-                                                                        : '#fff',
-                                                                    color: slotLocaciones[`${dateKey}-${hour}`] === 'facultad'
-                                                                        ? '#065f46'
-                                                                        : '#64748b',
-                                                                    fontSize: 11,
-                                                                    fontWeight: 700,
-                                                                    cursor: 'pointer',
-                                                                    transition: 'all 0.2s ease',
-                                                                    fontFamily: 'Inter, sans-serif',
-                                                                    display: 'flex',
-                                                                    alignItems: 'center',
-                                                                    justifyContent: 'center',
-                                                                    gap: 4
-                                                                }}
-                                                            >
-                                                                <FontAwesomeIcon icon={faGraduationCap} style={{ fontSize: 9 }} />
-                                                                Facultad
-                                                            </button>
-                                                        </div>
-                                                    )}
-                                                </div>
-                                            );
-                                        })}
+                                        Ubicación de la Sesión:
+                                    </label>
+                                    <div style={{ display: 'flex', gap: '12px' }}>
+                                        <button
+                                            type="button"
+                                            onClick={() => {
+                                                const slotKey = `${formatDateKey(selectedDate)}-${rangoHoraInicio}`;
+                                                setSlotLocaciones(prev => ({
+                                                    ...prev,
+                                                    [slotKey]: 'casa'
+                                                }));
+                                            }}
+                                            style={{
+                                                flex: 1,
+                                                padding: '12px',
+                                                background: (slotLocaciones[`${formatDateKey(selectedDate)}-${rangoHoraInicio}`] || 'casa') === 'casa'
+                                                    ? '#0d9488'
+                                                    : '#f8fafc',
+                                                color: (slotLocaciones[`${formatDateKey(selectedDate)}-${rangoHoraInicio}`] || 'casa') === 'casa'
+                                                    ? '#fff'
+                                                    : '#64748b',
+                                                border: (slotLocaciones[`${formatDateKey(selectedDate)}-${rangoHoraInicio}`] || 'casa') === 'casa'
+                                                    ? 'none'
+                                                    : '2px solid #e2e8f0',
+                                                borderRadius: '10px',
+                                                fontSize: '14px',
+                                                fontWeight: 600,
+                                                cursor: 'pointer',
+                                                transition: 'all 0.2s ease',
+                                                fontFamily: 'Inter, sans-serif',
+                                                display: 'flex',
+                                                alignItems: 'center',
+                                                justifyContent: 'center',
+                                                gap: '8px'
+                                            }}
+                                            onMouseEnter={e => {
+                                                if ((slotLocaciones[`${formatDateKey(selectedDate)}-${rangoHoraInicio}`] || 'casa') !== 'casa') {
+                                                    e.target.style.background = '#f1f5f9';
+                                                }
+                                            }}
+                                            onMouseLeave={e => {
+                                                if ((slotLocaciones[`${formatDateKey(selectedDate)}-${rangoHoraInicio}`] || 'casa') !== 'casa') {
+                                                    e.target.style.background = '#f8fafc';
+                                                }
+                                            }}
+                                        >
+                                            <FontAwesomeIcon icon={faHome} style={{ fontSize: '16px' }} />
+                                            Casa del Mentor
+                                        </button>
+                                        <button
+                                            type="button"
+                                            onClick={() => {
+                                                const slotKey = `${formatDateKey(selectedDate)}-${rangoHoraInicio}`;
+                                                setSlotLocaciones(prev => ({
+                                                    ...prev,
+                                                    [slotKey]: 'facultad'
+                                                }));
+                                            }}
+                                            style={{
+                                                flex: 1,
+                                                padding: '12px',
+                                                background: slotLocaciones[`${formatDateKey(selectedDate)}-${rangoHoraInicio}`] === 'facultad'
+                                                    ? '#0d9488'
+                                                    : '#f8fafc',
+                                                color: slotLocaciones[`${formatDateKey(selectedDate)}-${rangoHoraInicio}`] === 'facultad'
+                                                    ? '#fff'
+                                                    : '#64748b',
+                                                border: slotLocaciones[`${formatDateKey(selectedDate)}-${rangoHoraInicio}`] === 'facultad'
+                                                    ? 'none'
+                                                    : '2px solid #e2e8f0',
+                                                borderRadius: '10px',
+                                                fontSize: '14px',
+                                                fontWeight: 600,
+                                                cursor: 'pointer',
+                                                transition: 'all 0.2s ease',
+                                                fontFamily: 'Inter, sans-serif',
+                                                display: 'flex',
+                                                alignItems: 'center',
+                                                justifyContent: 'center',
+                                                gap: '8px'
+                                            }}
+                                            onMouseEnter={e => {
+                                                if (slotLocaciones[`${formatDateKey(selectedDate)}-${rangoHoraInicio}`] !== 'facultad') {
+                                                    e.target.style.background = '#f1f5f9';
+                                                }
+                                            }}
+                                            onMouseLeave={e => {
+                                                if (slotLocaciones[`${formatDateKey(selectedDate)}-${rangoHoraInicio}`] !== 'facultad') {
+                                                    e.target.style.background = '#f8fafc';
+                                                }
+                                            }}
+                                        >
+                                            <FontAwesomeIcon icon={faGraduationCap} style={{ fontSize: '16px' }} />
+                                            Facultad
+                                        </button>
                                     </div>
                                 </div>
                             )}
+
+                            {/* Selector de Capacidad Máxima */}
+                            <div style={{ marginBottom: '20px' }}>
+                                <label style={{
+                                    fontSize: '13px',
+                                    fontWeight: 600,
+                                    color: '#64748b',
+                                    display: 'block',
+                                    marginBottom: '8px',
+                                    fontFamily: 'Inter, -apple-system, sans-serif'
+                                }}>
+                                    Capacidad Máxima:
+                                </label>
+                                <select
+                                    value={slotMaxAlumnos[`${formatDateKey(selectedDate)}-${rangoHoraInicio}`] || mentorInfo.max_alumnos}
+                                    onChange={(e) => {
+                                        const slotKey = `${formatDateKey(selectedDate)}-${rangoHoraInicio}`;
+                                        setSlotMaxAlumnos(prev => ({
+                                            ...prev,
+                                            [slotKey]: Number(e.target.value)
+                                        }));
+                                    }}
+                                    style={{
+                                        width: '100%',
+                                        padding: '12px',
+                                        borderRadius: '10px',
+                                        border: '2px solid #e2e8f0',
+                                        fontSize: '14px',
+                                        fontWeight: 600,
+                                        cursor: 'pointer',
+                                        background: '#fff',
+                                        color: '#0f172a',
+                                        outline: 'none',
+                                        transition: 'all 0.2s ease',
+                                        fontFamily: 'Inter, sans-serif'
+                                    }}
+                                >
+                                    {capacidadOptions.map(cap => (
+                                        <option key={cap} value={cap}>
+                                            {cap} {cap === 1 ? 'persona' : 'personas'}
+                                        </option>
+                                    ))}
+                                </select>
+                            </div>
+
+                            {/* Botón Guardar */}
 
                             <div style={{ display: 'flex', gap: 12 }}>
                                 <button
@@ -1620,7 +1848,7 @@ export default function MyCalendar() {
                                     style={{
                                         flex: 1,
                                         padding: '12px 20px',
-                                        background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
+                                        background: '#10b981',
                                         color: '#fff',
                                         border: 'none',
                                         borderRadius: 10,
@@ -1656,7 +1884,7 @@ export default function MyCalendar() {
                                 width: 80,
                                 height: 80,
                                 borderRadius: '50%',
-                                background: 'linear-gradient(135deg, #dbeafe 0%, #bfdbfe 100%)',
+                                background: '#dbeafe',
                                 display: 'flex',
                                 alignItems: 'center',
                                 justifyContent: 'center',
@@ -1710,7 +1938,7 @@ export default function MyCalendar() {
                                     Horarios configurados
                                 </h3>
                                 <div style={{
-                                    background: 'linear-gradient(135deg, #dbeafe 0%, #bfdbfe 100%)',
+                                    background: '#dbeafe',
                                     color: '#1e40af',
                                     padding: '6px 14px',
                                     borderRadius: 16,
@@ -1762,101 +1990,116 @@ export default function MyCalendar() {
                                                             flexWrap: 'wrap',
                                                             gap: 8
                                                         }}>
-                                                            {slots.sort().map(slot => {
-                                                                const slotKey = `${dateKey}-${slot}`;
-                                                                const duracion = slotDurations[slotKey] || mentoriaDuration;
-                                                                const modalidad = slotModalidades[slotKey] || 'virtual';
-                                                                const locacion = slotLocaciones[slotKey];
-                                                                const disponible = slotDisponibilidad[slotKey] !== false;
+                                                                    {slots.sort().map(slot => {
+                                                                            const slotKey = `${dateKey}-${slot}`;
+                                                                            const duracion = slotDurations[slotKey] || mentoriaDuration;
+                                                                            const modalidad = slotModalidades[slotKey] || 'virtual';
+                                                                            const locacion = slotLocaciones[slotKey];
+                                                                            const disponible = slotDisponibilidad[slotKey] !== false;
+                                                                            const horaFin = slotHoraFin[slotKey];
+                                                                            const maxAlumnos = slotMaxAlumnos[slotKey] || 1;
 
-                                                                const modalidadColor = !disponible
-                                                                    ? '#fef3c7'
-                                                                    : modalidad === 'virtual'
-                                                                        ? 'linear-gradient(135deg, #dbeafe 0%, #bfdbfe 100%)'
-                                                                        : 'linear-gradient(135deg, #d1fae5 0%, #a7f3d0 100%)';
-                                                                const modalidadText = !disponible
-                                                                    ? '#92400e'
-                                                                    : modalidad === 'virtual' ? '#1e40af' : '#065f46';
+                                                                            return (
+                                                                                <div key={slot} style={{
+                                                                                    background: !disponible ? '#fef3c7' :
+                                                                                        modalidad === 'virtual' ? '#dbeafe' : '#d1fae5',
+                                                                                    color: !disponible ? '#92400e' :
+                                                                                        modalidad === 'virtual' ? '#1e40af' : '#065f46',
+                                                                                    padding: '10px 12px',
+                                                                                    borderRadius: 8,
+                                                                                    border: disponible ? '2px solid ' + (modalidad === 'virtual' ? '#93c5fd' : '#6ee7b7') : '2px solid #fbbf24',
+                                                                                    fontSize: 12,
+                                                                                    fontWeight: 600,
+                                                                                    position: 'relative',
+                                                                                    display: 'flex',
+                                                                                    flexDirection: 'column',
+                                                                                    gap: 6
+                                                                                }}>
+                                                                                    {!disponible && (
+                                                                                        <div style={{
+                                                                                            position: 'absolute',
+                                                                                            top: -6,
+                                                                                            right: -6,
+                                                                                            background: '#fbbf24',
+                                                                                            color: 'white',
+                                                                                            padding: '2px 6px',
+                                                                                            borderRadius: 4,
+                                                                                            fontSize: 8,
+                                                                                            fontWeight: 700,
+                                                                                            boxShadow: '0 2px 4px rgba(251, 191, 36, 0.3)',
+                                                                                            letterSpacing: '0.3px'
+                                                                                        }}>
+                                                                                            RESERVADA
+                                                                                        </div>
+                                                                                    )}
+                                                                                    <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                                                                                        <FontAwesomeIcon icon={faClock} style={{ fontSize: 10 }} />
+                                                                                        {horaFin
+                                                                                            ? `${slot} - ${horaFin.slice(0, 5)}`  // ✅ CORREGIDO: era hora, ahora slot
+                                                                                            : formatTimeRange(slot, duracion)  // ✅ CORREGIDO: era hora, ahora slot
+                                                                                        }
+                                                                                    </div>
+                                                                                    <div style={{ fontSize: 10, display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
+                <span style={{ display: 'flex', alignItems: 'center', gap: 3 }}>
+                    <FontAwesomeIcon icon={modalidad === 'virtual' ? faLaptop : faBuilding} style={{ fontSize: 9 }} />
+                    {modalidad.charAt(0).toUpperCase() + modalidad.slice(1)}
+                </span>
+                                                                                        {modalidad === 'presencial' && locacion && (
+                                                                                            <>
+                                                                                                <span>•</span>
+                                                                                                <span style={{ display: 'flex', alignItems: 'center', gap: 3 }}>
+                            <FontAwesomeIcon icon={locacion === 'casa' ? faHome : faGraduationCap} style={{ fontSize: 8 }} />
+                                                                                                    {locacion === 'casa' ? 'Casa' : 'Facultad'}
+                        </span>
+                                                                                            </>
+                                                                                        )}
+                                                                                        <span>•</span>
+                                                                                        <span style={{ display: 'flex', alignItems: 'center', gap: 3 }}>
+                    <FontAwesomeIcon icon={faUser} style={{ fontSize: 9 }} />
+                                                                                            {maxAlumnos}
+                </span>
+                                                                                    </div>
 
-                                                                return (
-                                                                    <div key={slot} style={{
-                                                                        background: modalidadColor,
-                                                                        color: modalidadText,
-                                                                        padding: '8px 12px',
-                                                                        borderRadius: 8,
-                                                                        display: 'flex',
-                                                                        flexDirection: 'column',
-                                                                        gap: 4,
-                                                                        minWidth: '110px',
-                                                                        position: 'relative',
-                                                                        border: !disponible ? '2px solid #fbbf24' : 'none'
-                                                                    }}>
-                                                                        {!disponible && (
-                                                                            <div style={{
-                                                                                position: 'absolute',
-                                                                                top: -8,
-                                                                                right: -8,
-                                                                                background: 'linear-gradient(135deg, #fbbf24 0%, #f59e0b 100%)',
-                                                                                color: 'white',
-                                                                                padding: '3px 8px',
-                                                                                borderRadius: 6,
-                                                                                fontSize: 9,
-                                                                                fontWeight: 700,
-                                                                                boxShadow: '0 2px 8px rgba(251, 191, 36, 0.4)',
-                                                                                letterSpacing: '0.3px'
-                                                                            }}>
-                                                                                RESERVADA
-                                                                            </div>
-                                                                        )}
-                                                                        <div style={{
-                                                                            fontSize: 12,
-                                                                            fontWeight: 700,
-                                                                            display: 'flex',
-                                                                            alignItems: 'center',
-                                                                            gap: 4
-                                                                        }}>
-                                                                            <FontAwesomeIcon icon={faClock} style={{ fontSize: 10 }} />
-                                                                            {formatTimeRange(slot, duracion)}
-                                                                        </div>
-                                                                        <div style={{
-                                                                            fontSize: 10,
-                                                                            fontWeight: 600,
-                                                                            display: 'flex',
-                                                                            alignItems: 'center',
-                                                                            justifyContent: 'space-between',
-                                                                            gap: 6
-                                                                        }}>
-                                                                            <span style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-                                                                                <FontAwesomeIcon
-                                                                                    icon={modalidad === 'virtual' ? faLaptop : faBuilding}
-                                                                                    style={{ fontSize: 9 }}
-                                                                                />
-                                                                                {modalidad.charAt(0).toUpperCase() + modalidad.slice(1)}
-                                                                                {modalidad === 'presencial' && locacion && (
-                                                                                    <span style={{ marginLeft: 4 }}>
-                                                                                        • <FontAwesomeIcon
-                                                                                        icon={locacion === 'casa' ? faHome : faGraduationCap}
-                                                                                        style={{ fontSize: 8 }}
-                                                                                    /> {locacion === 'casa' ? 'Casa' : 'Facultad'}
-                                                                                    </span>
-                                                                                )}
-                                                                            </span>
-                                                                            <span style={{
-                                                                                background: 'rgba(255,255,255,0.5)',
-                                                                                padding: '2px 6px',
-                                                                                borderRadius: 4,
-                                                                                fontWeight: 700,
-                                                                                display: 'flex',
-                                                                                alignItems: 'center',
-                                                                                gap: 3
-                                                                            }}>
-                                                                                <FontAwesomeIcon icon={faUser} style={{ fontSize: 8 }} />
-                                                                                {slotMaxAlumnos[slotKey] || mentorInfo.max_alumnos}
-                                                                            </span>
-                                                                        </div>
-                                                                    </div>
-                                                                );
-                                                            })}
+                                                                                    {/* 🆕 BOTÓN EDITAR */}
+                                                                                    {disponible && (
+                                                                                        <button
+                                                                                            onClick={(e) => {
+                                                                                                e.stopPropagation();
+                                                                                                handleEditSlot(dateKey, slot);  // ✅ CORREGIDO: era hora, ahora slot
+                                                                                            }}
+                                                                                            style={{
+                                                                                                marginTop: 4,
+                                                                                                padding: '4px 8px',
+                                                                                                background: '#2563eb',
+                                                                                                color: '#fff',
+                                                                                                border: 'none',
+                                                                                                borderRadius: 6,
+                                                                                                fontSize: 10,
+                                                                                                fontWeight: 600,
+                                                                                                cursor: 'pointer',
+                                                                                                transition: 'all 0.2s ease',
+                                                                                                fontFamily: 'Inter, sans-serif',
+                                                                                                display: 'flex',
+                                                                                                alignItems: 'center',
+                                                                                                justifyContent: 'center',
+                                                                                                gap: 4
+                                                                                            }}
+                                                                                            onMouseEnter={(e) => {
+                                                                                                e.currentTarget.style.background = '#1e40af';
+                                                                                                e.currentTarget.style.transform = 'translateY(-1px)';
+                                                                                            }}
+                                                                                            onMouseLeave={(e) => {
+                                                                                                e.currentTarget.style.background = '#2563eb';
+                                                                                                e.currentTarget.style.transform = 'translateY(0)';
+                                                                                            }}
+                                                                                        >
+                                                                                            <FontAwesomeIcon icon={faEdit} style={{ fontSize: 9 }} />
+                                                                                            Editar
+                                                                                        </button>
+                                                                                    )}
+                                                                                </div>
+                                                                            );
+                                                                        })}
                                                         </div>
                                                     </div>
                                                     <button

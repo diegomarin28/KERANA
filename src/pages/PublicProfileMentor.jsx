@@ -76,26 +76,6 @@ export default function PublicProfileMentor() {
     const [editingReview, setEditingReview] = useState(null);
     const [materiasNamesForReviews, setMateriasNamesForReviews] = useState({});
 
-    const [currentAuthUserId, setCurrentAuthUserId] = useState(null);
-
-    useEffect(() => {
-        const fetchCurrentUser = async () => {
-            const { data: { user } } = await supabase.auth.getUser();
-            if (user) {
-                const { data: usuarioData } = await supabase
-                    .from('usuario')
-                    .select('id_usuario')
-                    .eq('auth_id', user.id)
-                    .single();
-
-                if (usuarioData) {
-                    setCurrentAuthUserId(usuarioData.id_usuario);
-                }
-            }
-        };
-        fetchCurrentUser();
-    }, []);
-
     useEffect(() => {
         fetchProfileData();
     }, [username]);
@@ -139,6 +119,52 @@ export default function PublicProfileMentor() {
                     }
                     setMateriasNamesForReviews(names);
                 }
+
+                if (reviewsData && reviewsData.length > 0) {
+                    // Calcular promedio de estrellas
+                    const sum = reviewsData.reduce((acc, r) => acc + (r.estrellas || 0), 0);
+                    const avg = +(sum / reviewsData.length).toFixed(1);
+
+                    // Actualizar mentorData con el promedio calculado
+                    if (mentorData) {
+                        mentorData.estrellas_mentor = avg;
+                        mentorData.cantidad_resenas = reviewsData.length;
+                    }
+                }
+
+                // ✨ NUEVO: Obtener conteos por materia
+                const materiasConConteo = await Promise.all(
+                    mentorData.materias.map(async (m) => {
+                        const materiaId = m.id_materia;
+
+                        // Contar apuntes
+                        const { count: apuntesCount } = await supabase
+                            .from('apunte')
+                            .select('*', { count: 'exact', head: true })
+                            .eq('id_materia', materiaId);
+
+                        // Contar profesores
+                        const { count: profesoresCount } = await supabase
+                            .from('imparte')
+                            .select('*', { count: 'exact', head: true })
+                            .eq('id_materia', materiaId);
+
+                        // Contar mentores
+                        const { count: mentoresCount } = await supabase
+                            .from('mentor_materia')
+                            .select('*', { count: 'exact', head: true })
+                            .eq('id_materia', materiaId);
+
+                        return {
+                            ...m,
+                            total_apuntes: apuntesCount || 0,
+                            total_profesores: profesoresCount || 0,
+                            total_mentores: mentoresCount || 0
+                        };
+                    })
+                );
+
+                mentorData.materias = materiasConConteo;
             }
 
             const { data: notesData } = await publicProfileAPI.getRecentNotes(userId, 4);
@@ -601,7 +627,7 @@ export default function PublicProfileMentor() {
                                         Ver LinkedIn
                                     </a>
                                 )}
-                                {mentorInfo?.estrellas_mentor && (
+                                {mentorInfo?.estrellas_mentor > 0 && (
                                     <div style={mentorRatingInlineStyle}>
                                         <FontAwesomeIcon icon={faStar} style={{ fontSize: 20, color: '#F59E0B' }} />
                                         <span style={{ fontSize: 18, fontWeight: 700, color: '#0d9488' }}>{mentorInfo.estrellas_mentor.toFixed(1)}</span>
@@ -751,7 +777,7 @@ export default function PublicProfileMentor() {
                         </div>
 
                         <div style={mentorCardStyle}>
-                            {mentorInfo.estrellas_mentor && (
+                            {mentorInfo.estrellas_mentor > 0 && (
                                 <div style={mentorRatingCardStyle}>
                                     <FontAwesomeIcon icon={faStar} style={{ fontSize: 32, color: '#F59E0B' }} />
                                     <div>
@@ -769,21 +795,34 @@ export default function PublicProfileMentor() {
                                 gap: 20,
                                 gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))'
                             }}>
-                                {mentorInfo.materias?.map((m) => (
-                                    <CourseCard
-                                        key={m.id_materia}
-                                        course={{
-                                            tipo: 'materia',
-                                            id: m.materia.id_materia,
-                                            titulo: m.materia.nombre_materia,
-                                            subtitulo: m.materia.semestre ? `Semestre ${m.materia.semestre}` : null
-                                        }}
-                                    />
-                                ))}
+                                {mentorInfo.materias?.map((m) => {
+                                    // Validar que materia existe
+                                    if (!m.materia) {
+                                        console.warn('⚠️ Materia sin datos:', m);
+                                        return null;
+                                    }
+
+                                    return (
+                                        <CourseCard
+                                            key={m.materia.id_materia}
+                                            course={{
+                                                tipo: 'materia',
+                                                id: m.materia.id_materia,
+                                                titulo: m.materia.nombre_materia,
+                                                subtitulo: m.materia.semestre ? `Semestre ${m.materia.semestre}` : null,
+                                                conteo: {
+                                                    apuntes: m.total_apuntes ?? 0,
+                                                    profesores: m.total_profesores ?? 0,
+                                                    mentores: m.total_mentores ?? 0
+                                                }
+                                            }}
+                                        />
+                                    );
+                                })}
                             </div>
                         </div>
                     </div>
-                )}
+                    )}
 
                 {tab === 'apuntes' && (
                     <div style={{ marginTop: 24 }}>
@@ -978,7 +1017,7 @@ export default function PublicProfileMentor() {
                         })) || []}
                         supabase={supabase}
                         slotsAPI={slotsAPI}
-                        currentUserId={currentAuthUserId}
+                        currentUserId={profile.id_usuario}
                     />
                 )}
                 {/* Modal Avatar Grande */}
@@ -1102,7 +1141,7 @@ const emptyStateStyle = { textAlign: 'center', padding: '80px 20px', background:
 const emptyIconStyle = { fontSize: '4rem', marginBottom: 16, opacity: 0.5 };
 const emptyTitleStyle = { margin: '0 0 8px 0', fontSize: 20, fontWeight: 700, color: '#111827' };
 const emptyDescStyle = { margin: 0, color: '#666', fontSize: 15 };
-const mentorCardStyle = { background: 'white', borderRadius: 8, padding: 24, boxShadow: '0 0 0 1px rgba(0,0,0,0.08), 0 2px 4px rgba(0,0,0,0.08)' };
+const mentorCardStyle = { background: 'transparent', padding: 0 };
 const mentorRatingCardStyle = { display: 'flex', alignItems: 'center', gap: 20, padding: 24, background: '#f0fdfa', borderRadius: 12, marginBottom: 24, border: '2px solid #99f6e4' };
 const backButtonStyle = { padding: '12px 24px', background: '#0d9488', color: 'white', border: 'none', borderRadius: 24, fontWeight: 600, cursor: 'pointer', fontSize: 15, boxShadow: '0 2px 8px rgba(13, 148, 136, 0.3)', transition: 'all 0.2s ease' };
 const modalOverlayStyle = { position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0, 0, 0, 0.6)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 9999, backdropFilter: 'blur(4px)' };

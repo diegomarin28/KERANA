@@ -154,7 +154,6 @@ export default function MentorApply() {
                 return;
             }
 
-            console.log('🔍 Buscando usuario con auth_id:', user.id);
 
             const { data: usuarioData, error: userError } = await supabase
                 .from('usuario')
@@ -162,7 +161,6 @@ export default function MentorApply() {
                 .eq('auth_id', user.id)
                 .single();
 
-            console.log('📊 Resultado de búsqueda:', { usuarioData, userError });
 
             if (userError) {
                 console.error('❌ Error buscando usuario:', userError);
@@ -175,10 +173,9 @@ export default function MentorApply() {
                 return;
             }
 
-            console.log('✅ Usuario encontrado:', usuarioData);
 
             const { data: existingApplication, error: checkError } = await supabase
-                .from('mentor')
+                .from('mentor_aplicacion')  // ✅ Tabla correcta
                 .select('estado')
                 .eq('id_usuario', usuarioData.id_usuario)
                 .eq('id_materia', selectedMateria.id_materia)
@@ -203,16 +200,15 @@ export default function MentorApply() {
             const { filePath, publicUrl } = await uploadComprobante(formData.comprobante);
 
             const { error: insertError } = await supabase
-                .from('mentor')
+                .from('mentor_aplicacion')  // ✅ Tabla correcta
                 .insert({
                     id_usuario: usuarioData.id_usuario,
                     id_materia: selectedMateria.id_materia,
-                    calificacion: parseInt(formData.calificacion),
+                    calificacion_materia: parseInt(formData.calificacion),  // ✅ Nombre correcto
                     motivo: formData.motivo || null,
                     comprobante_path: filePath,
-                    comprobante_url: publicUrl,
-                    estado: 'pendiente',
-                    fecha_solicitud: new Date().toISOString()
+                    estado: 'pendiente'
+
                 });
 
             if (insertError) {
@@ -245,7 +241,7 @@ export default function MentorApply() {
             setSearchTerm('');
 
             setTimeout(() => {
-                navigate('/profile');
+                navigate('/');
             }, 2000);
 
         } catch (error) {
