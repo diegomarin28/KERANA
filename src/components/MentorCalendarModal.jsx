@@ -4,17 +4,14 @@ import {
     faCalendar, faChevronLeft, faChevronRight, faClock,
     faUser, faBook, faCheckCircle, faTimes, faVideo,
     faBuilding, faUsers, faEnvelope, faFileAlt, faDollarSign,
-    faHome, faUniversity
+    faHome, faUniversity, faFilter
 } from '@fortawesome/free-solid-svg-icons';
 
-
-//Botón agendar particular desde public profile mentor
 export default function MentorCalendarModal({
                                                 open,
                                                 onClose,
                                                 mentorId,
                                                 mentorName,
-                                                mentorMaterias = [],
                                                 supabase,
                                                 slotsAPI,
                                                 currentUserId
@@ -37,15 +34,24 @@ export default function MentorCalendarModal({
     const [descripcionSesion, setDescripcionSesion] = useState('');
     const [erroresValidacion, setErroresValidacion] = useState({});
 
+    // Nuevos estados para materias
+    const [mentorMaterias, setMentorMaterias] = useState([]);
+
     const months = ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio',
         'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'];
     const daysOfWeek = ['DOM', 'LUN', 'MAR', 'MIÉ', 'JUE', 'VIE', 'SÁB'];
 
     useEffect(() => {
         if (open && mentorId) {
-            loadAvailability();
+            loadMentorMaterias();
         }
     }, [open, mentorId]);
+
+    useEffect(() => {
+        if (mentorMaterias.length > 0) {
+            loadAvailability();
+        }
+    }, [mentorMaterias]);
 
     useEffect(() => {
         if (selectedDate) {
@@ -56,19 +62,58 @@ export default function MentorCalendarModal({
     useEffect(() => {
         if (showConfirmModal && currentUserId) {
             const fetchUserEmail = async () => {
-                const { data } = await supabase
+                console.log('🔍 Buscando email para usuario:', currentUserId);
+                const { data, error } = await supabase
                     .from('usuario')
                     .select('correo')
                     .eq('id_usuario', currentUserId)
                     .single();
 
+                console.log('📧 Resultado búsqueda email:', { data, error });
+
                 if (data?.correo) {
+                    console.log('✅ Email encontrado:', data.correo);
                     setEmailsParticipantes([data.correo]);
                 }
             };
             fetchUserEmail();
         }
     }, [showConfirmModal, currentUserId]);
+
+    const loadMentorMaterias = async () => {
+        try {
+            // Obtener todas las materias del mentor desde mentor_materia
+            const { data: mentorMateriasData, error } = await supabase
+                .from('mentor_materia')
+                .select(`
+                    id,
+                    id_materia,
+                    materia:id_materia (
+                        id_materia,
+                        nombre_materia,
+                        semestre
+                    )
+                `)
+                .eq('id_mentor', mentorId);
+
+            if (error) {
+                console.error('Error cargando materias del mentor:', error);
+                return;
+            }
+
+            console.log('📚 Materias del mentor:', mentorMateriasData);
+
+            const materias = mentorMateriasData?.map(mm => ({
+                id_materia: mm.materia.id_materia,
+                nombre_materia: mm.materia.nombre_materia,
+                semestre: mm.materia.semestre
+            })) || [];
+
+            setMentorMaterias(materias);
+        } catch (error) {
+            console.error('Error:', error);
+        }
+    };
 
     const loadAvailability = async () => {
         setLoading(true);
@@ -87,64 +132,32 @@ export default function MentorCalendarModal({
                 return;
             }
 
-            console.log('🔍 DEBUG - Slots recibidos:', slotsData);
-
             // Filtrar solo los slots de este mentor
             const mentorSlots = slotsData?.filter(slot => slot.id_mentor === mentorId) || [];
 
-            console.log('🔍 DEBUG - Slots del mentor:', mentorSlots);
-
-            // Obtener IDs de materias únicos
-            const materiaIds = [...new Set(
-                mentorSlots.map(s => s.mentor?.mentor_materia?.[0]?.id_materia).filter(Boolean)
-            )];
-
-            console.log('🔍 DEBUG - IDs de materias encontrados:', materiaIds);
-
-            let materiasMap = {};
-
-            // Consultar nombres de materias desde la base de datos
-            if (materiaIds.length > 0) {
-                const { data: materiasData } = await supabase
-                    .from('materia')
-                    .select('id_materia, nombre_materia')
-                    .in('id_materia', materiaIds);
-
-                console.log('🔍 DEBUG - Materias desde DB:', materiasData);
-
-                materiasData?.forEach(m => {
-                    materiasMap[m.id_materia] = m.nombre_materia;
-                });
-            }
-
-            console.log('🔍 DEBUG - Mapa de materias:', materiasMap);
+            console.log('🔍 Slots del mentor:', mentorSlots);
 
             const availability = {};
+
+            // Para cada slot, crear una entrada por cada materia del mentor
             mentorSlots.forEach(slot => {
-                const mentorMateria = slot.mentor?.mentor_materia?.[0];
-                const materiaId = mentorMateria?.id_materia;
-                const materiaNombre = materiasMap[materiaId] || 'Sin materia';
-
-                console.log('🔍 DEBUG - Procesando slot:', {
-                    fecha: slot.fecha,
-                    hora: slot.hora,
-                    materiaId,
-                    materiaNombre
-                });
-
-                if (!availability[slot.fecha]) {
-                    availability[slot.fecha] = {
-                        slots: []
-                    };
-                }
-                availability[slot.fecha].slots.push({
-                    ...slot,
-                    materia_nombre: materiaNombre,
-                    materia_id: materiaId
+                mentorMaterias.forEach(materia => {
+                    if (!availability[slot.fecha]) {
+                        availability[slot.fecha] = {
+                            slots: []
+                        };
+                    }
+                    availability[slot.fecha].slots.push({
+                        ...slot,
+                        materia_nombre: materia.nombre_materia,
+                        materia_id: materia.id_materia,
+                        // Crear un ID único para cada combinación slot-materia
+                        id_slot_materia: `${slot.id_slot}_${materia.id_materia}`
+                    });
                 });
             });
 
-            console.log('✅ DEBUG - Disponibilidad final:', availability);
+            console.log('✅ Disponibilidad final:', availability);
 
             setAvailabilityByDate(availability);
         } catch (error) {
@@ -163,8 +176,9 @@ export default function MentorCalendarModal({
             return;
         }
 
-        const slots = dayData.slots.map(slot => ({
+        let slots = dayData.slots.map(slot => ({
             id_slot: slot.id_slot,
+            id_slot_materia: slot.id_slot_materia,
             hora: slot.hora,
             duracion: slot.duracion,
             modalidad: slot.modalidad,
@@ -216,7 +230,8 @@ export default function MentorCalendarModal({
 
     const hasAvailability = (date) => {
         const dateKey = formatDateKey(date);
-        return availabilityByDate[dateKey]?.slots?.length > 0;
+        const daySlots = availabilityByDate[dateKey]?.slots || [];
+        return daySlots.length > 0;
     };
 
     const isToday = (date) => {
@@ -387,7 +402,7 @@ export default function MentorCalendarModal({
 
             setShowSuccessModal(true);
             resetModal();
-            loadAvailability(); // Recargar disponibilidad
+            loadAvailability();
 
         } catch (error) {
             console.error('Error:', error);
@@ -643,7 +658,9 @@ export default function MentorCalendarModal({
                                         color: '#6b7280'
                                     }}>
                                         <FontAwesomeIcon icon={faCalendar} style={{ fontSize: 48, color: '#cbd5e1', marginBottom: 16 }} />
-                                        <p style={{ margin: 0, fontWeight: 600 }}>No hay horarios disponibles</p>
+                                        <p style={{ margin: 0, fontWeight: 600 }}>
+                                            No hay horarios disponibles
+                                        </p>
                                     </div>
                                 ) : (
                                     <div style={{
@@ -660,7 +677,7 @@ export default function MentorCalendarModal({
 
                                             return (
                                                 <button
-                                                    key={slot.id_slot}
+                                                    key={`${slot.id_slot}_${slot.materia_id}`}
                                                     onClick={() => handleBookSlot(slot)}
                                                     disabled={!slot.disponible}
                                                     style={{
@@ -726,7 +743,7 @@ export default function MentorCalendarModal({
                     </div>
                 )}
 
-                {/* Modal de confirmación */}
+                {/* Modal de confirmación - RESTO DEL CÓDIGO IGUAL */}
                 {showConfirmModal && selectedSlot && (
                     <div style={{
                         position: 'fixed',

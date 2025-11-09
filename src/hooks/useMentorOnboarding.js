@@ -26,8 +26,7 @@ export function useMentorOnboarding() {
                 .eq('auth_id', user.id)
                 .maybeSingle();
 
-            if (usuarioError || !usuarioData) {
-                console.log('❌ No se encontró usuario en la tabla');
+            if (!usuarioData) {
                 setLoading(false);
                 return;
             }
@@ -54,7 +53,6 @@ export function useMentorOnboarding() {
 
             // Si es mentor pero NO completó onboarding → Mostrar modal
             if (!mentor.onboarding_completado) {
-                console.log('📋 Mentor sin onboarding completado → Mostrando modal');
                 setMentorData(mentor);
                 setShowModal(true);
             } else {

@@ -101,6 +101,7 @@ export function GlobalCalendar() {
         setLoading(true);
         await Promise.all([
             getUserData(),
+            loadMentorMaterias(),
             loadAvailability()
         ]);
         setLoading(false);
@@ -111,6 +112,34 @@ export function GlobalCalendar() {
         setCurrentUserId(userId);
         if (userId) {
             setCurrentEstudianteId(userId);
+        }
+    };
+
+    const loadMentorMaterias = async () => {
+        try {
+            const { data: allMentorMaterias } = await supabase
+                .from('mentor_materia')
+                .select(`
+                id_materia,
+                materia:id_materia (
+                    id_materia,
+                    nombre_materia
+                )
+            `);
+
+            const uniqueMaterias = {};
+            allMentorMaterias?.forEach(mm => {
+                if (mm.materia && !uniqueMaterias[mm.materia.id_materia]) {
+                    uniqueMaterias[mm.materia.id_materia] = {
+                        id_materia: mm.materia.id_materia,
+                        nombre_materia: mm.materia.nombre_materia
+                    };
+                }
+            });
+
+            setMaterias(Object.values(uniqueMaterias));
+        } catch (error) {
+            console.error('Error cargando materias:', error);
         }
     };
 
@@ -207,52 +236,55 @@ export function GlobalCalendar() {
                 return;
             }
 
-            const materiaIds = [...new Set(
-                slotsData?.map(s => s.mentor?.mentor_materia?.[0]?.id_materia).filter(Boolean)
-            )];
+            // Obtener materias de cada mentor
+            const mentorIds = [...new Set(slotsData?.map(s => s.id_mentor))];
+            const mentorMateriasMap = {};
 
-            let materiasMap = {};
-            let materiasArray = [];
+            for (const mentorId of mentorIds) {
+                const { data: mentorMaterias } = await supabase
+                    .from('mentor_materia')
+                    .select(`
+                    id_materia,
+                    materia:id_materia (
+                        id_materia,
+                        nombre_materia
+                    )
+                `)
+                    .eq('id_mentor', mentorId);
 
-            if (materiaIds.length > 0) {
-                const { data: materiasData } = await supabase
-                    .from('materia')
-                    .select('id_materia, nombre_materia')
-                    .in('id_materia', materiaIds);
-
-                materiasData?.forEach(m => {
-                    materiasMap[m.id_materia] = m.nombre_materia;
-                });
-
-                materiasArray = materiasData || [];
+                mentorMateriasMap[mentorId] = mentorMaterias?.map(mm => ({
+                    id_materia: mm.materia.id_materia,
+                    nombre_materia: mm.materia.nombre_materia
+                })) || [];
             }
 
-            setMaterias(materiasArray);
-
-            const slots = selectedMateria
-                ? slotsData?.filter(slot =>
-                    slot.mentor?.mentor_materia?.[0]?.id_materia === selectedMateria
-                )
-                : slotsData;
-
             const availability = {};
-            slots?.forEach(slot => {
-                const mentorMateria = slot.mentor?.mentor_materia?.[0];
-                const materiaId = mentorMateria?.id_materia;
-                const materiaNombre = materiasMap[materiaId] || 'Sin materia';
 
-                if (!slot.mentor) slot.mentor = {};
-                slot.mentor.materia_nombre = materiaNombre;
-                slot.mentor.id_materia = materiaId;
+            // Para cada slot, crear múltiples entradas (una por cada materia del mentor)
+            slotsData?.forEach(slot => {
+                const mentorMaterias = mentorMateriasMap[slot.id_mentor] || [];
 
-                if (!availability[slot.fecha]) {
-                    availability[slot.fecha] = {
-                        mentors: new Set(),
-                        slots: []
-                    };
-                }
-                availability[slot.fecha].mentors.add(slot.id_mentor);
-                availability[slot.fecha].slots.push(slot);
+                mentorMaterias.forEach(materia => {
+                    // Filtrar por materia seleccionada si existe
+                    if (selectedMateria && materia.id_materia !== selectedMateria) {
+                        return;
+                    }
+
+                    if (!availability[slot.fecha]) {
+                        availability[slot.fecha] = {
+                            mentors: new Set(),
+                            slots: []
+                        };
+                    }
+
+                    availability[slot.fecha].mentors.add(`${slot.id_mentor}_${materia.id_materia}`);
+                    availability[slot.fecha].slots.push({
+                        ...slot,
+                        materia_id: materia.id_materia,
+                        materia_nombre: materia.nombre_materia,
+                        slot_materia_id: `${slot.id_slot}_${materia.id_materia}`
+                    });
+                });
             });
 
             Object.keys(availability).forEach(date => {
@@ -274,20 +306,25 @@ export function GlobalCalendar() {
             return;
         }
 
-        const mentorMap = {};
+        const mentorMateriaMap = {};
+
         dayData.slots.forEach(slot => {
-            if (!mentorMap[slot.id_mentor]) {
-                mentorMap[slot.id_mentor] = {
+            const key = `${slot.id_mentor}_${slot.materia_id}`;
+
+            if (!mentorMateriaMap[key]) {
+                mentorMateriaMap[key] = {
                     mentorId: slot.id_mentor,
                     mentorName: slot.mentor.usuario.nombre,
-                    materia: slot.mentor.materia_nombre || 'Sin materia',
-                    materiaId: slot.mentor.id_materia,
+                    materia: slot.materia_nombre,
+                    materiaId: slot.materia_id,
                     maxAlumnos: slot.mentor.max_alumnos,
                     slots: []
                 };
             }
-            mentorMap[slot.id_mentor].slots.push({
+
+            mentorMateriaMap[key].slots.push({
                 id_slot: slot.id_slot,
+                slot_materia_id: slot.slot_materia_id,
                 hora: slot.hora,
                 duracion: slot.duracion,
                 modalidad: slot.modalidad,
@@ -297,11 +334,11 @@ export function GlobalCalendar() {
             });
         });
 
-        Object.values(mentorMap).forEach(mentor => {
+        Object.values(mentorMateriaMap).forEach(mentor => {
             mentor.slots.sort((a, b) => a.hora.localeCompare(b.hora));
         });
 
-        setMentorsForDate(Object.values(mentorMap));
+        setMentorsForDate(Object.values(mentorMateriaMap));
     };
 
     const calculateEndTime = (startTime, durationMinutes) => {
@@ -1050,7 +1087,7 @@ export function GlobalCalendar() {
                                                     : null;
 
                                             return (
-                                                <div key={slot.id_slot} style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                                                <div key={slot.slot_materia_id || slot.id_slot} style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
                                                     {/* Hora */}
                                                     <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
                                                         <FontAwesomeIcon icon={faClock} style={{ fontSize: 11 }} />
