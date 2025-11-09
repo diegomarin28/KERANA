@@ -196,7 +196,7 @@
 
                 if (insertError) throw insertError;
 
-                // ✅ ENVIAR EMAIL DE NOTIFICACIÓN AL ADMIN
+                // ENVIAR EMAIL DE NOTIFICACIÓN A NOSOTROS
                 try {
                     await emailjs.send(
                         "service_dan74a5",
@@ -207,11 +207,11 @@
                             user_name: usuarioData.nombre || user.email,
                             materia_nombre: selectedMateria.nombre_materia,
                             calificacion: formData.calificacion,
-                            // ✅ mensaje = el motivo del postulante (sin bloque prefabricado)
+                            //el motivo del postulante (sin bloque prefabricado)
                             message: formData.motivo?.trim() || "",
-                            // ✅ foto pública para el mail
+                            // foto pública para el mail
                             comprobante_url: publicUrl,
-                            // destinatario del admin (ajustalo a tu correo real)
+                            // destinatario del admin
                             to_email: "tu-email-admin@gmail.com",
                             subject: "📚 Nueva aplicación de mentor - Kerana"
                         },

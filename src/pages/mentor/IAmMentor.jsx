@@ -1910,12 +1910,50 @@ export default function IAmMentor() {
                                 onClick={async () => {
                                     setIsCanceling(true);
                                     try {
-                                        console.log('Cancelar sesión:', confirmCancelSession);
-                                        await new Promise(resolve => setTimeout(resolve, 1000));
+                                        // 1. Obtener datos de la sesión
+                                        const { data: sesion, error: fetchError } = await supabase
+                                            .from('mentor_sesion')
+                                            .select('fecha_hora, id_alumno, id_materia, materia(nombre_materia)')
+                                            .eq('id_sesion', confirmCancelSession.id)
+                                            .single();
 
+                                        if (fetchError) throw fetchError;
+
+                                        // 2. Extraer fecha y hora
+                                        const fechaHora = new Date(sesion.fecha_hora);
+                                        const fecha = fechaHora.toISOString().split('T')[0];
+                                        const hora = fechaHora.toTimeString().slice(0, 5) + ':00';
+
+                                        // 3. MARCAR la sesión como cancelada (NO borrarla todavía)
+                                        const { error: updateError } = await supabase
+                                            .from('mentor_sesion')
+                                            .update({
+                                                estado: 'cancelada',
+                                                cancelada_por: 'mentor'
+                                            })
+                                            .eq('id_sesion', confirmCancelSession.id);
+
+                                        if (updateError) throw updateError;
+
+                                        // 4. ELIMINAR el slot completamente de slots_disponibles
+                                        const { error: deleteSlotError } = await supabase
+                                            .from('slots_disponibles')
+                                            .delete()
+                                            .eq('id_mentor', mentorData.id_mentor)
+                                            .eq('fecha', fecha)
+                                            .eq('hora', hora);
+
+                                        if (deleteSlotError) throw deleteSlotError;
+
+                                        // 5. Actualizar UI del mentor (quitar de próximas)
                                         setProximasSesiones(prev =>
                                             prev.filter(s => s.id_sesion !== confirmCancelSession.id)
                                         );
+
+                                        // 6. Disparar evento para actualizar MyCalendar
+                                        window.dispatchEvent(new CustomEvent('slotDeleted', {
+                                            detail: { fecha, hora }
+                                        }));
 
                                         setCancelSuccess(true);
                                         setTimeout(() => setCancelSuccess(false), 3000);

@@ -577,16 +577,16 @@ export default function MyCalendar() {
     };
 
     useEffect(() => {
-        const handleSlotCanceled = (event) => {
+        const handleSlotDeleted = (event) => {
             const { fecha, hora } = event.detail;
             console.log('🔔 Slot cancelado desde IAmMentor:', fecha, hora);
             loadSavedSlots();
         };
 
-        window.addEventListener('slotCanceled', handleSlotCanceled);
+        window.addEventListener('slotCanceled', handleSlotDeleted);
 
         return () => {
-            window.removeEventListener('slotCanceled', handleSlotCanceled);
+            window.removeEventListener('slotCanceled', handleSlotDeleted);
         };
     }, [currentMentorId]);
 
