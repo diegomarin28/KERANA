@@ -36,6 +36,7 @@ import {
     faCalendarAlt,
     faCalendarCheck
 } from '@fortawesome/free-solid-svg-icons';
+import {notificationTypes} from "../../api/notificationTypes.js";
 
 const LOCALIDADES = {
     montevideo: [
@@ -153,6 +154,7 @@ export default function IAmMentor() {
         }
     };
 
+
     const fetchProximasSesiones = async () => {
         if (!mentorData?.id_mentor) return;
 
@@ -160,6 +162,7 @@ export default function IAmMentor() {
             setLoadingSesiones(true);
 
             const ahora = new Date();
+
 
             const { data: sesiones, error: sesionesError } = await supabase
                 .from('mentor_sesion')
@@ -177,10 +180,11 @@ export default function IAmMentor() {
         notas_mentor,
         cantidad_alumnos,
         emails_participantes,
-        descripcion_alumno
-      `)
+        descripcion_alumno,
+        cancelada_por
+    `)
                 .eq('id_mentor', mentorData.id_mentor)
-                .eq('estado', 'confirmada')
+                .eq('estado', 'confirmada')  // Solo confirmadas
                 .gte('fecha_hora', ahora.toISOString())
                 .order('fecha_hora', { ascending: true });
 
@@ -357,6 +361,113 @@ export default function IAmMentor() {
             });
         } finally {
             setIsRemoving(false);
+        }
+    };
+
+    const handleConfirmCancelSession = async () => {
+        if (!confirmCancelSession) return;
+
+        setIsCanceling(true);
+        try {
+            // Buscar la sesión completa
+            const sesion = proximasSesiones.find(s => s.id_sesion === confirmCancelSession.id);
+            if (!sesion) {
+                setErrorModal({ open: true, message: 'Sesión no encontrada' });
+                return;
+            }
+
+            // 1. Actualizar estado de la sesión
+            const { error: cancelError } = await supabase
+                .from('mentor_sesion')
+                .update({
+                    estado: 'cancelada',
+                    cancelada_por: 'mentor'
+                })
+                .eq('id_sesion', confirmCancelSession.id);
+
+            if (cancelError) {
+                console.error('Error actualizando sesión:', cancelError);
+                throw cancelError;
+            }
+
+            console.log('✅ Sesión cancelada correctamente:', confirmCancelSession.id); // ✅ DEBUG
+
+            // 2. Liberar el slot
+            const fecha = sesion.fecha_hora.split('T')[0];
+            const hora = sesion.fecha_hora.split('T')[1].substring(0, 5);
+
+            const { error: slotError } = await supabase
+                .from('slots_disponibles')
+                .update({ disponible: true })
+                .eq('id_mentor', sesion.id_mentor)
+                .eq('fecha', fecha)
+                .eq('hora', hora)
+                .eq('duracion', sesion.duracion_minutos);
+
+            if (slotError) {
+                console.error('Error liberando slot:', slotError);
+            }
+
+            // 3. Notificar a MyCalendar que el slot fue liberado
+            window.dispatchEvent(new CustomEvent('slotCanceled', {
+                detail: {
+                    fecha,
+                    hora,
+                    mentorId: sesion.id_mentor  // ✅ AÑADIDO para validación
+                }
+            }));
+
+            // 4. Enviar notificación al alumno (DESHABILITADO TEMPORALMENTE)
+            /*
+            try {
+                const { data: mentorCompleto } = await supabase
+                    .from('mentor')
+                    .select('id_usuario')
+                    .eq('id_mentor', sesion.id_mentor)
+                    .single();
+
+                if (mentorCompleto?.id_usuario) {
+                    const { data: mentorUsuario } = await supabase
+                        .from('usuario')
+                        .select('nombre')
+                        .eq('id_usuario', mentorCompleto.id_usuario)
+                        .single();
+
+                    if (mentorUsuario) {
+                        await notificationTypes.sesionCancelada(
+                            sesion.id_alumno,
+                            mentorCompleto.id_usuario,
+                            mentorUsuario.nombre,
+                            sesion.id_sesion,
+                            sesion.fecha_hora,
+                            sesion.materia?.nombre_materia
+                        );
+                    }
+                }
+            } catch (notifError) {
+                console.error('Error enviando notificación:', notifError);
+            }
+            */
+            console.log('Notificaciones deshabilitadas temporalmente');
+
+            // 5. Actualizar UI
+            setCancelSuccess(true);
+            setTimeout(() => setCancelSuccess(false), 3000);
+
+            // Recargar sesiones
+            await fetchProximasSesiones();
+
+            console.log('✅ Sesiones recargadas'); // ✅ DEBUG
+
+        } catch (error) {
+            console.error('Error cancelando sesión:', error);
+            setErrorModal({
+                open: true,
+                message: 'Error al cancelar la sesión. Intentá nuevamente.'
+            });
+        } finally {
+            setIsCanceling(false);
+            setConfirmCancelSession(null);
         }
     };
 
@@ -2150,12 +2261,89 @@ export default function IAmMentor() {
                 onClose={() => setSuccessModal({ open: false, message: '' })}
                 message={successModal.message}
             />
-            <SuccessModal
-                open={errorModal.open}
-                onClose={() => setErrorModal({ open: false, message: '' })}
-                message={errorModal.message}
-                isError={true}
-            />
+
+            {errorModal.open && (
+                <div style={{
+                    position: 'fixed',
+                    inset: 0,
+                    background: 'rgba(0, 0, 0, 0.7)',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    zIndex: 1000,
+                    backdropFilter: 'blur(4px)'
+                }} onClick={() => setErrorModal({ open: false, message: '' })}>
+                    <div style={{
+                        background: '#fff',
+                        borderRadius: 16,
+                        padding: 32,
+                        maxWidth: 500,
+                        width: '90%',
+                        boxShadow: '0 20px 60px rgba(0, 0, 0, 0.3)'
+                    }} onClick={(e) => e.stopPropagation()}>
+                        <div style={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: 16,
+                            marginBottom: 20
+                        }}>
+                            <div style={{
+                                width: 48,
+                                height: 48,
+                                borderRadius: 12,
+                                background: '#fee2e2',
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center'
+                            }}>
+                                <FontAwesomeIcon icon={faExclamationCircle} style={{ fontSize: 24, color: '#ef4444' }} />
+                            </div>
+                            <h3 style={{
+                                margin: 0,
+                                fontSize: 20,
+                                fontWeight: 700,
+                                color: '#0f172a',
+                                fontFamily: 'Inter, sans-serif'
+                            }}>
+                                Error
+                            </h3>
+                        </div>
+                        <p style={{
+                            margin: '0 0 24px 0',
+                            fontSize: 15,
+                            color: '#64748b',
+                            fontFamily: 'Inter, sans-serif',
+                            lineHeight: 1.6
+                        }}>
+                            {errorModal.message}
+                        </p>
+                        <button
+                            onClick={() => setErrorModal({ open: false, message: '' })}
+                            style={{
+                                width: '100%',
+                                padding: '12px 24px',
+                                background: '#ef4444',
+                                color: '#fff',
+                                border: 'none',
+                                borderRadius: 10,
+                                fontSize: 15,
+                                fontWeight: 700,
+                                cursor: 'pointer',
+                                transition: 'all 0.2s ease',
+                                fontFamily: 'Inter, sans-serif'
+                            }}
+                            onMouseEnter={(e) => {
+                                e.currentTarget.style.background = '#dc2626';
+                            }}
+                            onMouseLeave={(e) => {
+                                e.currentTarget.style.background = '#ef4444';
+                            }}
+                        >
+                            Entendido
+                        </button>
+                    </div>
+                </div>
+            )}
 
             {confirmCancelSession && (
                 <div style={{
@@ -2315,27 +2503,7 @@ export default function IAmMentor() {
                                 {confirmCancelSession.esMasDe36Horas ? 'No, mantener clase' : 'No cancelar'}
                             </button>
                             <button
-                                onClick={async () => {
-                                    setIsCanceling(true);
-                                    try {
-                                        console.log('Cancelar sesión:', confirmCancelSession);
-                                        await new Promise(resolve => setTimeout(resolve, 1000));
-
-                                        setProximasSesiones(prev =>
-                                            prev.filter(s => s.id_sesion !== confirmCancelSession.id)
-                                        );
-
-                                        setCancelSuccess(true);
-                                        setTimeout(() => setCancelSuccess(false), 3000);
-
-                                    } catch (error) {
-                                        console.error('Error cancelando sesión:', error);
-                                        setErrorModal({ open: true, message: 'Error al cancelar la sesión' });
-                                    } finally {
-                                        setIsCanceling(false);
-                                        setConfirmCancelSession(null);
-                                    }
-                                }}
+                                onClick={handleConfirmCancelSession}
                                 disabled={isCanceling}
                                 style={{
                                     flex: 1,
@@ -2365,7 +2533,7 @@ export default function IAmMentor() {
                                     }
                                 }}
                             >
-                                {isCanceling ? 'Cancelando...' : (confirmCancelSession.esMasDe36Horas ? 'Sí, cancelar' : 'Entiendo, cancelar igual')}
+                                {isCanceling ? 'Cancelando...' : (confirmCancelSession?.esMasDe36Horas ? 'Sí, cancelar' : 'Entiendo, cancelar igual')}
                             </button>
                         </div>
                     </div>

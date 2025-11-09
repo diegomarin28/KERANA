@@ -41,27 +41,31 @@ export function UpcomingMentorships() {
 
         const now = new Date().toISOString();
 
-        const query = supabase
+        let query = supabase
             .from('mentor_sesion')
             .select(`
-                *,
-                mentor:id_mentor(
-                    id_mentor,
-                    id_usuario,
-                    direccion,
-                    lugar_presencial,
-                    usuario:id_usuario(nombre, foto)
-                ),
-                materia:id_materia(nombre_materia)
-            `)
+            *,
+            mentor:id_mentor(
+                id_mentor,
+                id_usuario,
+                direccion,
+                lugar_presencial,
+                usuario:id_usuario(nombre, foto)
+            ),
+            materia:id_materia(nombre_materia)
+        `)
             .eq('id_alumno', userId)
-            .eq('estado', 'confirmada')
             .order('fecha_hora', { ascending: activeTab === 'proximas' });
 
         if (activeTab === 'proximas') {
-            query.gte('fecha_hora', now);
+            // ✅ Solo mostrar sesiones confirmadas en próximas
+            query = query
+                .eq('estado', 'confirmada')
+                .gte('fecha_hora', now);
         } else {
-            query.lt('fecha_hora', now);
+            // En pasadas mostramos completadas Y canceladas
+            query = query
+                .in('estado', ['completada', 'cancelada']);
         }
 
         const { data, error } = await query;
@@ -71,31 +75,27 @@ export function UpcomingMentorships() {
             return;
         }
 
+        console.log('📊 Sesiones cargadas:', data); // ✅ DEBUG
+
         const sesionesConModalidad = await Promise.all(
             data.map(async (sesion) => {
                 const fecha = sesion.fecha_hora.split('T')[0];
                 const hora = sesion.fecha_hora.split('T')[1].substring(0, 5);
 
-// asegurar 'hora' con ceros a la izquierda
                 const horaHHmm = hora?.slice(0,5) || new Date(sesion.fecha_hora)
                     .toTimeString()
-                    .slice(0,5); // 'HH:MM'
+                    .slice(0,5);
 
                 const { data: slot, error: slotError } = await supabase
                     .from('slots_disponibles')
                     .select('modalidad, locacion')
                     .eq('id_mentor', sesion.id_mentor)
-                    .eq('fecha', fecha)                  // 'YYYY-MM-DD'
-                    .eq('hora', horaHHmm)                // 'HH:MM'
+                    .eq('fecha', fecha)
+                    .eq('hora', horaHHmm)
                     .eq('duracion', sesion.duracion_minutos)
-                    .maybeSingle();                      // <- clave
+                    .maybeSingle();
 
                 if (slotError) console.warn('slots_disponibles vacio o error suave:', slotError);
-
-// fallback seguro
-                const modalidad = slot?.modalidad || 'virtual';
-                const locacion  = slot?.locacion  || null;
-
 
                 return {
                     ...sesion,
@@ -105,6 +105,7 @@ export function UpcomingMentorships() {
             })
         );
 
+        console.log('📊 Sesiones con modalidad:', sesionesConModalidad); // ✅ DEBUG
         setSesiones(sesionesConModalidad);
     };
 
@@ -128,7 +129,10 @@ export function UpcomingMentorships() {
         try {
             const { error: cancelError } = await supabase
                 .from('mentor_sesion')
-                .update({ estado: 'cancelada' })
+                .update({
+                    estado: 'cancelada',
+                    cancelada_por: 'alumno'  // ← NUEVO
+                })
                 .eq('id_sesion', selectedSesion.id_sesion);
 
             if (cancelError) {
@@ -392,7 +396,9 @@ export function UpcomingMentorships() {
                                         Mentor: {sesion.mentor.usuario.nombre}
                                     </p>
                                 </div>
-                                {activeTab === 'proximas' && (
+
+                                {/* Badge de "En X días" solo si está confirmada y es próxima */}
+                                {activeTab === 'proximas' && sesion.estado === 'confirmada' && (
                                     <div style={{
                                         background: '#dbeafe',
                                         color: '#1e40af',
@@ -402,6 +408,25 @@ export function UpcomingMentorships() {
                                         fontWeight: 700
                                     }}>
                                         {getDaysUntil(sesion.fecha_hora)}
+                                    </div>
+                                )}
+
+                                {/* ✅ NUEVO: Badge de cancelada */}
+                                {sesion.estado === 'cancelada' && (
+                                    <div style={{
+                                        background: 'linear-gradient(135deg, #fee2e2 0%, #fecaca 100%)',
+                                        color: '#dc2626',
+                                        padding: '8px 16px',
+                                        borderRadius: 8,
+                                        fontSize: 13,
+                                        fontWeight: 700,
+                                        border: '2px solid #fca5a5',
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        gap: 6
+                                    }}>
+                                        <FontAwesomeIcon icon={faTimes} style={{ fontSize: 12 }} />
+                                        Cancelada por {sesion.cancelada_por === 'mentor' ? 'el mentor' : 'ti'}
                                     </div>
                                 )}
                             </div>

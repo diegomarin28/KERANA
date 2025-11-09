@@ -201,8 +201,9 @@ export default function MyCalendar() {
                     seFiltra: slotDateTime < now && slot.disponible !== false
                 });
 
-                if (slotDateTime < now && slot.disponible !== false) {
-                    console.log('❌ Slot filtrado (pasado y disponible)');
+                // ✅ CAMBIO: Filtrar slots pasados Y disponibles (los cancelados también se ocultan)
+                if (slotDateTime < now) {
+                    console.log('⏰ Slot filtrado (pasado)');
                     return;
                 }
 
@@ -392,7 +393,7 @@ export default function MyCalendar() {
                     [slotKey]: mentorInfo.max_alumnos
                 }));
 
-                // ✅ CAMBIO: Validar con TODOS los slots (nuevos + existentes si NO está editando)
+                // CAMBIO: Validar con TODOS los slots (nuevos + existentes si NO está editando)
                 let slotsToCheck = newSlots;
                 if (!isEditingExisting) {
                     const existingSlots = savedSlots[dateKey] || [];
@@ -402,9 +403,9 @@ export default function MyCalendar() {
                 const overlaps = checkOverlap(dateKey, slotsToCheck);
                 if (overlaps.length > 0) {
                     const overlap = overlaps[0];
-                    setError(`Solapamiento: El slot de ${overlap.hour1} (${overlap.duration} min) se solapa con ${overlap.hour2}`);
+                    setError(`La sesión de las ${overlap.hour2} se solapa con la de las ${overlap.hour1}`);
                     setTimeout(() => setError(''), 5000);
-                    return prev; // ✅ NO agregar el slot si hay solapamiento
+                    return prev; // NO agregar el slot si hay solapamiento
                 }
 
                 return { ...prev, [dateKey]: newSlots };
