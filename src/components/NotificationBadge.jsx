@@ -27,6 +27,16 @@ export default function NotificationBadge({ inHero = true }) {
 
     useTabBadge(unreadCount);
 
+    // 🔍 DEBUG temporal
+    useEffect(() => {
+        console.log('📊 NotificationBadge Debug:', {
+            unreadCount,
+            notificaciones: notificaciones?.length,
+            loading,
+            inHero
+        });
+    }, [unreadCount, notificaciones, loading, inHero]);
+
     useEffect(() => {
         if (unreadCount > prevUnreadCount.current && prevUnreadCount.current !== 0) {
             setShouldAnimate(true);
@@ -196,7 +206,7 @@ export default function NotificationBadge({ inHero = true }) {
         }
         : {
             // AL SCROLLEAR
-            border: '2px solid #f0f7ff',
+            border: '2px solid #ffffff',
         };
 
     return (
@@ -211,26 +221,30 @@ export default function NotificationBadge({ inHero = true }) {
                     height: 40,
                     borderRadius: '50%',
                     ...buttonStyle,
-                    display: 'grid',
-                    placeItems: 'center',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
                     cursor: 'pointer',
                     transition: 'all 0.2s ease',
                 }}
                 onMouseEnter={(e) => {
                     if (inHero) {
                         e.currentTarget.style.background = 'rgba(255,255,255,0.2)';
+                        e.currentTarget.style.borderColor = 'rgba(255,255,255,0.3)';
                     } else {
                         e.currentTarget.style.background = '#f8fafc';
+                        e.currentTarget.style.borderColor = '#2563eb';
                         e.currentTarget.style.transform = 'scale(1.05)';
                     }
                 }}
                 onMouseLeave={(e) => {
                     e.currentTarget.style.background = buttonStyle.background;
+                    e.currentTarget.style.borderColor = inHero ? 'rgba(255,255,255,0.2)' : '#13346b';
                     e.currentTarget.style.transform = 'scale(1)';
                 }}
-                aria-label="Notificaciones"
+                aria-label={`Notificaciones${unreadCount > 0 ? ` (${unreadCount} sin leer)` : ''}`}
             >
-                <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" style={{ flexShrink: 0 }}>
                     <path
                         d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"
                         stroke="currentColor"
@@ -243,18 +257,21 @@ export default function NotificationBadge({ inHero = true }) {
                 {unreadCount > 0 && (
                     <span style={{
                         position: 'absolute',
-                        top: -2,
-                        right: -2,
-                        minWidth: 18,
-                        height: 18,
-                        padding: '0 5px',
-                        borderRadius: 9,
+                        top: -4,
+                        right: -4,
+                        minWidth: 20,
+                        height: 20,
+                        padding: '0 6px',
+                        borderRadius: '50%',
                         background: '#ef4444',
                         color: '#fff',
                         fontSize: 11,
                         fontWeight: 700,
-                        display: 'grid',
-                        placeItems: 'center',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        boxShadow: '0 2px 8px rgba(239, 68, 68, 0.4)',
+                        zIndex: 2,
                         ...badgeStyle,
                     }}>
                         {unreadCount > 99 ? '99+' : unreadCount}
@@ -262,7 +279,7 @@ export default function NotificationBadge({ inHero = true }) {
                 )}
             </button>
 
-            {/* Dropdown Modal - SIN CAMBIOS */}
+            {/* Dropdown Modal */}
             {isOpen && (
                 <div style={{
                     position: 'absolute',
@@ -624,7 +641,7 @@ export default function NotificationBadge({ inHero = true }) {
                 </div>
             )}
 
-            {/* Modal de confirmación unfollow - SIN CAMBIOS */}
+            {/* Modal de confirmación unfollow */}
             {showUnfollowConfirm && (
                 <div
                     onClick={handleCancelUnfollow}
