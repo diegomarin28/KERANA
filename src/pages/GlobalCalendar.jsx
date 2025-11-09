@@ -1832,18 +1832,18 @@ export function GlobalCalendar() {
                                         gap: '6px',
                                         boxShadow: isBooking || validandoReserva
                                             ? 'none'
-                                            : '0 4px 12px rgba(16, 185, 129, 0.3)'
+                                            : '0 4px 12px rgba(37, 99, 235, 0.3)'
                                     }}
                                     onMouseEnter={e => {
                                         if (!isBooking && !validandoReserva) {
                                             e.target.style.transform = 'translateY(-1px)';
-                                            e.target.style.boxShadow = '0 6px 20px rgba(16, 185, 129, 0.4)';
+                                            e.target.style.boxShadow = '0 4px 12px rgba(37, 99, 235, 0.3)';
                                         }
                                     }}
                                     onMouseLeave={e => {
                                         if (!isBooking && !validandoReserva) {
                                             e.target.style.transform = 'translateY(0)';
-                                            e.target.style.boxShadow = '0 4px 12px rgba(16, 185, 129, 0.3)';
+                                            e.target.style.boxShadow = '0 4px 12px rgba(37, 99, 235, 0.3)';
                                         }
                                     }}
                                 >

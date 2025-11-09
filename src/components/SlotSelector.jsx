@@ -138,8 +138,8 @@ export function SlotSelector({
 
     return (
         <div style={{
-            background: '#ecfdf5',
-            border: '2px solid #a7f3d0',
+            background: '#dbeafe',
+            border: '2px solid #93c5fd',
             borderRadius: '12px',
             padding: '16px',
             marginBottom: '20px'
@@ -148,7 +148,7 @@ export function SlotSelector({
             <div style={{
                 fontSize: '12px',
                 fontWeight: 600,
-                color: '#065f46',
+                color: '#1e40af',
                 marginBottom: '12px',
                 textAlign: 'center',
                 fontFamily: 'Inter, -apple-system, sans-serif'
@@ -169,7 +169,7 @@ export function SlotSelector({
                     <label style={{
                         fontSize: '11px',
                         fontWeight: 600,
-                        color: '#065f46',
+                        color: '#1e40af',
                         display: 'block',
                         marginBottom: '6px',
                         fontFamily: 'Inter, -apple-system, sans-serif'
@@ -203,7 +203,7 @@ export function SlotSelector({
                             textAlign: 'center',
                             fontSize: '16px',
                             fontWeight: 700,
-                            color: '#065f46',
+                            color: '#1e40af',
                             fontFamily: 'Inter, -apple-system, sans-serif'
                         }}>
                             {horaInicio.slice(0, 5)}
@@ -233,7 +233,7 @@ export function SlotSelector({
                     <label style={{
                         fontSize: '11px',
                         fontWeight: 600,
-                        color: '#065f46',
+                        color: '#1e40af',
                         display: 'block',
                         marginBottom: '6px',
                         fontFamily: 'Inter, -apple-system, sans-serif'
@@ -267,7 +267,7 @@ export function SlotSelector({
                             textAlign: 'center',
                             fontSize: '14px',
                             fontWeight: 700,
-                            color: '#065f46',
+                            color: '#1e40af',
                             fontFamily: 'Inter, -apple-system, sans-serif'
                         }}>
                             {formatearDuracion(duracion)}
@@ -303,7 +303,7 @@ export function SlotSelector({
                 <div style={{
                     fontSize: '12px',
                     fontWeight: 600,
-                    color: '#065f46',
+                    color: '#1e40af',
                     marginBottom: '4px',
                     fontFamily: 'Inter, -apple-system, sans-serif'
                 }}>
@@ -312,7 +312,7 @@ export function SlotSelector({
                 <div style={{
                     fontSize: '14px',
                     fontWeight: 700,
-                    color: '#065f46',
+                    color: '#1e40af',
                     marginBottom: '6px',
                     fontFamily: 'Inter, -apple-system, sans-serif'
                 }}>
