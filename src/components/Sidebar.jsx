@@ -260,7 +260,7 @@ export default function Sidebar({
 
                 <nav style={navStyle}>
                     <Group title="Mis Recursos" />
-                    <MenuLink icon={faShoppingCart} label="Comprados" onClick={() => go("/purchased")} />
+                    <MenuLink icon={faShoppingCart} label="Mis Compras" onClick={() => go("/purchased")} />
                     <MenuLink icon={faBookmark} label="Favoritos" onClick={() => go("/favorites")} />
                     <MenuLink icon={faFileAlt} label="Mis Apuntes" onClick={() => go("/my_papers")} />
                     {tieneSesiones && (

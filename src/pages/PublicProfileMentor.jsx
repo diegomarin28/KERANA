@@ -3,6 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import {publicProfileAPI} from '../api/database';
 import { useSeguidores } from '../hooks/useSeguidores';
 import ApunteCard from '../components/ApunteCard';
+import CourseCard from '../components/CourseCard';
 import {supabase} from "../supabase.js";
 import { ratingsAPI } from '../api/database';
 import AuthModal_HacerResenia from '../components/AuthModal_HacerResenia';
@@ -31,6 +32,7 @@ import {
     faCalendar
 } from '@fortawesome/free-solid-svg-icons';
 import { faLinkedin } from '@fortawesome/free-brands-svg-icons';
+import {useMentorStatus} from "../hooks/useMentorStatus.js";
 
 export default function PublicProfileMentor() {
     const { username } = useParams();
@@ -44,6 +46,7 @@ export default function PublicProfileMentor() {
     const [avatarOk, setAvatarOk] = useState(true);
     const [showShareTooltip, setShowShareTooltip] = useState(false);
     const [showFullImage, setShowFullImage] = useState(false);
+    const { isMentor, loading: mentorLoading } = useMentorStatus(true);
 
     const [showAllNotes, setShowAllNotes] = useState(false);
     const [allNotes, setAllNotes] = useState([]);
@@ -442,14 +445,32 @@ export default function PublicProfileMentor() {
 
     const getBadges = () => {
         if (!profile || !stats) return [];
+
         const badges = [];
         const memberDate = new Date(profile.fecha_creado);
         const monthsAgo = (new Date() - memberDate) / (1000 * 60 * 60 * 24 * 30);
-        if (monthsAgo >= 6) badges.push({ icon: faRocket, label: 'Early Adopter', color: '#10B981' });
-        if (stats.apuntes >= 10) badges.push({ icon: faBook, label: 'Bookworm', color: '#10B981' });
-        if (stats.apuntes >= 20) badges.push({ icon: faTrophy, label: 'Top Contributor', color: '#F59E0B' });
+
+        if (monthsAgo >= 6) {
+            badges.push({ icon: faRocket, label: 'Pionero', color: '#8B5CF6' });
+        }
+
+        if (stats.apuntesSubidos >= 10) {
+            badges.push({ icon: faTrophy, label: 'Colaborador Destacado', color: '#9F1239' });
+        }
+
+        if (stats.apuntesSubidos >= 100) {
+            badges.push({ icon: faBook, label: 'Ratón de biblioteca', color: '#F59E0B' });
+        }
+
+
+
+        if (isMentor) {
+            badges.push({ icon: faGraduationCap, label: 'Mentor Verificado', color: '#0d9488' });
+        }
+
         return badges;
     };
+
 
     const formatMemberSince = (dateString) => {
         const date = new Date(dateString);
@@ -510,12 +531,12 @@ export default function PublicProfileMentor() {
                             onMouseEnter={(e) => {
                                 if (avatarSrc) {
                                     e.currentTarget.style.transform = 'scale(1.05)';
-                                    e.currentTarget.style.boxShadow = '0 6px 16px rgba(16, 185, 129, 0.35)';
+                                    e.currentTarget.style.boxShadow = '0 6px 16px rgba(13, 148, 136, 0.35)';
                                 }
                             }}
                             onMouseLeave={(e) => {
                                 e.currentTarget.style.transform = 'scale(1)';
-                                e.currentTarget.style.boxShadow = '0 4px 12px rgba(16, 185, 129, 0.3)';
+                                e.currentTarget.style.boxShadow = '0 4px 12px rgba(13, 148, 136, 0.3)';
                             }}
                         >
                             {avatarSrc && avatarOk ? (
@@ -528,9 +549,6 @@ export default function PublicProfileMentor() {
                             <div style={profileInfoLeftStyle}>
                                 <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap', marginBottom: 8 }}>
                                     <h1 style={nameStyle}>{profile.nombre}</h1>
-                                    <span style={mentorVerifiedBadgeStyle}>
-                                        <FontAwesomeIcon icon={faGraduationCap} style={{ fontSize: 16 }} /> Mentor Verificado
-                                    </span>
                                 </div>
                                 <p style={usernameStyle}>@{profile.username}</p>
                                 {badges.length > 0 && (
@@ -542,7 +560,8 @@ export default function PublicProfileMentor() {
                                             </div>
                                         ))}
                                     </div>
-                                )}{/* LINKEDIN BUTTON */}
+                                )}
+                                {/* LINKEDIN BUTTON */}
                                 {profile.linkedin && (
                                     <a
                                         href={profile.linkedin}
@@ -550,23 +569,27 @@ export default function PublicProfileMentor() {
                                         rel="noopener noreferrer"
                                         style={linkedinButtonStyle}
                                         onMouseEnter={(e) => {
-                                        e.currentTarget.style.background = '#0a66c2';
-                                        e.currentTarget.style.color = 'white';
+                                            e.currentTarget.style.background = '#0a66c2';
+                                            e.currentTarget.style.color = 'white';
                                         }}
                                         onMouseLeave={(e) => {
-                                        e.currentTarget.style.background = 'white';
-                                        e.currentTarget.style.color = '#0a66c2';
+                                            e.currentTarget.style.background = 'white';
+                                            e.currentTarget.style.color = '#0a66c2';
                                         }}
                                     >
                                         <FontAwesomeIcon icon={faLinkedin} style={{ fontSize: 16 }} />
                                         Ver LinkedIn
                                     </a>
-                                    )}
+                                )}
                                 {mentorInfo?.estrellas_mentor && (
                                     <div style={mentorRatingInlineStyle}>
                                         <FontAwesomeIcon icon={faStar} style={{ fontSize: 20, color: '#F59E0B' }} />
-                                        <span style={{ fontSize: 18, fontWeight: 700, color: '#10B981' }}>{mentorInfo.estrellas_mentor.toFixed(1)}</span>
-                                        <span style={{ fontSize: 14, color: '#666' }}>/ 5.0 · {mentorInfo.materias?.length || 0} materias</span>
+                                        <span style={{ fontSize: 18, fontWeight: 700, color: '#0d9488' }}>{mentorInfo.estrellas_mentor.toFixed(1)}</span>
+                                        {mentorInfo.materias?.length > 0 && (
+                                            <span style={{ fontSize: 14, color: '#666' }}>
+                                                / 5.0 · {mentorInfo.materias.length} {mentorInfo.materias.length === 1 ? 'materia' : 'materias'}
+                                            </span>
+                                        )}
                                     </div>
                                 )}
                                 <div style={metaInfoStyle}>
@@ -576,13 +599,7 @@ export default function PublicProfileMentor() {
                                         </svg>
                                         Mentor desde {formatMemberSince(profile.fecha_creado)}
                                     </div>
-                                    <div style={metaItemStyle}>
-                                        <svg style={{ width: 16, height: 16 }} fill="currentColor" viewBox="0 0 20 20">
-                                            <path d="M11 3a1 1 0 100 2h2.586l-6.293 6.293a1 1 0 101.414 1.414L15 6.414V9a1 1 0 102 0V4a1 1 0 00-1-1h-5z" />
-                                            <path d="M5 5a2 2 0 00-2 2v8a2 2 0 002 2h8a2 2 0 002-2v-3a1 1 0 10-2 0v3H5V7h3a1 1 0 000-2H5z" />
-                                        </svg>
-                                        LinkedIn (próximamente)
-                                    </div>
+
                                 </div>
                                 {profile.mostrar_email && (
                                     <div style={emailContainerStyle}>
@@ -597,7 +614,7 @@ export default function PublicProfileMentor() {
                                 </div>
                             </div>
                             <div style={actionButtonsStyle}>
-                                <button onClick={handleSeguir} disabled={loadingFollow} style={{ ...followButtonStyle, background: siguiendo ? '#F3F4F6' : '#10B981', color: siguiendo ? '#111827' : 'white', border: siguiendo ? '2px solid #D1D5DB' : '2px solid #10B981' }}>
+                                <button onClick={handleSeguir} disabled={loadingFollow} style={{ ...followButtonStyle, background: siguiendo ? '#F3F4F6' : '#0d9488', color: siguiendo ? '#111827' : 'white', border: siguiendo ? '2px solid #D1D5DB' : '2px solid #0d9488' }}>
                                     {loadingFollow ? <div style={buttonSpinnerStyle}></div> : siguiendo ? (
                                         <>
                                             <FontAwesomeIcon icon={faUserCheck} style={{ width: 16, height: 16, marginRight: 6 }} />
@@ -618,7 +635,7 @@ export default function PublicProfileMentor() {
                                         width: 40,
                                         height: 40,
                                         borderRadius: '50%',
-                                        border: '2px solid #10B981',
+                                        border: '2px solid #0d9488',
                                         background: 'white',
                                         cursor: loadingFavorite ? 'not-allowed' : 'pointer',
                                         display: 'flex',
@@ -636,7 +653,7 @@ export default function PublicProfileMentor() {
                                         icon={faBookmark}
                                         style={{
                                             fontSize: 20,
-                                            color: isFavoriteMentor ? '#10B981' : '#D1D5DB'
+                                            color: isFavoriteMentor ? '#0d9488' : '#D1D5DB'
                                         }}
                                     />
                                 </button>
@@ -658,9 +675,9 @@ export default function PublicProfileMentor() {
                             onClick={() => setTab(t)}
                             style={{
                                 ...tabButtonStyle,
-                                background: tab === t ? '#10B981' : 'transparent',
+                                background: tab === t ? '#0d9488' : 'transparent',
                                 color: tab === t ? 'white' : '#666',
-                                borderBottom: tab === t ? '3px solid #10B981' : '3px solid transparent'
+                                borderBottom: tab === t ? '3px solid #0d9488' : '3px solid transparent'
                             }}
                         >
                             {t === 'mentorias' && <><FontAwesomeIcon icon={faGraduationCap} style={{ marginRight: 6 }} /> Mentorías</>}
@@ -683,7 +700,7 @@ export default function PublicProfileMentor() {
                             <button
                                 onClick={() => setShowCalendarModal(true)}
                                 style={{
-                                    background: '#10B981',
+                                    background: '#0d9488',
                                     color: '#fff',
                                     fontWeight: 700,
                                     padding: '12px 20px',
@@ -691,21 +708,21 @@ export default function PublicProfileMentor() {
                                     border: 'none',
                                     cursor: 'pointer',
                                     fontSize: 16,
-                                    boxShadow: '0 4px 12px rgba(16, 185, 129, 0.25)',
+                                    boxShadow: '0 4px 12px rgba(13, 148, 136, 0.25)',
                                     transition: 'all 0.2s ease-in-out',
                                     display: 'flex',
                                     alignItems: 'center',
                                     gap: 8
                                 }}
                                 onMouseEnter={(e) => {
-                                    e.currentTarget.style.background = '#059669';
+                                    e.currentTarget.style.background = '#14b8a6';
                                     e.currentTarget.style.transform = 'translateY(-2px)';
-                                    e.currentTarget.style.boxShadow = '0 8px 20px rgba(16, 185, 129, 0.35)';
+                                    e.currentTarget.style.boxShadow = '0 8px 20px rgba(13, 148, 136, 0.35)';
                                 }}
                                 onMouseLeave={(e) => {
-                                    e.currentTarget.style.background = '#10B981';
+                                    e.currentTarget.style.background = '#0d9488';
                                     e.currentTarget.style.transform = 'translateY(0)';
-                                    e.currentTarget.style.boxShadow = '0 4px 12px rgba(16, 185, 129, 0.25)';
+                                    e.currentTarget.style.boxShadow = '0 4px 12px rgba(13, 148, 136, 0.25)';
                                 }}
                             >
                                 <FontAwesomeIcon icon={faCalendarCheck} />
@@ -718,7 +735,7 @@ export default function PublicProfileMentor() {
                                 <div style={mentorRatingCardStyle}>
                                     <FontAwesomeIcon icon={faStar} style={{ fontSize: 32, color: '#F59E0B' }} />
                                     <div>
-                                        <div style={{ fontSize: 36, fontWeight: 800, color: '#10B981' }}>
+                                        <div style={{ fontSize: 36, fontWeight: 800, color: '#0d9488' }}>
                                             {mentorInfo.estrellas_mentor.toFixed(1)}
                                         </div>
                                         <div style={{ fontSize: 14, color: '#666', fontWeight: 600 }}>
@@ -727,23 +744,21 @@ export default function PublicProfileMentor() {
                                     </div>
                                 </div>
                             )}
-                            <div style={mentorMateriasGridStyle}>
+                            <div style={{
+                                display: 'grid',
+                                gap: 20,
+                                gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))'
+                            }}>
                                 {mentorInfo.materias?.map((m) => (
-                                    <div key={m.id_materia} style={mentorMateriaCardStyle}>
-                                        <div style={mentorMateriaIconStyle}>
-                                            <FontAwesomeIcon icon={faGraduationCap} />
-                                        </div>
-                                        <div>
-                                            <div style={mentorMateriaTitleStyle}>
-                                                {m.materia.nombre_materia}
-                                            </div>
-                                            {m.materia.semestre && (
-                                                <div style={mentorMateriaSemestreStyle}>
-                                                    Semestre {m.materia.semestre}
-                                                </div>
-                                            )}
-                                        </div>
-                                    </div>
+                                    <CourseCard
+                                        key={m.id_materia}
+                                        course={{
+                                            tipo: 'materia',
+                                            id: m.materia.id_materia,
+                                            titulo: m.materia.nombre_materia,
+                                            subtitulo: m.materia.semestre ? `Semestre ${m.materia.semestre}` : null
+                                        }}
+                                    />
                                 ))}
                             </div>
                         </div>
@@ -817,9 +832,9 @@ export default function PublicProfileMentor() {
                                             <FontAwesomeIcon icon={faFilter} style={{ marginRight: 6 }} />
                                             Filtrar por materia:
                                         </span>
-                                        <button onClick={() => handleFilterBySubject(null)} style={{ ...filterChipStyle, background: selectedSubject === null ? '#10B981' : 'white', color: selectedSubject === null ? 'white' : '#666', border: selectedSubject === null ? '2px solid #10B981' : '2px solid #E5E7EB' }}>Todas</button>
+                                        <button onClick={() => handleFilterBySubject(null)} style={{ ...filterChipStyle, background: selectedSubject === null ? '#0d9488' : 'white', color: selectedSubject === null ? 'white' : '#666', border: selectedSubject === null ? '2px solid #0d9488' : '2px solid #E5E7EB' }}>Todas</button>
                                         {userSubjects.map(materia => (
-                                            <button key={materia.id_materia} onClick={() => handleFilterBySubject(materia.id_materia)} style={{ ...filterChipStyle, background: selectedSubject === materia.id_materia ? '#10B981' : 'white', color: selectedSubject === materia.id_materia ? 'white' : '#666', border: selectedSubject === materia.id_materia ? '2px solid #10B981' : '2px solid #E5E7EB' }}>{materia.nombre_materia}</button>
+                                            <button key={materia.id_materia} onClick={() => handleFilterBySubject(materia.id_materia)} style={{ ...filterChipStyle, background: selectedSubject === materia.id_materia ? '#0d9488' : 'white', color: selectedSubject === materia.id_materia ? 'white' : '#666', border: selectedSubject === materia.id_materia ? '2px solid #0d9488' : '2px solid #E5E7EB' }}>{materia.nombre_materia}</button>
                                         ))}
                                     </div>
                                 )}
@@ -1022,31 +1037,30 @@ function StatInline({ number, label }) {
     );
 }
 
-const pageStyle = { minHeight: '100vh', background: '#F0FDF4', paddingBottom: 40 };
+const pageStyle = { minHeight: '100vh', background: '#f0fdfa', paddingBottom: 40 };
 const containerStyle = { maxWidth: 1128, margin: '0 auto', padding: '0 16px' };
 const centerStyle = { display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center', minHeight: '60vh' };
-const spinnerStyle = { width: 40, height: 40, border: '3px solid #f3f4f6', borderTop: '3px solid #10B981', borderRadius: '50%', animation: 'spin 0.8s linear infinite' };
+const spinnerStyle = { width: 40, height: 40, border: '3px solid #f3f4f6', borderTop: '3px solid #0d9488', borderRadius: '50%', animation: 'spin 0.8s linear infinite' };
 const buttonSpinnerStyle = { width: 16, height: 16, border: '2px solid #f3f4f6', borderTop: '2px solid currentColor', borderRadius: '50%', animation: 'spin 0.6s linear infinite' };
 const coverContainerStyle = { background: 'white', borderRadius: '8px 8px 0 0', overflow: 'hidden', marginTop: 16, boxShadow: '0 0 0 1px rgba(0,0,0,0.08), 0 2px 4px rgba(0,0,0,0.08)' };
-const coverPhotoStyle = { height: 120, background: 'linear-gradient(135deg, #10B981 0%, #059669 50%, #047857 100%)', position: 'relative' };
+const coverPhotoStyle = { height: 120, background: '#0d9488', position: 'relative' };
 const profileHeaderWrapperStyle = { padding: '0 24px 24px 24px', position: 'relative' };
-const avatarWrapperStyle = { width: 120, height: 120, borderRadius: '50%', overflow: 'hidden', border: '4px solid white', boxShadow: '0 4px 12px rgba(16, 185, 129, 0.3)', marginTop: -60, marginBottom: 16, background: 'white' };
+const avatarWrapperStyle = { width: 120, height: 120, borderRadius: '50%', overflow: 'hidden', border: '4px solid white', boxShadow: '0 4px 12px rgba(13, 148, 136, 0.3)', marginTop: -60, marginBottom: 16, background: 'white' };
 const avatarImageStyle = { width: '100%', height: '100%', objectFit: 'cover' };
-const avatarPlaceholderStyle = { width: '100%', height: '100%', background: 'linear-gradient(135deg, #10B981 0%, #059669 100%)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 48, fontWeight: 'bold', color: 'white' };
+const avatarPlaceholderStyle = { width: '100%', height: '100%', background: '#0d9488', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 48, fontWeight: 'bold', color: 'white' };
 const profileInfoContainerStyle = { display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 20, flexWrap: 'wrap' };
 const profileInfoLeftStyle = { flex: 1, minWidth: 280 };
 const nameStyle = { margin: 0, fontSize: 28, fontWeight: 700, color: '#000000E6', letterSpacing: '-0.5px' };
 const usernameStyle = { margin: '4px 0 12px 0', fontSize: 16, color: '#666', fontWeight: 500 };
-const mentorVerifiedBadgeStyle = { background: 'linear-gradient(135deg, #10B981 0%, #059669 100%)', color: 'white', padding: '6px 14px', borderRadius: 20, fontSize: 13, fontWeight: 600, display: 'inline-flex', alignItems: 'center', gap: 4, boxShadow: '0 2px 8px rgba(16, 185, 129, 0.3)' };
 const badgesContainerStyle = { display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 12 };
 const badgeStyle = { display: 'inline-flex', alignItems: 'center', gap: 6, padding: '6px 12px', borderRadius: 20, fontSize: 13, fontWeight: 600, background: 'white', border: '2px solid', transition: 'all 0.2s ease' };
-const mentorRatingInlineStyle = { display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12, padding: '10px 16px', background: 'linear-gradient(135deg, #ECFDF5 0%, #D1FAE5 100%)', borderRadius: 12, border: '2px solid #A7F3D0', width: 'fit-content' };
+const mentorRatingInlineStyle = { display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12, padding: '10px 16px', background: '#f0fdfa', borderRadius: 12, border: '2px solid #99f6e4', width: 'fit-content' };
 const metaInfoStyle = { display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 12 };
 const metaItemStyle = { display: 'flex', alignItems: 'center', gap: 8, fontSize: 14, color: '#666' };
 const emailContainerStyle = { display: 'flex', alignItems: 'center', gap: 6, fontSize: 14, color: '#666', marginBottom: 12 };
 const statsInlineStyle = { display: 'flex', gap: 20, marginTop: 8, flexWrap: 'wrap' };
 const actionButtonsStyle = { display: 'flex', gap: 10, alignItems: 'flex-start' };
-const followButtonStyle = { padding: '10px 24px', borderRadius: 24, fontWeight: 700, fontSize: 15, cursor: 'pointer', transition: 'all 0.2s ease', border: '2px solid', display: 'flex', alignItems: 'center', justifyContent: 'center', minWidth: 140, height: 40, boxShadow: '0 2px 8px rgba(16, 185, 129, 0.2)' };
+const followButtonStyle = { padding: '10px 24px', borderRadius: 24, fontWeight: 700, fontSize: 15, cursor: 'pointer', transition: 'all 0.2s ease', border: '2px solid', display: 'flex', alignItems: 'center', justifyContent: 'center', minWidth: 140, height: 40, boxShadow: '0 2px 8px rgba(13, 148, 136, 0.2)' };
 const shareButtonStyle = { width: 40, height: 40, borderRadius: '50%', border: '2px solid #D1D5DB', background: 'white', color: '#666', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', transition: 'all 0.2s ease', boxShadow: '0 1px 4px rgba(0,0,0,0.1)' };
 const tooltipStyle = { position: 'absolute', top: '100%', right: 0, marginTop: 8, padding: '8px 12px', background: '#111827', color: 'white', borderRadius: 6, fontSize: 13, fontWeight: 600, whiteSpace: 'nowrap', boxShadow: '0 4px 12px rgba(0,0,0,0.2)', zIndex: 100 };
 const tabsContainerStyle = { background: 'white', borderRadius: '0 0 8px 8px', display: 'flex', gap: 4, padding: '0 24px', borderTop: '1px solid #E5E7EB', boxShadow: '0 0 0 1px rgba(0,0,0,0.08), 0 2px 4px rgba(0,0,0,0.08)' };
@@ -1054,12 +1068,12 @@ const tabButtonStyle = { padding: '16px 20px', fontWeight: 600, fontSize: 15, cu
 const sectionHeaderStyle = { display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20, flexWrap: 'wrap', gap: 16 };
 const sectionTitleStyle = { margin: 0, fontSize: 22, fontWeight: 700, color: '#000000E6', letterSpacing: '-0.3px' };
 const sectionSubtitleStyle = { margin: '4px 0 0 0', fontSize: 14, color: '#666' };
-const verMasButtonStyle = { padding: '10px 20px', background: 'white', color: '#10B981', border: '2px solid #10B981', borderRadius: 24, fontWeight: 600, fontSize: 14, cursor: 'pointer', transition: 'all 0.2s ease', display: 'flex', alignItems: 'center', boxShadow: '0 1px 4px rgba(0,0,0,0.1)' };
+const verMasButtonStyle = { padding: '10px 20px', background: 'white', color: '#0d9488', border: '2px solid #0d9488', borderRadius: 24, fontWeight: 600, fontSize: 14, cursor: 'pointer', transition: 'all 0.2s ease', display: 'flex', alignItems: 'center', boxShadow: '0 1px 4px rgba(0,0,0,0.1)' };
 const backToRecentButtonStyle = { padding: '10px 20px', background: 'white', color: '#666', border: '2px solid #E5E7EB', borderRadius: 24, fontWeight: 600, fontSize: 14, cursor: 'pointer', transition: 'all 0.2s ease', display: 'flex', alignItems: 'center' };
 const carouselWrapperStyle = { position: 'relative', paddingBottom: 20 };
 const carouselContainerStyle = { display: 'flex', gap: 16, overflowX: 'auto', scrollBehavior: 'smooth', paddingBottom: 8, scrollbarWidth: 'thin', scrollbarColor: '#CBD5E1 transparent' };
 const carouselItemStyle = { minWidth: 280, flexShrink: 0 };
-const carouselArrowStyle = { position: 'absolute', top: '50%', transform: 'translateY(-50%)', width: 44, height: 44, borderRadius: '50%', background: 'white', border: '2px solid #10B981', color: '#10B981', fontSize: 28, fontWeight: 'bold', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 4px 12px rgba(16, 185, 129, 0.2)', transition: 'all 0.2s ease', zIndex: 10 };
+const carouselArrowStyle = { position: 'absolute', top: '50%', transform: 'translateY(-50%)', width: 44, height: 44, borderRadius: '50%', background: 'white', border: '2px solid #0d9488', color: '#0d9488', fontSize: 28, fontWeight: 'bold', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 4px 12px rgba(13, 148, 136, 0.2)', transition: 'all 0.2s ease', zIndex: 10 };
 const filtersContainerStyle = { display: 'flex', gap: 10, marginBottom: 24, flexWrap: 'wrap', alignItems: 'center', background: 'white', padding: 16, borderRadius: 8, boxShadow: '0 0 0 1px rgba(0,0,0,0.08)' };
 const filterLabelStyle = { fontSize: 14, fontWeight: 600, color: '#666', display: 'flex', alignItems: 'center' };
 const filterChipStyle = { padding: '8px 16px', borderRadius: 20, fontWeight: 600, fontSize: 13, cursor: 'pointer', transition: 'all 0.2s ease', border: '2px solid' };
@@ -1069,18 +1083,13 @@ const emptyIconStyle = { fontSize: '4rem', marginBottom: 16, opacity: 0.5 };
 const emptyTitleStyle = { margin: '0 0 8px 0', fontSize: 20, fontWeight: 700, color: '#111827' };
 const emptyDescStyle = { margin: 0, color: '#666', fontSize: 15 };
 const mentorCardStyle = { background: 'white', borderRadius: 8, padding: 24, boxShadow: '0 0 0 1px rgba(0,0,0,0.08), 0 2px 4px rgba(0,0,0,0.08)' };
-const mentorRatingCardStyle = { display: 'flex', alignItems: 'center', gap: 20, padding: 24, background: 'linear-gradient(135deg, #ECFDF5 0%, #D1FAE5 100%)', borderRadius: 12, marginBottom: 24, border: '2px solid #A7F3D0' };
-const mentorMateriasGridStyle = { display: 'grid', gap: 12, gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))' };
-const mentorMateriaCardStyle = { display: 'flex', alignItems: 'center', gap: 12, padding: 16, background: '#F9FAFB', border: '2px solid #E5E7EB', borderRadius: 8, transition: 'all 0.2s ease' };
-const mentorMateriaIconStyle = { fontSize: 28, width: 48, height: 48, background: 'white', borderRadius: 8, display: 'flex', alignItems: 'center', justifyContent: 'center', border: '2px solid #10B981' };
-const mentorMateriaTitleStyle = { fontSize: 15, fontWeight: 700, color: '#111827', lineHeight: 1.3 };
-const mentorMateriaSemestreStyle = { fontSize: 13, color: '#666', marginTop: 2 };
-const backButtonStyle = { padding: '12px 24px', background: '#10B981', color: 'white', border: 'none', borderRadius: 24, fontWeight: 600, cursor: 'pointer', fontSize: 15, boxShadow: '0 2px 8px rgba(16, 185, 129, 0.3)', transition: 'all 0.2s ease' };
+const mentorRatingCardStyle = { display: 'flex', alignItems: 'center', gap: 20, padding: 24, background: '#f0fdfa', borderRadius: 12, marginBottom: 24, border: '2px solid #99f6e4' };
+const backButtonStyle = { padding: '12px 24px', background: '#0d9488', color: 'white', border: 'none', borderRadius: 24, fontWeight: 600, cursor: 'pointer', fontSize: 15, boxShadow: '0 2px 8px rgba(13, 148, 136, 0.3)', transition: 'all 0.2s ease' };
 const modalOverlayStyle = { position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0, 0, 0, 0.6)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 9999, backdropFilter: 'blur(4px)' };
 const modalContentStyle = { background: 'white', borderRadius: 16, padding: '32px 24px 24px 24px', maxWidth: 400, width: '90%', boxShadow: '0 20px 60px rgba(0,0,0,0.3)', textAlign: 'center' };
-const modalAvatarContainerStyle = { width: 80, height: 80, margin: '0 auto 16px auto', borderRadius: '50%', overflow: 'hidden', border: '3px solid #10B981' };
+const modalAvatarContainerStyle = { width: 80, height: 80, margin: '0 auto 16px auto', borderRadius: '50%', overflow: 'hidden', border: '3px solid #0d9488' };
 const modalAvatarStyle = { width: '100%', height: '100%', objectFit: 'cover' };
-const modalAvatarPlaceholderStyle = { width: '100%', height: '100%', background: 'linear-gradient(135deg, #10B981 0%, #059669 100%)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 32, fontWeight: 'bold', color: 'white' };
+const modalAvatarPlaceholderStyle = { width: '100%', height: '100%', background: '#0d9488', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 32, fontWeight: 'bold', color: 'white' };
 const modalTitleStyle = { margin: '0 0 24px 0', fontSize: 18, fontWeight: 600, color: '#111827' };
 const modalButtonsStyle = { display: 'flex', flexDirection: 'column', gap: 10 };
 const modalConfirmButtonStyle = { padding: '12px 24px', background: '#EF4444', color: 'white', border: 'none', borderRadius: 8, fontWeight: 700, fontSize: 14, cursor: 'pointer', transition: 'all 0.2s ease' };

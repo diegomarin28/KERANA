@@ -1,6 +1,21 @@
 import { useRef, useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import StarDisplay from './StarDisplay';
+import {
+    faMicrophone,
+    faChartLine,
+    faHandshake,
+    faBolt,
+    faClipboardList,
+    faComments,
+    faFire,
+    faHeart,
+    faBook,
+    faLightbulb,
+    faDoorOpen,
+    faClipboard,
+    faQuestionCircle
+} from '@fortawesome/free-solid-svg-icons';
 
 // Tags disponibles
 const AVAILABLE_TAGS = [

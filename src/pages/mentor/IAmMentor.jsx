@@ -26,11 +26,11 @@ import {
     faCog,
     faCreditCard,
     faFileContract,
-    faChevronDown,
+    faCalendarTimes,
     faVideo,
     faGraduationCap,
-    faHome,
-    faUniversity,
+    faBolt,
+    faShieldAlt,
     faUser,
     faDollarSign,
     faCalendarAlt,
@@ -66,7 +66,7 @@ export default function IAmMentor() {
     const [showSessionModal, setShowSessionModal] = useState(false);
     const [errorModal, setErrorModal] = useState({ open: false, message: '' });
 
-    const { isMentor, mentorData: mentorStatusData, loading: mentorLoading } = useMentorStatus();
+    const { isMentor, mentorData: mentorStatusData, loading: mentorLoading, refetch } = useMentorStatus();
     const { paymentData, hasPaymentConfigured, savePaymentData } = useMentorPayment();
 
     const mentorData = mentorStatusData?.[0] || null;
@@ -286,12 +286,14 @@ export default function IAmMentor() {
         }
     }, [activeTab, mentorData]);
 
-    const handleRemoveMentorship = async (mentorshipId, materiaName) => {
+    const handleRemoveMentorship = async () => {
+        if (!confirmRemoveMentorship) return;
+
         try {
             setIsRemoving(true);
 
-            // 1. Verificar si tiene mentorías programadas en esta materia
-            const { data: sesionesActivas, error: sesionesError } = await supabase
+            // 1. Verificar sesiones activas
+            const { data: sesionesActivas } = await supabase
                 .from('mentor_sesion')
                 .select('id_sesion')
                 .eq('id_mentor', mentorData.id_mentor)
@@ -299,64 +301,60 @@ export default function IAmMentor() {
                 .eq('estado', 'confirmada')
                 .gte('fecha_hora', new Date().toISOString());
 
-            if (sesionesError) throw sesionesError;
-
-            if (sesionesActivas && sesionesActivas.length > 0) {
+            if (sesionesActivas?.length > 0) {
                 setErrorModal({
                     open: true,
-                    message: `No podés darte de baja de ${materiaName} porque tenés ${sesionesActivas.length} mentoría(s) programada(s). Cancelá las sesiones primero.`
+                    message: `No podés darte de baja de ${confirmRemoveMentorship.materia} porque tenés ${sesionesActivas.length} mentoría(s) programada(s).`
                 });
                 setConfirmRemoveMentorship(null);
-                setIsRemoving(false);
                 return;
             }
 
-            // 2. Eliminar la relación mentor_materia
-            const { error: deleteError } = await supabase
+            // 2. Eliminar mentor_materia
+            await supabase
                 .from('mentor_materia')
                 .delete()
-                .eq('id', mentorshipId);
+                .eq('id', confirmRemoveMentorship.id);
 
-            if (deleteError) throw deleteError;
-
-            // 3. Verificar si le quedan más materias
-            const { data: materiasRestantes, error: materiasError } = await supabase
+            // 3. Verificar materias restantes
+            const { data: materiasRestantes } = await supabase
                 .from('mentor_materia')
                 .select('id')
                 .eq('id_mentor', mentorData.id_mentor);
 
-            if (materiasError) throw materiasError;
-
-            // 4. Si no le quedan materias, eliminar de la tabla mentor
+            // 4. Si no quedan materias → eliminar mentor
             if (!materiasRestantes || materiasRestantes.length === 0) {
-                const { error: mentorDeleteError } = await supabase
+                await supabase
                     .from('mentor')
                     .delete()
                     .eq('id_mentor', mentorData.id_mentor);
 
-                if (mentorDeleteError) throw mentorDeleteError;
+                await refetch();
 
-                // Redirigir a home o página de mentores
                 setSuccessModal({
                     open: true,
                     message: 'Te diste de baja exitosamente. Ya no sos mentor.'
                 });
 
-                // Esperar 2 segundos y redirigir
                 setTimeout(() => {
                     window.location.href = '/';
                 }, 2000);
             } else {
-                // Solo actualizar la lista de materias
-                setMentorships(prev => prev.filter(m => m.id !== mentorshipId));
-                setSuccessModal({ open: true, message: 'Te diste de baja exitosamente' });
+                setMentorships(prev => prev.filter(m => m.id !== confirmRemoveMentorship.id));
+                setSuccessModal({
+                    open: true,
+                    message: 'Te diste de baja de la materia exitosamente'
+                });
             }
 
             setConfirmRemoveMentorship(null);
 
         } catch (err) {
             console.error('Error eliminando mentoría:', err);
-            setErrorModal({ open: true, message: 'Error al darte de baja de la materia' });
+            setErrorModal({
+                open: true,
+                message: 'Error al darte de baja. Intentá nuevamente.'
+            });
         } finally {
             setIsRemoving(false);
         }
@@ -742,10 +740,11 @@ export default function IAmMentor() {
                                                     </p>
                                                 </div>
                                                 <button
-                                                    onClick={() => handleRemoveMentorship(
-                                                        mentorship.id,
-                                                        mentorship.materia.nombre_materia
-                                                    )}
+                                                    onClick={() => setConfirmRemoveMentorship({
+                                                        id: mentorship.id,
+                                                        materia: mentorship.materia.nombre_materia,
+                                                        materiaId: mentorship.materia.id_materia
+                                                    })}
                                                     style={{
                                                         display: 'flex',
                                                         alignItems: 'center',
@@ -1428,11 +1427,11 @@ export default function IAmMentor() {
                                                 icon={faUser}
                                                 style={{ fontSize: 14, color: '#2563eb' }}
                                             />
-                                            Nombre completo de Mercado Pago *
+                                            Nombre completo en Mercado Pago *
                                         </label>
                                         <input
                                             type="text"
-                                            placeholder="tucuenta.alias.mp"
+                                            placeholder="Juan Pérez"
                                             value={pagoForm.mpAlias || ''}
                                             onChange={(e) => {
                                                 const value = e.target.value.slice(0, 100);
@@ -1658,77 +1657,486 @@ export default function IAmMentor() {
 
                     {activeTab === 'terminos' && (
                         <div>
-                            {/* Título mejorado */}
-                            <div style={{ marginBottom: 20 }}>
+                            {/* Título */}
+                            <div style={{ marginBottom: 24 }}>
                                 <h2 style={{
-                                    margin: '0 0 6px 0',
-                                    fontSize: 22,
-                                    fontWeight: 700,
-                                    color: '#0d9488',
-                                    fontFamily: 'Inter, sans-serif'
+                                    margin: '0 0 8px 0',
+                                    fontSize: 28,
+                                    fontWeight: 800,
+                                    color: '#0f172a',
+                                    fontFamily: 'Inter, sans-serif',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    gap: 12
                                 }}>
-                                    Términos y Condiciones
+                                    <FontAwesomeIcon icon={faFileContract} style={{ color: '#2563eb' }} />
+                                    Términos y Condiciones para Mentores
                                 </h2>
                                 <p style={{
                                     margin: 0,
-                                    fontSize: 14,
+                                    fontSize: 15,
                                     fontWeight: 500,
                                     color: '#64748b',
                                     fontFamily: 'Inter, sans-serif'
                                 }}>
-                                    Condiciones para ser mentor en Kerana
+                                    Condiciones que aceptaste al convertirte en mentor de Kerana
                                 </p>
                             </div>
 
-                            <Card style={{ padding: 24, marginTop: 20 }}>
-                                <div style={{ display: 'flex', flexDirection: 'column', gap: 20, fontFamily: 'Inter, sans-serif' }}>
-                                    <div style={infoBoxStyle}>
-                                        <h3 style={subtitleTermsStyle}>💰 Precios y Pagos</h3>
-                                        <ul style={listTermsStyle}>
-                                            <li><strong>Clases virtuales (Zoom):</strong> $430 UYU por sesión</li>
-                                            <li><strong>Clases presenciales:</strong> $630 UYU por sesión</li>
-                                            <li>Retenemos el pago 24 horas después de la clase</li>
-                                            <li>Si no hay inconvenientes, transferimos a tu cuenta</li>
-                                        </ul>
-                                    </div>
+                            <Card style={{ padding: 32, marginTop: 20 }}>
+                                <div style={{ display: 'flex', flexDirection: 'column', gap: 32, fontFamily: 'Inter, sans-serif' }}>
 
-                                    <div style={infoBoxStyle}>
-                                        <h3 style={subtitleTermsStyle}>
-                                            <FontAwesomeIcon icon={faCalendarAlt} style={{ marginRight: 8, color: '#0d9488' }} />
-                                            Política de Cancelaciones
-                                        </h3>
-                                        <ul style={listTermsStyle}>
-                                            <li><strong>Cancelación del estudiante:</strong>
-                                                <ul style={{ marginTop: 8 }}>
-                                                    <li><span style={{ color: '#10b981' }}>✓</span> Más de 12 horas antes: Reembolso completo</li>
-                                                    <li><span style={{ color: '#f59e0b' }}>!</span> Menos de 12 horas: Se te acredita 25%</li>
-                                                </ul>
+                                    {/* 1. Precios y Pagos */}
+                                    <div>
+                                        <div style={{
+                                            display: 'flex',
+                                            alignItems: 'center',
+                                            gap: 12,
+                                            marginBottom: 16,
+                                            paddingBottom: 12,
+                                            borderBottom: '2px solid #e5e7eb'
+                                        }}>
+                                            <FontAwesomeIcon
+                                                icon={faDollarSign}
+                                                style={{ fontSize: 20, color: '#2563eb' }}
+                                            />
+                                            <h3 style={{
+                                                margin: 0,
+                                                fontSize: 18,
+                                                fontWeight: 700,
+                                                color: '#0f172a'
+                                            }}>
+                                                1. Precios y Pagos
+                                            </h3>
+                                        </div>
+                                        <ul style={{
+                                            margin: 0,
+                                            paddingLeft: 24,
+                                            fontSize: 14,
+                                            lineHeight: 2,
+                                            color: '#475569',
+                                            fontWeight: 500
+                                        }}>
+                                            <li>
+                                                <strong>Clases virtuales:</strong> $430 UYU por sesión de 60 minutos
                                             </li>
-                                            <li><strong>Cancelación tuya:</strong>
-                                                <ul style={{ marginTop: 8 }}>
-                                                    <li><span style={{ color: '#10b981' }}>✓</span> Más de 36 horas antes: Sin penalización</li>
-                                                    <li><span style={{ color: '#ef4444' }}>✕</span> Menos de 36 horas: 1 strike</li>
-                                                    <li>⛔ 3 strikes = Baneo de 1 año</li>
-                                                </ul>
+                                            <li>
+                                                <strong>Clases presenciales:</strong> $630 UYU por sesión de 60 minutos
+                                            </li>
+                                            <li>
+                                                Los pagos son procesados a través de <strong>Mercado Pago</strong>
+                                            </li>
+                                            <li>
+                                                Kerana retiene el pago hasta <strong>24 horas después</strong> de finalizada la mentoría
+                                            </li>
+                                            <li>
+                                                Si no hay inconvenientes reportados, se transfiere automáticamente a tu cuenta de Mercado Pago
+                                            </li>
+                                            <li>
+                                                Mercado Pago cobra una comisión de aproximadamente <strong>6%</strong> sobre cada transacción
+                                            </li>
+                                            <li>
+                                                El mentor es responsable de declarar sus ingresos según la normativa fiscal vigente
                                             </li>
                                         </ul>
                                     </div>
 
-                                    <div style={infoBoxStyle}>
-                                        <h3 style={subtitleTermsStyle}>⚡ Responsabilidades</h3>
-                                        <ul style={listTermsStyle}>
-                                            <li>Responder solicitudes en tiempo y forma</li>
-                                            <li>Cumplir con los horarios acordados</li>
-                                            <li>Mantener respeto y profesionalismo</li>
-                                            <li>Reportar inconvenientes a: <strong>kerana.soporte@gmail.com</strong></li>
+                                    {/* 2. Privacidad y Protección de Datos */}
+                                    <div>
+                                        <div style={{
+                                            display: 'flex',
+                                            alignItems: 'center',
+                                            gap: 12,
+                                            marginBottom: 16,
+                                            paddingBottom: 12,
+                                            borderBottom: '2px solid #e5e7eb'
+                                        }}>
+                                            <FontAwesomeIcon
+                                                icon={faShieldAlt}
+                                                style={{ fontSize: 20, color: '#2563eb' }}
+                                            />
+                                            <h3 style={{
+                                                margin: 0,
+                                                fontSize: 18,
+                                                fontWeight: 700,
+                                                color: '#0f172a'
+                                            }}>
+                                                2. Privacidad y Protección de Datos
+                                            </h3>
+                                        </div>
+                                        <ul style={{
+                                            margin: 0,
+                                            paddingLeft: 24,
+                                            fontSize: 14,
+                                            lineHeight: 2,
+                                            color: '#475569',
+                                            fontWeight: 500
+                                        }}>
+                                            <li>
+                                                <strong>Información pública:</strong> Tu nombre, foto de perfil, localidad general (ej: Pocitos, Buceo) y materias que enseñás
+                                            </li>
+                                            <li>
+                                                <strong>Información privada:</strong> Tu dirección exacta, email y datos bancarios
+                                            </li>
+                                            <li>
+                                                Tu dirección solo se comparte con alumnos que <strong>pagaron</strong> una clase presencial en tu domicilio
+                                            </li>
+                                            <li>
+                                                Si solo das clases en facultad o virtuales, tu dirección nunca se comparte
+                                            </li>
+                                            <li>
+                                                Kerana no comparte tus datos bancarios con los alumnos bajo ninguna circunstancia
+                                            </li>
                                         </ul>
                                     </div>
 
-                                    <div style={{ padding: 16, background: '#EFF6FF', border: '2px solid #BFDBFE', borderRadius: 12, textAlign: 'center' }}>
-                                        <p style={{ margin: 0, fontSize: 14, color: '#1E40AF', fontFamily: 'Inter, sans-serif' }}>
-                                            📧 ¿Dudas o consultas? Escribinos a <strong>kerana.soporte@gmail.com</strong>
+                                    {/* 3. Política de Cancelaciones */}
+                                    <div>
+                                        <div style={{
+                                            display: 'flex',
+                                            alignItems: 'center',
+                                            gap: 12,
+                                            marginBottom: 16,
+                                            paddingBottom: 12,
+                                            borderBottom: '2px solid #e5e7eb'
+                                        }}>
+                                            <FontAwesomeIcon
+                                                icon={faCalendarTimes}
+                                                style={{ fontSize: 20, color: '#2563eb' }}
+                                            />
+                                            <h3 style={{
+                                                margin: 0,
+                                                fontSize: 18,
+                                                fontWeight: 700,
+                                                color: '#0f172a'
+                                            }}>
+                                                3. Política de Cancelaciones
+                                            </h3>
+                                        </div>
+
+                                        {/* 3.1 Cancelación del alumno */}
+                                        <div style={{ marginBottom: 20 }}>
+                                            <h4 style={{
+                                                margin: '0 0 12px 0',
+                                                fontSize: 15,
+                                                fontWeight: 700,
+                                                color: '#0f172a'
+                                            }}>
+                                                3.1. Cancelación por parte del alumno
+                                            </h4>
+                                            <ul style={{
+                                                margin: 0,
+                                                paddingLeft: 24,
+                                                fontSize: 14,
+                                                lineHeight: 2,
+                                                color: '#475569',
+                                                fontWeight: 500
+                                            }}>
+                                                <li>
+                                                    <strong>Más de 12 horas antes:</strong> El alumno recibe reembolso completo. El mentor no recibe pago.
+                                                </li>
+                                                <li>
+                                                    <strong>Menos de 12 horas antes:</strong> Se te acredita el 25% del monto aunque no se dicte la clase.
+                                                </li>
+                                                <li>
+                                                    Si el alumno no se presenta sin avisar, recibís el pago completo.
+                                                </li>
+                                            </ul>
+                                        </div>
+
+                                        {/* 3.2 Cancelación del mentor */}
+                                        <div>
+                                            <h4 style={{
+                                                margin: '0 0 12px 0',
+                                                fontSize: 15,
+                                                fontWeight: 700,
+                                                color: '#0f172a'
+                                            }}>
+                                                3.2. Cancelación por parte del mentor
+                                            </h4>
+                                            <ul style={{
+                                                margin: 0,
+                                                paddingLeft: 24,
+                                                fontSize: 14,
+                                                lineHeight: 2,
+                                                color: '#475569',
+                                                fontWeight: 500
+                                            }}>
+                                                <li>
+                                                    <strong>Más de 36 horas antes:</strong> Sin penalización. El alumno recibe reembolso completo.
+                                                </li>
+                                                <li>
+                                                    <strong>Menos de 36 horas antes:</strong> Se te asigna 1 strike, que te inválida realizar mentorías por una semana. El alumno recibe reembolso completo.
+                                                </li>
+                                                <li>
+                                                    <strong>3 strikes acumulados:</strong> Suspensión automática de las mentorías por 1 año.
+                                                </li>
+                                                <li>
+                                                    Los strikes se resetean cada 12 meses si no hay nuevas infracciones.
+                                                </li>
+                                            </ul>
+                                        </div>
+                                    </div>
+
+                                    {/* 4. Responsabilidades del Mentor */}
+                                    <div>
+                                        <div style={{
+                                            display: 'flex',
+                                            alignItems: 'center',
+                                            gap: 12,
+                                            marginBottom: 16,
+                                            paddingBottom: 12,
+                                            borderBottom: '2px solid #e5e7eb'
+                                        }}>
+                                            <FontAwesomeIcon
+                                                icon={faBolt}
+                                                style={{ fontSize: 20, color: '#2563eb' }}
+                                            />
+                                            <h3 style={{
+                                                margin: 0,
+                                                fontSize: 18,
+                                                fontWeight: 700,
+                                                color: '#0f172a'
+                                            }}>
+                                                4. Responsabilidades del Mentor
+                                            </h3>
+                                        </div>
+
+                                        {/* 4.1 Clases virtuales */}
+                                        <div style={{ marginBottom: 20 }}>
+                                            <h4 style={{
+                                                margin: '0 0 12px 0',
+                                                fontSize: 15,
+                                                fontWeight: 700,
+                                                color: '#0f172a'
+                                            }}>
+                                                4.1. Para clases virtuales
+                                            </h4>
+                                            <ul style={{
+                                                margin: 0,
+                                                paddingLeft: 24,
+                                                fontSize: 14,
+                                                lineHeight: 2,
+                                                color: '#475569',
+                                                fontWeight: 500
+                                            }}>
+                                                <li>
+                                                    Crear la reunión para la videollamada y enviárselo al alumno lo antes posible (los pasos de esto van a ser enviados al mail del mentor al momento que se agenda una sesión virtual)
+                                                </li>
+                                                <li>
+                                                    Estar online y en la llamada 5 minutos antes del horario acordado
+                                                </li>
+                                                <li>
+                                                    Asegurar una conexión estable a internet y equipo en buen funcionamiento
+                                                </li>
+                                            </ul>
+                                        </div>
+
+                                        {/* 4.2 Clases presenciales */}
+                                        <div style={{ marginBottom: 20 }}>
+                                            <h4 style={{
+                                                margin: '0 0 12px 0',
+                                                fontSize: 15,
+                                                fontWeight: 700,
+                                                color: '#0f172a'
+                                            }}>
+                                                4.2. Para clases presenciales
+                                            </h4>
+                                            <ul style={{
+                                                margin: 0,
+                                                paddingLeft: 24,
+                                                fontSize: 14,
+                                                lineHeight: 2,
+                                                color: '#475569',
+                                                fontWeight: 500
+                                            }}>
+                                                <li>
+                                                    Estar en el lugar acordado <strong>mínimo 10 minutos antes</strong> (obligatorio)
+                                                </li>
+                                                <li>
+                                                    Mantener un ambiente seguro y apropiado para el aprendizaje
+                                                </li>
+                                            </ul>
+                                        </div>
+
+                                        {/* 4.3 Responsabilidades generales */}
+                                        <div>
+                                            <h4 style={{
+                                                margin: '0 0 12px 0',
+                                                fontSize: 15,
+                                                fontWeight: 700,
+                                                color: '#0f172a'
+                                            }}>
+                                                4.3. Responsabilidades generales
+                                            </h4>
+                                            <ul style={{
+                                                margin: 0,
+                                                paddingLeft: 24,
+                                                fontSize: 14,
+                                                lineHeight: 2,
+                                                color: '#475569',
+                                                fontWeight: 500
+                                            }}>
+                                                <li>
+                                                    Cumplir puntualmente con los horarios acordados
+                                                </li>
+                                                <li>
+                                                    Mantener una actitud profesional y respetuosa en todo momento
+                                                </li>
+                                                <li>
+                                                    Brindar el máximo esfuerzo para que el alumno logre sus objetivos de aprendizaje
+                                                </li>
+                                                <li>
+                                                    Mantener comunicación clara y fluida con los alumnos antes y después de cada clase
+                                                </li>
+                                                <li>
+                                                    Actualizar tu disponibilidad horaria regularmente en la plataforma
+                                                </li>
+                                                <li>
+                                                    Reportar cualquier inconveniente, falta grave o situación irregular a <strong>kerana.soporte@gmail.com</strong>
+                                                </li>
+                                            </ul>
+                                        </div>
+                                    </div>
+
+                                    {/* 5. Código de Conducta */}
+                                    <div>
+                                        <div style={{
+                                            display: 'flex',
+                                            alignItems: 'center',
+                                            gap: 12,
+                                            marginBottom: 16,
+                                            paddingBottom: 12,
+                                            borderBottom: '2px solid #e5e7eb'
+                                        }}>
+                                            <FontAwesomeIcon
+                                                icon={faCheckCircle}
+                                                style={{ fontSize: 20, color: '#2563eb' }}
+                                            />
+                                            <h3 style={{
+                                                margin: 0,
+                                                fontSize: 18,
+                                                fontWeight: 700,
+                                                color: '#0f172a'
+                                            }}>
+                                                5. Código de Conducta
+                                            </h3>
+                                        </div>
+                                        <ul style={{
+                                            margin: 0,
+                                            paddingLeft: 24,
+                                            fontSize: 14,
+                                            lineHeight: 2,
+                                            color: '#475569',
+                                            fontWeight: 500
+                                        }}>
+                                            <li>
+                                                Está <strong>prohibido</strong> cualquier tipo de acoso, discriminación o comportamiento inapropiado
+                                            </li>
+                                            <li>
+                                                No se permite solicitar pagos fuera de la plataforma ni intercambiar datos bancarios con alumnos
+                                            </li>
+                                            <li>
+                                                Kerana se reserva el derecho de suspender o eliminar cuentas que violen estos términos sin previo aviso
+                                            </li>
+                                            <li>
+                                                Las decisiones de moderación y sanciones son finales e inapelables
+                                            </li>
+                                        </ul>
+                                    </div>
+
+                                    {/* 6. Modificaciones */}
+                                    <div>
+                                        <div style={{
+                                            display: 'flex',
+                                            alignItems: 'center',
+                                            gap: 12,
+                                            marginBottom: 16,
+                                            paddingBottom: 12,
+                                            borderBottom: '2px solid #e5e7eb'
+                                        }}>
+                                            <FontAwesomeIcon
+                                                icon={faCog}
+                                                style={{ fontSize: 20, color: '#2563eb' }}
+                                            />
+                                            <h3 style={{
+                                                margin: 0,
+                                                fontSize: 18,
+                                                fontWeight: 700,
+                                                color: '#0f172a'
+                                            }}>
+                                                6. Modificaciones a los Términos
+                                            </h3>
+                                        </div>
+                                        <p style={{
+                                            margin: 0,
+                                            fontSize: 14,
+                                            lineHeight: 2,
+                                            color: '#475569',
+                                            fontWeight: 500
+                                        }}>
+                                            Kerana se reserva el derecho de modificar estos términos y condiciones en cualquier momento.
+                                            Los cambios serán notificados por email y entrarán en vigencia 15 días después de su publicación.
+                                            Continuar usando la plataforma después de los cambios implica la aceptación de los nuevos términos.
                                         </p>
                                     </div>
+
+                                    {/* Separador */}
+                                    <div style={{
+                                        height: 1,
+                                        background: 'linear-gradient(to right, transparent, #cbd5e1, transparent)'
+                                    }}></div>
+
+                                    {/* Contacto */}
+                                    <div style={{
+                                        padding: 20,
+                                        background: '#f8fafc',
+                                        borderRadius: 12,
+                                        border: '1px solid #e2e8f0',
+                                        textAlign: 'center'
+                                    }}>
+                                        <p style={{
+                                            margin: '0 0 8px 0',
+                                            fontSize: 15,
+                                            fontWeight: 600,
+                                            color: '#0f172a'
+                                        }}>
+                                            <FontAwesomeIcon
+                                                icon={faEnvelope}
+                                                style={{ marginRight: 8, color: '#2563eb' }}
+                                            />
+                                            ¿Dudas o consultas?
+                                        </p>
+                                        <p style={{
+                                            margin: 0,
+                                            fontSize: 14,
+                                            color: '#64748b',
+                                            fontWeight: 500
+                                        }}>
+                                            Contactanos en{' '}
+                                            <a
+                                                href="mailto:kerana.soporte@gmail.com"
+                                                style={{
+                                                    color: '#2563eb',
+                                                    fontWeight: 700,
+                                                    textDecoration: 'none'
+                                                }}
+                                            >
+                                                kerana.soporte@gmail.com
+                                            </a>
+                                        </p>
+                                    </div>
+
+                                    {/* Fecha de última actualización */}
+                                    <p style={{
+                                        margin: 0,
+                                        fontSize: 12,
+                                        color: '#94a3b8',
+                                        textAlign: 'center',
+                                        fontStyle: 'italic'
+                                    }}>
+                                        Última actualización: Enero 2025
+                                    </p>
                                 </div>
                             </Card>
                         </div>
@@ -2035,156 +2443,149 @@ export default function IAmMentor() {
                         <div style={{ padding: 24 }}>
                             <p style={{ fontFamily: 'Inter, sans-serif' }}>Modal de sesión detallada aquí...</p>
                         </div>
-                        {/* Modal de confirmación para dar de baja */}
-                        {confirmRemoveMentorship && (
-                            <div style={{
-                                position: 'fixed',
-                                top: 0,
-                                left: 0,
-                                right: 0,
-                                bottom: 0,
-                                background: 'rgba(0,0,0,0.7)',
-                                backdropFilter: 'blur(4px)',
-                                display: 'flex',
-                                alignItems: 'center',
-                                justifyContent: 'center',
-                                zIndex: 9999,
-                                padding: 20,
-                                animation: 'fadeIn 0.2s ease-out',
-                                fontFamily: 'Inter, sans-serif'
-                            }}>
-                                <div style={{
-                                    background: 'linear-gradient(135deg, #fff 0%, #fef2f2 100%)',
-                                    padding: 28,
-                                    borderRadius: 16,
-                                    textAlign: 'center',
-                                    width: '100%',
-                                    maxWidth: 450,
-                                    boxShadow: '0 20px 60px rgba(0,0,0,0.3)',
-                                    border: '3px solid #fecaca',
-                                    animation: 'slideUp 0.3s ease-out'
-                                }}>
-                                    <div style={{
-                                        width: 64,
-                                        height: 64,
-                                        borderRadius: '50%',
-                                        background: 'linear-gradient(135deg, #fee2e2 0%, #fecaca 100%)',
-                                        display: 'flex',
-                                        alignItems: 'center',
-                                        justifyContent: 'center',
-                                        margin: '0 auto 20px',
-                                        boxShadow: '0 4px 12px rgba(239, 68, 68, 0.3)'
-                                    }}>
-                <span style={{ fontSize: 32, color: '#ef4444' }}>
-                    <FontAwesomeIcon icon={faExclamationCircle} />
-                </span>
-                                    </div>
-                                    <h3 style={{
-                                        margin: '0 0 12px 0',
-                                        fontSize: 22,
-                                        fontWeight: 700,
-                                        color: '#ef4444',
-                                        fontFamily: 'Inter, sans-serif'
-                                    }}>
-                                        ¿Estás seguro?
-                                    </h3>
-                                    <p style={{
-                                        color: '#991b1b',
-                                        marginBottom: 24,
-                                        fontSize: 14,
-                                        lineHeight: 1.6,
-                                        fontWeight: 500,
-                                        fontFamily: 'Inter, sans-serif'
-                                    }}>
-                                        ¿Querés dejar de ser mentor de <strong>{confirmRemoveMentorship.materia}</strong>?
-                                        <br />
-                                        Esta acción no se puede deshacer.
-                                    </p>
+                    </div>
+                </div>
+            )}
 
-                                    <div style={{ display: 'flex', gap: 12 }}>
-                                        <button
-                                            onClick={() => setConfirmRemoveMentorship({
-                                                id: mentorship.id,
-                                                materia: mentorship.materia.nombre_materia,
-                                                materiaId: mentorship.materia.id_materia
-                                            })}
-                                            disabled={isRemoving}
-                                            style={{
-                                                flex: 1,
-                                                background: '#f8fafc',
-                                                border: '2px solid #e2e8f0',
-                                                borderRadius: 10,
-                                                padding: '12px 20px',
-                                                cursor: isRemoving ? 'not-allowed' : 'pointer',
-                                                fontWeight: 600,
-                                                fontSize: 14,
-                                                color: '#0f172a',
-                                                transition: 'all 0.2s ease',
-                                                fontFamily: 'Inter, sans-serif',
-                                                opacity: isRemoving ? 0.5 : 1
-                                            }}
-                                            onMouseEnter={e => {
-                                                if (!isRemoving) {
-                                                    e.target.style.background = '#f1f5f9';
-                                                    e.target.style.transform = 'translateY(-1px)';
-                                                }
-                                            }}
-                                            onMouseLeave={e => {
-                                                if (!isRemoving) {
-                                                    e.target.style.background = '#f8fafc';
-                                                    e.target.style.transform = 'translateY(0)';
-                                                }
-                                            }}
-                                        >
-                                            Cancelar
-                                        </button>
-                                        <button
-                                            onClick={() => handleRemoveMentorship(
-                                                confirmRemoveMentorship.id,
-                                                confirmRemoveMentorship.materia
-                                            )}
-                                            disabled={isRemoving}
-                                            style={{
-                                                flex: 1,
-                                                background: 'linear-gradient(135deg, #ef4444 0%, #dc2626 100%)',
-                                                color: '#fff',
-                                                border: 'none',
-                                                borderRadius: 10,
-                                                padding: '12px 20px',
-                                                cursor: isRemoving ? 'not-allowed' : 'pointer',
-                                                fontWeight: 700,
-                                                fontSize: 14,
-                                                opacity: isRemoving ? 0.7 : 1,
-                                                transition: 'all 0.2s ease',
-                                                fontFamily: 'Inter, sans-serif',
-                                                boxShadow: '0 4px 12px rgba(239, 68, 68, 0.3)'
-                                            }}
-                                            onMouseEnter={e => {
-                                                if (!isRemoving) {
-                                                    e.target.style.transform = 'translateY(-2px)';
-                                                    e.target.style.boxShadow = '0 6px 20px rgba(239, 68, 68, 0.4)';
-                                                }
-                                            }}
-                                            onMouseLeave={e => {
-                                                if (!isRemoving) {
-                                                    e.target.style.transform = 'translateY(0)';
-                                                    e.target.style.boxShadow = '0 4px 12px rgba(239, 68, 68, 0.3)';
-                                                }
-                                            }}
-                                        >
-                                            {isRemoving ? 'Eliminando...' : 'Sí, darme de baja'}
-                                        </button>
-                                    </div>
-                                </div>
-                            </div>
-                        )}
+            {/* ✅ MODAL DE CONFIRMACIÓN "DARME DE BAJA" AHORA FUERA DEL MODAL DE SESIÓN */}
+            {confirmRemoveMentorship && (
+                <div style={{
+                    position: 'fixed',
+                    top: 0,
+                    left: 0,
+                    right: 0,
+                    bottom: 0,
+                    background: 'rgba(0,0,0,0.7)',
+                    backdropFilter: 'blur(4px)',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    zIndex: 9999,
+                    padding: 20,
+                    animation: 'fadeIn 0.2s ease-out',
+                    fontFamily: 'Inter, sans-serif'
+                }}>
+                    <div style={{
+                        background: 'linear-gradient(135deg, #fff 0%, #fef2f2 100%)',
+                        padding: 28,
+                        borderRadius: 16,
+                        textAlign: 'center',
+                        width: '100%',
+                        maxWidth: 450,
+                        boxShadow: '0 20px 60px rgba(0,0,0,0.3)',
+                        border: '3px solid #fecaca',
+                        animation: 'slideUp 0.3s ease-out'
+                    }}>
+                        <div style={{
+                            width: 64,
+                            height: 64,
+                            borderRadius: '50%',
+                            background: 'linear-gradient(135deg, #fee2e2 0%, #fecaca 100%)',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            margin: '0 auto 20px',
+                            boxShadow: '0 4px 12px rgba(239, 68, 68, 0.3)'
+                        }}>
+                            <span style={{ fontSize: 32, color: '#ef4444' }}>
+                                <FontAwesomeIcon icon={faExclamationCircle} />
+                            </span>
+                        </div>
+                        <h3 style={{
+                            margin: '0 0 12px 0',
+                            fontSize: 22,
+                            fontWeight: 700,
+                            color: '#ef4444',
+                            fontFamily: 'Inter, sans-serif'
+                        }}>
+                            ¿Estás seguro?
+                        </h3>
+                        <p style={{
+                            color: '#991b1b',
+                            marginBottom: 24,
+                            fontSize: 14,
+                            lineHeight: 1.6,
+                            fontWeight: 500,
+                            fontFamily: 'Inter, sans-serif'
+                        }}>
+                            ¿Querés dejar de ser mentor de <strong>{confirmRemoveMentorship.materia}</strong>?
+                            <br />
+                            Esta acción no se puede deshacer.
+                        </p>
+
+                        <div style={{ display: 'flex', gap: 12 }}>
+                            <button
+                                onClick={() => setConfirmRemoveMentorship(null)}
+                                disabled={isRemoving}
+                                style={{
+                                    flex: 1,
+                                    background: '#f8fafc',
+                                    border: '2px solid #e2e8f0',
+                                    borderRadius: 10,
+                                    padding: '12px 20px',
+                                    cursor: isRemoving ? 'not-allowed' : 'pointer',
+                                    fontWeight: 600,
+                                    fontSize: 14,
+                                    color: '#0f172a',
+                                    transition: 'all 0.2s ease',
+                                    fontFamily: 'Inter, sans-serif',
+                                    opacity: isRemoving ? 0.5 : 1
+                                }}
+                                onMouseEnter={e => {
+                                    if (!isRemoving) {
+                                        e.target.style.background = '#f1f5f9';
+                                        e.target.style.transform = 'translateY(-1px)';
+                                    }
+                                }}
+                                onMouseLeave={e => {
+                                    if (!isRemoving) {
+                                        e.target.style.background = '#f8fafc';
+                                        e.target.style.transform = 'translateY(0)';
+                                    }
+                                }}
+                            >
+                                Cancelar
+                            </button>
+                            <button
+                                onClick={handleRemoveMentorship}
+                                disabled={isRemoving}
+                                style={{
+                                    flex: 1,
+                                    background: 'linear-gradient(135deg, #ef4444 0%, #dc2626 100%)',
+                                    color: '#fff',
+                                    border: 'none',
+                                    borderRadius: 10,
+                                    padding: '12px 20px',
+                                    cursor: isRemoving ? 'not-allowed' : 'pointer',
+                                    fontWeight: 700,
+                                    fontSize: 14,
+                                    opacity: isRemoving ? 0.7 : 1,
+                                    transition: 'all 0.2s ease',
+                                    fontFamily: 'Inter, sans-serif',
+                                    boxShadow: '0 4px 12px rgba(239, 68, 68, 0.3)'
+                                }}
+                                onMouseEnter={e => {
+                                    if (!isRemoving) {
+                                        e.target.style.transform = 'translateY(-2px)';
+                                        e.target.style.boxShadow = '0 6px 20px rgba(239, 68, 68, 0.4)';
+                                    }
+                                }}
+                                onMouseLeave={e => {
+                                    if (!isRemoving) {
+                                        e.target.style.transform = 'translateY(0)';
+                                        e.target.style.boxShadow = '0 4px 12px rgba(239, 68, 68, 0.3)';
+                                    }
+                                }}
+                            >
+                                {isRemoving ? 'Eliminando...' : 'Sí, darme de baja'}
+                            </button>
+                        </div>
                     </div>
                 </div>
             )}
         </div>
     );
 }
-
 const pageStyle = {
     minHeight: '100vh',
     background: '#F9FAFB',

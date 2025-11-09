@@ -6,7 +6,7 @@ import {
     faCheck, faTimes, faTrash, faExclamationCircle,
     faCheckCircle, faSave, faCalendarDay, faInfoCircle,
     faExclamationTriangle, faCalendarAlt, faUsers,
-    faLaptop, faBuilding, faHome, faGraduationCap, faUser
+    faLaptop, faBuilding, faHome, faGraduationCap, faUser, faEdit
 } from '@fortawesome/free-solid-svg-icons';
 import {useEffect, useState} from "react";
 import { notificationTypes } from '../../api/notificationTypes';
@@ -37,6 +37,7 @@ export default function MyCalendar() {
     });
     const [slotLocaciones, setSlotLocaciones] = useState({});
     const [slotModalidades, setSlotModalidades] = useState({});
+    const [isEditingExisting, setIsEditingExisting] = useState(false);
 
     const availableHours = [
         '07:00' ,'08:00', '09:00', '10:00', '11:00', '12:00', '13:00',
@@ -256,37 +257,47 @@ export default function MyCalendar() {
         if (!date || isPastDate(date)) return;
         setSelectedDate(date);
         setShowTimeSelector(true);
+        setIsEditingExisting(false);
         const dateKey = formatDateKey(date);
 
-        const existingSlots = savedSlots[dateKey] ? [...savedSlots[dateKey]] : [];
         setSelectedSlots(prev => ({
             ...prev,
-            [dateKey]: existingSlots
+            [dateKey]: []
+        }));
+    };
+    const handleEditExisting = () => {
+        setIsEditingExisting(true);
+        const dateKey = formatDateKey(selectedDate);
+        const existingSlots = savedSlots[dateKey] || [];
+
+        // Cargar slots existentes para editar
+        setSelectedSlots(prev => ({
+            ...prev,
+            [dateKey]: [...existingSlots]
         }));
 
-        if (existingSlots.length > 0) {
-            existingSlots.forEach(hour => {
-                const slotKey = `${dateKey}-${hour}`;
-                if (!slotDurations[slotKey]) {
-                    setSlotDurations(prev => ({
-                        ...prev,
-                        [slotKey]: mentoriaDuration
-                    }));
-                }
-                if (!slotModalidades[slotKey]) {
-                    setSlotModalidades(prev => ({
-                        ...prev,
-                        [slotKey]: getDefaultModalidad()
-                    }));
-                }
-                if (!slotMaxAlumnos[slotKey]) {
-                    setSlotMaxAlumnos(prev => ({
-                        ...prev,
-                        [slotKey]: mentorInfo.max_alumnos
-                    }));
-                }
-            });
-        }
+        // Cargar configuraciones de cada slot
+        existingSlots.forEach(hour => {
+            const slotKey = `${dateKey}-${hour}`;
+            if (!slotDurations[slotKey]) {
+                setSlotDurations(prev => ({
+                    ...prev,
+                    [slotKey]: mentoriaDuration
+                }));
+            }
+            if (!slotModalidades[slotKey]) {
+                setSlotModalidades(prev => ({
+                    ...prev,
+                    [slotKey]: getDefaultModalidad()
+                }));
+            }
+            if (!slotMaxAlumnos[slotKey]) {
+                setSlotMaxAlumnos(prev => ({
+                    ...prev,
+                    [slotKey]: mentorInfo.max_alumnos
+                }));
+            }
+        });
     };
 
     const parseTime = (timeStr) => {
@@ -318,80 +329,87 @@ export default function MyCalendar() {
         return overlaps;
     };
 
+
     const toggleSlot = (hour) => {
         if (!selectedDate) return;
         const dateKey = formatDateKey(selectedDate);
         const slotKey = `${dateKey}-${hour}`;
+            setSelectedSlots(prev => {
+                const dateSlots = prev[dateKey] || [];
 
-        setSelectedSlots(prev => {
-            const dateSlots = prev[dateKey] || [];
+                if (dateSlots.includes(hour)) {
+                    const estaReservado = slotDisponibilidad[slotKey] === false;
 
-            if (dateSlots.includes(hour)) {
-                const estaReservado = slotDisponibilidad[slotKey] === false;
+                    if (estaReservado) {
+                        setShowReservedWarning(true);
+                        return prev;
+                    }
 
-                if (estaReservado) {
-                    setShowReservedWarning(true);
-                    return prev;
+                    const newSlots = dateSlots.filter(h => h !== hour).sort();
+                    setSlotDurations(prevDur => {
+                        const newDur = { ...prevDur };
+                        delete newDur[slotKey];
+                        return newDur;
+                    });
+                    setSlotModalidades(prevMod => {
+                        const newMod = { ...prevMod };
+                        delete newMod[slotKey];
+                        return newMod;
+                    });
+                    setSlotLocaciones(prevLoc => {
+                        const newLoc = { ...prevLoc };
+                        delete newLoc[slotKey];
+                        return newLoc;
+                    });
+                    setSlotMaxAlumnos(prevMax => {
+                        const newMax = { ...prevMax };
+                        delete newMax[slotKey];
+                        return newMax;
+                    });
+                    return { ...prev, [dateKey]: newSlots };
                 }
 
-                const newSlots = dateSlots.filter(h => h !== hour).sort();
-                setSlotDurations(prevDur => {
-                    const newDur = { ...prevDur };
-                    delete newDur[slotKey];
-                    return newDur;
-                });
-                setSlotModalidades(prevMod => {
-                    const newMod = { ...prevMod };
-                    delete newMod[slotKey];
-                    return newMod;
-                });
-                setSlotLocaciones(prevLoc => {
-                    const newLoc = { ...prevLoc };
-                    delete newLoc[slotKey];
-                    return newLoc;
-                });
-                setSlotMaxAlumnos(prevMax => {
-                    const newMax = { ...prevMax };
-                    delete newMax[slotKey];
-                    return newMax;
-                });
+                const newSlots = [...dateSlots, hour].sort();
+
+                setSlotDurations(prevDur => ({
+                    ...prevDur,
+                    [slotKey]: mentoriaDuration
+                }));
+
+                const defaultModalidad = getDefaultModalidad();
+                setSlotModalidades(prevMod => ({
+                    ...prevMod,
+                    [slotKey]: defaultModalidad
+                }));
+
+                setSlotLocaciones(prevLoc => ({
+                    ...prevLoc,
+                    [slotKey]: defaultModalidad === 'presencial' ? 'casa' : null
+                }));
+
+                setSlotMaxAlumnos(prevMax => ({
+                    ...prevMax,
+                    [slotKey]: mentorInfo.max_alumnos
+                }));
+
+                // ✅ CAMBIO: Validar con TODOS los slots (nuevos + existentes si NO está editando)
+                let slotsToCheck = newSlots;
+                if (!isEditingExisting) {
+                    const existingSlots = savedSlots[dateKey] || [];
+                    slotsToCheck = [...new Set([...existingSlots, ...newSlots])].sort();
+                }
+
+                const overlaps = checkOverlap(dateKey, slotsToCheck);
+                if (overlaps.length > 0) {
+                    const overlap = overlaps[0];
+                    setError(`Solapamiento: El slot de ${overlap.hour1} (${overlap.duration} min) se solapa con ${overlap.hour2}`);
+                    setTimeout(() => setError(''), 5000);
+                    return prev; // ✅ NO agregar el slot si hay solapamiento
+                }
+
                 return { ...prev, [dateKey]: newSlots };
-            }
-
-            const newSlots = [...dateSlots, hour].sort();
-
-            setSlotDurations(prevDur => ({
-                ...prevDur,
-                [slotKey]: mentoriaDuration
-            }));
-
-            const defaultModalidad = getDefaultModalidad();
-            setSlotModalidades(prevMod => ({
-                ...prevMod,
-                [slotKey]: defaultModalidad
-            }));
-
-            setSlotLocaciones(prevLoc => ({
-                ...prevLoc,
-                [slotKey]: defaultModalidad === 'presencial' ? 'casa' : null
-            }));
-
-            setSlotMaxAlumnos(prevMax => ({
-                ...prevMax,
-                [slotKey]: mentorInfo.max_alumnos
-            }));
-
-            const overlaps = checkOverlap(dateKey, newSlots);
-            if (overlaps.length > 0) {
-                const overlap = overlaps[0];
-                setError(`Solapamiento: El slot de ${overlap.hour1} (${overlap.duration} min) se solapa con ${overlap.hour2}`);
-                setTimeout(() => setError(''), 5000);
-                return prev;
-            }
-
-            return { ...prev, [dateKey]: newSlots };
-        });
-    };
+            });
+        };
 
     const updateSlotLocacion = (dateKey, hour, locacion) => {
         const slotKey = `${dateKey}-${hour}`;
@@ -407,8 +425,15 @@ export default function MyCalendar() {
             [`${dateKey}-${hour}`]: duration
         }));
 
-        const slots = selectedSlots[dateKey] || [];
-        const overlaps = checkOverlap(dateKey, slots);
+        // Validar con TODOS los slots (selectedSlots + savedSlots si NO está editando)
+        let allSlots = selectedSlots[dateKey] || [];
+
+        if (!isEditingExisting) {
+            const existingSlots = savedSlots[dateKey] || [];
+            allSlots = [...new Set([...existingSlots, ...allSlots])].sort();
+        }
+
+        const overlaps = checkOverlap(dateKey, allSlots);
 
         if (overlaps.length > 0) {
             const overlap = overlaps[0];
@@ -451,7 +476,19 @@ export default function MyCalendar() {
     const saveManualSlots = async () => {
         if (!selectedDate || !currentMentorId) return;
         const dateKey = formatDateKey(selectedDate);
-        const slots = selectedSlots[dateKey] || [];
+        let slots = selectedSlots[dateKey] || [];
+
+        if (slots.length === 0 && isEditingExisting) {
+            setError('Debes seleccionar al menos un horario');
+            setTimeout(() => setError(''), 3000);
+            return;
+        }
+
+        // Si NO está editando, combinar con existentes (sin duplicados)
+        if (!isEditingExisting) {
+            const existingSlots = savedSlots[dateKey] || [];
+            slots = [...new Set([...existingSlots, ...slots])].sort();
+        }
 
         if (slots.length === 0) {
             setError('Debes seleccionar al menos un horario');
@@ -1105,6 +1142,150 @@ export default function MyCalendar() {
                                     </p>
                                 </div>
                             </div>
+
+                            {/* Card de horarios existentes (read-only) */}
+                            {savedSlots[formatDateKey(selectedDate)]?.length > 0 && !isEditingExisting && (
+                                <>
+                                    <div style={{
+                                        background: 'linear-gradient(135deg, #ecfdf5 0%, #d1fae5 100%)',
+                                        borderRadius: 12,
+                                        padding: 16,
+                                        marginBottom: 16,
+                                        border: '2px solid #86efac'
+                                    }}>
+                                        <div style={{
+                                            display: 'flex',
+                                            justifyContent: 'space-between',
+                                            alignItems: 'center',
+                                            marginBottom: 12
+                                        }}>
+                                            <h4 style={{
+                                                margin: 0,
+                                                fontSize: 14,
+                                                fontWeight: 700,
+                                                color: '#166534',
+                                                display: 'flex',
+                                                alignItems: 'center',
+                                                gap: 6
+                                            }}>
+                                                <FontAwesomeIcon icon={faCheckCircle} style={{ fontSize: 14 }} />
+                                                Horarios ya configurados
+                                            </h4>
+                                            <button
+                                                onClick={handleEditExisting}
+                                                style={{
+                                                    padding: '6px 12px',
+                                                    background: 'linear-gradient(135deg, #2563eb 0%, #1e40af 100%)',
+                                                    color: '#fff',
+                                                    border: 'none',
+                                                    borderRadius: 8,
+                                                    fontSize: 12,
+                                                    fontWeight: 600,
+                                                    cursor: 'pointer',
+                                                    transition: 'all 0.2s ease',
+                                                    fontFamily: 'Inter, sans-serif',
+                                                    display: 'flex',
+                                                    alignItems: 'center',
+                                                    gap: 6
+                                                }}
+                                                onMouseEnter={e => {
+                                                    e.target.style.transform = 'translateY(-2px)';
+                                                    e.target.style.boxShadow = '0 4px 12px rgba(37, 99, 235, 0.3)';
+                                                }}
+                                                onMouseLeave={e => {
+                                                    e.target.style.transform = 'translateY(0)';
+                                                    e.target.style.boxShadow = 'none';
+                                                }}
+                                            >
+                                                <FontAwesomeIcon icon={faEdit} style={{ fontSize: 11 }} />
+                                                Editar
+                                            </button>
+                                        </div>
+
+                                        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+                                            {savedSlots[formatDateKey(selectedDate)].sort().map(hora => {
+                                                const slotKey = `${formatDateKey(selectedDate)}-${hora}`;
+                                                const duracion = slotDurations[slotKey] || 60;
+                                                const modalidad = slotModalidades[slotKey] || 'virtual';
+                                                const maxAlumnos = slotMaxAlumnos[slotKey] || 1;
+                                                const locacion = slotLocaciones[slotKey];
+                                                const disponible = slotDisponibilidad[slotKey] !== false;
+
+                                                return (
+                                                    <div key={hora} style={{
+                                                        background: disponible ? '#fff' : '#fef3c7',
+                                                        padding: '10px 12px',
+                                                        borderRadius: 8,
+                                                        border: disponible ? '2px solid #86efac' : '2px solid #fbbf24',
+                                                        fontSize: 12,
+                                                        fontWeight: 600,
+                                                        color: disponible ? '#166534' : '#92400e',
+                                                        position: 'relative'
+                                                    }}>
+                                                        {!disponible && (
+                                                            <div style={{
+                                                                position: 'absolute',
+                                                                top: -6,
+                                                                right: -6,
+                                                                background: 'linear-gradient(135deg, #fbbf24 0%, #f59e0b 100%)',
+                                                                color: 'white',
+                                                                padding: '2px 6px',
+                                                                borderRadius: 4,
+                                                                fontSize: 8,
+                                                                fontWeight: 700,
+                                                                boxShadow: '0 2px 4px rgba(251, 191, 36, 0.3)',
+                                                                letterSpacing: '0.3px'
+                                                            }}>
+                                                                RESERVADA
+                                                            </div>
+                                                        )}
+                                                        <div style={{ display: 'flex', alignItems: 'center', gap: 4, marginBottom: 4 }}>
+                                                            <FontAwesomeIcon icon={faClock} style={{ fontSize: 10 }} />
+                                                            {formatTimeRange(hora, duracion)}
+                                                        </div>
+                                                        <div style={{ fontSize: 10, display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
+                                <span style={{ display: 'flex', alignItems: 'center', gap: 3 }}>
+                                    <FontAwesomeIcon icon={modalidad === 'virtual' ? faLaptop : faBuilding} style={{ fontSize: 9 }} />
+                                    {modalidad.charAt(0).toUpperCase() + modalidad.slice(1)}
+                                </span>
+                                                            {modalidad === 'presencial' && locacion && (
+                                                                <>
+                                                                    <span>•</span>
+                                                                    <span style={{ display: 'flex', alignItems: 'center', gap: 3 }}>
+                                            <FontAwesomeIcon icon={locacion === 'casa' ? faHome : faGraduationCap} style={{ fontSize: 8 }} />
+                                                                        {locacion === 'casa' ? 'Casa' : 'Facultad'}
+                                        </span>
+                                                                </>
+                                                            )}
+                                                            <span>•</span>
+                                                            <span style={{ display: 'flex', alignItems: 'center', gap: 3 }}>
+                                    <FontAwesomeIcon icon={faUser} style={{ fontSize: 9 }} />
+                                                                {maxAlumnos}
+                                </span>
+                                                        </div>
+                                                    </div>
+                                                );
+                                            })}
+                                        </div>
+                                    </div>
+
+                                    {/* Separador visual */}
+                                    <div style={{
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        gap: 12,
+                                        margin: '16px 0',
+                                        color: '#64748b',
+                                        fontSize: 13,
+                                        fontWeight: 600
+                                    }}>
+                                        <div style={{ flex: 1, height: 1, background: '#e2e8f0' }} />
+                                        <FontAwesomeIcon icon={faUsers} style={{ fontSize: 12 }} />
+                                        <span>Agregar más horarios</span>
+                                        <div style={{ flex: 1, height: 1, background: '#e2e8f0' }} />
+                                    </div>
+                                </>
+                            )}
 
                             <div style={{
                                 display: 'grid',

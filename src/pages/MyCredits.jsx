@@ -386,15 +386,29 @@ export default function MyCredits() {
 
     const getTransactionIcon = (tipo) => {
         if (tipo.includes('apunte_subido') || tipo.includes('venta')) return faFileAlt;
-        if (tipo.includes('compra')) return faMoneyBill;
+
+        // Compra de paquetes → Ícono de tarjeta/créditos
+        if (tipo.toLowerCase().includes('compra de paquete')) return faCreditCard;
+
+        // Compra de apuntes → Ícono de dinero/carrito
+        if (tipo.includes('compra_apunte')) return faShoppingCart;
+
         if (tipo.includes('resena')) return faStar;
         if (tipo.includes('bono') || tipo.includes('hito')) return faGift;
         return faCoins;
     };
 
     const getTransactionColor = (tipo) => {
+        // Bonos e hitos siempre verde
         if (tipo.includes('bono') || tipo.includes('hito')) return '#10b981';
-        if (tipo.includes('compra')) return '#ef4444';
+
+        // Compra de paquetes (suma créditos) → Verde
+        if (tipo.toLowerCase().includes('compra de paquete')) return '#10b981';
+
+        // Compra de apuntes (resta créditos) → Rojo
+        if (tipo.includes('compra_apunte')) return '#ef4444';
+
+        // Por defecto azul
         return '#2563eb';
     };
 

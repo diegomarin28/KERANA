@@ -341,7 +341,7 @@ export default function Profile() {
                 }}>
                     {/* Botón Editar Perfil */}
                     <button
-                        onClick={() => navigate('/settings')}
+                        onClick={() => navigate('/edit-profile')}
                         style={{
                             position: 'absolute',
                             top: '24px',

@@ -41,9 +41,6 @@ export default function Favorites() {
                 .select('id_usuario, id_apunte')
                 .eq('id_usuario', userId);
 
-            console.log('Favoritos encontrados:', notesFav);
-            console.log('Error favoritos:', notesFavError);
-
             let noteItems = [];
             if (notesFav?.length) {
                 const apIds = notesFav.map(r => r.id_apunte);
@@ -57,7 +54,6 @@ export default function Favorites() {
                     console.error('Error cargando apuntes:', apuntesError);
                     throw apuntesError;
                 }
-                console.log('Apuntes cargados:', apuntes);
 
                 const { data: likesData, error: likesError } = await supabase
                     .from('likes')
@@ -142,7 +138,7 @@ export default function Favorites() {
                         if (userIds.length > 0) {
                             const {data: userData} = await supabase
                                 .from('usuario')
-                                .select('id_usuario, nombre, username')
+                                .select('id_usuario, nombre, username, foto')
                                 .in('id_usuario', userIds);
 
                             mentorUserData = (userData || []).reduce((acc, u) => {
@@ -217,15 +213,6 @@ export default function Favorites() {
         }
     };
 
-    const getTypeIcon = (type) => {
-        switch (type) {
-            case 'course': return faBook;
-            case 'note': return faBook;
-            case 'mentor': return faGraduationCap;
-            default: return faHeart;
-        }
-    };
-
     const getTypeLabel = (type) => {
         switch (type) {
             case 'course': return 'Curso';
@@ -238,6 +225,30 @@ export default function Favorites() {
     const filteredItems = activeFilter === 'all'
         ? items
         : items.filter(item => item.type === activeFilter);
+
+    // Agrupar por tipo
+    const notesFavorites = items.filter(item => item.type === 'note');
+    const mentorsFavorites = items.filter(item => item.type === 'mentor');
+
+    // Configuración de secciones
+    const sectionsConfig = [
+        {
+            key: 'note',
+            label: 'Apuntes',
+            icon: faFileAlt,
+            data: notesFavorites,
+            Component: ApunteCard,
+            getProps: (item) => ({ note: item.note })
+        },
+        {
+            key: 'mentor',
+            label: 'Mentores',
+            icon: faGraduationCap,
+            data: mentorsFavorites,
+            Component: MentorCard,
+            getProps: (item) => ({ mentor: item.mentor })
+        }
+    ];
 
     if (loading) {
         return (
@@ -336,7 +347,7 @@ export default function Favorites() {
             <div style={{
                 display: 'flex',
                 gap: 10,
-                marginBottom: 20,
+                marginBottom: 24,
                 flexWrap: 'wrap',
                 background: '#ffffff',
                 padding: '16px',
@@ -345,9 +356,8 @@ export default function Favorites() {
             }}>
                 {[
                     { key: 'all', label: 'Todos', icon: faFilter, count: items.length },
-                    { key: 'course', label: 'Materias', icon: faBook, count: items.filter(i => i.type === 'course').length },
-                    { key: 'note', label: 'Apuntes', icon: faFileAlt, count: items.filter(i => i.type === 'note').length },
-                    { key: 'mentor', label: 'Mentores', icon: faGraduationCap, count: items.filter(i => i.type === 'mentor').length }
+                    { key: 'note', label: 'Apuntes', icon: faFileAlt, count: notesFavorites.length },
+                    { key: 'mentor', label: 'Mentores', icon: faGraduationCap, count: mentorsFavorites.length }
                 ].map(filter => (
                     <button
                         key={filter.key}
@@ -493,7 +503,7 @@ export default function Favorites() {
                     </p>
                     <Button
                         variant="primary"
-                        onClick={() => window.location.href = `/${activeFilter === 'all' ? 'apuntes' : activeFilter + 's'}`}
+                        onClick={() => window.location.href = `/${activeFilter === 'all' ? 'apuntes' : activeFilter === 'note' ? 'apuntes' : 'mentores'}`}
                         style={{
                             padding: '12px 24px',
                             fontSize: 15,
@@ -504,43 +514,95 @@ export default function Favorites() {
                     </Button>
                 </Card>
             ) : (
-                <div
-                    style={{
-                        display: 'grid',
-                        gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))',
-                        gap: 20
-                    }}
-                >
-                    {filteredItems.map(item => (
-                        item.type === 'note' ? (
-                            <ApunteCard
-                                key={`${item.type}-${item.favId}`}
-                                note={item.note}
-                            />
-                        ) : item.type === 'mentor' ? (
-                            <div
-                                key={`${item.type}-${item.favId}`}
-                                style={{ gridColumn: 'span 2' }}
-                            >
-                                <MentorCard
-                                    key={`${item.type}-${item.favId}`}
-                                    mentor={item.mentor}
-                                />
-                            </div>
-                        ) : (
-                            <Card
-                                key={`${item.type}-${item.favId}`}
-                                style={{
-                                    padding: 20,
-                                    border: '2px solid #f1f5f9',
-                                    background: '#ffffff'
-                                }}
-                            >
-                                {/* otros tipos, si los hubiera */}
-                            </Card>
-                        )
-                    ))}
-                </div>
+                <>
+                    {/* Vista "Todos" con secciones separadas */}
+                    {activeFilter === 'all' ? (
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: 40 }}>
+                            {sectionsConfig.map((section) => {
+                                if (section.data.length === 0) return null;
+
+                                return (
+                                    <div key={section.key} style={{ marginBottom: 48 }}>
+                                        <div style={{
+                                            display: 'flex',
+                                            alignItems: 'center',
+                                            gap: 12,
+                                            marginBottom: 16,
+                                            paddingBottom: 12,
+                                            borderBottom: '2px solid #E5E7EB'
+                                        }}>
+                                            <FontAwesomeIcon
+                                                icon={section.icon}
+                                                style={{
+                                                    fontSize: 20,
+                                                    color: '#13346b'
+                                                }}
+                                            />
+                                            <h2 style={{
+                                                margin: 0,
+                                                fontSize: 20,
+                                                fontWeight: 700,
+                                                color: '#13346b',
+                                                fontFamily: 'Inter, sans-serif'
+                                            }}>
+                                                {section.label}
+                                            </h2>
+                                            <span style={{
+                                                background: '#EFF6FF',
+                                                color: '#1E40AF',
+                                                padding: '4px 12px',
+                                                borderRadius: 12,
+                                                fontSize: 13,
+                                                fontWeight: 700,
+                                                fontFamily: 'Inter, sans-serif'
+                                            }}>
+                                                {section.data.length}
+                                            </span>
+                                        </div>
+
+                                        <div style={{
+                                            display: 'grid',
+                                            gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))',
+                                            gap: 16
+                                        }}>
+                                            {section.data.map((item, index) => {
+                                                const Component = section.Component;
+                                                const props = section.getProps(item);
+                                                return (
+                                                    <Component
+                                                        key={`${section.key}-${item.favId}-${index}`}
+                                                        {...props}
+                                                    />
+                                                );
+                                            })}
+                                        </div>
+                                    </div>
+                                );
+                            })}
+                        </div>
+                    ) : (
+                        /* Vista filtrada (solo un tipo) */
+                        <div style={{
+                            display: 'grid',
+                            gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))',
+                            gap: 16
+                        }}>
+                            {filteredItems.map((item, index) => (
+                                item.type === 'note' ? (
+                                    <ApunteCard
+                                        key={`note-${item.favId}-${index}`}
+                                        note={item.note}
+                                    />
+                                ) : item.type === 'mentor' ? (
+                                    <MentorCard
+                                        key={`mentor-${item.favId}-${index}`}
+                                        mentor={item.mentor}
+                                    />
+                                ) : null
+                            ))}
+                        </div>
+                    )}
+                </>
             )}
         </div>
     );

@@ -34,6 +34,7 @@ export default function Home() {
 
     const [topNotes, setTopNotes] = useState([]);
     const [loadingTop, setLoadingTop] = useState(true);
+
     const [currentUserId, setCurrentUserId] = useState(null);
 
     useEffect(() => {
@@ -123,6 +124,7 @@ export default function Home() {
                     }
                 }
 
+
                 const likesPromises = data.map(note => notesAPI.getLikesCount(note.apunte_id));
                 const likesResults = await Promise.all(likesPromises);
 
@@ -130,9 +132,12 @@ export default function Home() {
                     data.map((note, idx) => [note.apunte_id, likesResults[idx]?.data || 0])
                 );
 
+
                 const notesWithUrls = data.map(note => {
                     const apunte = apuntes.find(a => a.id_apunte === note.apunte_id);
                     return {
+                        ...note,
+
                         id_apunte: note.apunte_id,
                         apunte_id: note.apunte_id,
                         titulo: note.titulo,

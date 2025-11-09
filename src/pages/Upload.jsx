@@ -3,11 +3,10 @@ import { useNavigate } from "react-router-dom";
 import { supabase } from '../supabase';
 import { creditsAPI } from '../api/database';
 import { Card } from '../components/UI/Card';
-import { Button } from '../components/UI/Button';
 import FileDrop from "../components/FileDrop";
 import { useNotificationSound } from '../hooks/useNotificationSound';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faCheckCircle } from '@fortawesome/free-solid-svg-icons';
+import { faCheckCircle, faCloudUploadAlt, faFileAlt, faLightbulb, faCheck } from '@fortawesome/free-solid-svg-icons';
 import * as pdfjsLib from "pdfjs-dist";
 
 // Configurar worker de PDF.js
@@ -343,7 +342,7 @@ export default function Upload() {
     const valid = formData.title.trim() && selectedMateria && formData.file && formData.agree;
 
     return (
-        <div style={{ maxWidth: 1000, margin: '0 auto', padding: 20 }}>
+        <div id="upload-form" style={{ maxWidth: 1000, margin: '0 auto', padding: 20 }}>
             {/* Modal de éxito */}
             {showSuccessModal && (
                 <div style={{
@@ -439,10 +438,54 @@ export default function Upload() {
                 </div>
             )}
 
-            <h1 style={{ marginBottom: 12 }}>Subir apunte</h1>
-            <p style={{ color: '#6b7280', marginBottom: 24 }}>
-                Completá los campos y subí el PDF para compartir con la comunidad.
-            </p>
+            {/* Estilos específicos para este componente */}
+            <style>{`
+                #upload-form * {
+                    box-sizing: border-box;
+                }
+            `}</style>
+
+            {/* Header mejorado */}
+            <div style={{
+                marginBottom: '32px',
+                textAlign: 'center'
+            }}>
+                <div style={{
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    width: '64px',
+                    height: '64px',
+                    borderRadius: '16px',
+                    background: 'linear-gradient(135deg, #2563eb 0%, #1e40af 100%)',
+                    marginBottom: '16px'
+                }}>
+                    <FontAwesomeIcon
+                        icon={faCloudUploadAlt}
+                        style={{ fontSize: '32px', color: '#fff' }}
+                    />
+                </div>
+                <h1 style={{
+                    margin: '0 0 8px 0',
+                    fontSize: 'clamp(28px, 5vw, 36px)',
+                    fontWeight: 800,
+                    color: '#0f172a'
+                }}>
+                    Subir Apunte
+                </h1>
+                <p style={{
+                    margin: 0,
+                    fontSize: '15px',
+                    color: '#64748b',
+                    fontWeight: 500,
+                    lineHeight: 1.6,
+                    maxWidth: '500px',
+                    marginLeft: 'auto',
+                    marginRight: 'auto'
+                }}>
+                    Completá los campos y subí el PDF para compartir con la comunidad
+                </p>
+            </div>
 
             {/* Indicador de progreso (si corresponde) */}
             {uploadProgress && (
@@ -475,28 +518,86 @@ export default function Upload() {
                     <Card style={{ padding: 32 }}>
                         <form onSubmit={handleSubmit}>
                             {/* Título */}
-                            <div style={{ marginBottom: 24 }}>
-                                <label style={{ display: 'block', marginBottom: 8, fontWeight: 600 }}>Título *</label>
+                            <div style={{ marginBottom: '28px' }}>
+                                <label style={{
+                                    display: 'block',
+                                    marginBottom: '10px',
+                                    fontWeight: 600,
+                                    fontSize: '14px',
+                                    color: '#0f172a',
+                                    fontFamily: 'Inter, -apple-system, sans-serif'
+                                }}>
+                                    Título *
+                                </label>
                                 <input
                                     type="text"
                                     value={formData.title}
                                     onChange={(e) => setFormData({ ...formData, title: e.target.value })}
                                     placeholder="Ej: Resumen Parcial 1 - Base de Datos I"
-                                    style={{ width: '100%', padding: 12, border: '1px solid #d1d5db', borderRadius: 8, fontSize: 14 }}
+                                    style={{
+                                        width: '100%',
+                                        padding: '12px 16px',
+                                        border: '2px solid #e2e8f0',
+                                        borderRadius: '10px',
+                                        fontSize: '14px',
+                                        fontWeight: 500,
+                                        color: '#0f172a',
+                                        outline: 'none',
+                                        transition: 'all 0.2s ease',
+                                        fontFamily: 'Inter, -apple-system, sans-serif',
+                                        background: '#fff'
+                                    }}
+                                    onFocus={(e) => {
+                                        e.currentTarget.style.borderColor = '#2563eb';
+                                        e.currentTarget.style.boxShadow = '0 0 0 3px rgba(37, 99, 235, 0.1)';
+                                    }}
+                                    onBlur={(e) => {
+                                        e.currentTarget.style.borderColor = '#e2e8f0';
+                                        e.currentTarget.style.boxShadow = 'none';
+                                    }}
                                     disabled={loading}
                                 />
                             </div>
 
                             {/* Materia con autocomplete */}
-                            <div style={{ marginBottom: 24, position: 'relative' }} ref={dropdownRef}>
-                                <label style={{ display: 'block', marginBottom: 8, fontWeight: 600 }}>Materia *</label>
+                            <div style={{ marginBottom: '28px', position: 'relative' }} ref={dropdownRef}>
+                                <label style={{
+                                    display: 'block',
+                                    marginBottom: '10px',
+                                    fontWeight: 600,
+                                    fontSize: '14px',
+                                    color: '#0f172a',
+                                    fontFamily: 'Inter, -apple-system, sans-serif'
+                                }}>
+                                    Materia *
+                                </label>
                                 <input
                                     type="text"
                                     value={searchTerm}
                                     onChange={(e) => { setSearchTerm(e.target.value); setSelectedMateria(null); }}
-                                    onFocus={() => searchTerm.trim() && setShowDropdown(true)}
+                                    onFocus={(e) => {
+                                        if (searchTerm.trim()) setShowDropdown(true);
+                                        e.currentTarget.style.borderColor = '#2563eb';
+                                        e.currentTarget.style.boxShadow = '0 0 0 3px rgba(37, 99, 235, 0.1)';
+                                    }}
+                                    onBlur={(e) => {
+                                        e.currentTarget.style.borderColor = '#e2e8f0';
+                                        e.currentTarget.style.boxShadow = 'none';
+                                    }}
                                     placeholder="Ej: Análisis Matemático"
-                                    style={{ width: '100%', padding: 12, border: '1px solid #d1d5db', borderRadius: 8, fontSize: 14 }}
+                                    style={{
+                                        width: '100%',
+                                        padding: '12px 16px',
+                                        border: '2px solid #e2e8f0',
+                                        borderRadius: '10px',
+                                        fontSize: '14px',
+                                        fontWeight: 500,
+                                        color: '#0f172a',
+                                        outline: 'none',
+                                        transition: 'all 0.2s ease',
+                                        fontFamily: 'Inter, -apple-system, sans-serif',
+                                        background: '#fff'
+                                    }}
                                     disabled={loading}
                                     autoComplete="off"
                                 />
@@ -551,80 +652,158 @@ export default function Upload() {
                             </div>
 
                             {/* Descripción */}
-                            <div style={{ marginBottom: 24 }}>
-                                <label style={{ display: 'block', marginBottom: 8, fontWeight: 600 }}>Descripción</label>
+                            <div style={{ marginBottom: '28px' }}>
+                                <label style={{
+                                    display: 'block',
+                                    marginBottom: '10px',
+                                    fontWeight: 600,
+                                    fontSize: '14px',
+                                    color: '#0f172a',
+                                    fontFamily: 'Inter, -apple-system, sans-serif'
+                                }}>
+                                    Descripción
+                                </label>
                                 <textarea
                                     value={formData.desc}
                                     onChange={(e) => setFormData({ ...formData, desc: e.target.value })}
                                     placeholder="Describí brevemente el contenido del apunte..."
                                     rows={4}
                                     style={{
-                                        width: '100%', padding: 12, border: '1px solid #d1d5db', borderRadius: 8,
-                                        fontSize: 14, resize: 'vertical', fontFamily: 'inherit'
+                                        width: '100%',
+                                        padding: '12px 16px',
+                                        border: '2px solid #e2e8f0',
+                                        borderRadius: '10px',
+                                        fontSize: '14px',
+                                        fontWeight: 500,
+                                        color: '#0f172a',
+                                        resize: 'vertical',
+                                        fontFamily: 'Inter, -apple-system, sans-serif',
+                                        outline: 'none',
+                                        transition: 'all 0.2s ease',
+                                        lineHeight: 1.6,
+                                        background: '#fff'
+                                    }}
+                                    onFocus={(e) => {
+                                        e.currentTarget.style.borderColor = '#2563eb';
+                                        e.currentTarget.style.boxShadow = '0 0 0 3px rgba(37, 99, 235, 0.1)';
+                                    }}
+                                    onBlur={(e) => {
+                                        e.currentTarget.style.borderColor = '#e2e8f0';
+                                        e.currentTarget.style.boxShadow = 'none';
                                     }}
                                     disabled={loading}
                                 />
                             </div>
 
                             {/* Archivo PDF */}
-                            <div style={{ marginBottom: 24 }}>
-                                <label style={{ display: 'block', marginBottom: 8, fontWeight: 600 }}>Archivo PDF *</label>
+                            <div style={{ marginBottom: '28px' }}>
+                                <label style={{
+                                    display: 'block',
+                                    marginBottom: '10px',
+                                    fontWeight: 600,
+                                    fontSize: '14px',
+                                    color: '#0f172a',
+                                    fontFamily: 'Inter, -apple-system, sans-serif'
+                                }}>
+                                    Archivo PDF *
+                                </label>
                                 <FileDrop file={formData.file} onFileSelected={handleFileChange} />
                             </div>
 
                             {/* Checkbox */}
-                            <div style={{ marginBottom: 32 }}>
-                                <label style={{ display: 'flex', alignItems: 'start', gap: 8, cursor: 'pointer', fontSize: 14 }}>
+                            <div style={{ marginBottom: '32px' }}>
+                                <label style={{
+                                    display: 'flex',
+                                    alignItems: 'start',
+                                    gap: '8px',
+                                    cursor: 'pointer',
+                                    fontSize: '14px',
+                                    fontWeight: 500,
+                                    color: '#0f172a',
+                                    fontFamily: 'Inter, -apple-system, sans-serif'
+                                }}>
                                     <input
                                         type="checkbox"
                                         checked={formData.agree}
                                         onChange={(e) => setFormData({ ...formData, agree: e.target.checked })}
                                         disabled={loading}
-                                        style={{ marginTop: 2 }}
+                                        style={{ marginTop: '2px' }}
                                     />
                                     <span><strong>Confirmo que tengo derecho a compartir este apunte.</strong></span>
                                 </label>
                             </div>
 
                             {/* Botones */}
-                            <div style={{ display: 'flex', gap: 12 }}>
-                                <Button
+                            <div style={{ display: 'flex', gap: '12px' }}>
+                                <button
                                     type="submit"
                                     disabled={!valid || loading}
                                     style={{
-                                        flex: 1, padding: 14,
-                                        background: (!valid || loading) ? '#9ca3af' : '#2563eb',
-                                        color: '#fff', border: 'none', borderRadius: 8,
-                                        fontWeight: 600, cursor: (!valid || loading) ? 'not-allowed' : 'pointer',
-                                        fontSize: 16
+                                        flex: 1,
+                                        padding: '14px 24px',
+                                        background: (!valid || loading) ? '#94a3b8' : '#2563eb',
+                                        color: '#fff',
+                                        border: 'none',
+                                        borderRadius: '10px',
+                                        fontWeight: 700,
+                                        fontSize: '15px',
+                                        cursor: (!valid || loading) ? 'not-allowed' : 'pointer',
+                                        transition: 'all 0.2s ease',
+                                        fontFamily: 'Inter, -apple-system, sans-serif'
+                                    }}
+                                    onMouseEnter={(e) => {
+                                        if (valid && !loading) {
+                                            e.currentTarget.style.background = '#1e40af';
+                                            e.currentTarget.style.transform = 'translateY(-2px)';
+                                            e.currentTarget.style.boxShadow = '0 8px 20px rgba(37, 99, 235, 0.3)';
+                                        }
+                                    }}
+                                    onMouseLeave={(e) => {
+                                        if (valid && !loading) {
+                                            e.currentTarget.style.background = '#2563eb';
+                                            e.currentTarget.style.transform = 'translateY(0)';
+                                            e.currentTarget.style.boxShadow = 'none';
+                                        }
                                     }}
                                 >
                                     {uploading ? (uploadProgress || 'Procesando...') : 'Publicar apunte'}
-                                </Button>
+                                </button>
                                 <button
                                     type="button"
                                     onClick={(e) => {
                                         e.stopPropagation();
-                                        onFileSelected(null);
+                                        // Resetear TODO el formulario
+                                        setFormData({
+                                            title: '',
+                                            desc: '',
+                                            file: null,
+                                            agree: false
+                                        });
+                                        setSelectedMateria(null);
+                                        setSearchTerm('');
+                                        setError('');
                                     }}
                                     style={{
-                                        background: '#fecaca',
+                                        background: '#fee2e2',
                                         color: '#dc2626',
                                         border: 'none',
-                                        borderRadius: 6,
-                                        padding: '8px 12px',
+                                        borderRadius: '10px',
+                                        padding: '14px 24px',
                                         cursor: 'pointer',
-                                        fontWeight: 600,
-                                        fontSize: 13,
-                                        transition: 'all 0.2s'
+                                        fontWeight: 700,
+                                        fontSize: '15px',
+                                        transition: 'all 0.2s ease',
+                                        fontFamily: 'Inter, -apple-system, sans-serif'
                                     }}
                                     onMouseEnter={(e) => {
                                         e.currentTarget.style.background = '#ef4444';
                                         e.currentTarget.style.color = '#fff';
+                                        e.currentTarget.style.transform = 'translateY(-2px)';
                                     }}
                                     onMouseLeave={(e) => {
-                                        e.currentTarget.style.background = '#fecaca';
+                                        e.currentTarget.style.background = '#fee2e2';
                                         e.currentTarget.style.color = '#dc2626';
+                                        e.currentTarget.style.transform = 'translateY(0)';
                                     }}
                                 >
                                     Cancelar
@@ -634,16 +813,45 @@ export default function Upload() {
                     </Card>
                 </div>
 
-                {/* Consejos */}
+                {/* Consejos - Sutil con Font Awesome */}
                 <div style={{ width: 260 }}>
                     <Card style={{
-                        padding: 20, background: '#f0f9ff',
-                        border: '1px solid #bfdbfe',
+                        padding: '24px',
+                        background: '#f0f9ff',
+                        border: '2px solid #bfdbfe',
                         position: 'sticky',
                         top: 80
                     }}>
-                        <h3 style={{ margin: '0 0 12px', color: '#1e40af', fontSize: 16 }}>💡 Consejos</h3>
-                        <ul style={{ margin: 0, paddingLeft: 20, color: '#1e3a8a', fontSize: 13, lineHeight: 1.6 }}>
+                        <div style={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '10px',
+                            marginBottom: '16px'
+                        }}>
+                            <FontAwesomeIcon
+                                icon={faLightbulb}
+                                style={{
+                                    color: '#1e40af',
+                                    fontSize: '20px'
+                                }}
+                            />
+                            <h3 style={{
+                                margin: 0,
+                                color: '#1e40af',
+                                fontSize: '17px',
+                                fontWeight: 700
+                            }}>
+                                Consejos
+                            </h3>
+                        </div>
+                        <ul style={{
+                            margin: 0,
+                            paddingLeft: '20px',
+                            color: '#1e3a8a',
+                            fontSize: '14px',
+                            fontWeight: 500,
+                            lineHeight: 1.8
+                        }}>
                             <li>Usá un título descriptivo y claro</li>
                             <li>Verificá que el PDF esté completo y legible</li>
                             <li>Máximo 20MB por archivo</li>

@@ -18,6 +18,7 @@ export default function ApunteCard({ note, currentUserId }) {
     const isMobile = window.innerWidth <= 375;
 
     useEffect(() => {
+
         setLikesCount(note.likes_count || 0);
 
         const checkLikedAndPurchased = async () => {
@@ -115,9 +116,7 @@ export default function ApunteCard({ note, currentUserId }) {
                 fontFamily: 'Inter, sans-serif',
                 display: 'flex',
                 flexDirection: 'column',
-                minHeight: isMobile ? 'auto' : 350,
-                width: '100%',
-                maxWidth: '100%',
+                minHeight: 350,
             }}
             onClick={handleClick}
             onMouseEnter={(e) => {

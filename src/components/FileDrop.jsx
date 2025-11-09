@@ -1,4 +1,6 @@
 import { useState } from "react";
+import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
+import { faCloudUploadAlt, faCheckCircle, faTimes } from '@fortawesome/free-solid-svg-icons';
 
 export default function FileDrop({ file, onFileSelected }) {
     const [dragOver, setDragOver] = useState(false);
@@ -49,31 +51,52 @@ export default function FileDrop({ file, onFileSelected }) {
                 onDrop={handleDrop}
                 onClick={() => document.getElementById('file-input').click()}
                 style={{
-                    border: `2px dashed ${dragOver ? '#2563eb' : '#cbd5e1'}`,
-                    borderRadius: 12,
-                    padding: 40,
+                    border: dragOver ? '2px dashed #2563eb' : '2px dashed #e2e8f0',
+                    borderRadius: '12px',
+                    padding: '40px',
                     textAlign: 'center',
-                    background: dragOver ? '#f0f9ff' : '#fafafa',
+                    background: dragOver ? '#eff6ff' : '#fafafa',
                     transition: 'all 0.2s ease',
                     cursor: 'pointer',
                     position: 'relative'
                 }}
+                onMouseEnter={(e) => {
+                    if (!dragOver && !file) {
+                        e.currentTarget.style.borderColor = '#2563eb';
+                        e.currentTarget.style.background = '#f8fafc';
+                    }
+                }}
+                onMouseLeave={(e) => {
+                    if (!dragOver && !file) {
+                        e.currentTarget.style.borderColor = '#e2e8f0';
+                        e.currentTarget.style.background = '#fafafa';
+                    }
+                }}
             >
-                <div style={{ fontSize: 48, marginBottom: 12 }}>
-                    📄
-                </div>
+                <FontAwesomeIcon
+                    icon={faCloudUploadAlt}
+                    style={{
+                        fontSize: '48px',
+                        color: dragOver ? '#2563eb' : '#94a3b8',
+                        marginBottom: '12px',
+                        transition: 'color 0.2s ease'
+                    }}
+                />
                 <p style={{
-                    color: dragOver ? '#2563eb' : '#6b7280',
+                    color: dragOver ? '#2563eb' : '#64748b',
                     margin: '0 0 8px 0',
                     fontWeight: 600,
-                    fontSize: 15
+                    fontSize: '15px',
+                    fontFamily: 'Inter, -apple-system, sans-serif'
                 }}>
-                    {dragOver ? '¡Soltá el archivo aquí!' : 'Arrastrá un archivo PDF o hacé clic para seleccionar'}
+                    {dragOver ? '¡Soltá el archivo acá!' : 'Arrastrá un archivo PDF o hacé clic para seleccionar'}
                 </p>
                 <p style={{
-                    color: '#9ca3af',
+                    color: '#94a3b8',
                     margin: 0,
-                    fontSize: 13
+                    fontSize: '13px',
+                    fontWeight: 500,
+                    fontFamily: 'Inter, -apple-system, sans-serif'
                 }}>
                     Máximo 20MB
                 </p>
@@ -90,34 +113,44 @@ export default function FileDrop({ file, onFileSelected }) {
             {/* Mostrar archivo seleccionado */}
             {file && (
                 <div style={{
-                    marginTop: 16,
-                    padding: 16,
+                    marginTop: '16px',
+                    padding: '16px',
                     background: '#f0fdf4',
-                    border: '1px solid #86efac',
-                    borderRadius: 8,
+                    border: '2px solid #86efac',
+                    borderRadius: '10px',
                     display: 'flex',
                     alignItems: 'center',
-                    gap: 12
+                    gap: '12px'
                 }}>
-                    <div style={{ fontSize: 32 }}>✅</div>
+                    <FontAwesomeIcon
+                        icon={faCheckCircle}
+                        style={{
+                            fontSize: '28px',
+                            color: '#16a34a',
+                            flexShrink: 0
+                        }}
+                    />
                     <div style={{
                         flex: 1,
-                        minWidth: 0  // ← AGREGAR ESTA LÍNEA
+                        minWidth: 0
                     }}>
                         <div style={{
                             fontWeight: 600,
                             color: '#166534',
-                            fontSize: 14,
-                            marginBottom: 4,
-                            overflow: 'hidden',           // ← AGREGAR
-                            textOverflow: 'ellipsis',     // ← AGREGAR
-                            whiteSpace: 'nowrap'
+                            fontSize: '14px',
+                            marginBottom: '4px',
+                            overflow: 'hidden',
+                            textOverflow: 'ellipsis',
+                            whiteSpace: 'nowrap',
+                            fontFamily: 'Inter, -apple-system, sans-serif'
                         }}>
                             {file.name}
                         </div>
                         <div style={{
                             color: '#16a34a',
-                            fontSize: 12
+                            fontSize: '12px',
+                            fontWeight: 500,
+                            fontFamily: 'Inter, -apple-system, sans-serif'
                         }}>
                             {formatFileSize(file.size)}
                         </div>
@@ -129,25 +162,30 @@ export default function FileDrop({ file, onFileSelected }) {
                             onFileSelected(null);
                         }}
                         style={{
-                            background: '#fecaca',
+                            background: '#fee2e2',
                             color: '#dc2626',
                             border: 'none',
-                            borderRadius: 6,
+                            borderRadius: '8px',
                             padding: '8px 12px',
                             cursor: 'pointer',
                             fontWeight: 600,
-                            fontSize: 13,
-                            transition: 'all 0.2s'
+                            fontSize: '13px',
+                            transition: 'all 0.2s ease',
+                            fontFamily: 'Inter, -apple-system, sans-serif',
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '6px'
                         }}
                         onMouseEnter={(e) => {
                             e.currentTarget.style.background = '#ef4444';
                             e.currentTarget.style.color = '#fff';
                         }}
                         onMouseLeave={(e) => {
-                            e.currentTarget.style.background = '#fecaca';
+                            e.currentTarget.style.background = '#fee2e2';
                             e.currentTarget.style.color = '#dc2626';
                         }}
                     >
+                        <FontAwesomeIcon icon={faTimes} style={{ fontSize: '12px' }} />
                         Quitar
                     </button>
                 </div>

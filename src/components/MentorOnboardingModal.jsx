@@ -10,7 +10,11 @@ import {
     faCheckCircle,
     faVideo,
     faHome,
-    faUniversity
+    faUniversity,
+    faFileContract,
+    faUser,
+    faEnvelope,
+    faCheck
 } from '@fortawesome/free-solid-svg-icons';
 
 const LOCALIDADES = {
@@ -26,7 +30,8 @@ const LOCALIDADES = {
     canelones: [
         'Ciudad de la Costa', 'Pando', 'Las Piedras', 'La Paz', 'Progreso',
         'Canelones', 'Santa Lucía', 'Atlántida', 'Parque del Plata',
-        'Solymar', 'Lagomar', 'El Pinar', 'Shangrilá', 'Salinas'
+        'Solymar', 'Lagomar', 'El Pinar', 'Shangrilá', 'Salinas', 'Colonia Nicolich'
+
     ]
 };
 
@@ -106,11 +111,12 @@ export function MentorOnboardingModal({ open, onComplete }) {
             <div style={modalStyle}>
                 {step === 1 ? (
                     <>
+                        {/* STEP 1: TÉRMINOS Y CONDICIONES COMPLETOS */}
                         <div style={headerStyle}>
                             <div style={{
                                 width: 80,
                                 height: 80,
-                                background: 'linear-gradient(135deg, #2563eb 0%, #1e40af 100%)',
+                                background: 'linear-gradient(135deg, #13346b 0%, #2563eb 100%)',
                                 borderRadius: '50%',
                                 display: 'flex',
                                 alignItems: 'center',
@@ -119,86 +125,190 @@ export function MentorOnboardingModal({ open, onComplete }) {
                                 boxShadow: '0 8px 24px rgba(37, 99, 235, 0.3)'
                             }}>
                                 <FontAwesomeIcon
-                                    icon={faGraduationCap}
+                                    icon={faFileContract}
                                     style={{ fontSize: 36, color: '#fff' }}
                                 />
                             </div>
-                            <h2 style={titleStyle}>¡Bienvenido como Mentor de Kerana!</h2>
+                            <h2 style={titleStyle}>Términos y Condiciones para Mentores</h2>
+                            <p style={{ ...textStyle, textAlign: 'center', marginTop: 8, color: '#64748b' }}>
+                                Leé atentamente las condiciones antes de continuar
+                            </p>
                         </div>
 
                         <div style={contentStyle}>
-                            <p style={textStyle}>
-                                <strong>¡Felicitaciones!</strong> Tu solicitud para ser mentor ha sido aprobada.
-                                Ahora formás parte de nuestra comunidad de educadores.
-                            </p>
-
-                            <div style={infoBoxStyle}>
-                                <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 12 }}>
-                                    <FontAwesomeIcon icon={faDollarSign} style={{ fontSize: 20, color: '#10b981' }} />
-                                    <h3 style={subtitleStyle}>Precios y Pagos</h3>
+                            {/* 1. Precios y Pagos */}
+                            <div>
+                                <div style={sectionHeaderStyle}>
+                                    <FontAwesomeIcon
+                                        icon={faDollarSign}
+                                        style={{ fontSize: 18, color: '#2563eb' }}
+                                    />
+                                    <h3 style={sectionTitleStyle}>1. Precios y Pagos</h3>
                                 </div>
                                 <ul style={listStyle}>
-                                    <li><strong>Clases virtuales (Teams):</strong> $430 UYU por sesión</li>
-                                    <li><strong>Clases presenciales:</strong> $630 UYU por sesión</li>
-                                    <li>Retenemos el pago 24 horas después de la clase</li>
-                                    <li>Si no hay inconvenientes, transferimos a tu cuenta de Mercado Pago</li>
-                                    <li>Mercado Pago cobra aproximadamente 6% de comisión sobre el monto</li>
+                                    <li><strong>Clases virtuales:</strong> $430 UYU por sesión de 60 minutos</li>
+                                    <li><strong>Clases presenciales:</strong> $630 UYU por sesión de 60 minutos</li>
+                                    <li>Los pagos son procesados a través de <strong>Mercado Pago</strong></li>
+                                    <li>Kerana retiene el pago hasta <strong>24 horas después</strong> de finalizada la mentoría</li>
+                                    <li>Si no hay inconvenientes, se transfiere automáticamente a tu cuenta</li>
+                                    <li>Mercado Pago cobra aproximadamente <strong>6%</strong> de comisión</li>
                                 </ul>
                             </div>
 
-                            <div style={infoBoxStyle}>
-                                <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 12 }}>
-                                    <FontAwesomeIcon icon={faShieldAlt} style={{ fontSize: 20, color: '#2563eb' }} />
-                                    <h3 style={subtitleStyle}>Privacidad de Datos</h3>
+                            {/* 2. Privacidad */}
+                            <div>
+                                <div style={sectionHeaderStyle}>
+                                    <FontAwesomeIcon
+                                        icon={faShieldAlt}
+                                        style={{ fontSize: 18, color: '#2563eb' }}
+                                    />
+                                    <h3 style={sectionTitleStyle}>2. Privacidad y Protección de Datos</h3>
                                 </div>
                                 <ul style={listStyle}>
-                                    <li><strong>Público:</strong> Tu localidad (ej: Pocitos, Buceo)</li>
-                                    <li><strong>Privado:</strong> Tu dirección exacta</li>
-                                    <li>Tu dirección solo se comparte cuando el usuario paga y elige clase presencial en tu casa</li>
-                                    <li>Si elegís solo facultad, tu dirección nunca se comparte</li>
+                                    <li><strong>Información pública:</strong> Nombre, foto, localidad general y materias</li>
+                                    <li><strong>Información privada:</strong> Dirección exacta, email y datos bancarios</li>
+                                    <li>Tu dirección solo se comparte con alumnos que pagaron una clase presencial en tu domicilio</li>
+                                    <li>Si solo das clases en facultad o virtuales, tu dirección nunca se comparte</li>
+                                    <li>Kerana no comparte tus datos bancarios con los alumnos bajo ninguna circunstancia</li>
                                 </ul>
                             </div>
 
-                            <div style={infoBoxStyle}>
-                                <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 12 }}>
-                                    <FontAwesomeIcon icon={faCalendarTimes} style={{ fontSize: 20, color: '#f59e0b' }} />
-                                    <h3 style={subtitleStyle}>Política de Cancelaciones</h3>
+                            {/* 3. Política de Cancelaciones */}
+                            <div>
+                                <div style={sectionHeaderStyle}>
+                                    <FontAwesomeIcon
+                                        icon={faCalendarTimes}
+                                        style={{ fontSize: 18, color: '#2563eb' }}
+                                    />
+                                    <h3 style={sectionTitleStyle}>3. Política de Cancelaciones</h3>
+                                </div>
+
+                                <div style={{ marginBottom: 16 }}>
+                                    <h4 style={subsectionTitleStyle}>3.1. Cancelación por parte del alumno</h4>
+                                    <ul style={listStyle}>
+                                        <li><strong>Más de 12 horas antes:</strong> El alumno recibe reembolso completo. El mentor no recibe pago.</li>
+                                        <li><strong>Menos de 12 horas:</strong> Se te acredita el 35% del monto aunque no se dicte la clase</li>
+                                        <li>Si el alumno no se presenta sin avisar, recibís el pago completo</li>
+                                    </ul>
+                                </div>
+
+                                <div>
+                                    <h4 style={subsectionTitleStyle}>3.2. Cancelación por parte del mentor</h4>
+                                    <ul style={listStyle}>
+                                        <li><strong>Más de 36 horas antes:</strong> Sin penalización. El alumno recibe reembolso completo</li>
+                                        <li><strong>Menos de 36 horas:</strong> Se te asigna 1 strike. El alumno recibe reembolso completo</li>
+                                        <li><strong>3 strikes acumulados:</strong> Suspensión automática de la cuenta por 1 año</li>
+                                        <li>Los strikes se resetean cada 6 meses si no hay nuevas infracciones</li>
+                                    </ul>
+                                </div>
+                            </div>
+
+                            {/* 4. Responsabilidades */}
+                            <div>
+                                <div style={sectionHeaderStyle}>
+                                    <FontAwesomeIcon
+                                        icon={faBolt}
+                                        style={{ fontSize: 18, color: '#2563eb' }}
+                                    />
+                                    <h3 style={sectionTitleStyle}>4. Responsabilidades del Mentor</h3>
+                                </div>
+
+                                <div style={{ marginBottom: 16 }}>
+                                    <h4 style={subsectionTitleStyle}>4.1. Para clases virtuales</h4>
+                                    <ul style={listStyle}>
+                                        <li>Crear el link de la videollamada y enviárselo al alumno con anticipación</li>
+                                        <li>Estar online y disponible 5 minutos antes del horario acordado</li>
+                                        <li>Asegurar una conexión estable a internet y equipo en buen funcionamiento</li>
+                                    </ul>
+                                </div>
+
+                                <div style={{ marginBottom: 16 }}>
+                                    <h4 style={subsectionTitleStyle}>4.2. Para clases presenciales</h4>
+                                    <ul style={listStyle}>
+                                        <li>Estar en el lugar acordado <strong>mínimo 10 minutos antes</strong> (obligatorio)</li>
+                                        <li>Confirmar el punto de encuentro con el alumno al menos 2 horas antes</li>
+                                        <li>Mantener un ambiente seguro y apropiado para el aprendizaje</li>
+                                    </ul>
+                                </div>
+
+                                <div>
+                                    <h4 style={subsectionTitleStyle}>4.3. Responsabilidades generales</h4>
+                                    <ul style={listStyle}>
+                                        <li>Responder solicitudes de clases en un plazo máximo de 24 horas</li>
+                                        <li>Cumplir puntualmente con los horarios acordados</li>
+                                        <li>Mantener una actitud profesional y respetuosa en todo momento</li>
+                                        <li>Brindar el máximo esfuerzo para que el alumno logre sus objetivos</li>
+                                        <li>Mantener comunicación clara y fluida con los alumnos</li>
+                                        <li>Actualizar tu disponibilidad horaria regularmente</li>
+                                        <li>Reportar inconvenientes a <strong>kerana.soporte@gmail.com</strong></li>
+                                    </ul>
+                                </div>
+                            </div>
+
+                            {/* 5. Código de Conducta */}
+                            <div>
+                                <div style={sectionHeaderStyle}>
+                                    <FontAwesomeIcon
+                                        icon={faCheckCircle}
+                                        style={{ fontSize: 18, color: '#2563eb' }}
+                                    />
+                                    <h3 style={sectionTitleStyle}>5. Código de Conducta</h3>
                                 </div>
                                 <ul style={listStyle}>
-                                    <li><strong>Cancelación del estudiante:</strong>
-                                        <ul style={{ marginTop: 8 }}>
-                                            <li>Más de 12 horas antes: Reembolso completo al usuario</li>
-                                            <li>Menos de 12 horas: Se te acredita 25% aunque no des la clase</li>
-                                        </ul>
-                                    </li>
-                                    <li><strong>Cancelación del mentor:</strong>
-                                        <ul style={{ marginTop: 8 }}>
-                                            <li>Más de 36 horas antes: Sin penalización</li>
-                                            <li>Menos de 36 horas: Recibís 1 strike</li>
-                                            <li>3 strikes = Baneo de 1 año</li>
-                                        </ul>
-                                    </li>
+                                    <li>Está <strong>prohibido</strong> cualquier tipo de acoso, discriminación o comportamiento inapropiado</li>
+                                    <li>No se permite solicitar pagos fuera de la plataforma</li>
+                                    <li>Kerana se reserva el derecho de suspender cuentas que violen estos términos</li>
+                                    <li>Las decisiones de moderación son finales e inapelables</li>
                                 </ul>
                             </div>
 
-                            <div style={infoBoxStyle}>
-                                <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 12 }}>
-                                    <FontAwesomeIcon icon={faBolt} style={{ fontSize: 20, color: '#ef4444' }} />
-                                    <h3 style={subtitleStyle}>Responsabilidades del Mentor</h3>
+                            {/* 6. Modificaciones */}
+                            <div>
+                                <div style={sectionHeaderStyle}>
+                                    <FontAwesomeIcon
+                                        icon={faCog}
+                                        style={{ fontSize: 18, color: '#2563eb' }}
+                                    />
+                                    <h3 style={sectionTitleStyle}>6. Modificaciones a los Términos</h3>
                                 </div>
-                                <ul style={listStyle}>
-                                    <li><strong>Clases virtuales:</strong> Crear la reunión de Microsoft Teams siguiendo los pasos del video enviado por correo cuando te agenden una clase</li>
-                                    <li><strong>Clases presenciales:</strong> Estar en el lugar acordado por lo menos 10 minutos antes del horario (obligatorio)</li>
-                                    <li>Responder solicitudes en tiempo y forma</li>
-                                    <li>Cumplir con los horarios acordados puntualmente</li>
-                                    <li>Mantener un ambiente de respeto y profesionalismo</li>
-                                    <li>Estar disponible y con buena actitud durante toda la clase</li>
-                                    <li>Entregar lo máximo de vos en cada sesión para que el alumno aprenda</li>
-                                    <li>Mantener comunicación fluida con el estudiante antes y después de la clase</li>
-                                    <li>Reportar cualquier inconveniente a: <strong>kerana.soporte@gmail.com</strong></li>
-                                </ul>
+                                <p style={textStyle}>
+                                    Kerana se reserva el derecho de modificar estos términos en cualquier momento.
+                                    Los cambios serán notificados por email y entrarán en vigencia 15 días después.
+                                    Continuar usando la plataforma implica la aceptación de los nuevos términos.
+                                </p>
                             </div>
 
+                            {/* Separador */}
+                            <div style={{
+                                height: 1,
+                                background: 'linear-gradient(to right, transparent, #cbd5e1, transparent)',
+                                margin: '8px 0'
+                            }}></div>
+
+                            {/* Contacto */}
+                            <div style={{
+                                padding: 16,
+                                background: '#f8fafc',
+                                borderRadius: 12,
+                                border: '1px solid #e2e8f0',
+                                textAlign: 'center'
+                            }}>
+                                <p style={{ margin: '0 0 4px 0', fontSize: 14, fontWeight: 600, color: '#0f172a' }}>
+                                    <FontAwesomeIcon icon={faEnvelope} style={{ marginRight: 8, color: '#2563eb' }} />
+                                    ¿Dudas o consultas?
+                                </p>
+                                <p style={{ margin: 0, fontSize: 13, color: '#64748b' }}>
+                                    Contactanos en{' '}
+                                    <a
+                                        href="mailto:kerana.soporte@gmail.com"
+                                        style={{ color: '#2563eb', fontWeight: 700, textDecoration: 'none' }}
+                                    >
+                                        kerana.soporte@gmail.com
+                                    </a>
+                                </p>
+                            </div>
+
+                            {/* Checkbox aceptación */}
                             <label style={checkboxContainerStyle}>
                                 <input
                                     type="checkbox"
@@ -206,10 +316,14 @@ export function MentorOnboardingModal({ open, onComplete }) {
                                     onChange={(e) => setAcceptedTerms(e.target.checked)}
                                     style={checkboxStyle}
                                 />
-                                <span style={{ fontSize: 14, fontFamily: 'Inter, sans-serif', fontWeight: 500 }}>
-                                    He leído y acepto los términos y condiciones como mentor de Kerana
+                                <span style={{ fontSize: 14, fontFamily: 'Inter, sans-serif', fontWeight: 600 }}>
+                                    He leído y acepto todos los términos y condiciones para ser mentor de Kerana
                                 </span>
                             </label>
+
+                            <p style={{ margin: 0, fontSize: 11, color: '#94a3b8', textAlign: 'center', fontStyle: 'italic' }}>
+                                Última actualización: Enero 2025
+                            </p>
                         </div>
 
                         <div style={footerStyle}>
@@ -222,12 +336,14 @@ export function MentorOnboardingModal({ open, onComplete }) {
                                 }}
                                 disabled={!acceptedTerms}
                             >
-                                <span>Continuar</span>
+                                <FontAwesomeIcon icon={faCheck} style={{ marginRight: 8 }} />
+                                Acepto, continuar
                             </button>
                         </div>
                     </>
                 ) : (
                     <>
+                        {/* STEP 2: CONFIGURACIÓN (SIN CAMBIOS) */}
                         <div style={headerStyle}>
                             <div style={{
                                 width: 80,
@@ -319,7 +435,7 @@ export function MentorOnboardingModal({ open, onComplete }) {
                                         style={checkboxStyle}
                                     />
                                     <FontAwesomeIcon icon={faVideo} style={{ color: '#2563eb', fontSize: 16 }} />
-                                    <span>Virtual (Teams) - $430 UYU</span>
+                                    <span>Virtual - $430 UYU</span>
                                 </label>
 
                                 <label style={checkboxLabelStyle}>
@@ -457,34 +573,46 @@ const contentStyle = {
 
 const textStyle = {
     margin: 0,
-    fontSize: 15,
-    lineHeight: 1.6,
-    color: '#374151',
+    fontSize: 14,
+    lineHeight: 1.8,
+    color: '#475569',
+    fontFamily: 'Inter, sans-serif',
+    fontWeight: 500
+};
+
+const sectionHeaderStyle = {
+    display: 'flex',
+    alignItems: 'center',
+    gap: 12,
+    marginBottom: 12,
+    paddingBottom: 8,
+    borderBottom: '2px solid #e5e7eb'
+};
+
+const sectionTitleStyle = {
+    margin: 0,
+    fontSize: 16,
+    fontWeight: 700,
+    color: '#0f172a',
     fontFamily: 'Inter, sans-serif'
 };
 
-const infoBoxStyle = {
-    background: '#F9FAFB',
-    border: '1px solid #E5E7EB',
-    borderRadius: 12,
-    padding: 20
-};
-
-const subtitleStyle = {
-    margin: 0,
-    fontSize: 16,
-    fontWeight: 600,
-    color: '#111827',
+const subsectionTitleStyle = {
+    margin: '0 0 8px 0',
+    fontSize: 14,
+    fontWeight: 700,
+    color: '#0f172a',
     fontFamily: 'Inter, sans-serif'
 };
 
 const listStyle = {
     margin: 0,
     paddingLeft: 20,
-    fontSize: 14,
-    lineHeight: 1.8,
-    color: '#4B5563',
-    fontFamily: 'Inter, sans-serif'
+    fontSize: 13,
+    lineHeight: 1.9,
+    color: '#475569',
+    fontFamily: 'Inter, sans-serif',
+    fontWeight: 500
 };
 
 const checkboxContainerStyle = {
@@ -619,7 +747,10 @@ const primaryButtonStyle = {
     fontSize: 15,
     cursor: 'pointer',
     transition: 'all 0.2s ease',
-    fontFamily: 'Inter, sans-serif'
+    fontFamily: 'Inter, sans-serif',
+    display: 'flex',
+    alignItems: 'center',
+    gap: 8
 };
 
 const secondaryButtonStyle = {

@@ -1,554 +1,752 @@
-    import { useState, useEffect, useRef } from 'react';
-    import { useNavigate } from 'react-router-dom';
-    import { supabase } from '../supabase';
-    import { Card } from '../components/UI/Card';
-    import { Button } from '../components/UI/Button';
-    import emailjs from '@emailjs/browser';
+import { useState, useEffect, useRef } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { supabase } from '../supabase';
+import { Card } from '../components/UI/Card';
+import { FileUploadZone } from '../components/UI/FileUploadZone';
+import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
+import {
+    faSearch,
+    faCheckCircle,
+    faExclamationCircle,
+    faInfoCircle,
+    faGraduationCap,
+    faBook
+} from '@fortawesome/free-solid-svg-icons';
+import emailjs from '@emailjs/browser';
 
+export default function MentorApply() {
+    const navigate = useNavigate();
+    const [loading, setLoading] = useState(false);
+    const [searchTerm, setSearchTerm] = useState('');
+    const [materias, setMaterias] = useState([]);
+    const [filteredMaterias, setFilteredMaterias] = useState([]);
+    const [selectedMateria, setSelectedMateria] = useState(null);
+    const [showDropdown, setShowDropdown] = useState(false);
+    const [formData, setFormData] = useState({
+        calificacion: '',
+        motivo: '',
+        comprobante: null
+    });
+    const [error, setError] = useState('');
+    const [fileError, setFileError] = useState('');
+    const [uploading, setUploading] = useState(false);
+    const [successMessage, setSuccessMessage] = useState('');
+    const dropdownRef = useRef(null);
 
-    export default function MentorApply() {
-        const navigate = useNavigate();
-        const [loading, setLoading] = useState(false);
-        const [searchTerm, setSearchTerm] = useState('');
-        const [materias, setMaterias] = useState([]);
-        const [filteredMaterias, setFilteredMaterias] = useState([]);
-        const [selectedMateria, setSelectedMateria] = useState(null);
-        const [showDropdown, setShowDropdown] = useState(false);
-        const [formData, setFormData] = useState({
-            calificacion: '',
-            motivo: '',
-            comprobante: null
-        });
-        const [error, setError] = useState('');
-        const [uploading, setUploading] = useState(false);
-        const [successMessage, setSuccessMessage] = useState('');
-        const dropdownRef = useRef(null);
+    useEffect(() => {
+        fetchMaterias();
+    }, []);
 
-        useEffect(() => {
-            fetchMaterias();
-        }, []);
-
-        useEffect(() => {
-            const handleClickOutside = (event) => {
-                if (dropdownRef.current && !dropdownRef.current.contains(event.target)) {
-                    setShowDropdown(false);
-                }
-            };
-            document.addEventListener('mousedown', handleClickOutside);
-            return () => document.removeEventListener('mousedown', handleClickOutside);
-        }, []);
-
-        const normalizeText = (text) => {
-            return text
-                .toLowerCase()
-                .normalize('NFD')
-                .replace(/[\u0300-\u036f]/g, '');
-        };
-
-        useEffect(() => {
-            if (searchTerm.trim()) {
-                const normalizedSearch = normalizeText(searchTerm);
-                const filtered = materias.filter(m =>
-                    normalizeText(m.nombre_materia).includes(normalizedSearch)
-                );
-                setFilteredMaterias(filtered);
-                setShowDropdown(true);
-            } else {
-                setFilteredMaterias([]);
+    useEffect(() => {
+        const handleClickOutside = (event) => {
+            if (dropdownRef.current && !dropdownRef.current.contains(event.target)) {
                 setShowDropdown(false);
             }
-        }, [searchTerm, materias]);
-
-        const fetchMaterias = async () => {
-            const { data: materiasData, error } = await supabase
-                .from('materia')
-                .select('id_materia, nombre_materia, semestre')
-                .order('nombre_materia');
-
-            if (error) {
-                console.error('Error cargando materias:', error);
-                return;
-            }
-            setMaterias(materiasData || []);
         };
+        document.addEventListener('mousedown', handleClickOutside);
+        return () => document.removeEventListener('mousedown', handleClickOutside);
+    }, []);
 
-        const handleMateriaSelect = (materia) => {
-            setSelectedMateria(materia);
-            setSearchTerm(materia.nombre_materia);
+    const normalizeText = (text) => {
+        return text
+            .toLowerCase()
+            .normalize('NFD')
+            .replace(/[\u0300-\u036f]/g, '');
+    };
+
+    useEffect(() => {
+        if (searchTerm.trim()) {
+            const normalizedSearch = normalizeText(searchTerm);
+            const filtered = materias.filter(m =>
+                normalizeText(m.nombre_materia).includes(normalizedSearch)
+            );
+            setFilteredMaterias(filtered);
+            setShowDropdown(true);
+        } else {
+            setFilteredMaterias([]);
             setShowDropdown(false);
-        };
+        }
+    }, [searchTerm, materias]);
 
-        const handleFileChange = (e) => {
-            const file = e.target.files[0];
-            if (file) {
-                if (!file.type.startsWith('image/')) {
-                    setError('El archivo debe ser una imagen (JPG, PNG, etc.)');
-                    return;
-                }
-                if (file.size > 5 * 1024 * 1024) {
-                    setError('El archivo no puede pesar más de 5MB');
-                    return;
-                }
-                setFormData({ ...formData, comprobante: file });
-                setError('');
-            }
-        };
+    const fetchMaterias = async () => {
+        const { data: materiasData, error } = await supabase
+            .from('materia')
+            .select('id_materia, nombre_materia, semestre')
+            .order('nombre_materia');
 
-        const uploadComprobante = async (file) => {
+        if (error) {
+            console.error('Error cargando materias:', error);
+            return;
+        }
+        setMaterias(materiasData || []);
+    };
+
+    const handleMateriaSelect = (materia) => {
+        setSelectedMateria(materia);
+        setSearchTerm(materia.nombre_materia);
+        setShowDropdown(false);
+    };
+
+    const handleFileChange = (file, error) => {
+        if (error) {
+            setFileError(error);
+            setFormData({ ...formData, comprobante: null });
+        } else {
+            setFileError('');
+            setFormData({ ...formData, comprobante: file });
+        }
+    };
+
+    const uploadComprobante = async (file) => {
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user) throw new Error('No hay usuario logueado');
+
+        const fileExt = file.name.split('.').pop();
+        const fileName = `${user.id}_${selectedMateria.id_materia}_${Date.now()}.${fileExt}`;
+        const filePath = fileName;
+
+        const { error: upErr } = await supabase.storage
+            .from('mentor-comprobantes')
+            .upload(filePath, file, { upsert: false });
+
+        if (upErr) throw upErr;
+
+        const { data: pub } = supabase.storage
+            .from('mentor-comprobantes')
+            .getPublicUrl(filePath);
+
+        const publicUrl = pub?.publicUrl || "";
+
+        return { filePath, publicUrl };
+    };
+
+    const handleSubmit = async (e) => {
+        e.preventDefault();
+        setError('');
+
+        if (!selectedMateria) {
+            setError('Debes seleccionar una materia');
+            return;
+        }
+
+        if (!formData.calificacion || formData.calificacion < 9 || formData.calificacion > 12) {
+            setError('La calificación debe ser entre 9 y 12');
+            return;
+        }
+
+        if (!Number.isInteger(Number(formData.calificacion))) {
+            setError('La calificación debe ser un número entero');
+            return;
+        }
+
+        if (!formData.comprobante) {
+            setError('Debes subir un comprobante de tu escolaridad');
+            return;
+        }
+
+        try {
+            setLoading(true);
+            setUploading(true);
+
             const { data: { user } } = await supabase.auth.getUser();
-            if (!user) throw new Error('No hay usuario logueado');
-
-            const fileExt = file.name.split('.').pop();
-            const fileName = `${user.id}_${selectedMateria.id_materia}_${Date.now()}.${fileExt}`;
-            const filePath = fileName;
-
-            // ✅ bucket correcto (public): mentor-comprobante
-            const { error: upErr } = await supabase.storage
-                .from('mentor-comprobantes')
-                .upload(filePath, file, { upsert: false });
-
-            if (upErr) throw upErr;
-
-            // URL pública
-            const { data: pub } = supabase.storage
-                .from('mentor-comprobantes')
-                .getPublicUrl(filePath);
-
-            const publicUrl = pub?.publicUrl || "";
-
-            // devolvemos ambos
-            return { filePath, publicUrl };
-        };
-
-
-        const handleSubmit = async (e) => {
-            e.preventDefault();
-            setError('');
-
-            if (!selectedMateria) {
-                setError('Debes seleccionar una materia');
+            if (!user) {
+                setError('Debes iniciar sesión');
                 return;
             }
 
-            if (!formData.calificacion || formData.calificacion < 8 || formData.calificacion > 12) {
-                setError('La calificación debe ser entre 8 y 12');
+            console.log('🔍 Buscando usuario con auth_id:', user.id);
+
+            const { data: usuarioData, error: userError } = await supabase
+                .from('usuario')
+                .select('id_usuario, nombre, correo')
+                .eq('auth_id', user.id)
+                .single();
+
+            console.log('📊 Resultado de búsqueda:', { usuarioData, userError });
+
+            if (userError) {
+                console.error('❌ Error buscando usuario:', userError);
+                setError(`Error al buscar usuario: ${userError.message}. Verifica que tu cuenta esté registrada.`);
                 return;
             }
 
-            if (!Number.isInteger(Number(formData.calificacion))) {
-                setError('La calificación debe ser un número entero');
+            if (!usuarioData) {
+                setError('No se encontró tu perfil de usuario en la base de datos.');
                 return;
             }
 
-            if (!formData.comprobante) {
-                setError('Debes subir un comprobante de tu escolaridad');
+            console.log('✅ Usuario encontrado:', usuarioData);
+
+            const { data: existingApplication, error: checkError } = await supabase
+                .from('mentor')
+                .select('estado')
+                .eq('id_usuario', usuarioData.id_usuario)
+                .eq('id_materia', selectedMateria.id_materia)
+                .maybeSingle();
+
+            if (checkError) {
+                console.error('Error verificando postulación existente:', checkError);
+                setError('Error al verificar postulaciones previas');
                 return;
+            }
+
+            if (existingApplication) {
+                if (existingApplication.estado === 'pendiente') {
+                    setError('Ya tenés una postulación pendiente para esta materia');
+                    return;
+                } else if (existingApplication.estado === 'aprobado') {
+                    setError('Ya sos mentor de esta materia');
+                    return;
+                }
+            }
+
+            const { filePath, publicUrl } = await uploadComprobante(formData.comprobante);
+
+            const { error: insertError } = await supabase
+                .from('mentor')
+                .insert({
+                    id_usuario: usuarioData.id_usuario,
+                    id_materia: selectedMateria.id_materia,
+                    calificacion: parseInt(formData.calificacion),
+                    motivo: formData.motivo || null,
+                    comprobante_path: filePath,
+                    comprobante_url: publicUrl,
+                    estado: 'pendiente',
+                    fecha_solicitud: new Date().toISOString()
+                });
+
+            if (insertError) {
+                console.error('Error insertando postulación:', insertError);
+                throw insertError;
             }
 
             try {
-                setLoading(true);
-                setUploading(true);
-
-                const { data: { user } } = await supabase.auth.getUser();
-                if (!user) {
-                    setError('Debes iniciar sesión');
-                    return;
-                }
-
-                // Buscar usuario por auth_id
-                console.log('🔍 Buscando usuario con auth_id:', user.id);
-
-                const { data: usuarioData, error: userError } = await supabase
-                    .from('usuario')
-                    .select('id_usuario, nombre, correo')
-                    .eq('auth_id', user.id)
-                    .single();
-
-                // Log detallado para debugging
-                console.log('📊 Resultado de búsqueda:', { usuarioData, userError });
-
-                if (userError) {
-                    console.error('❌ Error buscando usuario:', userError);
-                    setError(`Error al buscar usuario: ${userError.message}. Verifica que tu cuenta esté registrada.`);
-                    return;
-                }
-
-                if (!usuarioData) {
-                    setError('No se encontró tu perfil de usuario en la base de datos.');
-                    return;
-                }
-
-                const { filePath, publicUrl } = await uploadComprobante(formData.comprobante);
-
-                const { data: applicationData, error: insertError } = await supabase
-                    .from('mentor_aplicacion')
-                    .insert([{
-                        id_usuario: usuarioData.id_usuario,
-                        id_materia: selectedMateria.id_materia,
-                        motivo: formData.motivo?.trim() || null,
-                        calificacion_materia: parseInt(formData.calificacion, 10),
-                        comprobante_path: filePath,   // ✅ guardamos el path (no bytea)
-                        estado: 'pendiente'
-                    }])
-                    .select()
-                    .single();
-
-
-                if (insertError) throw insertError;
-
-                // ✅ ENVIAR EMAIL DE NOTIFICACIÓN AL ADMIN
-                try {
-                    await emailjs.send(
-                        "service_dan74a5",
-                        "template_e9obnfd",
-                        {
-                            application_id: applicationData.id,
-                            user_email: user.email,
-                            user_name: usuarioData.nombre || user.email,
-                            materia_nombre: selectedMateria.nombre_materia,
-                            calificacion: formData.calificacion,
-                            // ✅ mensaje = el motivo del postulante (sin bloque prefabricado)
-                            message: formData.motivo?.trim() || "",
-                            // ✅ foto pública para el mail
-                            comprobante_url: publicUrl,
-                            // destinatario del admin (ajustalo a tu correo real)
-                            to_email: "tu-email-admin@gmail.com",
-                            subject: "📚 Nueva aplicación de mentor - Kerana"
-                        },
-                        "DMO310micvFWXx-j4"
-                    );
-                    console.log('✅ Notificación enviada por email');
-                } catch (emailError) {
-                    console.log('❌ Email falló pero aplicación se guardó:', emailError);
-                }
-
-
-                setSuccessMessage('¡Tu postulación ha sido enviada con éxito! Te notificaremos por correo cuando sea revisada.');
-
-                // Esperar 3 segundos antes de redirigir para que el usuario vea el mensaje
-                setTimeout(() => {
-                    navigate('/');
-                }, 3000);
-
-            } catch (err) {
-                console.error('Error al postular:', err);
-                setError(err.message || 'Error al enviar la postulación');
-            } finally {
-                setLoading(false);
-                setUploading(false);
+                await emailjs.send(
+                    'service_8gg5zzh',
+                    'template_6jjq3wo',
+                    {
+                        user_nombre: usuarioData.nombre,
+                        user_email: usuarioData.correo,
+                        materia_nombre: selectedMateria.nombre_materia,
+                        calificacion: formData.calificacion,
+                        motivo: formData.motivo || 'No especificado',
+                        comprobante_url: publicUrl
+                    },
+                    'nZePMqXLCLLc7fxYg'
+                );
+                console.log('✅ Email enviado correctamente');
+            } catch (emailError) {
+                console.error('⚠️ Error enviando email (no crítico):', emailError);
             }
-        };
 
-        // ------------------ Listener de aprobación ------------------
-        useEffect(() => {
-            // Crear un canal para escuchar cambios en mentor_aplicacion
-            const channel = supabase
-                .channel('mentor_aplicaciones') // nombre único del canal
-                .on(
-                    'postgres_changes',
-                    { event: 'UPDATE', schema: 'public', table: 'mentor_aplicacion' },
-                    async (payload) => {
-                        const newRow = payload.new;
-                        const oldRow = payload.old;
+            setSuccessMessage('¡Postulación enviada con éxito! Te notificaremos cuando sea revisada.');
+            setFormData({ calificacion: '', motivo: '', comprobante: null });
+            setSelectedMateria(null);
+            setSearchTerm('');
 
-                        if (newRow.estado === 'aprobado' && oldRow.estado !== 'aprobado') {
-                            try {
-                                const { data: usuario } = await supabase
-                                    .from('usuario')
-                                    .select('nombre, correo')
-                                    .eq('id_usuario', newRow.id_usuario)
-                                    .single();
+            setTimeout(() => {
+                navigate('/profile');
+            }, 2000);
 
-                                await emailjs.send(
-                                    "service_dan74a5",
-                                    "template_aprobacion_mentor",
-                                    {
-                                        user_email: usuario.email,
-                                        user_name: usuario.nombre || usuario.email,
-                                        materia_nombre: selectedMateria?.nombre_materia || '',
-                                        message: `¡Felicidades! Tu postulación para ser mentor fue aprobada.`,
-                                        subject: "✅ Tu aplicación fue aprobada - Kerana"
-                                    },
-                                    "DMO310micvFWXx-j4"
-                                );
-                                console.log('✅ Email de aprobación enviado al usuario');
-                            } catch (err) {
-                                console.error('Error enviando email de aprobación:', err);
-                            }
-                        }
-                    }
-                )
-                .subscribe();
+        } catch (error) {
+            console.error('Error completo:', error);
+            setError(error.message || 'Error al enviar la postulación');
+        } finally {
+            setLoading(false);
+            setUploading(false);
+        }
+    };
 
-            // Limpiar el canal al desmontar
-            return () => {
-                supabase.removeChannel(channel);
-            };
-        }, [selectedMateria]);
+    if (successMessage) {
         return (
-            <div style={{ maxWidth: 700, margin: '0 auto', padding: 20 }}>
-                <h1 style={{ marginBottom: 12 }}>Postulate como Mentor</h1>
-                <p style={{ color: '#6b7280', marginBottom: 32 }}>
-                    Compartí tu conocimiento ayudando a otros estudiantes en materias donde te fue bien.
-                </p>
-
-                {successMessage && (
-                    <Card style={{
-                        background: '#f0fdf4',
-                        border: '1px solid #86efac',
-                        color: '#166534',
-                        padding: 20,
-                        marginBottom: 20,
+            <div style={{
+                maxWidth: '600px',
+                margin: '60px auto',
+                padding: '0 20px',
+                animation: 'fadeIn 0.4s ease'
+            }}>
+                <Card style={{
+                    padding: '48px 32px',
+                    textAlign: 'center',
+                    border: '2px solid #10b981'
+                }}>
+                    <div style={{
+                        width: '80px',
+                        height: '80px',
+                        margin: '0 auto 24px',
+                        borderRadius: '50%',
+                        background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
                         display: 'flex',
                         alignItems: 'center',
-                        gap: 12
+                        justifyContent: 'center',
+                        animation: 'scaleIn 0.5s ease'
                     }}>
-                        <svg style={{ width: 24, height: 24, flexShrink: 0 }} fill="currentColor" viewBox="0 0 20 20">
-                            <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
-                        </svg>
-                        <div>
-                            <div style={{ fontWeight: 600, marginBottom: 4 }}>¡Postulación enviada!</div>
-                            <div style={{ fontSize: 14 }}>{successMessage}</div>
-                        </div>
-                    </Card>
-                )}
-
-                {error && (
-                    <Card style={{
-                        background: '#fef2f2',
-                        border: '1px solid #fecaca',
-                        color: '#dc2626',
-                        padding: 16,
-                        marginBottom: 20
+                        <FontAwesomeIcon
+                            icon={faCheckCircle}
+                            style={{ fontSize: '40px', color: '#fff' }}
+                        />
+                    </div>
+                    <h2 style={{
+                        margin: '0 0 12px 0',
+                        fontSize: 'clamp(24px, 4vw, 32px)',
+                        fontWeight: 700,
+                        color: '#059669'
                     }}>
-                        {error}
-                    </Card>
-                )}
+                        ¡Postulación enviada!
+                    </h2>
+                    <p style={{
+                        margin: 0,
+                        color: '#64748b',
+                        fontSize: '15px',
+                        fontWeight: 500,
+                        lineHeight: 1.6
+                    }}>
+                        {successMessage}
+                    </p>
+                </Card>
+            </div>
+        );
+    }
 
-                <Card style={{ padding: 32 }}>
-                    <form onSubmit={handleSubmit}>
-                        <div style={{ marginBottom: 24, position: 'relative' }} ref={dropdownRef}>
-                            <label style={{ display: 'block', marginBottom: 8, fontWeight: 600 }}>
-                                Materia *
-                            </label>
-                            <input
-                                type="text"
-                                value={searchTerm}
-                                onChange={(e) => {
-                                    setSearchTerm(e.target.value);
-                                    setSelectedMateria(null);
-                                }}
-                                placeholder="Ej: Análisis Matemático"
-                                style={{
-                                    width: '100%',
-                                    padding: 12,
-                                    border: '1px solid #d1d5db',
-                                    borderRadius: 8,
-                                    fontSize: 14
-                                }}
-                                disabled={loading}
-                            />
+    return (
+        <div
+            id="mentor-apply-form"
+            style={{
+                maxWidth: '700px',
+                margin: '40px auto 120px',
+                padding: '0 20px',
+                boxSizing: 'border-box'
+            }}>
+            {/* Estilos específicos para este componente */}
+            <style>{`
+                #mentor-apply-form * {
+                    box-sizing: border-box;
+                }
+            `}</style>
+
+            {/* Header */}
+            <div style={{
+                marginBottom: '32px',
+                textAlign: 'center'
+            }}>
+                <div style={{
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    width: '64px',
+                    height: '64px',
+                    borderRadius: '16px',
+                    background: 'linear-gradient(135deg, #2563eb 0%, #1e40af 100%)',
+                    marginBottom: '16px'
+                }}>
+                    <FontAwesomeIcon
+                        icon={faGraduationCap}
+                        style={{ fontSize: '32px', color: '#fff' }}
+                    />
+                </div>
+                <h1 style={{
+                    margin: '0 0 8px 0',
+                    fontSize: 'clamp(28px, 5vw, 36px)',
+                    fontWeight: 800,
+                    color: '#0f172a'
+                }}>
+                    Postulate como Mentor
+                </h1>
+                <p style={{
+                    margin: 0,
+                    fontSize: '15px',
+                    color: '#64748b',
+                    fontWeight: 500,
+                    lineHeight: 1.6,
+                    maxWidth: '500px',
+                    marginLeft: 'auto',
+                    marginRight: 'auto'
+                }}>
+                    Ayudá a otros estudiantes compartiendo tu conocimiento en materias que dominás
+                </p>
+            </div>
+
+            {/* Formulario */}
+            <Card style={{ padding: '32px 28px' }}>
+                <form onSubmit={handleSubmit}>
+                    {/* Búsqueda de materia */}
+                    <div style={{ marginBottom: '28px' }}>
+                        <label style={{
+                            display: 'block',
+                            marginBottom: '10px',
+                            fontWeight: 600,
+                            fontSize: '14px',
+                            color: '#0f172a'
+                        }}>
+                            Materia *
+                        </label>
+                        <div style={{ position: 'relative' }} ref={dropdownRef}>
+                            <div style={{ position: 'relative' }}>
+                                <input
+                                    type="text"
+                                    value={searchTerm}
+                                    onChange={(e) => setSearchTerm(e.target.value)}
+                                    placeholder="Buscá tu materia..."
+                                    style={{
+                                        width: '100%',
+                                        padding: '12px 16px 12px 44px',
+                                        border: error && !selectedMateria ? '2px solid #ef4444' : '2px solid #e2e8f0',
+                                        borderRadius: '10px',
+                                        fontSize: '14px',
+                                        fontWeight: 500,
+                                        color: '#0f172a',
+                                        outline: 'none',
+                                        transition: 'all 0.2s ease',
+                                        background: '#fff',
+                                        boxSizing: 'border-box'
+                                    }}
+                                    onFocus={(e) => {
+                                        if (!error) {
+                                            e.currentTarget.style.borderColor = '#2563eb';
+                                            e.currentTarget.style.boxShadow = '0 0 0 3px rgba(37, 99, 235, 0.1)';
+                                        }
+                                    }}
+                                    onBlur={(e) => {
+                                        e.currentTarget.style.borderColor = '#e2e8f0';
+                                        e.currentTarget.style.boxShadow = 'none';
+                                    }}
+                                    disabled={loading}
+                                />
+                                <FontAwesomeIcon
+                                    icon={faSearch}
+                                    style={{
+                                        position: 'absolute',
+                                        left: '16px',
+                                        top: '50%',
+                                        transform: 'translateY(-50%)',
+                                        color: '#94a3b8',
+                                        fontSize: '16px',
+                                        pointerEvents: 'none'
+                                    }}
+                                />
+                            </div>
+
+                            {/* Dropdown de materias */}
                             {showDropdown && filteredMaterias.length > 0 && (
                                 <div style={{
                                     position: 'absolute',
-                                    top: '100%',
+                                    top: 'calc(100% + 8px)',
                                     left: 0,
                                     right: 0,
                                     background: '#fff',
-                                    border: '1px solid #d1d5db',
-                                    borderRadius: 8,
-                                    marginTop: 4,
-                                    maxHeight: 200,
+                                    border: '2px solid #e2e8f0',
+                                    borderRadius: '12px',
+                                    boxShadow: '0 12px 32px rgba(0,0,0,0.12)',
+                                    maxHeight: '280px',
                                     overflowY: 'auto',
-                                    zIndex: 100,
-                                    boxShadow: '0 4px 6px -1px rgba(0,0,0,0.1)'
+                                    zIndex: 50,
+                                    animation: 'slideDown 0.2s ease'
                                 }}>
-                                    {filteredMaterias.map(materia => (
+                                    {filteredMaterias.map((materia) => (
                                         <div
                                             key={materia.id_materia}
                                             onClick={() => handleMateriaSelect(materia)}
                                             style={{
                                                 padding: '12px 16px',
                                                 cursor: 'pointer',
-                                                borderBottom: '1px solid #f3f4f6'
+                                                borderBottom: '1px solid #f1f5f9',
+                                                display: 'flex',
+                                                alignItems: 'center',
+                                                gap: '12px',
+                                                transition: 'all 0.15s ease'
                                             }}
-                                            onMouseEnter={(e) => e.target.style.background = '#f9fafb'}
-                                            onMouseLeave={(e) => e.target.style.background = '#fff'}
+                                            onMouseEnter={(e) => {
+                                                e.currentTarget.style.background = '#f8fafc';
+                                            }}
+                                            onMouseLeave={(e) => {
+                                                e.currentTarget.style.background = '#fff';
+                                            }}
                                         >
-                                            <div style={{ fontWeight: 500 }}>{materia.nombre_materia}</div>
+                                            <FontAwesomeIcon
+                                                icon={faBook}
+                                                style={{
+                                                    color: '#64748b',
+                                                    fontSize: '14px'
+                                                }}
+                                            />
+                                            <div style={{ fontWeight: 500, fontSize: '14px', color: '#0f172a' }}>
+                                                {materia.nombre_materia}
+                                            </div>
                                         </div>
                                     ))}
                                 </div>
                             )}
                         </div>
+                    </div>
 
-                        <div style={{ marginBottom: 24 }}>
-                            <label style={{ display: 'block', marginBottom: 8, fontWeight: 600 }}>
-                                Calificación obtenida * (mínimo 8)
-                            </label>
-                            <input
-                                type="text"
-                                value={formData.calificacion}
-                                onChange={(e) => {
-                                    const val = e.target.value;
-                                    // Limpiar error al escribir
-                                      if (error) setError('');
-
-                                    // Permitir solo dígitos
-                                    if (/^\d*$/.test(val)) {
-                                        setFormData({ ...formData, calificacion: val });
-                                    }
-                                }}
-                                onBlur={() => {
-                                    // Validar el rango cuando el input se va del rango
-                                    const num = Number(formData.calificacion);
-                                    if (formData.calificacion !== '' && (num < 8 || num > 12)) {
-                                        setError('Por favor ingrese un valor entre 8 y 12');
-                                        setFormData({ ...formData, calificacion: '' });
-                                    }
-                                }}
-                                placeholder="Ej: 10"
-                                style={{
-                                    width: '100%',
-                                    padding: 12,
-                                    border: error && !formData.calificacion ? '2px solid #ef4444' : '1px solid #d1d5db',
-                                    borderRadius: 8,
-                                    fontSize: 14,
-                                    outline: 'none'
-                                }}
-                                disabled={loading}
-                            />
-
-                            {/* Mensaje de error */}
-                            {error && !formData.calificacion && (
-                                <div style={{
-                                    marginTop: 8,
-                                    display: 'flex',
-                                    alignItems: 'flex-start',
-                                    gap: 8,
-                                    color: '#dc2626'
-                                }}>
-                                    <svg
-                                        style={{ width: 20, height: 20, flexShrink: 0, marginTop: 2 }}
-                                        fill="currentColor"
-                                        viewBox="0 0 20 20"
-                                    >
-                                        <path
-                                            fillRule="evenodd"
-                                            d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z"
-                                            clipRule="evenodd"
-                                        />
-                                    </svg>
-                                    <span style={{ fontSize: 14 }}>{error}</span>
-                                </div>
-                            )}
-
-                            {/* Indicador de éxito */}
-                            {formData.calificacion && Number(formData.calificacion) >= 8 && Number(formData.calificacion) <= 12 && (
-                                <div style={{
-                                    marginTop: 8,
-                                    display: 'flex',
-                                    alignItems: 'center',
-                                    gap: 8,
-                                    color: '#16a34a'
-                                }}>
-                                    <svg
-                                        style={{ width: 20, height: 20 }}
-                                        fill="currentColor"
-                                        viewBox="0 0 20 20"
-                                    >
-                                        <path
-                                            fillRule="evenodd"
-                                            d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z"
-                                            clipRule="evenodd"
-                                        />
-                                    </svg>
-                                    <span style={{ fontSize: 14 }}>Valor válido: {formData.calificacion}</span>
-                                </div>
-                            )}
-                        </div>
-
-                        <div style={{ marginBottom: 24 }}>
-                            <label style={{ display: 'block', marginBottom: 8, fontWeight: 600 }}>
-                                Comprobante de escolaridad * (foto/imagen)
-                            </label>
-                            <input
-                                type="file"
-                                accept="image/*"
-                                onChange={handleFileChange}
-                                style={{
-                                    width: '100%',
-                                    padding: 12,
-                                    border: '1px solid #d1d5db',
-                                    borderRadius: 8,
-                                    fontSize: 14
-                                }}
-                                disabled={loading}
-                            />
-                            {formData.comprobante && (
-                                <div style={{
-                                    marginTop: 8,
-                                    fontSize: 14,
-                                    color: '#059669',
-                                    display: 'flex',
-                                    alignItems: 'center',
-                                    gap: 6
-                                }}>
-                                    ✓ {formData.comprobante.name}
-                                </div>
-                            )}
-                        </div>
-
-                        <div style={{ marginBottom: 32 }}>
-                            <label style={{ display: 'block', marginBottom: 8, fontWeight: 600 }}>
-                                Motivo (opcional)
-                            </label>
-                            <textarea
-                                value={formData.motivo}
-                                onChange={(e) => setFormData({ ...formData, motivo: e.target.value })}
-                                placeholder="Contanos por qué querés ser mentor de esta materia..."
-                                rows={4}
-                                style={{
-                                    width: '100%',
-                                    padding: 12,
-                                    border: '1px solid #d1d5db',
-                                    borderRadius: 8,
-                                    fontSize: 14,
-                                    resize: 'vertical',
-                                    fontFamily: 'inherit'
-                                }}
-                                disabled={loading}
-                            />
-                        </div>
-
-                        <Button
-                            type="submit"
-                            disabled={loading}
+                    {/* Calificación */}
+                    <div style={{ marginBottom: '28px' }}>
+                        <label style={{
+                            display: 'block',
+                            marginBottom: '10px',
+                            fontWeight: 600,
+                            fontSize: '14px',
+                            color: '#0f172a'
+                        }}>
+                            Calificación obtenida * (mínimo 9)
+                        </label>
+                        <input
+                            type="text"
+                            value={formData.calificacion}
+                            onChange={(e) => {
+                                const val = e.target.value;
+                                if (error) setError('');
+                                if (/^\d*$/.test(val)) {
+                                    setFormData({ ...formData, calificacion: val });
+                                }
+                            }}
+                            onBlur={() => {
+                                const num = Number(formData.calificacion);
+                                if (formData.calificacion !== '' && (num < 9 || num > 12)) {
+                                    setError('Por favor ingrese un valor entre 9 y 12');
+                                    setFormData({ ...formData, calificacion: '' });
+                                }
+                            }}
+                            placeholder="Ej: 10"
                             style={{
                                 width: '100%',
-                                padding: 14,
-                                background: loading ? '#9ca3af' : '#2563eb',
-                                color: '#fff',
-                                border: 'none',
-                                borderRadius: 8,
-                                fontWeight: 600,
-                                cursor: loading ? 'not-allowed' : 'pointer',
-                                fontSize: 16
+                                padding: '12px 16px',
+                                border: error && !formData.calificacion ? '2px solid #ef4444' : '2px solid #e2e8f0',
+                                borderRadius: '10px',
+                                fontSize: '14px',
+                                fontWeight: 500,
+                                color: '#0f172a',
+                                outline: 'none',
+                                transition: 'all 0.2s ease'
                             }}
-                        >
-                            {uploading ? 'Subiendo archivo...' : loading ? 'Enviando...' : 'Enviar postulación'}
-                        </Button>
-                    </form>
-                </Card>
+                            onFocus={(e) => {
+                                if (!error) {
+                                    e.currentTarget.style.borderColor = '#2563eb';
+                                    e.currentTarget.style.boxShadow = '0 0 0 3px rgba(37, 99, 235, 0.1)';
+                                }
+                            }}
+                            onBlur={(e) => {
+                                const num = Number(formData.calificacion);
+                                if (formData.calificacion !== '' && (num < 9 || num > 12)) {
+                                    setError('Por favor ingrese un valor entre 9 y 12');
+                                    setFormData({ ...formData, calificacion: '' });
+                                }
+                                e.currentTarget.style.borderColor = '#e2e8f0';
+                                e.currentTarget.style.boxShadow = 'none';
+                            }}
+                            disabled={loading}
+                        />
 
-                <Card style={{ marginTop: 20, padding: 20, background: '#f0f9ff', border: '1px solid #bfdbfe' }}>
-                    <h3 style={{ margin: '0 0 8px 0', color: '#1e40af' }}>Requisitos</h3>
-                    <ul style={{ margin: 0, paddingLeft: 20, color: '#1e3a8a' }}>
-                        <li>Calificación mínima de 8 en la materia</li>
-                        <li>Subir comprobante de tu escolaridad (foto de bedelía)</li>
-                        <li>Tu postulación será revisada por un administrador</li>
-                    </ul>
-                </Card>
-            </div>
-        );
-    }
+                        {/* Indicador de éxito */}
+                        {formData.calificacion && Number(formData.calificacion) >= 9 && Number(formData.calificacion) <= 12 && (
+                            <div style={{
+                                marginTop: '10px',
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: '8px',
+                                color: '#059669',
+                                fontSize: '13px',
+                                fontWeight: 600,
+                                animation: 'fadeIn 0.3s ease'
+                            }}>
+                                <FontAwesomeIcon icon={faCheckCircle} style={{ fontSize: '16px' }} />
+                                <span>Valor válido: {formData.calificacion}</span>
+                            </div>
+                        )}
+                    </div>
+
+                    {/* Upload de comprobante */}
+                    <div style={{ marginBottom: '28px' }}>
+                        <label style={{
+                            display: 'block',
+                            marginBottom: '10px',
+                            fontWeight: 600,
+                            fontSize: '14px',
+                            color: '#0f172a'
+                        }}>
+                            Comprobante de escolaridad * (foto/imagen)
+                        </label>
+                        <FileUploadZone
+                            file={formData.comprobante}
+                            onFileChange={handleFileChange}
+                            accept="image/*"
+                            maxSize={5}
+                            disabled={loading}
+                            error={fileError}
+                        />
+                    </div>
+
+                    {/* Motivo (opcional) */}
+                    <div style={{ marginBottom: '32px' }}>
+                        <label style={{
+                            display: 'block',
+                            marginBottom: '10px',
+                            fontWeight: 600,
+                            fontSize: '14px',
+                            color: '#0f172a'
+                        }}>
+                            Motivo (opcional)
+                        </label>
+                        <textarea
+                            value={formData.motivo}
+                            onChange={(e) => setFormData({ ...formData, motivo: e.target.value })}
+                            placeholder="Contanos por qué querés ser mentor de esta materia..."
+                            rows={4}
+                            style={{
+                                width: '100%',
+                                padding: '12px 16px',
+                                border: '2px solid #e2e8f0',
+                                borderRadius: '10px',
+                                fontSize: '14px',
+                                fontWeight: 500,
+                                color: '#0f172a',
+                                resize: 'vertical',
+                                fontFamily: 'Inter, -apple-system, sans-serif',
+                                outline: 'none',
+                                transition: 'all 0.2s ease',
+                                lineHeight: 1.6
+                            }}
+                            onFocus={(e) => {
+                                e.currentTarget.style.borderColor = '#2563eb';
+                                e.currentTarget.style.boxShadow = '0 0 0 3px rgba(37, 99, 235, 0.1)';
+                            }}
+                            onBlur={(e) => {
+                                e.currentTarget.style.borderColor = '#e2e8f0';
+                                e.currentTarget.style.boxShadow = 'none';
+                            }}
+                            disabled={loading}
+                        />
+                    </div>
+
+                    {/* Mensaje de error general */}
+                    {error && (
+                        <div style={{
+                            marginBottom: '24px',
+                            padding: '14px 16px',
+                            background: '#fef2f2',
+                            border: '2px solid #fecaca',
+                            borderRadius: '10px',
+                            display: 'flex',
+                            alignItems: 'flex-start',
+                            gap: '10px',
+                            animation: 'fadeIn 0.3s ease'
+                        }}>
+                            <FontAwesomeIcon
+                                icon={faExclamationCircle}
+                                style={{
+                                    color: '#dc2626',
+                                    fontSize: '18px',
+                                    marginTop: '1px',
+                                    flexShrink: 0
+                                }}
+                            />
+                            <span style={{
+                                color: '#dc2626',
+                                fontSize: '14px',
+                                fontWeight: 500,
+                                lineHeight: 1.5
+                            }}>
+                                {error}
+                            </span>
+                        </div>
+                    )}
+
+                    {/* Botón de envío */}
+                    <button
+                        type="submit"
+                        disabled={loading}
+                        style={{
+                            width: '100%',
+                            padding: '14px 24px',
+                            background: loading ? '#94a3b8' : '#2563eb',
+                            color: '#fff',
+                            border: 'none',
+                            borderRadius: '10px',
+                            fontWeight: 700,
+                            fontSize: '15px',
+                            cursor: loading ? 'not-allowed' : 'pointer',
+                            transition: 'all 0.2s ease',
+                            boxShadow: loading ? 'none' : '0 4px 12px rgba(37, 99, 235, 0.3)',
+                            fontFamily: 'Inter, -apple-system, sans-serif'
+                        }}
+                        onMouseEnter={(e) => {
+                            if (!loading) {
+                                e.currentTarget.style.transform = 'translateY(-2px)';
+                                e.currentTarget.style.boxShadow = '0 8px 20px rgba(37, 99, 235, 0.4)';
+                            }
+                        }}
+                        onMouseLeave={(e) => {
+                            if (!loading) {
+                                e.currentTarget.style.transform = 'translateY(0)';
+                                e.currentTarget.style.boxShadow = '0 4px 12px rgba(37, 99, 235, 0.3)';
+                            }
+                        }}
+                    >
+                        {uploading ? 'Subiendo archivo...' : loading ? 'Enviando...' : 'Enviar postulación'}
+                    </button>
+                </form>
+            </Card>
+
+            {/* Card de requisitos */}
+            <Card style={{
+                marginTop: '24px',
+                padding: '24px',
+                background: 'linear-gradient(135deg, #eff6ff 0%, #dbeafe 100%)',
+                border: '2px solid #bfdbfe'
+            }}>
+                <div style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '10px',
+                    marginBottom: '16px'
+                }}>
+                    <FontAwesomeIcon
+                        icon={faInfoCircle}
+                        style={{
+                            color: '#1e40af',
+                            fontSize: '20px'
+                        }}
+                    />
+                    <h3 style={{
+                        margin: 0,
+                        color: '#1e40af',
+                        fontSize: '17px',
+                        fontWeight: 700
+                    }}>
+                        Requisitos
+                    </h3>
+                </div>
+                <ul style={{
+                    margin: 0,
+                    paddingLeft: '20px',
+                    color: '#1e3a8a',
+                    fontSize: '14px',
+                    fontWeight: 500,
+                    lineHeight: 1.8
+                }}>
+                    <li>Calificación mínima de 9 en la materia</li>
+                    <li>Subir comprobante de tu escolaridad (foto que encontrás en el portal de la facultad)</li>
+                    <li>Tu postulación será revisada por un administrador</li>
+                </ul>
+            </Card>
+
+            {/* Keyframes para animaciones */}
+            <style>{`
+                @keyframes fadeIn {
+                    from { opacity: 0; transform: translateY(8px); }
+                    to { opacity: 1; transform: translateY(0); }
+                }
+                
+                @keyframes slideDown {
+                    from { opacity: 0; transform: translateY(-8px); }
+                    to { opacity: 1; transform: translateY(0); }
+                }
+                
+                @keyframes scaleIn {
+                    from { opacity: 0; transform: scale(0.8); }
+                    to { opacity: 1; transform: scale(1); }
+                }
+            `}</style>
+        </div>
+    );
+}
