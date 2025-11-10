@@ -17,24 +17,33 @@ export const slotsAPI = {
         });
 
         try {
+            // Función auxiliar: suma minutos a una hora y devuelve HH:mm
+            const sumarMinutos = (horaStr, minutos) => {
+                const [h, m] = horaStr.split(':').map(Number);
+                const total = h * 60 + m + minutos;
+                const hh = Math.floor(total / 60) % 24;
+                const mm = total % 60;
+                return `${String(hh).padStart(2, '0')}:${String(mm).padStart(2, '0')}`;
+            };
+
             const slotsParaGuardar = slotsConDuracion.map(slot => {
+                const duracion = slot.duracion || duracionDefault || 60;
+                const horaBase = slot.hora?.slice(0, 5); // quitar segundos si vinieran
+                const horaFin = horaBase ? sumarMinutos(horaBase, duracion) : null;
+
                 const slotData = {
                     id_mentor: mentorId,
-                    fecha: fecha,
-                    hora: slot.hora,
-                    duracion: slot.duracion || duracionDefault,
+                    fecha,
+                    hora: horaBase,
+                    hora_fin: horaFin,
+                    duracion,
                     modalidad: slot.modalidad || 'virtual',
                     disponible: true,
                     origen: 'manual'
                 };
 
-                // Solo agregar campos opcionales si existen en la tabla
-                if (slot.locacion !== undefined) {
-                    slotData.locacion = slot.locacion;
-                }
-                if (slot.max_alumnos !== undefined) {
-                    slotData.max_alumnos = slot.max_alumnos;
-                }
+                if (slot.locacion !== undefined) slotData.locacion = slot.locacion;
+                if (slot.max_alumnos !== undefined) slotData.max_alumnos = slot.max_alumnos;
 
                 console.log('📦 Slot preparado:', slotData);
                 return slotData;

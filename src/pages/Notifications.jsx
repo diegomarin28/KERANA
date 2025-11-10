@@ -13,6 +13,7 @@ import {
 import { useNotificationsContext } from '../contexts/NotificationsContext';
 import { getNotificationIcon } from '../utils/notificationRouter';
 import { useSeguidores } from '../hooks/useSeguidores';
+import {useMentorStatus} from "../hooks/useMentorStatus.js";
 
 export default function Notifications() {
     const navigate = useNavigate();
@@ -33,6 +34,7 @@ export default function Notifications() {
     } = useNotificationsContext();
 
     const { seguirUsuario, dejarDeSeguir, verificarSiSigue } = useSeguidores();
+    const { isMentor, loading: mentorLoading } = useMentorStatus(true);
 
     useEffect(() => {
         cargarNotificaciones();
@@ -65,14 +67,21 @@ export default function Notifications() {
             return;
         }
 
-        // Si YA está leída: ir al perfil (segundo click)
+        // ✅ ARREGLADO: Determinar si el emisor es mentor
         if (notif.emisor?.username) {
-            navigate(`/user/${notif.emisor.username}`);
+            // Verificar si el emisor es mentor
+            if (notif.emisor?.isMentor) {
+                navigate(`/mentor/${notif.emisor.username}`);
+            } else {
+                navigate(`/user/${notif.emisor.username}`);
+            }
+            return;
         }
 
         if (notif.tipo === 'mentor_nuevas_horas') {
             if (notif.emisor?.username) {
-                navigate(`/user/${notif.emisor.username}`);
+                // Los mentores siempre van a /mentor/:username
+                navigate(`/mentor/${notif.emisor.username}`);
             }
             return;
         }

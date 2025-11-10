@@ -291,7 +291,7 @@ export default function Header() {
         textDecoration: "none",
         whiteSpace: "nowrap",
         minWidth: 125,
-        height: 36,
+        height: 23,
         cursor: "pointer",
         appearance: "none",
         WebkitAppearance: "none",

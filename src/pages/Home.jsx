@@ -6,6 +6,7 @@ import { supabase } from "../supabase";
 import ApunteCard from "../components/ApunteCard.jsx";
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faLeaf, faTint, faCloud, faArrowRight } from '@fortawesome/free-solid-svg-icons';
+import { notesAPI } from "../api/database";
 
 export default function Home() {
     const [reveal, setReveal] = useState(false);
@@ -49,7 +50,7 @@ export default function Home() {
 
                 const apIds = data.map(d => d.apunte_id);
                 const { data: apuntes, error: apError } = await supabase
-                    .from('apuntes_completos')  // ← Vista que ya tiene todos los datos
+                    .from('apuntes_completos')
                     .select('*')
                     .in('id_apunte', apIds);
 
@@ -71,13 +72,23 @@ export default function Home() {
                     }
                 }
 
+
+                const likesPromises = data.map(note => notesAPI.getLikesCount(note.apunte_id));
+                const likesResults = await Promise.all(likesPromises);
+
+                const likesMap = new Map(
+                    data.map((note, idx) => [note.apunte_id, likesResults[idx].data])
+                );
+
+
                 const notesWithUrls = data.map(note => {
                     const apunte = apuntes.find(a => a.id_apunte === note.apunte_id);
                     return {
                         ...note,
                         usuario: apunte?.usuario || { nombre: 'Anónimo' },
                         signedUrl: urls[note.apunte_id] || null,
-                        thumbnail_path: apunte?.thumbnail_path || null
+                        thumbnail_path: apunte?.thumbnail_path || null,
+                        likes_count: likesMap.get(note.apunte_id) || 0
                     };
                 });
 
@@ -357,7 +368,8 @@ export default function Home() {
                                                 usuario: { nombre: n.usuario_nombre },
                                                 materia: { nombre_materia: n.nombre_materia },
                                                 signedUrl: n.signedUrl,
-                                                thumbnail_path: n.thumbnail_path
+                                                thumbnail_path: n.thumbnail_path,
+                                                likes_count: n.likes_count || 0
                                             }}
                                             currentUserId={currentUserId}
                                         />

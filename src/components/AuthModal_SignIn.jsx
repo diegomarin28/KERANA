@@ -204,6 +204,14 @@ export default function AuthModal_SignIn({ open, onClose, onSignedIn }) {
                         password: "Debe contener al menos: una minúscula (a-z), una mayúscula (A-Z) y un número (0-9)"
                     });
                 }
+
+                else if (authError.message.includes('Database error saving new user')) {
+                    setFieldErrors({
+                        ...fieldErrors,
+                        username: "Este nombre de usuario ya fue utilizado"
+                    });
+                }
+
                 else {
                     // Cualquier otro error de Supabase
                     setFieldErrors({ ...fieldErrors, password: "Error: " + authError.message });

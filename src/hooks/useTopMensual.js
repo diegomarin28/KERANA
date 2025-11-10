@@ -7,7 +7,6 @@ export function useTopMensual() {
     const [topData, setTopData] = useState(null);
     const [userPosition, setUserPosition] = useState(null);
     const [loading, setLoading] = useState(true);
-    const [calculating, setCalculating] = useState(false);
 
     useEffect(() => {
         checkAndShowTopMensual();
@@ -15,74 +14,45 @@ export function useTopMensual() {
 
     const checkAndShowTopMensual = async () => {
         try {
-            const hoy = new Date();
-            const dia = hoy.getDate();
-
-            // Solo mostrar entre día 1 y 5
-            if (dia > 5) {
-                setLoading(false);
-                return;
-            }
-
             // Mes anterior (el que se premia)
+            const hoy = new Date();
             const mesAnterior = new Date(hoy.getFullYear(), hoy.getMonth() - 1, 1);
             const mes = mesAnterior.getMonth() + 1;
             const año = mesAnterior.getFullYear();
 
-            // Verificar si el usuario ya vio el modal este mes
-            const storageKey = `top_mensual_visto_${mes}_${año}`;
+            // ✅ Verificar si ya lo vio este mes ACTUAL (no el anterior)
+            const mesActual = hoy.getMonth() + 1;
+            const añoActual = hoy.getFullYear();
+            const storageKey = `top_mensual_visto_${mesActual}_${añoActual}`;
             const yaVisto = localStorage.getItem(storageKey);
 
             if (yaVisto) {
+                console.log('✅ Ya viste el top este mes');
                 setLoading(false);
                 return;
             }
 
-            // Verificar si ya existe el top de este mes
+            // ✅ Obtener top del mes ANTERIOR
+            console.log(`📊 Buscando top de ${mes}/${año}...`);
             const { data: topExistente, error: topError } = await creditsAPI.getTopMensual(mes, año);
 
             if (topError) {
-                console.error('Error obteniendo top:', topError);
+                console.error('❌ Error obteniendo top:', topError);
                 setLoading(false);
                 return;
             }
 
-            // Si NO existe, calcular automáticamente
-            if (!topExistente || topExistente.length === 0) {
-                console.log(`📊 Top de ${mes}/${año} no existe, calculando...`);
-                setCalculating(true);
-
-                try {
-                    // Llamar a la Edge Function para calcular
-                    const { error: calcError } = await supabase.functions.invoke('calcular-top-mensual');
-
-                    if (calcError) {
-                        console.error('Error calculando top:', calcError);
-                        setLoading(false);
-                        setCalculating(false);
-                        return;
-                    }
-
-                    // Esperar un momento y volver a obtener
-                    await new Promise(resolve => setTimeout(resolve, 2000));
-
-                    const { data: topNuevo } = await creditsAPI.getTopMensual(mes, año);
-                    if (topNuevo && topNuevo.length > 0) {
-                        await showTopModal(topNuevo, mes, año, storageKey);
-                    }
-                } catch (error) {
-                    console.error('Error en cálculo automático:', error);
-                } finally {
-                    setCalculating(false);
-                }
-            } else {
-                // Ya existe, mostrar directamente
+            // ✅ Si existe, mostrar
+            if (topExistente && topExistente.length > 0) {
+                console.log('✅ Top encontrado, mostrando modal');
                 await showTopModal(topExistente, mes, año, storageKey);
+            } else {
+                console.log('⚠️ No hay top del mes anterior');
+                setLoading(false);
             }
 
         } catch (error) {
-            console.error('Error en checkAndShowTopMensual:', error);
-        } finally {
+            console.error('❌ Error en checkAndShowTopMensual:', error);
             setLoading(false);
         }
     };
@@ -106,8 +76,9 @@ export function useTopMensual() {
         setTopData({ rankings: topData, mes, año });
         setShowModal(true);
 
-        // Marcar como visto
+        // ✅ Marcar como visto ESTE MES (para que no aparezca más hasta el próximo mes)
         localStorage.setItem(storageKey, 'true');
+        setLoading(false);
     };
 
     const closeModal = () => {
@@ -119,7 +90,6 @@ export function useTopMensual() {
         topData,
         userPosition,
         loading,
-        calculating,
         closeModal
     };
 }

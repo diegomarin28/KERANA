@@ -560,7 +560,7 @@ export default function Profile() {
                         </div>
 
                         <div
-                            onClick={() => navigate('/following')}
+                            onClick={() => navigate('/followers')}
                             style={{
                                 textAlign: 'center',
                                 cursor: 'pointer',

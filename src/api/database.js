@@ -2053,23 +2053,31 @@ export const publicProfileAPI = {
         const { data, error } = await supabase
             .from('mentor')
             .select(`
-                id_mentor,
-                estrellas_mentor,
-                contacto,
-                descripcion
-            `)
+            id_mentor,
+            estrellas_mentor,
+            contacto,
+            descripcion,
+            usuario!mentor_id_usuario_fkey(bio, linkedin)
+        `)
             .eq('id_usuario', userId)
             .maybeSingle();
 
         if (error) return { data: null, error };
 
         if (data) {
+            // Traer la bio y linkedin desde el usuario
+            if (data.usuario) {
+                data.bio = data.usuario.bio;
+                data.linkedin = data.usuario.linkedin;
+                delete data.usuario; // Limpiar el objeto anidado
+            }
+
             const { data: materias } = await supabase
                 .from('mentor_materia')
                 .select(`
-                    id_materia,
-                    materia(nombre_materia, semestre)
-                `)
+                id_materia,
+                materia(nombre_materia, semestre)
+            `)
                 .eq('id_mentor', data.id_mentor);
 
             data.materias = materias || [];

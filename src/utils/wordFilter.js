@@ -4,8 +4,7 @@ const PALABRAS_PROHIBIDAS = [
     'puta', 'puto', 'hdp', 'hijo de puta', 'hija de puta',
     'pelotudo', 'pelotuda', 'boludo', 'boluda', 'forro', 'forra',
     'gil', 'gila', 'mogolico', 'mogolica', 'idiota', 'imbecil',
-    'tarado', 'tarada', 'retrasado', 'retrasada', 'mogolico', 'trolo', 'fuck', 'shit', 'asshole', 'bitch', 'idiot, ' +
-    'motherfucker', 'carajo',
+    'tarado', 'tarada', 'retrasado', 'retrasada', 'mogolico', 'trolo', 'fuck', 'shit', 'asshole', 'bitch', 'idiot', 'motherfucker', 'carajo',
 
     // Variantes con números/símbolos
     'mrd', 'h.d.p', 'put@', 'put4', 'c0ncha', 'p3lotudo',
@@ -22,9 +21,8 @@ const PALABRAS_PROHIBIDAS = [
     'coje', 'cojer', 'garchar', 'culear', 'folla', 'follar'
 ];
 
-/**
- * Normaliza texto para comparación (remueve tildes, convierte a minúsculas)
- */
+//Normaliza texto para comparación (remueve tildes, convierte a minúsculas)
+
 const normalizarTexto = (texto) => {
     return texto
         .toLowerCase()
@@ -32,11 +30,8 @@ const normalizarTexto = (texto) => {
         .replace(/[\u0300-\u036f]/g, ''); // Remueve tildes
 };
 
-/**
- * Verifica si un texto contiene palabras prohibidas
- * @param {string} texto - Texto a verificar
- * @returns {Object} { contiene: boolean, palabrasEncontradas: string[] }
- */
+//Verifica si un texto contiene palabras prohibidas
+
 export const contienePalabrasProhibidas = (texto) => {
     if (!texto || typeof texto !== 'string') {
         return { contiene: false, palabrasEncontradas: [] };

@@ -54,14 +54,14 @@ export default function ReviewsSection({
                                            onMateriaChange,
                                            onAddReview,
                                            onReviewDeleted,
-                                           onEditReview
+                                           onEditReview,
+                                           isMentorProfile = false
                                        }) {
     const [materiasNames, setMateriasNames] = useState({});
     const [currentUserId, setCurrentUserId] = useState(null);
     const [deleteModalOpen, setDeleteModalOpen] = useState(false);
     const [reviewToDelete, setReviewToDelete] = useState(null);
     const [deleting, setDeleting] = useState(false);
-    const { isMentor, loading: mentorLoading } = useMentorStatus(true);
 
     useEffect(() => {
         loadMateriasNames();
@@ -199,7 +199,7 @@ export default function ReviewsSection({
                     onClick={onAddReview}
                     style={{
                         padding: '12px 24px',
-                        background: isMentor ? '#0d9488' : '#2563eb',
+                        background: isMentorProfile ? '#0d9488' : '#2563eb',
                         color: '#fff',
                         border: 'none',
                         borderRadius: 12,
@@ -363,7 +363,7 @@ export default function ReviewsSection({
                             onClick={onAddReview}
                             style={{
                                 padding: '12px 24px',
-                                background: isMentor ? '#0d9488' : '#2563eb',
+                                background: isMentorProfile ? '#0d9488' : '#2563eb',
                                 color: '#fff',
                                 border: 'none',
                                 borderRadius: 12,
@@ -377,7 +377,7 @@ export default function ReviewsSection({
                                 gap: 8
                             }}
                             onMouseEnter={(e) => {
-                                e.target.style.background = isMentor ? '#14b8a6' : '#1e40af';
+                                e.target.style.background = isMentorProfile ? '#0d9488' : '#2563eb',
                                 e.target.style.transform = 'translateY(-2px)';
                                 e.target.style.boxShadow = '0 8px 20px rgba(37, 99, 235, 0.3)';
                             }}

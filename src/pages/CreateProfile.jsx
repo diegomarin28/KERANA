@@ -2,6 +2,18 @@ import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '../supabase';
 import { useAvatar } from '../contexts/AvatarContext';
+import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
+import {
+    faSmileBeam,
+    faCamera,
+    faPenToSquare,
+    faLink,
+    faXmark,
+    faHourglassHalf,
+    faCloudArrowUp,
+    faCheckCircle,
+    faLightbulb,
+} from '@fortawesome/free-solid-svg-icons';
 
 export default function CreateProfile() {
     const [formData, setFormData] = useState({
@@ -41,7 +53,6 @@ export default function CreateProfile() {
             setUserName(profile.nombre || 'Usuario');
             setCurrentAvatar(profile.foto);
 
-            // Si ya completó el perfil (tiene foto Y bio), redirigir a home
             if (profile.foto && profile.bio) {
                 navigate('/');
                 return;
@@ -131,7 +142,6 @@ export default function CreateProfile() {
 
             let avatarUrl = currentAvatar;
 
-            // Si hay un nuevo avatar, subirlo
             if (preview) {
                 avatarUrl = await uploadAvatar();
                 if (!avatarUrl) {
@@ -140,7 +150,6 @@ export default function CreateProfile() {
                 }
             }
 
-            // Actualizar perfil (todos los campos son opcionales)
             const updateData = {
                 foto: avatarUrl || null,
                 bio: formData.bio.trim() || null,
@@ -154,7 +163,6 @@ export default function CreateProfile() {
 
             if (error) throw error;
 
-            // Actualizar contexto si hay avatar
             if (avatarUrl) {
                 updateAvatar(avatarUrl);
             }
@@ -188,16 +196,16 @@ export default function CreateProfile() {
     return (
         <div style={pageStyle}>
             <div style={containerStyle}>
-                {/* Header con bienvenida */}
                 <div style={headerStyle}>
                     <div style={badgeStyle}>KERANA</div>
-                    <h1 style={titleStyle}>¡Bienvenido, {userName}! 🎉</h1>
+                    <h1 style={titleStyle}>
+                        ¡Bienvenido, {userName}! <FontAwesomeIcon icon={faSmileBeam} />
+                    </h1>
                     <p style={subtitleStyle}>
                         Completá tu perfil para aprovechar al máximo Kerana
                     </p>
                 </div>
 
-                {/* Card principal */}
                 <div style={cardStyle}>
                     {message.text && (
                         <div style={{
@@ -210,9 +218,10 @@ export default function CreateProfile() {
                     )}
 
                     <form onSubmit={handleSubmit} style={formStyle}>
-                        {/* Avatar */}
                         <div style={sectionStyle}>
-                            <label style={labelStyle}>📸 Foto de perfil (opcional)</label>
+                            <label style={labelStyle}>
+                                <FontAwesomeIcon icon={faCamera} /> Foto de perfil (opcional)
+                            </label>
                             <p style={hintStyle}>
                                 Agregá una foto para que otros usuarios te reconozcan, o mantené tu inicial
                             </p>
@@ -250,16 +259,17 @@ export default function CreateProfile() {
                                             }}
                                             style={cancelButtonStyle}
                                         >
-                                            ✕ Cancelar
+                                            <FontAwesomeIcon icon={faXmark} /> Cancelar
                                         </button>
                                     )}
                                 </div>
                             </div>
                         </div>
 
-                        {/* Bio */}
                         <div style={sectionStyle}>
-                            <label style={labelStyle}>📝 Biografía (opcional)</label>
+                            <label style={labelStyle}>
+                                <FontAwesomeIcon icon={faPenToSquare} /> Biografía (opcional)
+                            </label>
                             <p style={hintStyle}>
                                 Contanos un poco sobre vos (máx. 160 caracteres)
                             </p>
@@ -279,9 +289,10 @@ export default function CreateProfile() {
                             </div>
                         </div>
 
-                        {/* LinkedIn */}
                         <div style={sectionStyle}>
-                            <label style={labelStyle}>🔗 LinkedIn (opcional)</label>
+                            <label style={labelStyle}>
+                                <FontAwesomeIcon icon={faLink} /> LinkedIn (opcional)
+                            </label>
                             <p style={hintStyle}>
                                 Compartí tu perfil profesional
                             </p>
@@ -297,14 +308,25 @@ export default function CreateProfile() {
                             />
                         </div>
 
-                        {/* Botones */}
                         <div style={buttonsContainerStyle}>
                             <button
                                 type="submit"
                                 disabled={saving || uploading}
                                 style={saving || uploading ? primaryButtonDisabledStyle : primaryButtonStyle}
                             >
-                                {saving ? '⏳ Guardando...' : uploading ? '📤 Subiendo foto...' : '✅ Completar perfil'}
+                                {saving ? (
+                                    <>
+                                        <FontAwesomeIcon icon={faHourglassHalf} /> Guardando...
+                                    </>
+                                ) : uploading ? (
+                                    <>
+                                        <FontAwesomeIcon icon={faCloudArrowUp} /> Subiendo foto...
+                                    </>
+                                ) : (
+                                    <>
+                                        <FontAwesomeIcon icon={faCheckCircle} /> Completar perfil
+                                    </>
+                                )}
                             </button>
                             <button
                                 type="button"
@@ -318,16 +340,16 @@ export default function CreateProfile() {
                     </form>
                 </div>
 
-                {/* Footer con info */}
                 <div style={footerInfoStyle}>
                     <p style={footerTextStyle}>
-                        💡 <strong>Tip:</strong> Completar tu perfil te ayuda a ganar confianza en la comunidad
+                        <FontAwesomeIcon icon={faLightbulb} /> <strong>Tip:</strong> Completar tu perfil te ayuda a ganar confianza en la comunidad
                     </p>
                 </div>
             </div>
         </div>
     );
 }
+
 
 // 🎨 ESTILOS
 const pageStyle = {

@@ -4,6 +4,7 @@ import { supabase } from '../supabase';
 import { creditsAPI } from '../api/database';
 import { Card } from '../components/UI/Card';
 import FileDrop from "../components/FileDrop";
+import { Button } from '../components/UI/Button';
 import { useNotificationSound } from '../hooks/useNotificationSound';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faCheckCircle, faCloudUploadAlt, faFileAlt, faLightbulb, faCheck } from '@fortawesome/free-solid-svg-icons';
@@ -407,7 +408,7 @@ export default function Upload() {
 
                         {/* Botón */}
                         <Button
-                            onClick={() => navigate('/')}
+                            onClick={() => navigate("/")}
                             style={{
                                 padding: '14px 32px',
                                 background: '#2563eb',

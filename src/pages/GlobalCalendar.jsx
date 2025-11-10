@@ -9,7 +9,7 @@ import {
     faCalendar, faChevronLeft, faChevronRight, faClock,
     faUser, faBook, faCheckCircle, faTimes, faVideo,
     faBuilding, faUsers, faFilter, faXmark, faEnvelope,
-    faFileAlt, faDollarSign, faHome, faUniversity, faAngleDown
+    faFileAlt, faSpinner, faHome, faUniversity, faAngleDown
 } from '@fortawesome/free-solid-svg-icons';
 import { SlotSelector } from '../components/SlotSelector';
 import { calcularPrecioPorDuracion, formatearPrecio } from '../utils/preciosHelper';
@@ -86,7 +86,7 @@ export function GlobalCalendar() {
 
     // Autocompletar email del usuario
     useEffect(() => {
-        if (showConfirmModal && currentUserId && emailsParticipantes.length === 1 && !emailsParticipantes[0]) {
+        if (showConfirmModal && currentUserId && slotSeleccionadoParaReserva) {
             const fetchUserEmail = async () => {
                 const { data } = await supabase
                     .from('usuario')
@@ -94,10 +94,15 @@ export function GlobalCalendar() {
                     .eq('id_usuario', currentUserId)
                     .single();
 
-                if (data?.correo && slotSeleccionadoParaReserva?.modalidad === 'virtual') {
-                    // Solo autocompletar si es email institucional
-                    if (data.correo.endsWith('@correo.um.edu.uy')) {
+                if (data?.correo) {
+                    // SOLO autocompletar el PRIMER email (del usuario actual)
+                    // Y SOLO si es virtual y es email institucional
+                    if (slotSeleccionadoParaReserva.modalidad === 'virtual' &&
+                        data.correo.endsWith('@correo.um.edu.uy')) {
                         setEmailsParticipantes([data.correo]);
+                    } else {
+                        // Si es presencial o no es email institucional, dejar vacío
+                        setEmailsParticipantes(['']);
                     }
                 }
             };
@@ -197,12 +202,14 @@ export function GlobalCalendar() {
 
     const validarFormulario = () => {
         const errores = {};
-        const esVirtual = selectedSlot?.modalidad === 'virtual';
+        const esVirtual = slotSeleccionadoParaReserva?.modalidad === 'virtual';
 
         emailsParticipantes.forEach((email, index) => {
             if (!email.trim()) {
                 errores[`email_${index}`] = 'El email es obligatorio';
             } else {
+                // ✅ SI ES VIRTUAL: obligar @correo.um.edu.uy
+                // ✅ SI ES PRESENCIAL: validación genérica
                 const ok = esVirtual ? validarEmailInstitucional(email) : validarEmailGenerico(email);
                 if (!ok) {
                     errores[`email_${index}`] = esVirtual
@@ -219,14 +226,19 @@ export function GlobalCalendar() {
     const handleNumPersonasChange = (cantidad) => {
         setNumPersonas(cantidad);
 
-        const nuevosEmails = [...emailsParticipantes];
-        if (cantidad > emailsParticipantes.length) {
-            while (nuevosEmails.length < cantidad) {
-                nuevosEmails.push('');
-            }
-        } else {
-            nuevosEmails.length = cantidad;
+        const nuevosEmails = [];
+        const esVirtual = slotSeleccionadoParaReserva?.modalidad === 'virtual';
+
+        // ✅ PRIMER email: autocompletado con el del usuario SI es virtual + institucional
+        // (esto se maneja en el useEffect de línea ~91)
+        // Aquí solo inicializamos con vacío por si acaso
+        nuevosEmails.push(emailsParticipantes[0] || '');
+
+        // ✅ RESTO de emails: siempre vacíos
+        for (let i = 1; i < cantidad; i++) {
+            nuevosEmails.push('');
         }
+
         setEmailsParticipantes(nuevosEmails);
         setErroresValidacion({});
     };
@@ -265,41 +277,78 @@ export function GlobalCalendar() {
                 .eq('disponible', true)
                 .single();
 
-            if (!slot) return false;
+            if (!slot) {
+                console.log('❌ Slot no encontrado o no disponible');
+                return false;
+            }
+
+            // Calcular hora_fin si es null (usando duración)
+            let slotHoraFin = slot.hora_fin;
+            if (!slotHoraFin && slot.duracion) {
+                const inicioMin = timeToMinutes(slot.hora);
+                const finMin = inicioMin + slot.duracion;
+                slotHoraFin = minutesToTime(finMin);
+            }
+
+            if (!slotHoraFin) {
+                console.log('❌ No se pudo determinar hora_fin del slot');
+                return false;
+            }
+
+            // Normalizar formatos (quitar segundos)
+            const normalizeTime = (time) => time ? time.substring(0, 5) : time;
 
             // Verificar que el rango solicitado esté dentro del slot disponible
-            const slotInicioMin = timeToMinutes(slot.hora);
-            const slotFinMin = timeToMinutes(slot.hora_fin);
-            const reservaInicioMin = timeToMinutes(horaInicio);
-            const reservaFinMin = timeToMinutes(horaFin);
+            const slotInicioMin = timeToMinutes(normalizeTime(slot.hora));
+            const slotFinMin = timeToMinutes(normalizeTime(slotHoraFin));
+            const reservaInicioMin = timeToMinutes(normalizeTime(horaInicio));
+            const reservaFinMin = timeToMinutes(normalizeTime(horaFin));
+
+            console.log('🔍 Verificando rango:', {
+                slot: `${normalizeTime(slot.hora)} - ${normalizeTime(slotHoraFin)} (${slotInicioMin} - ${slotFinMin} min)`,
+                reserva: `${normalizeTime(horaInicio)} - ${normalizeTime(horaFin)} (${reservaInicioMin} - ${reservaFinMin} min)`,
+                valido: reservaInicioMin >= slotInicioMin && reservaFinMin <= slotFinMin
+            });
 
             return (
                 reservaInicioMin >= slotInicioMin &&
                 reservaFinMin <= slotFinMin
             );
         } catch (error) {
-            console.error('Error verificando disponibilidad:', error);
+            console.error('❌ Error verificando disponibilidad:', error);
             return false;
         }
     };
 
-    /**
-     * Valida que haya tiempo suficiente entre slots presenciales
-     * en ubicaciones diferentes (V3)
-     */
     const validarUbicacionPresencialUsuario = async (mentorId, fecha, horaInicio, locacion) => {
         if (!locacion) return { valido: true };
 
         try {
+            // ✅ Si no hay mentorId, no intentamos consultar
+            if (!mentorId) {
+                console.warn('⚠️ validarUbicacionPresencialUsuario: mentorId es undefined, se asume válido');
+                return { valido: true };
+            }
+
+            // 🔧 Normalizar hora para Supabase (asegura formato HH:mm:ss)
+            const ensureHHMMSS = (t) => (t && t.length === 5 ? `${t}:00` : t);
+            const horaInicioParam = ensureHHMMSS(horaInicio);
+
+
             // Buscar slots ocupados anteriores en el mismo día
-            const { data: slotsAnteriores } = await supabase
+            const { data: slotsAnteriores, error } = await supabase
                 .from('slots_disponibles')
                 .select('*')
                 .eq('id_mentor', mentorId)
                 .eq('fecha', fecha)
                 .eq('disponible', false)
                 .eq('modalidad', 'presencial')
-                .lt('hora_fin', horaInicio);
+                .lt('hora_fin', horaInicioParam); // ✅ formato corregido
+
+            if (error) {
+                console.error('❌ Error validando ubicación presencial:', error);
+                return { valido: false, mensaje: 'Error validando disponibilidad presencial' };
+            }
 
             if (!slotsAnteriores || slotsAnteriores.length === 0) {
                 return { valido: true };
@@ -334,11 +383,28 @@ export function GlobalCalendar() {
         }
     };
 
-    /**
-     * Divide el slot disponible y crea la reserva
-     * Elimina fragmentos < 60 min (V2)
-     */
-    const dividirYReservarSlot = async (slotOriginal, horaInicio, horaFin, duracion, userId) => {
+
+    const dividirYReservarSlot = async (slotOriginalIn, horaInicio, horaFin, duracion, userId) => {
+        // 🔧 Normaliza "HH:MM" -> "HH:MM:SS"
+        const toHHMMSS = (h) => (h && h.length === 5 ? `${h}:00` : h);
+
+        // 🧱 Asegurar que tenemos id_mentor y fecha; si faltan, los traemos por id_slot
+        let slotOriginal = slotOriginalIn;
+        if (!slotOriginal?.id_mentor || !slotOriginal?.fecha) {
+            const { data, error } = await supabase
+                .from('slots_disponibles')
+                .select('id_slot, id_mentor, fecha, hora, hora_fin, duracion, modalidad, locacion, max_alumnos, disponible')
+                .eq('id_slot', slotOriginalIn.id_slot)
+                .single();
+
+            if (error || !data) {
+                console.error('❌ No pude cargar el slot original', error || slotOriginalIn);
+                throw new Error('No se pudo cargar el slot original');
+            }
+            slotOriginal = data;
+        }
+
+        // ⏱️ Cálculos en minutos
         const inicioSlot = timeToMinutes(slotOriginal.hora);
         const finSlot = timeToMinutes(slotOriginal.hora_fin);
         const inicioReserva = timeToMinutes(horaInicio);
@@ -354,10 +420,7 @@ export function GlobalCalendar() {
         const fragmentoInicial = inicioReserva - inicioSlot;
         const fragmentoFinal = finSlot - finReserva;
 
-        console.log('📊 Fragmentos:', {
-            inicial: fragmentoInicial,
-            final: fragmentoFinal
-        });
+        console.log('📊 Fragmentos:', { inicial: fragmentoInicial, final: fragmentoFinal });
 
         // PASO 2: Eliminar slot original
         const { error: errorDelete } = await supabase
@@ -379,8 +442,8 @@ export function GlobalCalendar() {
                 .insert({
                     id_mentor: slotOriginal.id_mentor,
                     fecha: slotOriginal.fecha,
-                    hora: slotOriginal.hora,
-                    hora_fin: horaInicio,
+                    hora: toHHMMSS(slotOriginal.hora),
+                    hora_fin: toHHMMSS(horaInicio),
                     duracion: fragmentoInicial,
                     modalidad: slotOriginal.modalidad,
                     locacion: slotOriginal.locacion,
@@ -397,26 +460,40 @@ export function GlobalCalendar() {
             console.log(`⏭️ Fragmento inicial descartado (${fragmentoInicial}min < 60min)`);
         }
 
-        // PASO 4: Crear registro de reserva
+        // PASO 4: INSERT de la RESERVA (acá va el insert que te fallaba)
+        console.log('📝 Intentando INSERT con datos:', {
+            id_mentor: slotOriginal.id_mentor,
+            fecha: slotOriginal.fecha,
+            hora: toHHMMSS(horaInicio),
+            hora_fin: toHHMMSS(horaFin),
+            duracion,
+            modalidad: slotOriginal.modalidad,
+            locacion: slotOriginal.locacion,
+            max_alumnos: slotOriginal.max_alumnos,
+            disponible: false,
+            reservado_por: userId
+        });
+
         const { data: reserva, error: errorReserva } = await supabase
             .from('slots_disponibles')
             .insert({
                 id_mentor: slotOriginal.id_mentor,
                 fecha: slotOriginal.fecha,
-                hora: horaInicio,
-                hora_fin: horaFin,
-                duracion: duracion,
+                hora: toHHMMSS(horaInicio),
+                hora_fin: toHHMMSS(horaFin),
+                duracion,
                 modalidad: slotOriginal.modalidad,
                 locacion: slotOriginal.locacion,
                 max_alumnos: slotOriginal.max_alumnos,
                 disponible: false,
-                reservado_por: userId
+                reservado_por: userId,
+                origen: 'manual'
             })
             .select()
             .single();
 
         if (errorReserva) {
-            console.error('❌ Error creando reserva:', errorReserva);
+            console.error('🧩 Detalle del errorReserva:', JSON.stringify(errorReserva, null, 2));
             throw new Error('No se pudo crear la reserva');
         }
 
@@ -429,8 +506,8 @@ export function GlobalCalendar() {
                 .insert({
                     id_mentor: slotOriginal.id_mentor,
                     fecha: slotOriginal.fecha,
-                    hora: horaFin,
-                    hora_fin: slotOriginal.hora_fin,
+                    hora: toHHMMSS(horaFin),
+                    hora_fin: toHHMMSS(slotOriginal.hora_fin),
                     duracion: fragmentoFinal,
                     modalidad: slotOriginal.modalidad,
                     locacion: slotOriginal.locacion,
@@ -449,6 +526,7 @@ export function GlobalCalendar() {
 
         return reserva;
     };
+
 
     const loadAvailability = async () => {
         const now = new Date();
@@ -650,6 +728,9 @@ export function GlobalCalendar() {
     };
 
     const handleBooking = async (datosReserva) => {
+        console.log('📦 Datos recibidos en handleBooking:', datosReserva);
+        console.log('📦 Slot seleccionado:', slotSeleccionadoParaReserva);
+
         if (!selectedMentor || !slotSeleccionadoParaReserva || !currentEstudianteId) {
             setErrorMessage('Datos de reserva incompletos');
             setShowErrorModal(true);
@@ -665,14 +746,22 @@ export function GlobalCalendar() {
         setIsBooking(true);
         setValidandoReserva(true);
 
+        // Helpers de tiempo
+        const normalizeTime = (t) => (t ? t.substring(0, 5) : t);      // -> "HH:mm"
+        const ensureHHMMSS = (t) => (t ? (t.length === 5 ? `${t}:00` : t) : t); // -> "HH:mm:ss"
+
         try {
             console.log('🎯 Iniciando reserva:', datosReserva);
 
-            // VALIDACIÓN 1: Verificar disponibilidad del rango completo
+            // Normalizaciones para validaciones
+            const horaInicioNorm = normalizeTime(datosReserva.horaInicio); // "HH:mm"
+            const horaFinNorm    = normalizeTime(datosReserva.horaFin);    // "HH:mm"
+
+            // VALIDACIÓN 1: rango disponible
             const rangoDisponible = await verificarDisponibilidadRango(
                 slotSeleccionadoParaReserva.id_slot,
-                datosReserva.horaInicio,
-                datosReserva.horaFin
+                horaInicioNorm,
+                horaFinNorm
             );
 
             if (!rangoDisponible) {
@@ -680,15 +769,14 @@ export function GlobalCalendar() {
                 setShowErrorModal(true);
                 return;
             }
-
             console.log('✅ Rango disponible verificado');
 
-            // VALIDACIÓN 2: Ubicación presencial (si aplica)
+            // VALIDACIÓN 2: ubicación presencial (si aplica)
             if (slotSeleccionadoParaReserva.modalidad === 'presencial') {
                 const validacion = await validarUbicacionPresencialUsuario(
                     slotSeleccionadoParaReserva.id_mentor,
                     formatDateKey(selectedDate),
-                    datosReserva.horaInicio,
+                    ensureHHMMSS(horaInicioNorm), // le pasamos HH:mm:ss por si la función arma queries
                     slotSeleccionadoParaReserva.locacion
                 );
 
@@ -697,48 +785,68 @@ export function GlobalCalendar() {
                     setShowErrorModal(true);
                     return;
                 }
-
                 console.log('✅ Validación de ubicación presencial OK');
             }
 
-            // DIVISIÓN Y RESERVA DEL SLOT
+            // DIVIDIR Y RESERVAR SLOT (tu función ya anda OK)
             const reservaCreada = await dividirYReservarSlot(
                 slotSeleccionadoParaReserva,
-                datosReserva.horaInicio,
+                datosReserva.horaInicio, // mantiene tu flujo actual
                 datosReserva.horaFin,
                 datosReserva.duracion,
                 currentEstudianteId
             );
-
             console.log('✅ Slot dividido y reservado:', reservaCreada);
 
-            // TODO: INTEGRAR MERCADO PAGO AQUÍ
-            const pagoExitoso = true; // ⚠️ CAMBIAR cuando integres MP
-
+            // (MP pendiente)
+            const pagoExitoso = true;
             if (!pagoExitoso) {
                 setErrorMessage('El pago no pudo ser procesado');
                 setShowErrorModal(true);
                 return;
             }
 
-            // CREAR SESIÓN
-            const fechaHora = `${formatDateKey(selectedDate)}T${datosReserva.horaInicio}`;
+            // Timestamp para la sesión (usar HH:mm:ss)
+            const fechaHora = `${formatDateKey(selectedDate)}T${ensureHHMMSS(horaInicioNorm)}`;
+
+            // Resolver mentorId de forma segura (evita eq.undefined)
+            const mentorId =
+                reservaCreada?.id_mentor ??
+                slotSeleccionadoParaReserva?.id_mentor ??
+                selectedMentor?.id_mentor ??
+                null;
+
+            console.log('🔎 mentorId sources:', {
+                fromReserva: reservaCreada?.id_mentor,
+                fromSlot: slotSeleccionadoParaReserva?.id_mentor,
+                fromSelected: selectedMentor?.id_mentor
+            });
+
+            if (!mentorId) {
+                setErrorMessage('No se pudo identificar el mentor del slot');
+                setShowErrorModal(true);
+                return;
+            }
+
+            // Crear sesión
+            const payloadSesion = {
+                id_mentor: mentorId,
+                id_alumno: currentEstudianteId,
+                id_materia: selectedMentor.materiaId,
+                fecha_hora: fechaHora,
+                duracion_minutos: datosReserva.duracion,
+                estado: 'confirmada',
+                pagado: true,
+                precio: datosReserva.precio,
+                cantidad_alumnos: numPersonas,
+                emails_participantes: emailsParticipantes,
+                descripcion_alumno: descripcionSesion.trim() || null
+            };
+            console.log('🧾 Payload mentor_sesion:', payloadSesion);
 
             const { data: nuevaSesion, error: errorSesion } = await supabase
                 .from('mentor_sesion')
-                .insert({
-                    id_mentor: slotSeleccionadoParaReserva.id_mentor,
-                    id_alumno: currentEstudianteId,
-                    id_materia: selectedMentor.materiaId,
-                    fecha_hora: fechaHora,
-                    duracion_minutos: datosReserva.duracion,
-                    estado: 'confirmada',
-                    pagado: true,
-                    precio: datosReserva.precio,
-                    cantidad_alumnos: numPersonas,
-                    emails_participantes: emailsParticipantes,
-                    descripcion_alumno: descripcionSesion.trim() || null
-                })
+                .insert(payloadSesion)
                 .select()
                 .single();
 
@@ -746,7 +854,6 @@ export function GlobalCalendar() {
                 console.error('❌ Error creando sesión:', errorSesion);
                 throw errorSesion;
             }
-
             console.log('✅ Sesión creada:', nuevaSesion);
 
             // NOTIFICACIÓN AL MENTOR
@@ -754,7 +861,7 @@ export function GlobalCalendar() {
                 const { data: mentorUser } = await supabase
                     .from('mentor')
                     .select('id_usuario')
-                    .eq('id_mentor', slotSeleccionadoParaReserva.id_mentor)
+                    .eq('id_mentor', mentorId)      // ✅ usar mentorId resuelto
                     .single();
 
                 const { data: estudianteData } = await supabase
@@ -783,7 +890,7 @@ export function GlobalCalendar() {
                 const { data: mentorData } = await supabase
                     .from('mentor')
                     .select('id_usuario, usuario:id_usuario(nombre, correo)')
-                    .eq('id_mentor', slotSeleccionadoParaReserva.id_mentor)
+                    .eq('id_mentor', mentorId)      // ✅ usar mentorId resuelto
                     .single();
 
                 const { data: alumnoData } = await supabase
@@ -807,7 +914,7 @@ export function GlobalCalendar() {
                         alumnoNombre: alumnoData.nombre,
                         materiaNombre: selectedMentor.materia,
                         fecha: fechaFormateada,
-                        hora: datosReserva.horaInicio,
+                        hora: horaInicioNorm,               // mostrás sin segundos
                         duracion: datosReserva.duracion,
                         cantidadAlumnos: numPersonas,
                         emailsParticipantes: emailsParticipantes,
@@ -819,12 +926,10 @@ export function GlobalCalendar() {
                 console.error('⚠️ Error enviando emails (no crítico):', emailError);
             }
 
-            // CERRAR MODALES Y MOSTRAR ÉXITO
+            // Cierre y refresh
             setShowConfirmModal(false);
             setShowSuccessModal(true);
             resetModal();
-
-            // RECARGAR DISPONIBILIDAD
             await loadAvailability();
 
         } catch (error) {
@@ -836,6 +941,7 @@ export function GlobalCalendar() {
             setValidandoReserva(false);
         }
     };
+
 
     if (loading) return (
         <div style={{
@@ -1476,7 +1582,7 @@ export function GlobalCalendar() {
                         {/* Contenido */}
                         <div style={{ padding: '20px 24px' }}>
 
-                            {/* Info del mentor y materia */}
+                            {/* Info del mentor y materia CON badge de modalidad a la derecha */}
                             <div style={{
                                 display: 'flex',
                                 gap: '12px',
@@ -1484,111 +1590,119 @@ export function GlobalCalendar() {
                                 padding: '14px',
                                 background: '#f8fafc',
                                 borderRadius: '10px',
-                                border: '2px solid #e2e8f0'
+                                border: '2px solid #e2e8f0',
+                                justifyContent: 'space-between',
+                                alignItems: 'center'
                             }}>
-                                <div style={{
-                                    width: '44px',
-                                    height: '44px',
-                                    borderRadius: '50%',
-                                    background: 'linear-gradient(135deg, #2563eb 0%, #1e40af 100%)',
-                                    display: 'flex',
-                                    alignItems: 'center',
-                                    justifyContent: 'center',
-                                    color: '#fff',
-                                    fontSize: '18px',
-                                    fontWeight: 700,
-                                    flexShrink: 0
-                                }}>
-                                    {selectedMentor.mentorName?.charAt(0).toUpperCase()}
-                                </div>
-                                <div style={{ flex: 1, minWidth: 0 }}>
+                                {/* Izquierda: Avatar + Info */}
+                                <div style={{ display: 'flex', gap: '12px', flex: 1, minWidth: 0 }}>
                                     <div style={{
-                                        fontSize: '15px',
+                                        width: '44px',
+                                        height: '44px',
+                                        borderRadius: '50%',
+                                        background: 'linear-gradient(135deg, #2563eb 0%, #1e40af 100%)',
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        justifyContent: 'center',
+                                        color: '#fff',
+                                        fontSize: '18px',
                                         fontWeight: 700,
-                                        color: '#0f172a',
-                                        fontFamily: 'Inter, -apple-system, sans-serif',
-                                        marginBottom: '2px',
-                                        overflow: 'hidden',
-                                        textOverflow: 'ellipsis',
-                                        whiteSpace: 'nowrap'
+                                        flexShrink: 0
                                     }}>
-                                        {selectedMentor.mentorName}
+                                        {selectedMentor.mentorName?.charAt(0).toUpperCase()}
                                     </div>
-                                    <div style={{
-                                        fontSize: '13px',
-                                        color: '#64748b',
-                                        fontFamily: 'Inter, -apple-system, sans-serif',
-                                        display: 'flex',
-                                        alignItems: 'center',
-                                        gap: '5px',
-                                        marginBottom: '2px'
-                                    }}>
-                                        <FontAwesomeIcon icon={faBook} style={{ fontSize: '10px' }} />
-                                        {selectedMentor.materia}
-                                    </div>
-                                    <div style={{
-                                        fontSize: '12px',
-                                        color: '#64748b',
-                                        fontFamily: 'Inter, -apple-system, sans-serif',
-                                        display: 'flex',
-                                        alignItems: 'center',
-                                        gap: '5px'
-                                    }}>
-                                        <FontAwesomeIcon icon={faCalendar} style={{ fontSize: '10px' }} />
-                                        {selectedDate.toLocaleDateString('es-UY', {
-                                            day: 'numeric',
-                                            month: 'long'
-                                        })}
-                                    </div>
-                                    <div style={{
-                                        marginBottom: '20px',
-                                        padding: '14px',
-                                        background: slotSeleccionadoParaReserva.modalidad === 'virtual'
-                                            ? 'linear-gradient(135deg, #dbeafe 0%, #bfdbfe 100%)'
-                                            : 'linear-gradient(135deg, #d1fae5 0%, #a7f3d0 100%)',
-                                        border: slotSeleccionadoParaReserva.modalidad === 'virtual'
-                                            ? '2px solid #93c5fd'
-                                            : '2px solid #6ee7b7',
-                                        borderRadius: '10px',
-                                        display: 'flex',
-                                        alignItems: 'center',
-                                        gap: '12px'
-                                    }}>
-                                        <FontAwesomeIcon
-                                            icon={slotSeleccionadoParaReserva.modalidad === 'virtual' ? faVideo : faBuilding}
-                                            style={{
-                                                fontSize: '20px',
-                                                color: slotSeleccionadoParaReserva.modalidad === 'virtual' ? '#1e40af' : '#065f46'
-                                            }}
-                                        />
-                                        <div style={{ flex: 1 }}>
-                                            <div style={{
-                                                fontSize: '15px',
-                                                fontWeight: 700,
-                                                color: slotSeleccionadoParaReserva.modalidad === 'virtual' ? '#1e40af' : '#065f46',
-                                                fontFamily: 'Inter, sans-serif'
-                                            }}>
-                                                Modalidad: {slotSeleccionadoParaReserva.modalidad === 'virtual' ? 'Virtual' : 'Presencial'}
-                                            </div>
-                                            {slotSeleccionadoParaReserva.modalidad === 'presencial' && slotSeleccionadoParaReserva.locacion && (
-                                                <div style={{
-                                                    fontSize: '13px',
-                                                    color: '#065f46',
-                                                    fontWeight: 500,
-                                                    marginTop: '4px',
-                                                    display: 'flex',
-                                                    alignItems: 'center',
-                                                    gap: '6px'
-                                                }}>
-                                                    <FontAwesomeIcon
-                                                        icon={slotSeleccionadoParaReserva.locacion === 'casa' ? faHome : faUniversity}
-                                                        style={{ fontSize: '11px' }}
-                                                    />
-                                                    {slotSeleccionadoParaReserva.locacion === 'casa' ? 'Casa del mentor' : 'Facultad'}
-                                                </div>
-                                            )}
+                                    <div style={{ flex: 1, minWidth: 0 }}>
+                                        <div style={{
+                                            fontSize: '15px',
+                                            fontWeight: 700,
+                                            color: '#0f172a',
+                                            fontFamily: 'Inter, -apple-system, sans-serif',
+                                            marginBottom: '2px',
+                                            overflow: 'hidden',
+                                            textOverflow: 'ellipsis',
+                                            whiteSpace: 'nowrap'
+                                        }}>
+                                            {selectedMentor.mentorName}
+                                        </div>
+                                        <div style={{
+                                            fontSize: '13px',
+                                            color: '#64748b',
+                                            fontFamily: 'Inter, -apple-system, sans-serif',
+                                            display: 'flex',
+                                            alignItems: 'center',
+                                            gap: '5px',
+                                            marginBottom: '2px'
+                                        }}>
+                                            <FontAwesomeIcon icon={faBook} style={{ fontSize: '10px' }} />
+                                            {selectedMentor.materia}
+                                        </div>
+                                        <div style={{
+                                            fontSize: '12px',
+                                            color: '#64748b',
+                                            fontFamily: 'Inter, -apple-system, sans-serif',
+                                            display: 'flex',
+                                            alignItems: 'center',
+                                            gap: '5px'
+                                        }}>
+                                            <FontAwesomeIcon icon={faCalendar} style={{ fontSize: '10px' }} />
+                                            {selectedDate.toLocaleDateString('es-UY', {
+                                                day: 'numeric',
+                                                month: 'long'
+                                            })}
                                         </div>
                                     </div>
+                                </div>
+
+                                {/* Derecha: Badge de modalidad */}
+                                <div style={{
+                                    padding: '10px 16px',
+                                    background: slotSeleccionadoParaReserva.modalidad === 'virtual'
+                                        ? '#dbeafe'
+                                        : '#dbeafe',
+                                    border: slotSeleccionadoParaReserva.modalidad === 'virtual'
+                                        ? '2px solid #93c5fd'
+                                        : '2px solid #93c5fd',
+                                    borderRadius: '10px',
+                                    display: 'flex',
+                                    flexDirection: 'column',
+                                    alignItems: 'center',
+                                    gap: '4px',
+                                    flexShrink: 0
+                                }}>
+                                    <FontAwesomeIcon
+                                        icon={slotSeleccionadoParaReserva.modalidad === 'virtual' ? faVideo : faBuilding}
+                                        style={{
+                                            fontSize: '18px',
+                                            color: '#1e40af'
+                                        }}
+                                    />
+                                    <div style={{
+                                        fontSize: '12px',
+                                        fontWeight: 700,
+                                        color: '#1e40af',
+                                        fontFamily: 'Inter, sans-serif',
+                                        textAlign: 'center',
+                                        whiteSpace: 'nowrap'
+                                    }}>
+                                        {slotSeleccionadoParaReserva.modalidad === 'virtual' ? 'Virtual' : 'Presencial'}
+                                    </div>
+                                    {slotSeleccionadoParaReserva.modalidad === 'presencial' && slotSeleccionadoParaReserva.locacion && (
+                                        <div style={{
+                                            fontSize: '10px',
+                                            color: '#64748b',
+                                            fontWeight: 500,
+                                            textAlign: 'center',
+                                            display: 'flex',
+                                            alignItems: 'center',
+                                            gap: '4px'
+                                        }}>
+                                            <FontAwesomeIcon
+                                                icon={slotSeleccionadoParaReserva.locacion === 'casa' ? faHome : faUniversity}
+                                                style={{ fontSize: '9px' }}
+                                            />
+                                            {slotSeleccionadoParaReserva.locacion === 'casa' ? 'Casa' : 'Facultad'}
+                                        </div>
+                                    )}
                                 </div>
                             </div>
 
@@ -1656,58 +1770,83 @@ export function GlobalCalendar() {
                             </div>
 
                             {/* Emails participantes (si más de 1 persona) */}
-                            {numPersonas > 1 && (
-                                <div style={{ marginBottom: '20px' }}>
-                                    <label style={{
-                                        display: 'flex',
-                                        alignItems: 'center',
-                                        gap: '7px',
-                                        marginBottom: '10px',
-                                        fontSize: '13px',
-                                        fontWeight: 700,
-                                        color: '#0f172a',
-                                        fontFamily: 'Inter, -apple-system, sans-serif'
-                                    }}>
-                                        <FontAwesomeIcon icon={faEnvelope} style={{ color: '#2563eb', fontSize: '13px' }} />
-                                        Emails de participantes adicionales
-                                    </label>
-                                    {Array.from({ length: numPersonas - 1 }).map((_, index) => (
+                            {/* Emails participantes */}
+                            <div style={{ marginBottom: '20px' }}>
+                                <label style={{
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    gap: '7px',
+                                    marginBottom: '10px',
+                                    fontSize: '13px',
+                                    fontWeight: 700,
+                                    color: '#0f172a',
+                                    fontFamily: 'Inter, -apple-system, sans-serif'
+                                }}>
+                                    <FontAwesomeIcon icon={faEnvelope} style={{ color: '#2563eb', fontSize: '13px' }} />
+                                    Emails de participantes {slotSeleccionadoParaReserva?.modalidad === 'virtual' && '(institucionales obligatorios)'}
+                                </label>
+
+                                {Array.from({ length: numPersonas }).map((_, index) => (
+                                    <div key={index} style={{ marginBottom: '8px' }}>
                                         <input
-                                            key={index}
                                             type="email"
-                                            placeholder={`Email participante ${index + 2}`}
+                                            placeholder={index === 0
+                                                ? 'Tu email'
+                                                : `Email participante ${index + 1}`
+                                            }
                                             value={emailsParticipantes[index] || ''}
-                                            onChange={(e) => {
-                                                const newEmails = [...emailsParticipantes];
-                                                newEmails[index] = e.target.value;
-                                                setEmailsParticipantes(newEmails);
-                                            }}
+                                            onChange={(e) => handleEmailChange(index, e.target.value)}
                                             disabled={isBooking}
                                             style={{
                                                 width: '100%',
                                                 padding: '11px',
                                                 borderRadius: '10px',
-                                                border: '2px solid #e2e8f0',
+                                                border: erroresValidacion[`email_${index}`]
+                                                    ? '2px solid #ef4444'
+                                                    : '2px solid #e2e8f0',
                                                 fontSize: '13px',
                                                 fontFamily: 'Inter, -apple-system, sans-serif',
-                                                marginBottom: '8px',
                                                 outline: 'none',
-                                                transition: 'all 0.2s ease'
+                                                transition: 'all 0.2s ease',
+                                                background: '#fff'
                                             }}
-                                            onFocus={e => e.target.style.borderColor = '#2563eb'}
-                                            onBlur={e => e.target.style.borderColor = '#e2e8f0'}
+                                            onFocus={e => {
+                                                if (!erroresValidacion[`email_${index}`]) {
+                                                    e.target.style.borderColor = '#2563eb';
+                                                }
+                                            }}
+                                            onBlur={e => {
+                                                if (!erroresValidacion[`email_${index}`]) {
+                                                    e.target.style.borderColor = '#e2e8f0';
+                                                }
+                                            }}
                                         />
-                                    ))}
-                                    <p style={{
-                                        margin: '6px 0 0 0',
-                                        fontSize: '11px',
-                                        color: '#64748b',
-                                        fontFamily: 'Inter, -apple-system, sans-serif'
-                                    }}>
-                                        Recomendamos utilizar emails institucionales @correo.um.edu.uy
-                                    </p>
-                                </div>
-                            )}
+                                        {erroresValidacion[`email_${index}`] && (
+                                            <p style={{
+                                                margin: '4px 0 0 0',
+                                                fontSize: '11px',
+                                                color: '#ef4444',
+                                                fontWeight: 600,
+                                                fontFamily: 'Inter, -apple-system, sans-serif'
+                                            }}>
+                                                {erroresValidacion[`email_${index}`]}
+                                            </p>
+                                        )}
+                                    </div>
+                                ))}
+
+                                <p style={{
+                                    margin: '6px 0 0 0',
+                                    fontSize: '11px',
+                                    color: '#64748b',
+                                    fontFamily: 'Inter, -apple-system, sans-serif'
+                                }}>
+                                    {slotSeleccionadoParaReserva?.modalidad === 'virtual'
+                                        ? 'Obligatorio usar emails @correo.um.edu.uy para sesiones virtuales'
+                                        : 'Usa cualquier email válido para sesiones presenciales'
+                                    }
+                                </p>
+                            </div>
 
                             {/* Descripción opcional */}
                             <div style={{ marginBottom: '20px' }}>

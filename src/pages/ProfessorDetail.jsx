@@ -490,10 +490,7 @@ export default function ProfessorDetail() {
                             borderRadius: 12,
                             border: '2px solid #e5e7eb'
                         }}>
-                            <FontAwesomeIcon
-                                icon={faStar}
-                                style={{ fontSize: 18, color: '#f59e0b' }}
-                            />
+
                             <StarDisplay rating={averageRating} size={20} />
                             <span style={{
                                 fontWeight: 700,

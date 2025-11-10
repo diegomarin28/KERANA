@@ -597,8 +597,8 @@ export default function MyCalendar() {
         const horaInicio = hora;
         const horaFin = slotHoraFin[slotKey];
 
-        if (horaInicio) setRangoHoraInicio(horaInicio);
-        if (horaFin) setRangoHoraFin(horaFin);
+        if (horaInicio) setRangoHoraInicio(horaInicio.slice(0, 5));
+        if (horaFin) setRangoHoraFin(horaFin.slice(0, 5));
 
         // Cargar configuraciones
         const modalidad = slotModalidades[slotKey] || getDefaultModalidad();
@@ -659,11 +659,9 @@ export default function MyCalendar() {
         }
 
         // Validar solapamiento con slots existentes
-        const resultadoSolapa = verificarSolapamientoConHoraFin(
-            dateKey,
-            rangoHoraInicio,
-            rangoHoraFin
-        );
+        const resultadoSolapa = editingSlotKey
+            ? { solapa: false }  // Si editas, permitir solapamiento con el mismo slot
+            : verificarSolapamientoConHoraFin(dateKey, rangoHoraInicio, rangoHoraFin);
 
         if (resultadoSolapa.solapa) {
             const conflicto = resultadoSolapa.slotConflicto;
@@ -698,8 +696,8 @@ export default function MyCalendar() {
         try {
             // Preparar datos del slot
             const slotData = {
-                hora: rangoHoraInicio,
-                hora_fin: rangoHoraFin,
+                hora: rangoHoraInicio.slice(0, 5),
+                hora_fin: rangoHoraFin.slice(0, 5),
                 duracion: duracionRango,
                 modalidad: modalidadElegida,
                 locacion: locacionElegida,
@@ -759,6 +757,7 @@ export default function MyCalendar() {
             setTimeout(() => setSuccess(''), 3000);
             setShowTimeSelector(false);
             setSelectedDate(null);
+            setEditingSlotKey(null);
 
             // Recargar slots
             loadSavedSlots();
@@ -1401,7 +1400,7 @@ export default function MyCalendar() {
                                                 onClick={handleEditExisting}
                                                 style={{
                                                     padding: '6px 12px',
-                                                    background: '#2563eb',
+                                                    background: '#94a3b8',
                                                     color: '#fff',
                                                     border: 'none',
                                                     borderRadius: 8,
@@ -1416,11 +1415,13 @@ export default function MyCalendar() {
                                                 }}
                                                 onMouseEnter={e => {
                                                     e.target.style.transform = 'translateY(-2px)';
-                                                    e.target.style.boxShadow = '0 4px 12px rgba(37, 99, 235, 0.3)';
+                                                    e.target.style.boxShadow = '0 4px 12px rgba(148, 163, 184, 0.3)';
+                                                    e.target.style.background = '#64748b';
                                                 }}
                                                 onMouseLeave={e => {
                                                     e.target.style.transform = 'translateY(0)';
                                                     e.target.style.boxShadow = 'none';
+                                                    e.target.style.background = '#94a3b8';
                                                 }}
                                             >
                                                 <FontAwesomeIcon icon={faEdit} style={{ fontSize: 11 }} />
@@ -1522,14 +1523,33 @@ export default function MyCalendar() {
                                 startTime={rangoHoraInicio}
                                 endTime={rangoHoraFin}
                                 onStartChange={(newStart) => {
+                                    const oldSlotKey = `${formatDateKey(selectedDate)}-${rangoHoraInicio}`;
+                                    const newSlotKey = `${formatDateKey(selectedDate)}-${newStart}`;
+
+                                    // Preservar modalidad, locación y max_alumnos del slot anterior
+                                    const modalidadActual = slotModalidades[oldSlotKey] || getDefaultModalidad();
+                                    const locacionActual = slotLocaciones[oldSlotKey];
+                                    const maxAlumnosActual = slotMaxAlumnos[oldSlotKey] || mentorInfo.max_alumnos;
+
                                     setRangoHoraInicio(newStart);
-                                    const slotKey = `${formatDateKey(selectedDate)}-${newStart}`;
-                                    if (!slotModalidades[slotKey]) {
-                                        setSlotModalidades(prev => ({
+
+                                    // Solo actualizar si NO existe o copiar del anterior
+                                    setSlotModalidades(prev => ({
+                                        ...prev,
+                                        [newSlotKey]: modalidadActual
+                                    }));
+
+                                    if (modalidadActual === 'presencial' && locacionActual) {
+                                        setSlotLocaciones(prev => ({
                                             ...prev,
-                                            [slotKey]: getDefaultModalidad()
+                                            [newSlotKey]: locacionActual
                                         }));
                                     }
+
+                                    setSlotMaxAlumnos(prev => ({
+                                        ...prev,
+                                        [newSlotKey]: maxAlumnosActual
+                                    }));
                                 }}
                                 onEndChange={(newFin) => setRangoHoraFin(newFin)}
                                 modalidad={slotModalidades[`${formatDateKey(selectedDate)}-${rangoHoraInicio}`] || getDefaultModalidad()}
@@ -2070,7 +2090,7 @@ export default function MyCalendar() {
                                                                                             style={{
                                                                                                 marginTop: 4,
                                                                                                 padding: '4px 8px',
-                                                                                                background: '#2563eb',
+                                                                                                background: '#94a3b8',
                                                                                                 color: '#fff',
                                                                                                 border: 'none',
                                                                                                 borderRadius: 6,
@@ -2085,11 +2105,11 @@ export default function MyCalendar() {
                                                                                                 gap: 4
                                                                                             }}
                                                                                             onMouseEnter={(e) => {
-                                                                                                e.currentTarget.style.background = '#1e40af';
+                                                                                                e.currentTarget.style.background = '#64748b';
                                                                                                 e.currentTarget.style.transform = 'translateY(-1px)';
                                                                                             }}
                                                                                             onMouseLeave={(e) => {
-                                                                                                e.currentTarget.style.background = '#2563eb';
+                                                                                                e.currentTarget.style.background = '#94a3b8';
                                                                                                 e.currentTarget.style.transform = 'translateY(0)';
                                                                                             }}
                                                                                         >

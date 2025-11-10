@@ -4,7 +4,7 @@ import { Card } from '../components/UI/Card';
 import { MentorCard } from '../components/MentorCard';
 import { useNavigate } from 'react-router-dom';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faSearch, faGraduationCap, faFilter, faCalendarAlt, faChevronDown, faList, faCalendarDay } from '@fortawesome/free-solid-svg-icons';
+import { faSearch, faGraduationCap, faFilter, faCalendarAlt, faChevronDown, faList, faCalendarDay, faStar, faCalendarDays } from '@fortawesome/free-solid-svg-icons';
 import MentorCalendarModal from '../components/MentorCalendarModal';
 import { slotsAPI } from '../api/slots.js';
 
@@ -758,7 +758,7 @@ export default function Mentors() {
                                         fontSize: '22px',
                                         fontWeight: 700
                                     }}>
-                                        📅 Mentores Disponibles
+                                        <FontAwesomeIcon icon={faCalendarDays} /> Mentores Disponibles
                                     </h2>
                                     <div style={{
                                         fontSize: '14px',
@@ -914,12 +914,13 @@ export default function Mentors() {
                                                 gap: '6px',
                                                 marginBottom: '16px'
                                             }}>
-                                                <span style={{
-                                                    color: mentor.estrellas_mentor > 0 ? '#fbbf24' : '#d1d5db',
-                                                    fontSize: '18px'
-                                                }}>
-                                                    ⭐
-                                                </span>
+                                                <FontAwesomeIcon
+                                                    icon={faStar}
+                                                    style={{
+                                                        color: mentor.estrellas_mentor > 0 ? '#fbbf24' : '#d1d5db',
+                                                        fontSize: '18px'
+                                                    }}
+                                                />
                                                 <span style={{
                                                     fontWeight: 700,
                                                     fontSize: '16px',
@@ -952,8 +953,8 @@ export default function Mentors() {
                                                 justifyContent: 'center',
                                                 gap: '8px'
                                             }}>
-                                                <span>📅</span>
-                                                Ver calendario y agendar
+                                                    <FontAwesomeIcon icon={faCalendarDays} />
+                                                    Ver calendario y agendar
                                             </div>
                                         </div>
                                     ))}
@@ -968,7 +969,7 @@ export default function Mentors() {
                                             fontSize: '64px',
                                             marginBottom: '16px'
                                         }}>
-                                            📅
+                                            <FontAwesomeIcon icon={faCalendarDays} />
                                         </div>
                                         <h3 style={{
                                             margin: '0 0 12px 0',

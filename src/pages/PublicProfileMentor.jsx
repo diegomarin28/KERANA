@@ -76,6 +76,7 @@ export default function PublicProfileMentor() {
     const [editingReview, setEditingReview] = useState(null);
     const [materiasNamesForReviews, setMateriasNamesForReviews] = useState({});
 
+
     useEffect(() => {
         fetchProfileData();
     }, [username]);
@@ -99,6 +100,7 @@ export default function PublicProfileMentor() {
             setStats(statsData);
             const { data: mentorData } = await publicProfileAPI.checkIfMentor(userId);
             setMentorInfo(mentorData);
+
 
             // Cargar reseñas del mentor
             if (mentorData?.id_mentor) {
@@ -593,10 +595,44 @@ export default function PublicProfileMentor() {
                         </div>
                         <div style={profileInfoContainerStyle}>
                             <div style={profileInfoLeftStyle}>
+
                                 <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap', marginBottom: 8 }}>
                                     <h1 style={nameStyle}>{profile.nombre}</h1>
+                                    {mentorInfo?.estrellas_mentor > 0 && (
+                                        <div style={{
+                                            display: 'inline-flex',
+                                            alignItems: 'center',
+                                            gap: 4,
+                                            padding: '4px 10px',
+                                            background: '#f0fdfa',
+                                            borderRadius: 8,
+                                            border: '1px solid #99f6e4'
+                                        }}>
+                                            <FontAwesomeIcon icon={faStar} style={{ fontSize: 12, color: '#F59E0B' }} />
+                                            <span style={{ fontSize: 13, fontWeight: 700, color: '#0d9488' }}>
+                        {mentorInfo.estrellas_mentor.toFixed(1)}
+                    </span>
+                                        </div>
+                                    )}
                                 </div>
+
+                                {/* ⭐ AGREGAR ESTO: */}
                                 <p style={usernameStyle}>@{profile.username}</p>
+
+                                {/* Biografía del mentor */}
+                                {mentorInfo?.bio && (
+                                    <p style={{
+                                        margin: '12px 0 16px 0',
+                                        fontSize: '14px',
+                                        lineHeight: 1.6,
+                                        color: '#4b5563',
+                                        fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, sans-serif',
+                                        maxWidth: '600px'
+                                    }}>
+                                        {mentorInfo.bio}
+                                    </p>
+                                )}
+
                                 {badges.length > 0 && (
                                     <div style={badgesContainerStyle}>
                                         {badges.map((badge, idx) => (
@@ -607,6 +643,7 @@ export default function PublicProfileMentor() {
                                         ))}
                                     </div>
                                 )}
+
                                 {/* LINKEDIN BUTTON */}
                                 {profile.linkedin && (
                                     <a
@@ -614,6 +651,7 @@ export default function PublicProfileMentor() {
                                         target="_blank"
                                         rel="noopener noreferrer"
                                         style={linkedinButtonStyle}
+                                        // ... resto del código
                                         onMouseEnter={(e) => {
                                             e.currentTarget.style.background = '#0a66c2';
                                             e.currentTarget.style.color = 'white';
@@ -626,17 +664,6 @@ export default function PublicProfileMentor() {
                                         <FontAwesomeIcon icon={faLinkedin} style={{ fontSize: 16 }} />
                                         Ver LinkedIn
                                     </a>
-                                )}
-                                {mentorInfo?.estrellas_mentor > 0 && (
-                                    <div style={mentorRatingInlineStyle}>
-                                        <FontAwesomeIcon icon={faStar} style={{ fontSize: 20, color: '#F59E0B' }} />
-                                        <span style={{ fontSize: 18, fontWeight: 700, color: '#0d9488' }}>{mentorInfo.estrellas_mentor.toFixed(1)}</span>
-                                        {mentorInfo.materias?.length > 0 && (
-                                            <span style={{ fontSize: 14, color: '#666' }}>
-                                                / 5.0 · {mentorInfo.materias.length} {mentorInfo.materias.length === 1 ? 'materia' : 'materias'}
-                                            </span>
-                                        )}
-                                    </div>
                                 )}
                                 <div style={metaInfoStyle}>
                                     <div style={metaItemStyle}>
@@ -777,19 +804,6 @@ export default function PublicProfileMentor() {
                         </div>
 
                         <div style={mentorCardStyle}>
-                            {mentorInfo.estrellas_mentor > 0 && (
-                                <div style={mentorRatingCardStyle}>
-                                    <FontAwesomeIcon icon={faStar} style={{ fontSize: 32, color: '#F59E0B' }} />
-                                    <div>
-                                        <div style={{ fontSize: 36, fontWeight: 800, color: '#0d9488' }}>
-                                            {mentorInfo.estrellas_mentor.toFixed(1)}
-                                        </div>
-                                        <div style={{ fontSize: 14, color: '#666', fontWeight: 600 }}>
-                                            Calificación promedio
-                                        </div>
-                                    </div>
-                                </div>
-                            )}
                             <div style={{
                                 display: 'grid',
                                 gap: 20,
@@ -822,7 +836,7 @@ export default function PublicProfileMentor() {
                             </div>
                         </div>
                     </div>
-                    )}
+                )}
 
                 {tab === 'apuntes' && (
                     <div style={{ marginTop: 24 }}>
@@ -938,6 +952,7 @@ export default function PublicProfileMentor() {
                             onAddReview={() => setShowReviewModal(true)}
                             onReviewDeleted={handleReviewDeleted}
                             onEditReview={handleEditReview}
+                            isMentorProfile={true}
                         />
                     </div>
                 )}
